@@ -1131,7 +1131,7 @@ public sealed class GraphWorkspace : UserControl
     {
         try
         {
-            if (!Clipboard.TryGetData<string>(GraphClipboard.FormatName, out string? payload) || payload is null) { SetMessage("Copy nodes in Audio Mixer before pasting."); return; }
+            if (!Clipboard.TryGetData<string>(GraphClipboard.FormatName, out string? payload) || payload is null) { SetMessage("Copy nodes in Vine Mix before pasting."); return; }
             int repeat = payload == _lastPastedPayload ? _pasteRepeat : 0;
             Point target = anchor ?? (_viewport.IsMouseOver ? ToWorld(Mouse.GetPosition(_viewport)) : VisibleCenter());
             if (anchor is null) target += new Vector(repeat * 24, repeat * 24);

@@ -35,7 +35,7 @@ public partial class MainWindow : Window
         NativeCaption.Attach(this, 4 + TitleBarHeight + 1 + GraphWorkspace.ToolbarHeight - NativeCaption.ResizeBorderSize, resizable: true);
         _mixer = mixer; InitializeComponent(); DataContext = mixer;
         SaveIndicator.SetBinding(TextBlock.TextProperty, new Binding(nameof(MixerViewModel.SaveStatus)) { Converter = CompactSaveStatus.Instance });
-        if (mixer.IsPreview) Title = "Audio Mixer · UI Preview";
+        if (mixer.IsPreview) Title = "Vine Mix · UI Preview";
         var minimise = NativeCaption.WindowButton(this, close: false);
         minimise.Margin = new Thickness(0, 0, 6, 0);
         WindowActions.Children.Add(minimise);
@@ -171,7 +171,7 @@ public partial class MainWindow : Window
     internal static ContextMenu CreateSettingsMenu(MixerViewModel mixer, Action<string, bool>? feedback = null, Action? showHelp = null, Action? findNode = null)
     {
         var menu = new ContextMenu { Width = 340 };
-        AutomationProperties.SetName(menu, "Audio Mixer settings");
+        AutomationProperties.SetName(menu, "Vine Mix settings");
         MenuItem Preference(string title, string property, string help, ItemCollection? items = null)
         {
             var item = new MenuItem { Header = title, IsCheckable = true, StaysOpenOnClick = true,
@@ -194,7 +194,7 @@ public partial class MainWindow : Window
         Preference("Show advanced inputs and outputs", nameof(MixerViewModel.ShowAdvancedAudioDevices),
             "Show line-level inputs, network or telephone endpoints, and S/PDIF or digital passthrough devices. Ordinary microphones, speakers, headphones and HDMI outputs remain visible; unclassified active devices also remain visible. Availability controls still apply.", visibility.Items);
         menu.Items.Add(visibility);
-        var startup = Preference("Start Audio Mixer when I sign in", nameof(MixerViewModel.StartAtLogin),
+        var startup = Preference("Start Vine Mix when I sign in", nameof(MixerViewModel.StartAtLogin),
             "Automatically start the mixer when you sign in to Windows.");
         startup.SetBinding(IsEnabledProperty, new Binding(nameof(MixerViewModel.CanEdit)) { Source = mixer });
         menu.Items.Add(new Separator());

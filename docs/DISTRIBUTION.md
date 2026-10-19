@@ -1,24 +1,23 @@
 # Distribution and attribution
 
 Reviewed 19 October 2026 against the dependencies and assets in this repository.
-This records the checked distribution setup and its limits. The full upstream
+This records Vine Mix's distribution setup and its limits. The full upstream
 licences, rather than this summary, govern each component.
 
 ## Source repository
 
 Keep the root `LICENSE`, `THIRD_PARTY_NOTICES.md`, the complete `licenses/`
 directory and `desktop/AudioMixer.Desktop/Assets/Fonts/LICENSE.txt` in source
-copies. The root licence covers the application's original material; it does
+copies. The root MIT licence covers Vine Mix's original material; it does
 not relicense the embedded fonts, dependencies, runtime components or cited
 third-party material. Preserve upstream copyright and licence headers if
 vendoring dependency source in future.
 
-The initial repository reserves rights to the original application code pending
-the owner's choice of a public source licence. Publishing source or possessing
-this checkout does not grant reuse or redistribution rights to that original
-material beyond the root `LICENSE`. The permissive licences of dependencies do
-not grant those rights on the application's behalf. The owner can change the
-original-code licence when making a public release.
+Vine Mix's original code and documentation are released under the MIT licence,
+copyright (c) 2026 acoyeen. It permits reuse, modification and redistribution,
+including commercial distribution, subject to its terms. Keep its copyright
+and permission notice in copies or substantial portions of that material.
+Third-party components retain their own terms and notices alongside it.
 
 The repository excludes local build tools, downloaded archives, compiled
 packages, user settings, activation backups and historical design captures.
@@ -66,7 +65,7 @@ later published. Do not apply the application licence to that image.
 
 ## Drivers and commercial use
 
-Distribute Audio Mixer without driver installers or driver binaries. Users
+Distribute Vine Mix without driver installers or driver binaries. Users
 obtain their chosen virtual audio driver directly from the vendor. The
 application's source licence grants no extra rights to a driver or another
 vendor's branding.
@@ -75,7 +74,7 @@ vendor's branding.
 donationware, professional-use and distribution conditions. Its A+B/C+D driver
 packages cannot be bundled with another product under the published terms.
 [VAC Lite](https://vac.muzychenko.net/en/license.txt) is restricted to private
-home use without income generation. A source release of Audio Mixer does not
+home use without income generation. A source release of Vine Mix does not
 require distributing either driver; a commercial user must choose a driver
 licence suitable for that user's activity.
 

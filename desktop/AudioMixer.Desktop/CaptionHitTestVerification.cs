@@ -97,7 +97,7 @@ internal static class CaptionHitTestVerification
                         if (buttonBounds.Values.Any(bounds => bounds.Contains(point))) continue;
                         if (Classify(point) != "CAPTION") failures.Add($"Empty/passive {point} -> {Classify(point)}");
                     }
-                    require(passive.Any(text => text.Text == "Audio Mixer")
+                    require(passive.Any(text => text.Text == "Vine Mix")
                         && passive.Any(text => text.Name == "SaveIndicator")
                         && passive.Any(text => BindingOperations.GetBinding(text, TextBlock.TextProperty)?.Path?.Path == nameof(MixerViewModel.Warning))
                         && failures.Count == 0,

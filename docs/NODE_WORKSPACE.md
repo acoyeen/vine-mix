@@ -1,4 +1,4 @@
-# Audio Mixer — node workspace
+# Vine Mix — node workspace
 
 This development changes the mixer from a fixed console into an editable audio
 graph. The earlier two-microphone/two-output limit is superseded by spawnable

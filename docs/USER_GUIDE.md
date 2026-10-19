@@ -1,4 +1,4 @@
-# Audio Mixer user guide
+# Vine Mix user guide
 
 A Windows 11 audio mixer built around draggable nodes and visible audio cables.
 Create sources, processing chains and destinations on a resizable node canvas, with
@@ -271,7 +271,7 @@ capture and audible routing still require the deferred qualification session.
 
 After building, launch **`artifacts/AudioMixer/AudioMixer.exe`**. The native engine
 is alongside it, and the package includes the .NET desktop runtime. Closing the
-window hides it to the tray; right-click its tray icon and choose **Quit Audio Mixer** to stop audio. Start at
+window hides it to the tray; right-click its tray icon and choose **Quit Vine Mix** to stop audio. Start at
 login is optional and off by default.
 
 ```powershell

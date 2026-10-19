@@ -58,13 +58,14 @@ Local evidence, excluded from Git:
 - `artifacts/repository-native-review-20261019/results.json`
 - `artifacts/repository-desktop-review-20261019-222017/results.json`
 - `artifacts/repository-desktop-review-20261019-222017/model-copy-performance.json`
+- `artifacts/vine-mix-brand-verification-20261019-224422/results.json`
 - `artifacts/lifecycle-coarse-verification/` (four full lifecycle passes)
 
 ## Distribution and limits
 
 See [DISTRIBUTION.md](DISTRIBUTION.md) and
-[THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md). Original application rights
-are reserved until the owner chooses another licence. Vendor driver installers
+[THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md). Vine Mix's original application
+is licensed under MIT, as selected by the owner. Vendor driver installers
 are not distributed. Their licence restrictions remain separate from this app.
 
 This was a targeted maintenance and provenance review, not an exhaustive security,

@@ -426,7 +426,7 @@ public sealed class MixerViewModel : Observable, IDisposable
     {
         if (snapshot.Configuration.Version == 1)
         {
-            if (!_preview) throw new InvalidOperationException("The running engine needs the node-workspace update. Quit Audio Mixer and reopen the new version.");
+            if (!_preview) throw new InvalidOperationException("The running engine needs the node-workspace update. Quit Vine Mix and reopen the new version.");
             snapshot.Configuration.Graph = GraphDefaults.FromLegacy(snapshot.Configuration);
             snapshot.Configuration.Version = 2;
         }
@@ -796,7 +796,7 @@ public sealed class MixerViewModel : Observable, IDisposable
         try { await _connection!.RequestAsync("shutdown", null, null, timeout.Token); }
         catch (Exception error) when (error is System.IO.IOException or TimeoutException or OperationCanceledException or InvalidOperationException or System.Text.Json.JsonException or UnauthorizedAccessException) { }
         await _supervisor!.StopForQuitAsync();
-        return _pending.Count > 0 || saveFailure.Length > 0 ? "The most recent settings changes could not be saved. Audio Mixer has stopped.\n\n" + (saveFailure.Length > 0 ? saveFailure : "The settings changed repeatedly during shutdown.") : "";
+        return _pending.Count > 0 || saveFailure.Length > 0 ? "The most recent settings changes could not be saved. Vine Mix has stopped.\n\n" + (saveFailure.Length > 0 ? saveFailure : "The settings changed repeatedly during shutdown.") : "";
         }
         finally { _engineGate.Release(); }
     }

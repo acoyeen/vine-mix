@@ -1,4 +1,4 @@
-# Audio Mixer — testing and later hardware qualification
+# Vine Mix — testing and later hardware qualification
 
 ## Run the current checks
 
@@ -1163,7 +1163,7 @@ are changed. They also do not restart the deferred endurance run.
 
 ## Suggested later prompt
 
-> Qualify the node-based Audio Mixer using TESTING.md and docs/APP_AUDIO.md.
+> Qualify the node-based Vine Mix using TESTING.md and docs/APP_AUDIO.md.
 > First inspect the current saved graph, headphones, Windows defaults and driver
 > state. Preserve my current assignments. Verify offline graph/UI results, then
 > guide me through quiet audible checks, EQ/dynamics, per-app capture, independent

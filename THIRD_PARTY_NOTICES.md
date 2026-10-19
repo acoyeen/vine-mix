@@ -1,6 +1,7 @@
 # Third-party notices
 
-Audio Mixer's original source is covered by the root [LICENSE](LICENSE).
+Vine Mix's original source is released under the MIT licence in the root
+[LICENSE](LICENSE), copyright (c) 2026 acoyeen.
 Third-party components retain the licences and copyright notices below; the
 root licence does not replace them. Preserve this file and the complete
 [`licenses/`](licenses/) directory when sharing the application. Release
@@ -65,7 +66,7 @@ Copyright (c) Microsoft Corporation. The sample repository's complete MIT notice
 is preserved in `licenses/Microsoft-Windows-classic-samples-LICENSE.txt` as an
 acknowledgement of this implementation reference.
 
-Audio Mixer's `native/src/process_capture.cpp` implements its own discovery,
+Vine Mix's `native/src/process_capture.cpp` implements its own discovery,
 callback lifetime, interruptible capture worker, queues and recovery. The local
 `ProcessActivationParams` declaration represents the documented Windows ABI's
 values and layout because the build's MinGW headers lack that declaration. The
@@ -113,11 +114,11 @@ separately, retain this attribution:
 > Unchanged. [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/),
 > subject to the [manual's stated exceptions](https://docs.blender.org/manual/en/latest/copyright.html).
 
-Blender implementation code and branding are not embedded in Audio Mixer.
+Blender implementation code and branding are not embedded in Vine Mix.
 
 ## Separately obtained virtual audio drivers
 
-Audio Mixer does not redistribute or install VB-CABLE, VB-CABLE A+B/C+D, or
+Vine Mix does not redistribute or install VB-CABLE, VB-CABLE A+B/C+D, or
 Virtual Audio Cable (VAC). Obtain any driver separately from its publisher and
 follow that publisher's licence for the intended use.
 
@@ -127,7 +128,7 @@ follow that publisher's licence for the intended use.
   publisher's published terms.
 - [VAC licence](https://vac.muzychenko.net/en/license.txt): the Lite/freeware
   version is restricted to private home use without income generation. Other
-  versions have their own terms. Audio Mixer's licence does not expand those
+  versions have their own terms. Vine Mix's licence does not expand those
   permissions.
 
 The names of upstream projects and publishers identify components and sources;

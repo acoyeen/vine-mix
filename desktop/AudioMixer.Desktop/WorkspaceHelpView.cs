@@ -108,7 +108,7 @@ internal sealed class WorkspaceHelpView : UserControl
         footer.Margin = new Thickness(0, 20, 0, 8);
         footer.SetResourceReference(TextBlock.ForegroundProperty, "ConsoleMutedBrush");
         content.Children.Add(footer);
-        var quit = Text("To stop audio, choose Quit Audio Mixer from the tray menu.");
+        var quit = Text("To stop audio, choose Quit Vine Mix from the tray menu.");
         quit.SetResourceReference(TextBlock.ForegroundProperty, "ConsoleMutedBrush");
         content.Children.Add(quit);
     }

@@ -94,11 +94,11 @@ public partial class App : Application
         _window = new MainWindow(_mixer);
         MainWindow = _window;
         var menu = new Forms.ContextMenuStrip();
-        menu.Items.Add("Open Audio Mixer", null, (_, _) => Dispatcher.BeginInvoke(new Action(ShowMixer)));
+        menu.Items.Add("Open Vine Mix", null, (_, _) => Dispatcher.BeginInvoke(new Action(ShowMixer)));
         menu.Items.Add("Windows sound settings", null, (_, _) => OpenExternal("ms-settings:sound"));
         menu.Items.Add(new Forms.ToolStripSeparator());
-        menu.Items.Add("Quit Audio Mixer", null, (_, _) => Dispatcher.BeginInvoke(new Action(async () => await QuitAsync())));
-        _tray = new Forms.NotifyIcon { Text = "Audio Mixer", Icon = System.Drawing.SystemIcons.Application, ContextMenuStrip = menu, Visible = true };
+        menu.Items.Add("Quit Vine Mix", null, (_, _) => Dispatcher.BeginInvoke(new Action(async () => await QuitAsync())));
+        _tray = new Forms.NotifyIcon { Text = "Vine Mix", Icon = System.Drawing.SystemIcons.Application, ContextMenuStrip = menu, Visible = true };
         _tray.DoubleClick += (_, _) => Dispatcher.BeginInvoke(new Action(ShowMixer));
         if (!e.Args.Contains("--background", StringComparer.OrdinalIgnoreCase)) _window.Show();
         else _mixer.IsVisible = false;
@@ -124,7 +124,7 @@ public partial class App : Application
             if (_mixer is not null)
             {
                 string warning = await _mixer.StopAsync();
-                if (warning.Length > 0) MessageBox.Show(warning, "Audio Mixer · Settings not saved", MessageBoxButton.OK, MessageBoxImage.Information);
+                if (warning.Length > 0) MessageBox.Show(warning, "Vine Mix · Settings not saved", MessageBoxButton.OK, MessageBoxImage.Information);
             }
         }
         finally { Shutdown(); }

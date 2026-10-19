@@ -130,7 +130,7 @@ try {
     }
     $allProcesses = @(Get-Process -Name AudioMixer, AudioMixer.Engine -ErrorAction SilentlyContinue)
     if (@($allProcesses | Where-Object { $_.Path -ine $uiPath -and $_.Path -ine $enginePath }).Count) {
-        throw 'An Audio Mixer process is running from another package. No process was stopped.'
+        throw 'An Vine Mix process is running from another package. No process was stopped.'
     }
     $oldUi = @(Get-ExactProcess 'AudioMixer' $uiPath)
     $oldEngine = @(Get-ExactProcess 'AudioMixer.Engine' $enginePath)

@@ -1,9 +1,9 @@
-# Audio Mixer
+# Vine Mix
 
 A Windows 11 audio mixer with a node workspace: connect microphones, applications,
 effects and listening or virtual microphone outputs using visible audio cables.
 
-![Audio Mixer workspace](docs/images/workspace.png)
+![Vine Mix workspace](docs/images/workspace.png)
 
 ## Features
 
@@ -43,7 +43,7 @@ Later builds can use `-NoBootstrap`. If the app is running, stage a separate pac
 
 Launch with `--preview` to explore a silent example graph without starting the
 engine or saving settings. Closing the normal window hides it to the tray; use
-**Quit Audio Mixer** from its tray menu to stop audio. New outputs start muted
+**Quit Vine Mix** from its tray menu to stop audio. New outputs start muted
 and require device assignment.
 
 Physical devices and application capture can be used without virtual drivers.
@@ -64,9 +64,12 @@ Read the [distribution guide](docs/DISTRIBUTION.md) before sharing a package.
 - [Testing](TESTING.md), [contributing](CONTRIBUTING.md) and [changelog](CHANGELOG.md)
 - [Third-party credits](THIRD_PARTY_NOTICES.md) and [distribution requirements](docs/DISTRIBUTION.md)
 
-The original application currently has [all rights reserved](LICENSE), pending
-the owner's choice of a distribution licence. Third-party components keep their
-own licences and required credits.
+The original application is licensed under [MIT](LICENSE). Third-party
+components keep their own licences and required credits.
+
+The planned project domains are **vinemix.dev** and **vinemix.app**. The internal
+executable and settings names currently use `AudioMixer` for compatibility with
+existing installations; the displayed product name is Vine Mix.
 
 Settings live at `%LOCALAPPDATA%\AudioMixer\settings.json`. Application capture
 copies existing playback; it does not silence the original application. Parallel

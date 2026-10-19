@@ -44,7 +44,7 @@ int wmain(int argc, wchar_t** argv) {
             if (option == L"--list-devices") listDevices = true;
             else if (option == L"--settings" && i + 1 < argc) settings = argv[++i];
             else if (option == L"--help") {
-                std::cout << "Audio Mixer Engine\n  --list-devices   Enumerate endpoints without opening audio streams\n"
+                std::cout << "Vine Mix Engine\n  --list-devices   Enumerate endpoints without opening audio streams\n"
                     "  --settings FILE Use a separate configuration file\n"; return 0;
             } else throw std::runtime_error("Unknown argument. Use --help.");
         }
@@ -68,6 +68,6 @@ int wmain(int argc, wchar_t** argv) {
         engine.stop();
         return 0;
     } catch (const std::exception& error) {
-        std::cerr << "Audio Mixer: " << error.what() << '\n'; return 1;
+        std::cerr << "Vine Mix: " << error.what() << '\n'; return 1;
     }
 }

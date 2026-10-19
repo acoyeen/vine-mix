@@ -92,7 +92,7 @@ public sealed class EngineSupervisor : IDisposable
                 {
                     if (candidate.HasExited || candidate.SessionId != current.SessionId) continue;
                     if (!string.Equals(candidate.MainModule?.FileName, _enginePath, StringComparison.OrdinalIgnoreCase))
-                        throw new IOException("Another Audio Mixer installation is running. Close it before restarting this engine.");
+                        throw new IOException("Another Vine Mix installation is running. Close it before restarting this engine.");
                 }
                 catch (InvalidOperationException) { } // It exited during enumeration.
                 catch (System.ComponentModel.Win32Exception error)

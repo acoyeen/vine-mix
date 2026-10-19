@@ -51,7 +51,7 @@ internal static class GraphClipboard
     internal static bool TryCreatePaste(string json, GraphConfiguration target, Point anchor, out GraphPaste paste, out string error)
     {
         paste = new GraphPaste([], [], 0);
-        error = "The clipboard does not contain a valid Audio Mixer node group.";
+        error = "The clipboard does not contain a valid Vine Mix node group.";
         if (string.IsNullOrWhiteSpace(json)) return false;
         try
         {
@@ -136,7 +136,7 @@ internal static class GraphClipboard
         }
         catch (Exception exception) when (exception is JsonException or NotSupportedException or EncoderFallbackException)
         {
-            error = "The clipboard does not contain a valid Audio Mixer node group.";
+            error = "The clipboard does not contain a valid Vine Mix node group.";
             return false;
         }
     }

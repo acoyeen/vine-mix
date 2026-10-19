@@ -1,6 +1,6 @@
 Audio EQ Cookbook -- mathematical reference and implementation acknowledgement
 
-Audio Mixer's native EQ coefficient calculations and desktop EQ response display
+Vine Mix's native EQ coefficient calculations and desktop EQ response display
 implement formulae described in the Audio EQ Cookbook by Robert Bristow-Johnson,
 adapted for W3C by Raymond Toy. The implementation adapts the mathematical
 formulae to the application's C++ and C# filters, coefficient normalization,
