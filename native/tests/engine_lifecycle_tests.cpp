@@ -103,6 +103,8 @@ bool AudioWorker::ready() const noexcept {
     return !impl_->id.empty() && (impl_->id != "out1" || test::output1Available.load()) && (impl_->id != "out2" || test::output2Available.load());
 }
 PathState AudioWorker::status() const { PathState path; path.state = ready() ? "Running" : "Waiting"; path.channels = 2; return path; }
+std::uint32_t AudioWorker::periodFrames() const noexcept { return quantumFrames; }
+std::uint32_t AudioWorker::targetQueueFrames() const noexcept { return quantumFrames + quantumFrames / 2; }
 void AudioWorker::stop() noexcept { impl_->stopped.store(true); }
 struct ProcessCaptureWorker::Impl {
     std::shared_ptr<FrameQueue> queue;

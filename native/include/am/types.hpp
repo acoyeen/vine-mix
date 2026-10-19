@@ -145,6 +145,7 @@ struct PathState {
     std::uint64_t overruns{};
     std::uint64_t reconnects{};
     double queueMs{};
+    double periodMs{}, bufferMs{}, targetQueueMs{}, resamplerPendingMs{};
 };
 struct EngineStatus {
     std::uint64_t audioFrames{};

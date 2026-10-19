@@ -58,7 +58,8 @@ Configuration defaultConfiguration();
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_ONLY_SERIALIZE(Endpoint, id, stableId, name,
     direction, state, isVirtual, channels, rate, transport, formFactor, description, interfaceName)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_ONLY_SERIALIZE(PathState, state, message,
-    endpointId, rate, channels, underruns, overruns, reconnects, queueMs)
+    endpointId, rate, channels, underruns, overruns, reconnects, queueMs,
+    periodMs, bufferMs, targetQueueMs, resamplerPendingMs)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_ONLY_SERIALIZE(EngineStatus::Node, id, peak, peakLeft, peakRight, channels, clipped, gainReductionDb, detectorDb, dynamicsFrame, spectrumDb, spectrumFrame, spectrumRevision, path)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_ONLY_SERIALIZE(EngineStatus, audioFrames,
     sourcePeaks, peakA, peakB, clipA, clipB, inputs, outputs, nodes)

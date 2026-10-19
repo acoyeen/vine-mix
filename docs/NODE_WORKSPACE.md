@@ -526,6 +526,12 @@ Legacy microphone channel selections remain part of the capture binding, so
 different channel selections keep separate workers. App capture workers provide
 the same stereo input contract. Output workers remain exclusive per endpoint.
 
+Endpoint workers request shorter supported shared periods with bounded default
+and legacy fallbacks. Capture pre-roll, device-aware playback budgets and bounded
+mixer catch-up reduce avoidable buffering while preserving effect/converter
+quality. See [audio latency](AUDIO_LATENCY.md) for timing diagnostics, recovery
+rules and the distinction between synthetic evidence and hardware measurement.
+
 Only the selected path goes silent when a device disappears or an app exits.
 Returning paths discard stale buffered audio. Every listening output consumes
 its own live queue. Audio cycles are rejected, including cycles made of muted

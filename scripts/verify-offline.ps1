@@ -13,7 +13,7 @@ if (Test-Path -LiteralPath $ResultDirectory) { throw 'Choose a new results direc
 $null = New-Item -ItemType Directory -Path $ResultDirectory
 $targets = @('AudioMixer.GraphTests','AudioMixer.EngineLifecycleTests','AudioMixer.QualificationTests',
     'AudioMixer.DriftQueueTests','AudioMixer.AdvancedEffectsTests','AudioMixer.DenoiserTests','AudioMixer.SpectrumTests',
-    'AudioMixer.DeEsserQualityTests','AudioMixer.EffectsQualityTests','AudioMixer.GraphPerformanceTests','AudioMixer.WindowsCatalogTests','AudioMixer.ExclusiveRenderTests','AudioMixer.VoiceColorTests','AudioMixer.CoreDynamicsTests')
+    'AudioMixer.DeEsserQualityTests','AudioMixer.EffectsQualityTests','AudioMixer.GraphPerformanceTests','AudioMixer.WindowsCatalogTests','AudioMixer.ExclusiveRenderTests','AudioMixer.SharedAudioTests','AudioMixer.AudioTimingTests','AudioMixer.MixClockTests','AudioMixer.VoiceColorTests','AudioMixer.CoreDynamicsTests')
 $oldPath=$env:PATH; $oldDotnet=$env:DOTNET_ROOT
 $results=[Collections.Generic.List[object]]::new()
 $failure=$null

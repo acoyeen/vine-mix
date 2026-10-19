@@ -97,6 +97,10 @@ public sealed class PathState
     public ulong Overruns { get; set; }
     public ulong Reconnects { get; set; }
     public double QueueMs { get; set; }
+    public double PeriodMs { get; set; }
+    public double BufferMs { get; set; }
+    public double TargetQueueMs { get; set; }
+    public double ResamplerPendingMs { get; set; }
     public string Display => State switch
     {
         "Unassigned" => "Not assigned",

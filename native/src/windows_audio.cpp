@@ -7,6 +7,8 @@
 #include "am/windows_audio.hpp"
 #include "am/windows_audio_detail.hpp"
 #include "am/dsp.hpp"
+#include "am/audio_timing.hpp"
+#include "am/stream_stability.hpp"
 
 #include <windows.h>
 #include <initguid.h>
@@ -547,6 +549,81 @@ long detail::initializeExclusiveRender(IMMDevice* device, IAudioClient** returne
     return S_OK;
 }
 
+long detail::initializeSharedStream(IMMDevice* device, bool capture, IAudioClient** returnedClient,
+    tWAVEFORMATEX** returnedFormat, std::uint32_t* periodFrames, bool preferLowLatency) {
+    if (returnedClient) *returnedClient = nullptr;
+    if (returnedFormat) *returnedFormat = nullptr;
+    if (periodFrames) *periodFrames = 0;
+    if (!device || !returnedClient || !returnedFormat || !periodFrames) return E_POINTER;
+    // Keep the endpoint's mix format and processing category unchanged. A
+    // shorter period changes scheduling, not the converter/effect quality.
+    enum class Attempt { shortest, normal, legacy };
+    Attempt attempt = preferLowLatency ? Attempt::shortest : Attempt::normal;
+    std::uint32_t failedPeriod{};
+    for (;;) {
+        ComPtr<IAudioClient> client;
+        auto result = device->Activate(IID_IAudioClient, CLSCTX_ALL, nullptr, client.out());
+        if (FAILED(result)) return result;
+#ifdef __IAudioClient2_INTERFACE_DEFINED__
+        ComPtr<IAudioClient2> client2;
+        if (SUCCEEDED(client->QueryInterface(__uuidof(IAudioClient2), client2.out()))) {
+            AudioClientProperties properties{};
+            properties.cbSize = sizeof(properties);
+            properties.eCategory = capture ? AudioCategory_Other : AudioCategory_Media;
+            client2->SetClientProperties(&properties);
+        }
+        client2.reset();
+#endif
+        WAVEFORMATEX* allocated{};
+        result = client->GetMixFormat(&allocated);
+        const auto freeFormat = [](WAVEFORMATEX* value) { CoTaskMemFree(value); };
+        std::unique_ptr<WAVEFORMATEX, decltype(freeFormat)> wave(allocated, freeFormat);
+        if (FAILED(result)) return result;
+        if (!wave || !wave->nSamplesPerSec) return AUDCLNT_E_UNSUPPORTED_FORMAT;
+        std::uint32_t selected{};
+#ifdef __IAudioClient3_INTERFACE_DEFINED__
+        ComPtr<IAudioClient3> client3;
+        if (attempt != Attempt::legacy && SUCCEEDED(client->QueryInterface(__uuidof(IAudioClient3), client3.out()))) {
+            UINT32 normal{}, fundamental{}, minimum{}, maximum{};
+            if (SUCCEEDED(client3->GetSharedModeEnginePeriod(wave.get(), &normal, &fundamental, &minimum, &maximum))
+                && fundamental && minimum && minimum <= maximum) {
+                const auto shortest = (static_cast<std::uint64_t>(minimum) + fundamental - 1) / fundamental * fundamental;
+                if (shortest <= maximum) {
+                    if (attempt == Attempt::shortest) selected = static_cast<std::uint32_t>(shortest);
+                    else if (normal >= minimum && normal <= maximum && normal % fundamental == 0 && normal != failedPeriod)
+                        selected = normal;
+                }
+            }
+            if (selected) {
+                result = client3->InitializeSharedAudioStream(AUDCLNT_STREAMFLAGS_EVENTCALLBACK,
+                    selected, wave.get(), nullptr);
+                client3.reset();
+                if (SUCCEEDED(result)) {
+                    *returnedClient = client.detach(); *returnedFormat = wave.release(); *periodFrames = selected;
+                    return S_OK;
+                }
+                // Neither the failed IAudioClient nor any queried interface
+                // survives the next activation. Some drivers poison a client
+                // even when Initialize* fails.
+                failedPeriod = selected;
+                attempt = attempt == Attempt::shortest ? Attempt::normal : Attempt::legacy;
+                continue;
+            }
+        }
+        client3.reset();
+#endif
+        result = client->Initialize(AUDCLNT_SHAREMODE_SHARED,
+            AUDCLNT_STREAMFLAGS_EVENTCALLBACK | AUDCLNT_STREAMFLAGS_NOPERSIST, 0, 0, wave.get(), nullptr);
+        if (FAILED(result)) return result;
+        REFERENCE_TIME normal{}, minimum{};
+        if (SUCCEEDED(client->GetDevicePeriod(&normal, &minimum)) && normal > 0 && normal <= 10000000) {
+            *periodFrames = static_cast<std::uint32_t>((static_cast<std::uint64_t>(normal) * wave->nSamplesPerSec + 9999999) / 10000000);
+        }
+        *returnedClient = client.detach(); *returnedFormat = wave.release();
+        return S_OK;
+    }
+}
+
 long detail::renderFramesAvailable(IAudioClient* client, bool exclusive, std::uint32_t bufferFrames,
     std::uint32_t* available) {
     if (!client || !available) return E_POINTER;
@@ -639,6 +716,9 @@ struct AudioWorker::Impl {
     std::uint64_t observedGeneration{};
     std::uint64_t observedConfiguration{};
     std::atomic<std::uint64_t> streamUnderruns{0};
+    std::atomic<std::uint32_t> targetQueueFrames{0}, pendingResamplerFrames{0};
+    std::atomic<std::uint32_t> enginePeriodFrames{0};
+    bool preferLowLatency = true; // Stream-thread policy; explicit selection/retry resets it.
     std::thread thread;
 
     Impl(bool isCapture, bool isMicrophone, std::shared_ptr<FrameQueue> frames, DeviceCatalog& devices, std::string transport)
@@ -657,8 +737,14 @@ struct AudioWorker::Impl {
     }
     void state(std::string value, std::string message = {}, const Endpoint* endpoint = nullptr) {
         ready.store(value == "Running", std::memory_order_release);
+        if (value != "Running" && value != "Priming") {
+            targetQueueFrames.store(0, std::memory_order_relaxed);
+            pendingResamplerFrames.store(0, std::memory_order_relaxed);
+            enginePeriodFrames.store(0, std::memory_order_relaxed);
+        }
         std::lock_guard lock(mutex);
         path.state = std::move(value); path.message = std::move(message);
+        if (path.state != "Running" && path.state != "Priming") path.periodMs = path.bufferMs = 0;
         if (endpoint) { path.endpointId = endpoint->id; path.channels = endpoint->channels; path.rate = endpoint->rate; }
         else if (path.state == "Unassigned") { path.endpointId.clear(); path.rate = path.channels = 0; }
     }
@@ -704,25 +790,15 @@ struct AudioWorker::Impl {
         if (FAILED(result = enumerator->GetDevice(id.c_str(), device.put()))) return result;
         ComPtr<IAudioClient> client;
         WAVEFORMATEX* allocatedFormat{};
+        std::uint32_t periodFrames{};
         if (exclusiveRender) {
             // The virtual microphone reaches its cable directly rather than
             // joining Windows' shared playback mix. Never fall back to shared
             // output: that would silently reintroduce screen-share audio.
             if (FAILED(result = detail::initializeExclusiveRender(device.get(), client.put(), &allocatedFormat))) return result;
         } else {
-            if (FAILED(result = device->Activate(IID_IAudioClient, CLSCTX_ALL, nullptr, client.out()))) return result;
-#ifdef __IAudioClient2_INTERFACE_DEFINED__
-            ComPtr<IAudioClient2> client2;
-            if (SUCCEEDED(client->QueryInterface(__uuidof(IAudioClient2), client2.out()))) {
-                AudioClientProperties properties{};
-                properties.cbSize = sizeof(properties);
-                properties.bIsOffload = FALSE;
-                properties.eCategory = capture ? AudioCategory_Other : AudioCategory_Media;
-                properties.Options = AUDCLNT_STREAMOPTIONS_NONE;
-                client2->SetClientProperties(&properties);
-            }
-#endif
-            if (FAILED(result = client->GetMixFormat(&allocatedFormat))) return result;
+            if (FAILED(result = detail::initializeSharedStream(device.get(), capture,
+                client.put(), &allocatedFormat, &periodFrames, preferLowLatency))) return result;
         }
         const auto freeFormat = [](WAVEFORMATEX* value) { CoTaskMemFree(value); };
         std::unique_ptr<WAVEFORMATEX, decltype(freeFormat)> wave(allocatedFormat, freeFormat);
@@ -733,42 +809,16 @@ struct AudioWorker::Impl {
         Handle audioEvent{CreateEventW(nullptr, FALSE, FALSE, nullptr)};
         if (!audioEvent.get()) return HRESULT_FROM_WIN32(GetLastError());
 
-        if (!exclusiveRender) {
-            bool initialized{};
-#ifdef __IAudioClient3_INTERFACE_DEFINED__
-            ComPtr<IAudioClient3> client3;
-            if (SUCCEEDED(client->QueryInterface(__uuidof(IAudioClient3), client3.out()))) {
-                UINT32 defaultPeriod{}, fundamental{}, minimum{}, maximum{};
-                if (SUCCEEDED(client3->GetSharedModeEnginePeriod(wave.get(), &defaultPeriod, &fundamental, &minimum, &maximum))) {
-                    result = client3->InitializeSharedAudioStream(AUDCLNT_STREAMFLAGS_EVENTCALLBACK,
-                        defaultPeriod, wave.get(), nullptr);
-                    initialized = SUCCEEDED(result);
-                }
-            }
-            client3.reset();
-#endif
-            if (!initialized) {
-            // A failed Initialize* may leave the audio client non-reusable.
-            // Activate a fresh client for the documented shared-mode fallback.
-            client.reset();
-            if (FAILED(result = device->Activate(IID_IAudioClient, CLSCTX_ALL, nullptr, client.out()))) return result;
-#ifdef __IAudioClient2_INTERFACE_DEFINED__
-            ComPtr<IAudioClient2> client2;
-            if (SUCCEEDED(client->QueryInterface(__uuidof(IAudioClient2), client2.out()))) {
-                AudioClientProperties properties{}; properties.cbSize = sizeof(properties);
-                properties.eCategory = capture ? AudioCategory_Other : AudioCategory_Media;
-                client2->SetClientProperties(&properties);
-            }
-#endif
-            result = client->Initialize(AUDCLNT_SHAREMODE_SHARED,
-                AUDCLNT_STREAMFLAGS_EVENTCALLBACK | AUDCLNT_STREAMFLAGS_NOPERSIST, 0, 0, wave.get(), nullptr);
-            if (FAILED(result)) return result;
-            }
-        }
         if (FAILED(result = client->SetEventHandle(audioEvent.get()))) return result;
         UINT32 bufferFrames{};
         if (FAILED(result = client->GetBufferSize(&bufferFrames))) return result;
         if (!bufferFrames || bufferFrames > format.rate * 4) return AUDCLNT_E_BUFFER_SIZE_ERROR;
+        // Exclusive event rendering consumes a whole buffer each event. For a
+        // legacy shared device whose period is unknown, use the actual buffer
+        // as a conservative demand estimate rather than guess a short period.
+        if (exclusiveRender || !periodFrames) periodFrames = bufferFrames;
+        StreamBufferPolicy buffering(format.rate, periodFrames, capture);
+        enginePeriodFrames.store(static_cast<std::uint32_t>(buffering.deviceFramesToEngineFrames(periodFrames)), std::memory_order_relaxed);
 
         ComPtr<IAudioSessionControl2> session;
         if (!capture && SUCCEEDED(client->GetService(__uuidof(IAudioSessionControl2), session.out())))
@@ -795,7 +845,10 @@ struct AudioWorker::Impl {
         {
             std::lock_guard lock(mutex);
             path.rate = format.rate; path.channels = format.channels;
+            path.periodMs = static_cast<double>(periodFrames) * 1000 / format.rate;
+            path.bufferMs = static_cast<double>(bufferFrames) * 1000 / format.rate;
         }
+        targetQueueFrames.store(buffering.targetFrames(), std::memory_order_relaxed);
         if (!capture) {
             BYTE* data{};
             if (FAILED(result = renderClient->GetBuffer(bufferFrames, &data))) return result;
@@ -811,9 +864,21 @@ struct AudioWorker::Impl {
         } cleanup{client.get(), task};
 
         { std::lock_guard lock(mutex); ++path.reconnects; }
-        state("Running", exclusiveRender ? "Direct virtual microphone output (exclusive WASAPI)" : "", &endpoint);
+        state("Running", exclusiveRender ? "Direct virtual microphone output (exclusive WASAPI)"
+            : preferLowLatency ? "" : "Compatible audio timing after repeated interruptions", &endpoint);
         const HANDLE events[]{stopEvent.get(), controlEvent.get(), audioEvent.get()};
         auto lastEvent = std::chrono::steady_clock::now();
+        const auto streamStart = lastEvent;
+        StreamStability stability;
+        const auto needsCompatibleTiming = [&](std::chrono::steady_clock::time_point now) {
+            if (exclusiveRender || !preferLowLatency) return false;
+            if (!stability.observe(std::chrono::duration<double>(now - streamStart).count())) return false;
+            preferLowLatency = false;
+            return true;
+        };
+        auto captureCheck = lastEvent + std::chrono::seconds(1);
+        auto previousCaptureUnderruns = queue->underrunEvents();
+        bool captureWarmed{};
         std::uint64_t fadeFrames{};
         const auto fadeLength = std::max<std::uint32_t>(1, format.rate / 100);
         bool renderPrimed{};
@@ -836,14 +901,20 @@ struct AudioWorker::Impl {
             lastEvent = now;
 
             if (capture) {
+                double feedbackElapsed = elapsed;
                 UINT32 packetFrames{};
                 if (FAILED(result = captureClient->GetNextPacketSize(&packetFrames))) return result;
                 while (packetFrames) {
                     BYTE* data{}; UINT32 count{}; DWORD flags{}; UINT64 position{}, qpc{};
                     if (FAILED(result = captureClient->GetBuffer(&data, &count, &flags, &position, &qpc))) return result;
                     if (flags & AUDCLNT_BUFFERFLAGS_DATA_DISCONTINUITY) {
+                        if (needsCompatibleTiming(now)) {
+                            captureClient->ReleaseBuffer(count);
+                            return S_FALSE;
+                        }
                         resampler.reset(); drift.reset(); clockEstimate = {}; queue->requestClear();
                         fadeFrames = 0;
+                        captureWarmed = false; captureCheck = now + std::chrono::seconds(1);
                     }
                     if (!(flags & AUDCLNT_BUFFERFLAGS_TIMESTAMP_ERROR)) clockEstimate.observe(position, qpc, format.rate);
                     std::size_t offset{};
@@ -857,7 +928,11 @@ struct AudioWorker::Impl {
                         }
                         const auto accepted = resampler.push(std::span<const Frame>(input.data(), frames));
                         if (accepted != frames) { resampler.reset(); queue->requestClear(); }
-                        const double correction = drift.update(static_cast<double>(queue->size()), sampleRate * 0.015, elapsed) / clockEstimate.multiplier;
+                        // Several packets can arrive at one late callback.
+                        // Advance feedback time once, not once per packet or
+                        // conversion chunk, so catch-up does not overcorrect.
+                        const double correction = drift.update(static_cast<double>(queue->size()), buffering.targetFrames(),
+                            std::exchange(feedbackElapsed, 0.0)) / clockEstimate.multiplier;
                         for (;;) {
                             const auto generated = resampler.produce(output, correction);
                             if (resampler.lastError()) { captureClient->ReleaseBuffer(count); return E_FAIL; }
@@ -873,6 +948,15 @@ struct AudioWorker::Impl {
                         configurationSerial.load(std::memory_order_acquire) != serial) return S_FALSE;
                     if (FAILED(result = captureClient->GetNextPacketSize(&packetFrames))) return result;
                 }
+                // Ignore expected startup starvation. Sustained late delivery
+                // earns a bounded extra block of jitter protection, without
+                // changing effects, converter quality or a healthy device.
+                if (now >= captureCheck) {
+                    const auto underruns = queue->underrunEvents();
+                    if (captureWarmed && underruns - previousCaptureUnderruns > 2) buffering.observeUnderrun();
+                    previousCaptureUnderruns = underruns; captureWarmed = true;
+                    captureCheck = now + std::chrono::seconds(1);
+                }
             } else {
                 UINT32 available{};
                 if (FAILED(result = detail::renderFramesAvailable(client.get(), exclusiveRender, bufferFrames, &available))) return result;
@@ -886,9 +970,10 @@ struct AudioWorker::Impl {
                 if (queue->clearPending() || queue->size() > sampleRate / 5) {
                     queue->clear(); resampler.reset(); drift.reset(); fadeFrames = 0; renderPrimed = false;
                 }
-                if (!renderPrimed && queue->size() >= sampleRate / 100) renderPrimed = true;
                 const double buffered = queue->size() + resampler.pendingInputFrames();
-                const double correction = drift.update(buffered, sampleRate * 0.015, elapsed) * clockEstimate.multiplier;
+                const auto demand = static_cast<std::uint32_t>((static_cast<std::uint64_t>(available) * sampleRate + format.rate - 1) / format.rate);
+                if (!renderPrimed && buffered >= buffering.primeFrames(demand)) renderPrimed = true;
+                const double correction = drift.update(buffered, buffering.targetFrames(), elapsed) * clockEstimate.multiplier;
                 std::size_t filled{};
                 if (renderPrimed) {
                     while (filled < available) {
@@ -907,7 +992,10 @@ struct AudioWorker::Impl {
                 }
                 if (filled < available) {
                     std::fill(output.begin() + static_cast<std::ptrdiff_t>(filled), output.begin() + available, Frame{});
-                    if (!renderUnderrun && renderPrimed) ++streamUnderruns;
+                    if (!renderUnderrun && renderPrimed) {
+                        ++streamUnderruns; buffering.observeUnderrun();
+                        if (needsCompatibleTiming(now)) return S_FALSE;
+                    }
                     renderUnderrun = true;
                     // Re-prime after an underrun rather than alternate bursts
                     // of speech and silence on successive hardware callbacks.
@@ -929,6 +1017,11 @@ struct AudioWorker::Impl {
                 format.encode(std::span<const Frame>(output.data(), available), data);
                 if (FAILED(result = renderClient->ReleaseBuffer(available, filled ? 0 : AUDCLNT_BUFFERFLAGS_SILENT))) return result;
             }
+            targetQueueFrames.store(buffering.targetFrames(), std::memory_order_relaxed);
+            const auto pending = resampler.pendingInputFrames();
+            pendingResamplerFrames.store(static_cast<std::uint32_t>(capture
+                ? (static_cast<std::uint64_t>(pending) * sampleRate + format.rate - 1) / format.rate : pending),
+                std::memory_order_relaxed);
         }
         return S_FALSE;
     }
@@ -947,6 +1040,7 @@ struct AudioWorker::Impl {
                 serial = configurationSerial.load(std::memory_order_acquire);
             }
             const auto generation = catalog.generation();
+            if (serial != observedConfiguration) preferLowLatency = true;
             if (serial != observedConfiguration || generation != observedGeneration) {
                 backoff = 0; observedConfiguration = serial; observedGeneration = generation;
             }
@@ -1021,10 +1115,14 @@ void AudioWorker::configure(DeviceBinding binding) {
 }
 void AudioWorker::retry() noexcept { impl_->configurationSerial.fetch_add(1, std::memory_order_release); SetEvent(impl_->controlEvent.get()); }
 bool AudioWorker::ready() const noexcept { return impl_->ready.load(std::memory_order_acquire); }
+std::uint32_t AudioWorker::periodFrames() const noexcept { return impl_->enginePeriodFrames.load(std::memory_order_relaxed); }
+std::uint32_t AudioWorker::targetQueueFrames() const noexcept { return impl_->targetQueueFrames.load(std::memory_order_relaxed); }
 PathState AudioWorker::status() const {
     std::lock_guard lock(impl_->mutex);
     auto state = impl_->path;
     state.queueMs = static_cast<double>(impl_->queue->size()) * 1000.0 / sampleRate;
+    state.targetQueueMs = static_cast<double>(impl_->targetQueueFrames.load(std::memory_order_relaxed)) * 1000.0 / sampleRate;
+    state.resamplerPendingMs = static_cast<double>(impl_->pendingResamplerFrames.load(std::memory_order_relaxed)) * 1000.0 / sampleRate;
     state.underruns = impl_->queue->underrunEvents() + impl_->streamUnderruns.load(std::memory_order_relaxed);
     state.overruns = impl_->queue->overrunEvents();
     return state;

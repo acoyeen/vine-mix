@@ -1285,3 +1285,40 @@ needed: the engine and native inputs remain bound to the prior 14-suite evidence
 No Computer Use or native input/focus was performed.
 
 Evidence: `artifacts/node-alignment-fixed-gap-20261019/ui-final/results.json`.
+
+## Lower audio latency — 20 October 2026
+
+All 17 native suites passed after the final engine review. The complete offline
+run also passed 9,139 detached WPF checks, produced 166 renders and reported zero
+binding errors. Verification used synthetic audio, fake COM clients, temporary
+settings and detached UI; no real endpoints or production control pipe opened.
+
+New regression coverage:
+
+- SharedAudioTests: 981 assertions for shortest legal shared periods, unchanged
+  formats/categories, fresh-client default/legacy fallback, malformed drivers,
+  COM ownership and bounded runtime stability downgrade.
+- AudioTimingTests: 3,093,622 assertions with production sinc conversion, capture
+  pre-roll and queue policy; 48 asynchronous capture/playback scenarios at
+  44.1/48/96 kHz, approximately 1/5/10/20 ms periods, independent phases and
+  +/-750 ppm clocks. Includes large/batched render demands, a producer stall,
+  adaptive capture reserve, partial reads, discontinuities and stale queues.
+- MixClockTests: 20,016 deterministic cadence, short-miss, bounded catch-up,
+  sustained overload and resume assertions.
+
+In the representative synthetic 48 kHz / 128-frame-period comparison, mean
+combined application queue occupancy was 23.09 ms versus 30.16 ms with the
+previous 720-frame queue targets under matched clocks and conversion. This
+roughly 7.07 ms difference is a queue-model result; it excludes device, effect,
+filter-history and acoustic delay and is not measured hardware improvement.
+Existing denoiser, sample-conversion and effect quality checks passed unchanged.
+
+Evidence: `artifacts/latency-verification-20261020/results.json` (native and UI)
+and `artifacts/latency-verification-final-20261020/results.json` (final native
+recheck). Reproduce with `scripts/verify-offline.ps1`.
+
+Actual microphone-to-headphone latency, listening under load, driver-specific
+minimum-period reliability, hotplug and endurance remain manual qualifications.
+The separate candidate package does not replace or restart the running app.
+See [audio latency](docs/AUDIO_LATENCY.md) for policy, diagnostics and primary
+Windows API references.

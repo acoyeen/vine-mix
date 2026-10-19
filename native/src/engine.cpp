@@ -1,4 +1,6 @@
 #include "am/engine.hpp"
+#include "am/audio_timing.hpp"
+#include "am/mix_clock.hpp"
 #include "am/process_capture.hpp"
 #include "am/spectrum.hpp"
 #include <windows.h>
@@ -28,6 +30,7 @@ bool sameProcess(const ProcessBinding& a, const ProcessBinding& b) noexcept {
 struct Engine::Port {
     GraphNode identity;
     std::shared_ptr<FrameQueue> queue = std::make_shared<FrameQueue>(9600);
+    CaptureBufferReader reader; // Mixer-thread consumer state, retained with the shared source.
     std::unique_ptr<AudioWorker> device;
     std::unique_ptr<ProcessCaptureWorker> app;
     bool activated{};
@@ -263,8 +266,9 @@ void Engine::mixLoop() {
     if (!timer) timer = CreateWaitableTimerW(nullptr, FALSE, nullptr);
     if (!timer) { if (task) AvRevertMmThreadCharacteristics(task); requestStop(); return; }
     LARGE_INTEGER frequency{}, now{}; QueryPerformanceFrequency(&frequency); QueryPerformanceCounter(&now);
-    const auto ticksPerBlock = frequency.QuadPart / 200;
-    auto next = now.QuadPart, previous = now.QuadPart;
+    const auto ticksPerBlock = frequency.QuadPart * static_cast<LONGLONG>(quantumFrames) / sampleRate;
+    MixClock clock(ticksPerBlock, now.QuadPart);
+    auto previous = now.QuadPart;
     HANDLE waits[] = {stopEvent_, timer};
     Runtime* active{}; Runtime* fading{}; std::uint32_t fadeRemaining{};
     std::array<std::array<Frame, quantumFrames>, maximumGraphNodes * 2> input{};
@@ -302,10 +306,11 @@ void Engine::mixLoop() {
                     meter->dynamicsFrame.store(0, std::memory_order_release);
                 }
                 for (std::size_t i = 0; i < runtime->plan.nodeCount; ++i) if (auto* port = runtime->ports[i].get()) {
-                    if (isSource(runtime->plan.nodes[i].kind)) port->queue->clear(); else port->queue->requestClear();
+                    if (isSource(runtime->plan.nodes[i].kind)) { port->queue->clear(); port->reader.reset(); }
+                    else port->queue->requestClear();
                 }
             }
-            next = now.QuadPart; resumeRequested_.store(true, std::memory_order_release);
+            clock.reset(now.QuadPart); resumeRequested_.store(true, std::memory_order_release);
         }
         std::size_t captured{}, rendered{};
         for (auto* runtime : {active, fading}) if (runtime) {
@@ -316,7 +321,16 @@ void Engine::mixLoop() {
                 std::size_t slot{}; while (slot < captured && inputPorts[slot] != port) ++slot;
                 if (slot == captured) {
                     inputPorts[captured++] = port; input[slot].fill({});
-                    if (port->ready()) {
+                    if (port->device) {
+                        // Acquire readiness before reading its published period;
+                        // function argument evaluation order cannot enforce it.
+                        const bool ready = port->ready();
+                        const auto period = port->device->periodFrames();
+                        const auto reserve = port->device->targetQueueFrames();
+                        port->reader.read(*port->queue, input[slot], ready, period, reserve);
+                    }
+                    else if (port->ready()) {
+                        // Process loopback retains its separate delivery policy.
                         if (port->queue->size() > sampleRate / 10) port->queue->clear();
                         port->queue->pop(input[slot]);
                     } else port->queue->clear();
@@ -368,8 +382,9 @@ void Engine::mixLoop() {
         if (fading) { fadeRemaining -= static_cast<std::uint32_t>(quantumFrames); if (fadeRemaining == 0) fading = nullptr; }
         if (active && !fading) activeGeneration_.store(active->generation, std::memory_order_release);
         audioFrames_.fetch_add(quantumFrames, std::memory_order_relaxed);
-        next += ticksPerBlock; QueryPerformanceCounter(&now);
-        if (next < now.QuadPart) next = now.QuadPart + ticksPerBlock;
+        QueryPerformanceCounter(&now);
+        const auto next = clock.advance(now.QuadPart);
+        if (next <= now.QuadPart) continue;
         LARGE_INTEGER due{}; due.QuadPart = -std::max<LONGLONG>(1, (next - now.QuadPart) * 10000000 / frequency.QuadPart);
         if (!SetWaitableTimer(timer, &due, 0, nullptr, nullptr, FALSE)) { requestStop(); break; }
         if (WaitForMultipleObjects(2, waits, FALSE, INFINITE) != WAIT_OBJECT_0 + 1) break;

@@ -37,6 +37,9 @@ public:
     void configure(DeviceBinding binding);
     void retry() noexcept;
     bool ready() const noexcept;
+    // Negotiated device callback period expressed in the graph's 48 kHz frames.
+    std::uint32_t periodFrames() const noexcept;
+    std::uint32_t targetQueueFrames() const noexcept;
     PathState status() const;
     void stop() noexcept;
 private:

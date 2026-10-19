@@ -178,7 +178,11 @@ The snapshot includes:
 - `settingsPath`, `logPath`, `warning`.
 
 A path contains state, message, endpointId, rate, channels, underruns, overruns,
-reconnects and queueMs. Relevant states include Unassigned, Resolving, Opening,
+reconnects and queueMs. Device paths also report periodMs (requested shared
+period or legacy default), bufferMs (allocated WASAPI buffer), targetQueueMs
+and resamplerPendingMs. These are timing diagnostics, not measured round-trip
+latency; queueMs excludes pending resampler input and filter history. See
+[audio latency](AUDIO_LATENCY.md). Relevant states include Unassigned, Resolving, Opening,
 Priming, Running, Waiting, Busy, AccessDenied, ServiceUnavailable, Recovering,
 Unsupported and Error. Friendly names do not replace identities. App paths may
 wait for an exact executable to return.

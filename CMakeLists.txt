@@ -176,6 +176,18 @@ if(AUDIO_MIXER_OFFLINE_TESTS)
     native/tests/exclusive_render_tests.cpp native/src/windows_audio.cpp native/src/dsp.cpp)
   audio_mixer_verification_target(AudioMixer.ExclusiveRenderTests)
   target_link_libraries(AudioMixer.ExclusiveRenderTests PRIVATE samplerate ole32 uuid avrt propsys)
+
+  add_executable(AudioMixer.SharedAudioTests
+    native/tests/shared_audio_tests.cpp native/src/windows_audio.cpp native/src/dsp.cpp)
+  audio_mixer_verification_target(AudioMixer.SharedAudioTests)
+  target_link_libraries(AudioMixer.SharedAudioTests PRIVATE samplerate ole32 uuid avrt propsys)
+
+  add_executable(AudioMixer.AudioTimingTests native/tests/audio_timing_tests.cpp native/src/dsp.cpp)
+  audio_mixer_verification_target(AudioMixer.AudioTimingTests)
+  target_link_libraries(AudioMixer.AudioTimingTests PRIVATE samplerate)
+
+  add_executable(AudioMixer.MixClockTests native/tests/mix_clock_tests.cpp)
+  audio_mixer_verification_target(AudioMixer.MixClockTests)
 endif()
 
 # These are diagnostics for real endpoints, deliberately separate from silent
