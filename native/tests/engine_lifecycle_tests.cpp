@@ -19,10 +19,19 @@ std::atomic<int> created{}, live{}, duplicates{}, render1{}, render2{}, renderB{
 std::atomic<float> heard1{}, heard2{}, heardB{};
 std::atomic<bool> output1Available{true}, output2Available{true};
 std::atomic<bool> failNextConfiguration{};
+std::atomic<int> workerWakeMilliseconds{5};
 std::mutex portsMutex;
 std::map<std::string, int> openPorts;
 void check(bool condition, const char* reason) { if (!condition) throw std::runtime_error(reason); }
 void wait(int milliseconds) { std::this_thread::sleep_for(std::chrono::milliseconds(milliseconds)); }
+void refillCapture(am::FrameQueue& queue, std::span<const am::Frame> frames) {
+    // Constant synthetic capture has no independent hardware clock/drift
+    // controller. Keep 40 ms ready so coarse thread wakes cannot turn the DC
+    // fixture into alternating signal and silence. Work and storage are bounded.
+    constexpr std::size_t leadBlocks = 8;
+    for (std::size_t block = 0; block < leadBlocks && queue.size() < leadBlocks * am::quantumFrames; ++block)
+        if (queue.push(frames) != frames.size()) break;
+}
 template<class Predicate> bool eventually(Predicate predicate) {
     for (int attempt = 0; attempt < 100; ++attempt) { if (predicate()) return true; wait(10); }
     return predicate();
@@ -50,14 +59,25 @@ struct AudioWorker::Impl {
                 std::string current; { std::lock_guard lock(mutex); current = id; }
                 const bool ready = !current.empty() && (current != "out1" || test::output1Available.load())
                     && (current != "out2" || test::output2Available.load());
-                if (ready && capture) { frames.fill({current == "virtual-in" ? .2f : .3f, .1f}); queue->push(frames); }
-                if (ready && !capture) {
-                    frames.fill({}); queue->pop(frames);
-                    if (current == "out1") { ++test::render1; test::heard1.store(frames.back().left); }
-                    if (current == "out2") { ++test::render2; test::heard2.store(frames.back().left); }
-                    if (current == "virtual-out") { ++test::renderB; test::heardB.store(frames.back().left); }
+                if (ready && capture) {
+                    frames.fill({current == "virtual-in" ? .2f : .3f, .1f});
+                    test::refillCapture(*queue, frames);
                 }
-                test::wait(5);
+                if (ready && !capture) {
+                    // A hardware callback consumes all frames available for
+                    // its elapsed device time. Drain a bounded queue here too:
+                    // one pop per Sleep would accumulate stale output when a
+                    // VM schedules this worker less often than the engine.
+                    for (std::size_t block = 0; block < queue->capacity() / am::quantumFrames && queue->size(); ++block) {
+                        const auto count = queue->pop(frames);
+                        if (!count) break;
+                        const float heard = frames[count - 1].left;
+                        if (current == "out1") { test::heard1.store(heard); ++test::render1; }
+                        if (current == "out2") { test::heard2.store(heard); ++test::render2; }
+                        if (current == "virtual-out") { test::heardB.store(heard); ++test::renderB; }
+                    }
+                }
+                test::wait(test::workerWakeMilliseconds.load());
             }
         });
     }
@@ -96,7 +116,7 @@ struct ProcessCaptureWorker::Impl {
             std::array<Frame, quantumFrames> frames; frames.fill({.4f, .15f});
             while (!stopped.load()) {
                 bool active; { std::lock_guard lock(mutex); active = !identity.empty(); }
-                if (active) queue->push(frames);
+                if (active) test::refillCapture(*queue, frames);
                 test::wait(5);
             }
         });
@@ -340,27 +360,45 @@ int main() {
             test::check(colorOutput != config.graph.edges.end(), "Synthetic Voice Color output route is missing");
             const auto originalColorOutput = *colorOutput;
             colorOutput->from = "voice-color";
+            // Exercise coarse capture AND renderer wakes independently of the
+            // engine's 5 ms timer, as can occur on a loaded Windows VM.
+            test::workerWakeMilliseconds = 20;
             const auto observeColor = [&](double tone, float expected, const char* reason) {
                 const auto priorFrames = engine.snapshot()["status"]["audioFrames"].get<std::uint64_t>();
                 config.graph.nodes[voiceColorIndex].voiceColor = {tone, 0};
                 config.graph.nodes[voiceColorIndex].bypass = false;
                 engine.configure(config, config.revision); ++config.revision;
                 int stable{};
-                float measured{};
-                test::check(test::eventually([&] {
+                int rendered = test::render1.load(), observedRender = rendered;
+                std::uint64_t observedFrames = priorFrames, currentFrames = priorFrames;
+                float measured{}, heard{};
+                const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+                while (stable < 3 && std::chrono::steady_clock::now() < deadline) {
+                    test::wait(10);
+                    rendered = test::render1.load();
+                    if (rendered == observedRender) continue;
                     const auto snapshot = engine.snapshot();
                     // Clear historical peak accumulation while the runtime,
-                    // filter ramps and queued output settle. Require several
-                    // independent matching observations, not one lucky frame.
-                    if (snapshot["status"]["audioFrames"].get<std::uint64_t>() < priorFrames + sampleRate / 8) return false;
+                    // filter ramps and queued output settle. Count only
+                    // observations with fresh engine AND consumed output
+                    // blocks; repeated polls of a stale heard value do not pass.
+                    currentFrames = snapshot["status"]["audioFrames"].get<std::uint64_t>();
+                    observedRender = rendered;
+                    if (currentFrames <= observedFrames) continue;
+                    observedFrames = currentFrames;
+                    if (currentFrames < priorFrames + sampleRate / 8) continue;
                     measured = snapshot["status"]["nodes"][voiceColorIndex]["peakLeft"].get<float>();
-                    const float heard = test::heard1.load();
+                    heard = test::heard1.load();
                     const bool matched = std::abs(measured - expected) < expected * .025f
                         && std::abs(heard - expected) < expected * .025f
                         && snapshot["configuration"]["revision"].get<std::uint64_t>() == config.revision;
                     stable = matched ? stable + 1 : 0;
-                    return stable >= 3;
-                }), reason);
+                }
+                const auto failure = std::string(reason) + "; expected=" + std::to_string(expected)
+                    + ", measured=" + std::to_string(measured) + ", heard=" + std::to_string(heard)
+                    + ", stable=" + std::to_string(stable) + ", audioFrames=" + std::to_string(currentFrames)
+                    + ", renderedBlocks=" + std::to_string(rendered);
+                test::check(stable >= 3, failure.c_str());
                 return measured;
             };
             const float neutralColor = observeColor(0, .3f,
@@ -381,7 +419,8 @@ int main() {
                 "Voice Color output changes must retain existing synthetic audio workers");
             *colorOutput = originalColorOutput;
             engine.configure(config, config.revision); ++config.revision;
-            std::cout << "Live Voice Color rendered levels: neutral=" << neutralColor << "; Warm=" << warmColor
+            test::workerWakeMilliseconds = 5;
+            std::cout << "Live Voice Color rendered levels (20 ms synthetic worker wakes): neutral=" << neutralColor << "; Warm=" << warmColor
                 << "; Bright=" << brightColor << "; reset=" << resetColor << '\n';
             const auto beforeColorFrames = initial["status"]["audioFrames"].get<std::uint64_t>();
             for (int i = 0; i < 32; ++i) {

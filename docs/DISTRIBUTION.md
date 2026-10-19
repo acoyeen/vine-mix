@@ -81,6 +81,15 @@ licence suitable for that user's activity.
 
 ## Dependency changes and release checks
 
+The current development executables are unsigned: Authenticode inspection of
+both `AudioMixer.exe` and `AudioMixer.Engine.exe` reports `NotSigned`. A publisher
+who wants a verified signing identity must sign and timestamp the final
+executables using their own certificate before making the distribution archive.
+[Microsoft's SignTool documentation](https://learn.microsoft.com/en-us/windows/win32/seccrypto/signtool)
+describes signing and signature verification. Recompute archive checksums after
+signing or changing package contents. Signing is separate from dependency
+licensing and from the still-incomplete hardware qualification.
+
 When changing a dependency version, model, runtime or font, refresh its full
 licence, per-file copyright notices and upstream provenance at the same time.
 Rebuild the final package and inspect its notice files. For native dependencies,

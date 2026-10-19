@@ -20,6 +20,12 @@ node types, saved graphs, routing and visual behavior remain intact.
   from history comparisons.
 - Removed an unused gain formatter and an unused dial-group label parameter.
   Kept compatibility code used by saved graphs and independent migration tests.
+- Made the synthetic lifecycle workers maintain bounded capture buffering and
+  consume queued rendered blocks when their threads wake. Voice Color checks
+  deliberately use coarse 20 ms capture/render wakes and require fresh rendered
+  blocks and engine progress, preserving the strict expected endpoint values.
+  This prevents the test fixture's scheduling from starving its steady signal;
+  production audio processing is unchanged.
 - Added missing source/runtime notices, including component-specific copyrights
   omitted by some upstream top-level licence files. Packaging now requires
   notices instead of silently skipping missing files.
@@ -52,6 +58,7 @@ Local evidence, excluded from Git:
 - `artifacts/repository-native-review-20261019/results.json`
 - `artifacts/repository-desktop-review-20261019-222017/results.json`
 - `artifacts/repository-desktop-review-20261019-222017/model-copy-performance.json`
+- `artifacts/lifecycle-coarse-verification/` (four full lifecycle passes)
 
 ## Distribution and limits
 

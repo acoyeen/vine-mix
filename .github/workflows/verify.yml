@@ -25,12 +25,25 @@ jobs:
         with:
           persist-credentials: false
       - name: Cache pinned local tools
-        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        id: tools
+        uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
-          path: .tools
+          path: |
+            .tools/dotnet
+            .tools/llvm-mingw-20261006-ucrt-x86_64
+            .tools/cmake-4.4.4-windows-x86_64
           key: windows-tools-${{ hashFiles('scripts/bootstrap-tools.ps1') }}
       - name: Build application package
         run: ./scripts/build.ps1
+      - name: Save pinned local tools
+        if: steps.tools.outputs.cache-hit != 'true'
+        uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: |
+            .tools/dotnet
+            .tools/llvm-mingw-20261006-ucrt-x86_64
+            .tools/cmake-4.4.4-windows-x86_64
+          key: windows-tools-${{ hashFiles('scripts/bootstrap-tools.ps1') }}
       - name: Run synthetic audio and detached desktop checks
         run: ./scripts/verify-offline.ps1 -ResultDirectory "$PWD/artifacts/ci-verification"
       - name: Retain verification reports
