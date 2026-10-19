@@ -1,0 +1,31 @@
+.tools/
+build/
+artifacts/
+downloads/
+**/bin/
+**/obj/
+.vs/
+*.user
+*.log
+*.dmp
+*.exe
+*.dll
+*.pdb
+*.zip
+*.7z
+*.bak
+settings.json
+settings.json.*
+
+# Local configuration, credentials and editor state.
+.env
+.env.*
+!.env.example
+*.pfx
+*.p12
+.idea/
+
+# Historical generated renders stay local; publish curated docs/images instead.
+docs/design/*/
+docs/design/*.png
+docs/review-images/
