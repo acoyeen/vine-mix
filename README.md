@@ -56,6 +56,7 @@ Read the [distribution guide](docs/DISTRIBUTION.md) before sharing a package.
 
 - [User guide and shortcuts](docs/USER_GUIDE.md)
 - [Node workspace and architecture](docs/NODE_WORKSPACE.md)
+- [Planned installation, updates and release screens](docs/INSTALLATION_AND_UPDATES.md)
 - [Application capture and routing](docs/APP_AUDIO.md)
 - [Device visibility and recovery](docs/DEVICE_VISIBILITY.md)
 - [Effects and limitations](docs/EFFECTS_RESEARCH.md)
