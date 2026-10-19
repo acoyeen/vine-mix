@@ -1,0 +1,44 @@
+libsamplerate 0.2.2 -- additional source-file notices
+
+Verbatim leading licence/copyright comments from the C/C++ source and headers
+used by this Windows x64 build, supplementing the upstream COPYING file.
+Identical comment blocks are grouped. Paths are relative to the upstream source.
+
+========================================================================
+include/samplerate.h
+src/fastest_coeffs.h
+src/samplerate.c
+========================================================================
+/*
+** Copyright (c) 2002-2016, Erik de Castro Lopo <erikd@mega-nerd.com>
+** All rights reserved.
+**
+** This code is released under 2-clause BSD license. Please see the
+** file at : https://github.com/libsndfile/libsamplerate/blob/master/COPYING
+*/
+
+========================================================================
+src/common.h
+src/src_linear.c
+src/src_sinc.c
+src/src_zoh.c
+========================================================================
+/*
+** Copyright (c) 2002-2021, Erik de Castro Lopo <erikd@mega-nerd.com>
+** All rights reserved.
+**
+** This code is released under 2-clause BSD license. Please see the
+** file at : https://github.com/libsndfile/libsamplerate/blob/master/COPYING
+*/
+
+========================================================================
+src/high_qual_coeffs.h
+src/mid_qual_coeffs.h
+========================================================================
+/*
+** Copyright (c) 2007-2016, Erik de Castro Lopo <erikd@mega-nerd.com>
+** All rights reserved.
+**
+** This code is released under 2-clause BSD license. Please see the
+** file at : https://github.com/libsndfile/libsamplerate/blob/master/COPYING
+*/
