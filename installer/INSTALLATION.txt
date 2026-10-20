@@ -1,0 +1,66 @@
+VINE MIX INSTALLATION HELP
+
+Application folder
+  Default: %LOCALAPPDATA%\Programs\Vine Mix
+  Run AudioMixer.exe, or use the Vine Mix Start menu shortcut.
+
+Saved workspaces, preferences, backups and logs
+  %LOCALAPPDATA%\AudioMixer
+  These files are separate from the application and are retained on upgrade,
+  repair and uninstall. The existing AudioMixer name preserves compatibility.
+  Save an extra copy of important workspaces through the application's controls.
+
+Existing portable copies
+  All copies share one user account's settings and audio engine identity.
+  Setup leaves a running copy in another folder alone. Choose Quit Vine Mix in
+  its tray menu before opening the installed copy. Closing its window only
+  hides it to the tray. Do not manually run two engines against the same files.
+
+Virtual audio drivers
+  VB-CABLE receives other applications' playback into Vine Mix.
+  VAC supplies Vine Mix's outgoing audio to recording/microphone applications.
+  Setup checks installed device and driver-package identity, including disabled
+  devices. Existing packages are kept; their names/settings are not reset.
+  Missing drivers are optional and require separate consent and administrator
+  approval in their original vendor installation windows. Restart Windows after
+  installing drivers before using them. Vine Mix can run without virtual paths.
+
+  VB-CABLE by VB-Audio is donationware; all contributions are welcome.
+  https://vb-audio.com/Cable/
+  https://vb-audio.com/Services/licensing.htm
+
+  VAC Lite by Eugene Muzychenko is restricted to private home use unrelated to
+  earning income. Its terms also govern redistribution. This installer's free,
+  non-commercial driver bundle is not cleared for monetised distribution.
+  https://vac.muzychenko.net/en/license.txt
+  https://vac.muzychenko.net/en/download.htm
+
+  An installed but unavailable driver may need enabling, a restart or repair.
+  Setup does not reinstall it automatically. Review Windows sound settings,
+  Device Manager and the vendor instructions. Check Windows microphone access
+  if recording endpoints are inaccessible. Other-driver support is future work.
+
+Upgrade and repair
+  Run a newer installer and use the existing installation folder. Save your work
+  and quit a copy running from that folder first. Setup will not force it closed.
+  Running the same version again repairs its application files. Downgrading an
+  installation marked as a newer version is blocked. This installer does not
+  implement online update checking or automatic downloads of application updates.
+
+Uninstall
+  Use Windows Settings > Apps > Installed apps > Vine Mix > Uninstall, or the
+  Start menu uninstall shortcut. Quit the installed copy first. Uninstall removes
+  installed application files and shortcuts, retaining saved workspaces and all
+  shared audio drivers. If this installed copy owns its start-at-login entry,
+  that entry is removed. Other copies' startup entries are retained.
+
+Security and notices
+  The current development installer and Vine Mix executables are unsigned.
+  Driver vendor signatures are verified during package preparation. They do not
+  sign Vine Mix or imply vendor endorsement. Read TERMS.txt, THIRD_PARTY_NOTICES.md
+  and the licences directory for the separate component terms.
+
+Unattended application-only deployment
+  Setup requires explicit /ACCEPTTERMS=1 for /SILENT or /VERYSILENT runs.
+  Specify /DRIVERS=none. Driver installs are interactive only. /NORESTART prevents
+  an automatic restart. Silent setup does not launch Vine Mix.

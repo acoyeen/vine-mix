@@ -1,8 +1,47 @@
 # Vine Mix installation and update architecture
 
-Status: proposed architecture, 19 October 2026. Installer and updater implementation
-is future work. The repository stays private during development; public GitHub
-releases will provide the eventual update source.
+Status: **first installer and manual upgrade/repair implemented 20 October 2026**.
+The online updater, version switching, recovery journal and release highlights
+below remain proposed future work. The repository stays private during
+development; public GitHub releases will provide the eventual update source.
+
+## Current installer
+
+Run `scripts/build-installer.ps1` to build
+`artifacts/installers/VineMix-0.2.0-Setup-x64.exe` using pinned Inno Setup 7.1.0.
+It targets Windows 11 x64, requires acceptance of the installer terms and uses a
+stable, per-user application directory at `%LOCALAPPDATA%\Programs\Vine Mix`.
+The desktop and engine remain together in that folder. User settings, saved
+workspaces, preferences, backups and logs retain their existing
+`%LOCALAPPDATA%\AudioMixer` location. This first installer uses a flat stable
+payload rather than the future versioned launcher design below.
+
+The driver page detects the actual VB-CABLE and VAC hardware/installed-package
+identities, including disabled, nonpresent and staged devices. It skips existing
+packages, offers only confirmed missing drivers, shows vendor terms/usage limits
+and requires separate acceptance before launching their original elevated setup
+windows. Both complete official driver packages are available offline in the
+free, non-commercial bundle. It never removes a driver during app uninstall.
+
+Re-running Setup repairs application files or upgrades an older marked version;
+a marked newer version cannot be downgraded. Setup will not force-close a mixer
+or overwrite a target in use. A portable copy elsewhere can continue while files
+are installed into an unused folder, but all copies share per-user settings,
+mutexes and the control pipe. Setup suppresses a second launch while any copy is
+running. Installing drivers requires the running mixer to be quit first.
+
+Uninstall removes owned application files and shortcuts, retaining personal
+data, unknown user files and shared drivers. It removes the start-at-login value
+only when it points exactly to this installed copy. Start-at-login remains an
+application preference; Setup does not change it.
+
+The app, helper and generated installer are unsigned development artifacts.
+Driver package signatures and original file hashes are verified during build;
+that does not sign or certify Vine Mix. See the
+[installer source and verification guide](../installer/README.md),
+[distribution conditions](DISTRIBUTION.md) and installed SetupSupport help.
+
+## Proposed automatic update architecture
 
 Vine Mix will use one setup executable for first installation and upgrades. The
 desktop checks for releases and offers the update; a separate helper coordinates
@@ -30,7 +69,7 @@ version's licence and commercial-use terms before distributing it.
 [conditional execution](https://jrsoftware.org/ishelp/topic_scriptcheck.htm),
 [running other installers](https://jrsoftware.org/ishelp/topic_runsection.htm).
 
-## Stable installation and saved state
+## Proposed versioned installation and saved state
 
 Use a per-user application installation initially. Driver installation is a
 separate elevated operation and must not change which Windows user's data is

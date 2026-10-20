@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1230" height="320" viewBox="500 196 1230 320" role="img" aria-labelledby="title desc">
+  <title id="title">VineMix wide logo</title>
+  <desc id="desc">Original split VM symbol followed by green Vine and white Mix. Full-width i dots align with the capital V and M; both i stems are shortened from the top. All artwork is editable vector paths and shapes.</desc>
+  
+  
+  <g id="vm-symbol" transform="translate(578 253) scale(2)">
+    <path fill="#3B8C66" d="M2,0 H21 Q22,0 23,1 L50,28 L77,1 Q78,0 79,0 H98 Q101,0 99,3 L52,50 Q50,52 48,50 L1,3 Q-1,0 2,0 Z"/>
+    <path fill="#E8EBF2" d="M3,24 Q3,21 5,23 L50,68 L95,23 Q97,21 97,24 V99 Q97,101 95,101 H81 Q79,101 79,99 V60 L52,87 Q50,89 48,87 L21,60 V99 Q21,101 19,101 H5 Q3,101 3,99 Z"/>
+  </g>
+  <g id="vine" fill="#3B8C66">
+    <path id="capital-v" d="M845 273 H879 Q882 273 883 276 L919.5 386 L957 276 Q958 273 961 273 H994 Q998 273 996.5 277.5 L942 429 Q940.6 433.5 936 433.5 H904 Q900 433.5 898.7 429.5 L842.5 277.5 Q841 273 845 273 Z"/>
+    <g id="vine-i">
+      <rect id="vine-i-dot" x="1007" y="273" width="37" height="34" rx="4"/>
+      <rect id="vine-i-stem" x="1007" y="318" width="37" height="116" rx="2.5"/>
+    </g>
+    <path id="letter-n" d="M1062 311.5 H1091 Q1094 311.5 1094 314.5 V324 C1102 314 1113 309.5 1125 309.5 C1154.5 309.5 1169 328 1169 354 V430.5 Q1169 433.5 1166 433.5 H1136 Q1133 433.5 1133 430.5 V362 C1133 348 1127 341.5 1115 341.5 C1102 341.5 1094 350.5 1094 364 V430.5 Q1094 433.5 1091 433.5 H1062 Q1059 433.5 1059 430.5 V314.5 Q1059 311.5 1062 311.5 Z"/>
+    <path id="letter-e" fill-rule="evenodd" d="M1235 310 C1271 310 1292 335 1292 372 V377 Q1292 381 1288 381 H1213 C1215 396 1223 404 1236 404 C1246 404 1253 400 1260 390 L1284 403 Q1287 404.5 1285 408 C1274 425 1259 434 1236 434 C1200 434 1177 410 1177 372 C1177 336 1200 310 1235 310 Z M1213 359 H1257 C1255 346 1248 339.5 1235 339.5 C1224 339.5 1216 346.5 1213 359 Z"/>
+  </g>
+  <g id="mix" fill="#E8EBF2">
+    <path id="capital-m" d="M1304 273 H1337 Q1340 273 1342 277 L1380.5 345 L1422 277 Q1424 273 1427 273 H1459 Q1462 273 1462 276 V430 Q1462 433 1459 433 H1429 Q1426 433 1426 430 V335 L1388 394 Q1386 398 1382 398 H1379 Q1375 398 1373 394 L1336 335 V430 Q1336 433 1333 433 H1304 Q1301 433 1301 430 V276 Q1301 273 1304 273 Z"/>
+    <g id="mix-i">
+      <rect id="mix-i-dot" x="1477" y="273" width="36" height="33" rx="4"/>
+      <rect id="mix-i-stem" x="1477" y="318" width="36" height="115" rx="2.5"/>
+    </g>
+    <path id="letter-x" d="M1526 311.5 H1559 Q1562 311.5 1564 314.5 L1586 346 L1608 314.5 Q1610 311.5 1613 311.5 H1647 Q1652 311.5 1648.5 316 L1607.5 372 L1649 428.5 Q1652 433 1647 433 H1612 Q1609 433 1607 430 L1586 398 L1563 430 Q1561 433 1558 433 H1525 Q1520 433 1523.5 428.5 L1564 372 L1523.5 316 Q1520.5 311.5 1526 311.5 Z"/>
+  </g>
+  
+</svg>

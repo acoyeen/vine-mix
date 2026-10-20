@@ -4,6 +4,11 @@ A working log for rough ideas, researched options, and possible future features.
 Entries are proposals, not delivery commitments or instructions to implement.
 Existing plans elsewhere in `docs/` remain separate unless an idea links to them.
 
+Implemented items are removed from this active list and retained in the
+[implemented ideas archive](IDEAS_IMPLEMENTED.md). IDs are never reused.
+Cleanup on 20 October 2026 archived IDEA-007 through IDEA-010; their remaining
+manual qualification notes are preserved there.
+
 ## How this log works
 
 Capture the useful intent behind each idea, check it against the current project,
@@ -12,9 +17,9 @@ assumptions, and open questions distinct. Include dated primary-source links for
 external research; explicitly mark research that is still pending.
 
 Use IDs such as `IDEA-001` and statuses such as **Captured**, **Researched**,
-**Needs decision**, **Planned**, **Implemented**, or **Parked**. Update related
-entries instead of adding duplicates. A status of Planned requires an explicit
-decision to pursue the idea.
+**Needs decision**, **Planned**, or **Parked**; move completed entries to the
+archive. Update related entries instead of adding duplicates. A status of Planned
+requires an explicit decision to pursue the idea.
 
 ## Ideas
 
@@ -32,12 +37,11 @@ order; subsequent implementation decisions are recorded in the individual entrie
 | [IDEA-004](#idea-004-user-created-tasks-for-multiple-changes) | User-created tasks for multiple changes | Researched |
 | [IDEA-005](#idea-005-pin-nodes-and-tasks-to-the-top-of-the-window) | Pin nodes and tasks to the top of the window | Researched |
 | [IDEA-006](#idea-006-external-parameters-and-conditional-task-triggers) | External parameters and conditional task triggers | Researched |
-| [IDEA-007](#idea-007-static-and-dynamic-modes-in-the-ducking-node) | Static and Dynamic modes in the Ducking node | Implemented |
-| [IDEA-008](#idea-008-separate-expander-and-gate-nodes) | Separate Expander and Gate nodes | Implemented |
-| [IDEA-009](#idea-009-unavailable-output-warnings-matching-inputs) | Unavailable output warnings matching inputs | Implemented |
-| [IDEA-010](#idea-010-empty-eq-default-and-centered-plot-text) | Empty EQ default and centered plot text | Implemented |
 | [IDEA-011](#idea-011-compact-bypass-control-and-clear-processing-semantics) | Compact bypass control and clear processing semantics | Captured |
 | [IDEA-012](#idea-012-silence-an-apps-direct-playback-while-monitoring-through-vine-mix) | Silence an app's direct playback while monitoring through Vine Mix | Researched |
+| [IDEA-013](#idea-013-audio-file-inputs-and-soundboard-playback) | Audio-file inputs and soundboard playback | Researched |
+| [IDEA-014](#idea-014-dedicated-vine-mix-virtual-audio-driver) | Dedicated Vine Mix virtual audio driver | Parked |
+| [IDEA-015](#idea-015-support-additional-virtual-audio-drivers) | Support additional virtual audio drivers | Captured |
 
 ## IDEA-001: Dedicated visualization nodes
 
@@ -107,7 +111,7 @@ order; subsequent implementation decisions are recorded in the individual entrie
   expose it through their context menu. Graph nodes also have saved mute state.
   However, today's intermediate-node UI exposes Bypass, which passes audio
   through; it would not implement the intended switch-off behavior. The existing
-  audio-reactive Expander/Gate is also a different operation. See
+  audio-reactive Expander and Gate nodes perform different operations. See
   [workspace controls](NODE_WORKSPACE.md), `desktop/AudioMixer.Desktop/GraphModels.cs`,
   and `native/include/am/graph.hpp`.
 - **Scope and tradeoffs:** Small to medium relative to the other proposals.
@@ -256,239 +260,6 @@ order; subsequent implementation decisions are recorded in the individual entrie
   establish addresses, value directions, liveness, and coexistence with VRChat,
   then specify the closed-eyes-to-five-second-fade scenario end to end.
 
-## IDEA-007: Static and Dynamic modes in the Ducking node
-
-- **Captured:** 2026-10-20 (UTC+10). **Status:** Implemented and activated.
-- **Source:** the maintainer requested this proposal be passed from the chat
-  "Explain sidechain processing" and recorded here for future development.
-  the maintainer subsequently explicitly requested implementation on 2026-10-20.
-- **User need and rationale:** Organize controls around lowering one signal in
-  response to another, without requiring users to understand compressor detector
-  terminology.
-- **User's desired direction:** Group both forms of ducking in the Ducking node
-  through a dropdown:
-  - **Static ducking:** Apply a fixed attenuation target once the external trigger
-    exceeds Threshold. Show Threshold, Duck amount, Attack, and Release.
-  - **Dynamic ducking:** Use external sidechain compression; reduction increases
-    with how far the trigger exceeds Threshold, according to Ratio. Show
-    Threshold, Ratio, Attack, and Release.
-  Both modes retain the same main-audio input/output and detector-only trigger
-  connection. Both require crossing Threshold; neither should react to just any
-  microphone sound. Trigger audio never joins the audible output.
-- **Compressor direction:** Remove the Main audio / Sidechain detector dropdown
-  from the ordinary Compressor's normal interface, focusing it on reducing its
-  own louder passages using its main audio. Preserve existing saved compressor
-  behavior and routing; the exact compatibility and presentation strategy remains
-  unresolved. Do not silently convert existing external compressors or presets.
-- **Proposed hover tooltips:**
-  - Static: "Lowers the audio by a set amount when the trigger sound crosses the
-    threshold."
-  - Dynamic: "Lowers the audio more as the trigger sound gets louder above the
-    threshold."
-- **Internal evidence checked (2026-10-20):**
-  [Dynamics documentation](CORE_DYNAMICS.md), `native/src/graph.cpp`, and
-  `desktop/AudioMixer.Desktop/GraphNodeView.cs` describe/implement the current
-  fixed-depth Ducking node and the Compressor's main/external detector choice.
-  Static ducking currently smooths its detector with 5 ms rise / 50 ms fall and
-  uses a fixed 3 dB hysteresis margin, then applies a separate attack/release gain
-  envelope. External compression uses its existing peak/ratio curve. These are
-  different algorithms; introducing a mode selector does not establish identical
-  detector, timing, threshold-release, or transition behavior between them.
-  No external research or new runtime/hardware verification was performed for
-  this entry; these are local code/documentation findings.
-- **Considerations, not user-approved requirements:** "Fixed amount" and
-  "Voice responsive" might be friendlier alternate labels, and persistent help
-  could complement hover tooltips. Static ducking creates consistent space for
-  speech; Dynamic responds more to loud speech but may leave less space for
-  quiet speech. Removing external detection from the Compressor's normal UI
-  sacrifices a conventional advanced workflow, so decide whether an advanced
-  route remains accessible.
-- **Likely scope and dependencies:** Ducking mode selector, mode-specific controls
-  and help, dynamic-mode processing/configuration representation, Compressor
-  presentation, persistence and backward compatibility, and focused verification.
-  Existing sidechain connections and compressor processing are useful foundations;
-  reusing them requires explicit behavior and migration decisions. No dependency
-  on the task or external-parameter proposals is required.
-- **Open questions:** Final mode labels; detector and timing semantics in each
-  mode; whether advanced external compression stays accessible; how existing
-  saved external compressors are displayed and edited; retention of mode-specific
-  values; and behavior during mode changes. Keep existing saved setups intact
-  until a compatibility strategy is explicitly chosen.
-- **Implementation decision (2026-10-20):** the maintainer confirmed no current
-  compressors use sidechains and that preserving such node/cable setups is not
-  a concern. Compressor now always measures its own programme signal and has no
-  detector selector or trigger socket. Only Ducking accepts trigger cables.
-  Older detector strings remain readable but do not select external processing.
-  Static ducking is the unchanged fixed-amount algorithm. Dynamic ducking uses
-  the existing peak/ratio transfer above Threshold, with no make-up gain or
-  main-input fallback. Both modes share the gain envelope across changes;
-  Static's detector remains warm. Amount and Ratio remain saved independently.
-  The dropdown shows **Static ducking** and **Dynamic ducking**, with the proposed
-  tooltips and four visible controls in each mode. Ratio defaults to 4:1.
-- **Verification:** All 17 native suites and 9,945 detached desktop checks,
-  189 renders, zero binding errors. Evidence:
-  `artifacts/dynamics-organization-20261020/native-final/results.json` and
-  `artifacts/dynamics-organization-20261020/ui-final-2/results.json`.
-- **Activation (2026-10-20):** The matched engine/interface package is running.
-  All previously running audio paths resumed, audio frames advanced, and the
-  saved settings file was unchanged. Configuration matched after accounting for
-  the newly introduced Ducking defaults. Evidence:
-  `artifacts/dynamics-organization-20261020/activation/result.json`.
-- **Next step:** Review real speech/music behavior. Synthetic checks do not
-  establish listening quality.
-
-## IDEA-008: Separate Expander and Gate nodes
-
-- **Captured:** 2026-10-20 (UTC+10). **Status:** Implemented and activated.
-- **User's requested direction:** Split the combined Expander / Gate node into
-  two distinct nodes: **Expander** and **Gate**.
-- **Rationale (inferred):** Make each processor directly discoverable and give it
-  a focused interface instead of requiring a mode change within a combined node.
-- **Proposal:** Offer separate Add/search entries and node identities, each
-  showing its relevant controls. Based on the existing modes, Expander would show
-  Threshold, Ratio, Attack, Release, and Range; Gate would show Threshold, Attack,
-  Hold, Release, Range, and Hysteresis. These control lists are a suggested reuse
-  of current behavior, not newly confirmed requirements.
-- **Project fit and internal review (2026-10-20):**
-  [Current dynamics documentation](CORE_DYNAMICS.md#expander--gate),
-  `desktop/AudioMixer.Desktop/NodeCatalog.cs`, and
-  `desktop/AudioMixer.Desktop/GraphModels.cs` describe one `expander` node kind
-  with a saved mode and separate mode-specific settings. Existing processing
-  could remain shared internally while presenting two nodes; the requested split
-  does not itself require changing either audio algorithm. No external research
-  or runtime verification was needed for this capture.
-- **Scope and tradeoffs:** Node catalog/search, dedicated presentation and
-  defaults, configuration representation, copy/paste/reset, documentation, and
-  compatibility checks. Two entries improve direct access but enlarge the node
-  library. Preserve existing saved nodes' settings, routing, and audible behavior;
-  decide how their stored mode maps to the separate node identities.
-- **Open questions:** Compatibility/migration approach; whether users can later
-  convert one type to the other; and how to retain settings previously saved for
-  the inactive mode. No conversion behavior has been requested or approved.
-- **Implementation update (2026-10-20):** Added dedicated Expander and Gate
-  creation/search entries with five and six controls respectively, without a
-  mode selector. New Gate records use kind `gate` and the existing gate algorithm.
-  Existing `expander` records saved in gate mode still display Gate controls and
-  retain that mode on reset, without automatic identity/settings migration.
-  Save/load, copying, reset and Undo/Redo retain settings and routing. No new
-  node-conversion action was added.
-- **Verification:** The same 17 native suites and 9,945 desktop checks above
-  include dedicated/earlier Gate sample parity, bypass, history, telemetry,
-  parameter validation and allocation guards. Both node renders were inspected.
-- **Activation (2026-10-20):** Installed with IDEA-007; saved settings and all
-  previously running paths were preserved. Evidence:
-  `artifacts/dynamics-organization-20261020/activation/result.json`.
-- **Next step:** Review real speech and background noise. Hardware/listening
-  checks have not been performed.
-
-## IDEA-009: Unavailable output warnings matching inputs
-
-- **Captured:** 2026-10-20 (UTC+10). **Status:** Implemented and activated.
-- **User observation and requested direction:** Missing inputs have a red
-  outline/glow and flashing warning, but missing outputs do not receive the same
-  treatment. Extend that availability warning to outputs as well.
-- **User need:** Make a missing listening or virtual output as easy to notice as
-  a missing input, so users can identify why a route cannot deliver sound.
-- **Proposal:** Apply the existing input-warning treatment to assigned,
-  unavailable physical and virtual outputs: red device-name pulse, faint outer
-  glow, warning triangle, and a specific reason/recovery tooltip. Clear the
-  warning when playback recovers. Including both output types and matching all
-  existing warning details is the proposed interpretation of "outputs as well."
-- **Project fit and internal review (2026-10-20):**
-  [Input availability](INPUT_AVAILABILITY.md) documents the current input-only
-  warning, reduced-animation behavior, accessible status, and rules that silence
-  and healthy mute do not imply failure. [Device visibility](DEVICE_VISIBILITY.md)
-  already retains unavailable assigned output devices in selectors.
-  `desktop/AudioMixer.Desktop/GraphNodeView.cs` contains input-specific warning
-  state alongside output device controls. No external research or live device
-  checks were performed for this capture.
-- **Suggested behavior and scope:** Reuse the visual/accessibility treatment,
-  but classify output availability from playback/device state rather than capture
-  state. Preserve selection outlines, node geometry, and socket positions.
-  Respect reduced animation and high contrast. An assigned unavailable output
-  should still warn while muted; healthy mute, silence, an unassigned output, or
-  a connection attempt should not alone be classified as a missing device.
-  These details carry forward the existing input conventions as suggestions.
-- **Tradeoffs and open questions:** Distinguish a missing/disabled/unplugged
-  device from playback startup/failure and an offline engine. Confirm which
-  existing output statuses provide reliable evidence and suitable recovery text.
-  A visual warning must not change assignments, routing, levels, or saved setups.
-- **Implementation update (2026-10-20):** the maintainer explicitly requested this work.
-  Physical and virtual outputs now share the input warning presentation: red
-  outer glow, steady triangle above the meter, and a 1.6-second device-name pulse.
-  Playback state and render-device identities determine the warning; running
-  playback clears it even when inventory lags. Healthy mute, silence and
-  connection attempts do not trigger it. Missing VAC Lite warns on an unassigned
-  virtual output, matching the existing missing-VB-CABLE input behavior. Output
-  access help corrects the older engine's microphone-specific access wording.
-  Controls and socket positions remain fixed through warning/recovery changes;
-  no audio-engine, routing or personal settings changes are part of this update.
-- **Verification:** 9,507 detached desktop checks, 174 renders, zero binding
-  errors; output/input warning renders inspected. Evidence:
-  `artifacts/output-availability-20261020/ui-final-3/results.json`.
-- **Activation:** Applied after the maintainer confirmed Saved/idle. The interface was
-  replaced while the same audio-engine process continued running; configuration,
-  audio settings, UI preferences and previously running paths were preserved.
-  Evidence: `artifacts/output-availability-20261020/activation.json`.
-- **Next step:** Manually check real output unplug/replug and audible recovery.
-  Those hardware/listening checks have not been performed.
-
-## IDEA-010: Empty EQ default and centered plot text
-
-- **Captured:** 2026-10-20 (UTC+10). **Status:** Implemented and activated.
-- **User observation:** EQ currently starts with five bands; bands 1 and 5 have
-  a different Width/Q. The band information at the top overlaps/clips with the
-  decibel reading on the left.
-- **Requested behavior:** New EQ nodes start with **zero bands**. Center the
-  "double-click to add a band" hint, and center the band information at the top
-  of the EQ so it does not collide with the left decibel labels.
-- **Rationale:** Start with a clean, flat EQ that users build as needed, and keep
-  instructions and active-band details legible.
-- **Project fit and internal review (2026-10-20):**
-  [EQ documentation](NODE_WORKSPACE.md#eq-and-dynamics) already permits zero to
-  eight bands and a flat response with no bands. In
-  `desktop/AudioMixer.Desktop/GraphModels.cs`, `EqBand.Defaults()` creates five
-  bands: low/high shelves at the ends use Q 0.70710678, while the middle bells use
-  Q 1. This explains the differing defaults; the user has not requested changing
-  shape-specific Q values. `desktop/AudioMixer.Desktop/Controls/EqualizerEditor.cs`
-  owns the plot interaction and text rendering. The clipping is user-reported;
-  no new visual reproduction or external research was performed for this note.
-- **Scope and tradeoffs:** Update new-EQ defaults and plot text layout, preserve
-  existing saved bands, and keep band creation discoverable in the empty state.
-  Center within the usable plot area with clearance for axis labels rather than
-  allowing long band details to overlap either scale. Keep Tone and dedicated
-  filter defaults independent of this change.
-- **Implementation update (2026-10-20):** the maintainer requested implementation of new
-  zero-band EQs and centred text. New workspace EQs now start empty and flat;
-  explicit empty arrays remain empty through persistence, copying and Undo/Redo.
-  Saved populated bands and older settings that omit the band field keep their
-  existing behavior. Tone and dedicated filter defaults are unchanged. Band
-  controls become available when the first band is added.
-  The top caption and empty hint are centred within the plot's usable width,
-  excluding both axis gutters. The hint stays above the flat response line;
-  narrow captions use one-line ellipsis with full details in accessible status.
-  Alignment is part of the existing text cache, preserving redraw reuse.
-- **Reset follow-up (2026-10-20):** The first creation-only update retained
-  five-band resets. the maintainer then reported that right-click reset still restored
-  the old defaults. Both **Reset node to defaults** and **Reset EQ to flat**
-  now clear all bands, matching a new EQ. An already empty EQ does not publish
-  another curve-reset edit. Undo retains the ability to restore populated bands;
-  individual band-position reset behavior is unchanged.
-  The correction passed 9,701 detached checks, 182 renders and zero binding
-  errors: `artifacts/eq-reset-empty-20261020/ui-final/results.json`.
-  It was activated with the same engine, configuration, settings and preferences
-  preserved: `artifacts/eq-reset-empty-20261020/activation.json`.
-- **Verification:** 9,692 detached desktop checks, 182 renders, zero binding
-  errors. Actual text ink was checked at 320/540 DIP widths and 96/144/192 DPI;
-  empty/first-band nodes and selected/multiselect captions were visually reviewed.
-  Evidence: `artifacts/eq-empty-centred-20261020/ui-final/results.json`.
-- **Activation:** Applied under the maintainer's instruction to proceed without further
-  Saved/idle prompts. The same audio engine continued running, with configuration,
-  settings, preferences and previously running paths preserved. Evidence:
-  `artifacts/eq-empty-centred-20261020/activation.json`.
-- **Next step:** Review creation and pointer interaction in the running workspace.
-  No audio processing changes.
-
 ## IDEA-011: Compact bypass control and clear processing semantics
 
 - **Captured:** 2026-10-20 (UTC+10). **Status:** Captured.
@@ -629,6 +400,194 @@ order; subsequent implementation decisions are recorded in the individual entrie
   mute using known non-protected material. Then check child sessions, relaunch,
   multiple nodes, and restoration. If capture is silenced, investigate guided
   virtual-cable routing. This entry authorizes research notes only.
+
+## IDEA-013: Audio-file inputs and soundboard playback
+
+- **Captured:** 2026-10-20 (UTC+10). **Status:** Researched.
+- **User's requested direction:** Drag MP3 and other supported audio files
+  directly onto the canvas to create audio-file input nodes. Also offer an
+  Audio File node through normal node creation. Allow looping and a play button
+  for soundboard-style activation. In a later phase, let users bind a keyboard
+  shortcut to trigger a sound even when the app window is not focused.
+- **User need:** Play clips or looping audio through the same effects, mixes,
+  listening outputs, and virtual microphone routes as other sources, without
+  running a separate player and capturing it.
+- **Project fit and local review (2026-10-20):**
+  `desktop/AudioMixer.Desktop/NodeCatalog.cs` currently offers microphone,
+  virtual-input, and running-app sources; `native/include/am/graph.hpp` has no
+  audio-file source kind. Existing graph routing, resampling, bounded audio
+  queues, and playback status offer reusable patterns, but file decoding and a
+  playback transport would be new. Existing canvas node/cable dragging is not
+  file-drop support. No playback prototype or shortcut registration was performed.
+- **Primary-source research (2026-10-20):**
+  [WPF drag and drop](https://learn.microsoft.com/en-us/dotnet/desktop/wpf/advanced/drag-and-drop-overview)
+  provides the desktop drop interaction. Windows
+  [Media Foundation Source Reader](https://learn.microsoft.com/en-us/windows/win32/medfound/source-reader)
+  can decode files into samples for an application's own pipeline, but does not
+  manage playback timing; Vine Mix would schedule the samples itself. Microsoft's
+  [format reference](https://learn.microsoft.com/en-us/windows/win32/medfound/supported-media-formats-in-media-foundation)
+  lists MP3, WAVE, and AAC/MPEG-4 support. MP3/WAV are candidate initial formats;
+  verify exact container/codec and Windows-installation coverage before promising
+  other formats. A broader decoder library is an alternative, with dependency,
+  packaging, and licence costs; none has been selected.
+  [RegisterHotKey](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-registerhotkey)
+  provides system-wide shortcuts for the later phase, subject to reserved or
+  already-registered combinations. Report conflicts rather than promising that
+  every key binding works in every application.
+- **Suggested initial behavior:** A dropped file creates a source at the drop
+  position in canvas coordinates, named after the file, initially stopped. Its
+  audio output uses ordinary cables. Provide Play/Stop, Loop, and clear loading,
+  ready, playing, and missing/unsupported-file feedback. A file picker on the
+  standalone node complements dropping. These details are suggestions; only
+  file input, dropping, looping, and play activation were explicitly requested.
+- **Scope and tradeoffs:** Medium to large: source configuration and persistence,
+  file loading/decoding, transport commands/status, node UI, drops, and offline
+  verification. Decode and read files away from the real-time audio thread and
+  supply bounded/prepared samples in the engine's 48 kHz stereo format. Short
+  predecoded clips reduce trigger delay but consume memory; streaming long files
+  bounds memory but needs buffering and seeking. Compressed encoder delay/padding
+  can affect loop boundaries, so gapless looping needs separate verification.
+- **Open questions:** Which additional formats; one node per file on multi-drop;
+  repeated Play restarts, overlaps, or toggles; whole-file versus region looping;
+  file references versus copied assets and relinking moved files; startup playback
+  policy; and whether shortcuts should toggle loops as well as trigger clips.
+  Background shortcuts require a running shortcut handler; operation while hidden
+  to tray versus after the interface exits remains to be specified.
+- **Dependencies:** Manual playback and looping come first; global shortcuts are
+  explicitly later. IDEA-005's pinned controls could make clips easier to reach.
+  Future task activation would be a separate extension to IDEA-004, not an
+  assumption that tasks may create or rearrange nodes.
+- **Next step:** Define the first supported formats, replay/loop behavior, and
+  file-storage policy; then specify an offline clip-to-effects-to-output check
+  and drop-to-node interaction. Plan global shortcuts after manual playback works.
+  This is a future-development note, not implementation authorization.
+
+## IDEA-014: Dedicated Vine Mix virtual audio driver
+
+- **Captured and researched:** 2026-10-20 (UTC+10).
+  **Status:** Parked. the maintainer decided on 2026-10-20 to retain VB-CABLE for virtual
+  input and VAC Lite for virtual output for now. Custom driver development is
+  outside the current scope. The completed research is retained for a future
+  reconsideration; broader application compatibility is recorded in IDEA-015.
+- **User need:** A streamlined installer and predictable virtual input/output
+  devices without paid cable dependencies or restrictions that prevent accepting
+  donations or selling Vine Mix. the maintainer requested investigation of AudioMirror's
+  legitimacy/reliability and the work needed to adapt it.
+- **Proposal:** One maintained Vine Mix driver package with two independent
+  cable paths: applications into the mixer, and the finished mix into recording
+  applications. Initial assumption: Windows 11 x64, stereo 48 kHz. the maintainer confirmed
+  that **four clearly labelled Windows endpoints are acceptable**, and that
+  **the cables must also work between other applications with Vine Mix closed**.
+  Each playback/recording pair therefore needs an autonomous internal connection.
+- **Evidence and rationale:** See the dated
+  [AudioMirror assessment](AUDIOMIRROR_ASSESSMENT.md) and subsequent
+  [open-source driver survey](OPEN_SOURCE_DRIVER_SURVEY.md). The inspected AudioMirror default branch
+  is at `a9618d1ab4114e3e35e8e50ae804a4205315d1f2` (2022-10-15).
+  The author warns it is unfinished. Two buffer defects were reproduced in an
+  isolated source harness; cleanup/removal defects and incomplete multi-cable
+  support are visible in source. The upstream uninstall-fix PR remains unmerged.
+  No AudioMirror kernel driver was built or installed, and no Windows 11 audio
+  qualification was performed. Research sources, limits and test method are in
+  the assessment.
+- **Broader research follow-up (2026-10-20):** Inspected eight additional source
+  repositories. The initial survey preferred MicDeck VAD for a conventional-cable
+  prototype; its two portable suites passed here. AudioRouter's separately
+  MS-PL-licensed driver provides multi-cable declarations and private engine
+  transport; its host bridge suite passed 88,167 checks after supplying two
+  missing no-op annotation macros. Virtual Cables plus BSD-licensed usbip-win2
+  is a distinct alternative with transport/timing tradeoffs. These are prototype
+  priorities, not reliability claims or a dependency decision. DeckX includes
+  real but basic loopback; VirtualDrivers' inspected public capture path emits
+  silence. Exact commits, licensing boundaries and limitations are in the survey.
+- **Deeper comparison (2026-10-20):** See
+  [MicDeck and AudioRouter foundations](VIRTUAL_DRIVER_FOUNDATION_COMPARISON.md).
+  The updated first prototype recommendation is **AudioRouter's Windows driver
+  framework with two new internal loopback paths**, retaining normal WASAPI and
+  requiring no relay service. Its existing private bridge is not autonomous.
+  MicDeck's portable transport passed two-million-frame stress and sanitizer
+  checks, but exact-source tests reproduced a counter/frequency inversion and
+  invalid cyclic-buffer positions; power/format integration is also incomplete.
+  AudioRouter's upstream suite and additional transport tests passed here; newer
+  upstream VM/Verifier records apply to an identical driver subtree, but remain
+  self-reported and do not qualify our proposed transport change. Native WDK
+  compilation and remaining live-test limits are recorded in the comparison.
+- **Commercial-use conditions:** MicDeck's driver MIT and AudioRouter's explicit
+  driver MS-PL grant allow commercial distribution/donations with their notices
+  and conditions. AudioRouter's surrounding GPL Rust client/helper is outside
+  that grant; our proposed autonomous design avoids importing its client and
+  needs an independent installer helper. Preserve per-file provenance and
+  Microsoft notices. No paid cable licence is needed, but our own accepted
+  production signing/qualification path still needs a budget. AudioMirror's
+  inherited Microsoft source requires the same careful component review.
+- **Scope/tradeoffs/dependencies:** Large, with ongoing kernel-driver ownership.
+  Requires a WDK build pipeline, buffer/lifetime repairs, two unique endpoint
+  pairs, role-aware native/desktop binding, careful saved-device migration,
+  installer rollback, test machines, Windows compatibility qualification and
+  publisher signing. Current drivers remain the fallback. App installer/save-path
+  improvements can proceed separately under their existing proposal.
+- **Scope decision (2026-10-20):** Following the research, the maintainer chose to keep
+  the existing VB-CABLE and VAC Lite dependencies for now and defer custom driver
+  development. Rechecked
+  [VB-Audio's terms](https://vb-audio.com/Services/licensing.htm) and the
+  [VAC EULA](https://vac.muzychenko.net/en/license.txt): base VB-CABLE explicitly
+  permits compliant free/commercial application bundles; VAC Lite restricts use
+  to private homes without income generation and prohibits profiting from its
+  provision to others. These are distinct from monetising Vine Mix's separate
+  application. Paid-app/donation scenarios must not be represented as blanket
+  permission to bundle Lite or use it for income-generating audio work. A
+  driver-independent application with separately obtained, appropriately licensed
+  drivers is a lower-maintenance route to assess before custom development.
+- **Alternatives and unresolved decisions:** Retain MicDeck's portable transport,
+  Virtual Cables/USB-IP and a current Microsoft SimpleAudioSample/SysVAD foundation
+  as alternatives if the AudioRouter feasibility gate fails. The earlier
+  AudioMirror-only and initial MicDeck-first priorities are superseded by the
+  deeper findings. Decide supported Windows releases, transport precision,
+  staffing, test target and signing budget if this idea is revisited. No new
+  driver dependency has been adopted.
+- **Practical next step:** Keep the current two-driver setup. Assess its
+  distribution and revenue model separately; no custom driver work is scheduled.
+  If custom implementation is
+  later requested, run the separate
+  one-to-two-week AudioRouter feasibility gate: build/package, add two isolated
+  internal cable paths and test both simultaneously with Vine Mix closed in a
+  disposable Windows target. A more complete prototype is estimated at two to
+  five weeks and release qualification at several months, with explicit
+  uncertainty and an experienced driver engineer assumed. This entry does not
+  authorize installing or developing the driver.
+
+## IDEA-015: Support additional virtual audio drivers
+
+- **Captured:** 2026-10-20 (UTC+10). **Status:** Captured for later;
+  the maintainer explicitly chose to keep the current two drivers for now.
+- **User need:** Let users choose compatible virtual audio cables they already
+  have, including appropriately licensed alternatives for commercial activity,
+  without requiring Vine Mix to develop or maintain a kernel driver.
+- **Proposal:** Extend **Troubleshooting → Reassign device** to offer compatible
+  virtual recording devices for Virtual Input and compatible virtual playback
+  devices for Virtual Output. Preserve explicit saved assignments, missing-device
+  recovery and output-ownership protection. Keep the current VB-CABLE/VAC Lite
+  defaults until a separate implementation decision is made. This is an
+  application compatibility feature, distinct from the parked custom-driver
+  proposal in [IDEA-014](#idea-014-dedicated-vine-mix-virtual-audio-driver).
+- **Project fit and feasibility:** Checked the current code on 2026-10-20.
+  `VirtualDeviceBindings.Matches` restricts the menu to VB-CABLE capture and VAC
+  playback endpoints. Native graph validation and audio workers enforce matching
+  restrictions, so widening the menu alone would not enable other drivers.
+  Initial assumption: standard Windows endpoints accessed through the existing
+  WASAPI engine; private driver protocols or ASIO would require separate scope.
+  See [virtual device selection](VIRTUAL_DEVICE_UI.md),
+  `desktop/AudioMixer.Desktop/VirtualDeviceBindings.cs`,
+  `native/src/engine.cpp` and `native/src/windows_audio.cpp`.
+- **Scope and tradeoffs:** Update device classification, menu filtering, engine
+  validation and audio-opening policy together. Qualify format support, shared
+  versus exclusive access, latency, simultaneous clients and reconnect behavior
+  for each supported driver. Compatibility does not grant redistribution or
+  commercial-use rights; each dependency retains its own licence. No additional
+  driver has been selected or qualified by this entry.
+- **Practical next step:** When revisited, define the supported endpoint contract
+  and choose a small driver compatibility matrix, then test both independent
+  audio paths while preserving existing saved bindings. Recording this idea does
+  not authorize implementation, installation or changes to the running app.
 
 ## Relationships and possible investigation order
 

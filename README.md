@@ -39,6 +39,20 @@ the audio libraries and RNNoise model. It builds a self-contained desktop packag
 users do not need to install .NET. No audio drivers are installed by the build.
 Keep the entire package together, including its `licenses` directory.
 
+To create the Windows installer instead:
+
+```powershell
+.\scripts\build-installer.ps1
+```
+
+The result is `artifacts\installers\VineMix-0.2.0-Setup-x64.exe`. It installs
+under `%LOCALAPPDATA%\Programs\Vine Mix`, preserving saved data under
+`%LOCALAPPDATA%\AudioMixer`. It detects the two current drivers and offers their
+original setups only when missing. This bundle is for free, non-commercial
+distribution and retains the vendors' separate usage conditions. Read the
+[installer guide](installer/README.md) before distributing it. The development
+installer is unsigned.
+
 Later builds can use `-NoBootstrap`. If the app is running, stage a separate package:
 
 ```powershell
@@ -51,8 +65,9 @@ engine or saving settings. Closing the normal window hides it to the tray; use
 and require device assignment.
 
 Physical devices and application capture can be used without virtual drivers.
-Virtual nodes require separately installed [VB-CABLE](https://vb-audio.com/Cable/)
-and [Virtual Audio Cable](https://vac.muzychenko.net/en/download.htm).
+Virtual nodes require installed [VB-CABLE](https://vb-audio.com/Cable/)
+and [Virtual Audio Cable](https://vac.muzychenko.net/en/download.htm). The
+installer can offer these prerequisites; portable packages require manual setup.
 Their licences are separate; VAC Lite has private-home/non-income restrictions.
 Read the [distribution guide](docs/DISTRIBUTION.md) before sharing a package.
 
@@ -61,7 +76,8 @@ Read the [distribution guide](docs/DISTRIBUTION.md) before sharing a package.
 - [Future development ideas and research notes](docs/IDEAS.md)
 - [User guide and shortcuts](docs/USER_GUIDE.md)
 - [Node workspace and architecture](docs/NODE_WORKSPACE.md)
-- [Planned installation, updates and release screens](docs/INSTALLATION_AND_UPDATES.md)
+- [Installer, planned updates and release screens](docs/INSTALLATION_AND_UPDATES.md)
+- [Installer verification](docs/INSTALLER_VERIFICATION.md) and [fresh Windows test instructions](docs/INSTALLER_TESTING.md)
 - [Application capture and routing](docs/APP_AUDIO.md)
 - [Device visibility and recovery](docs/DEVICE_VISIBILITY.md)
 - [Effects and limitations](docs/EFFECTS_RESEARCH.md)

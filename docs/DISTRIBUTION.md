@@ -1,7 +1,7 @@
 # Distribution and attribution
 
 Reviewed 19 October 2026 against the dependencies and assets in this repository.
-Font and branding notices updated 20 October 2026.
+Font, branding and installer notices updated 20 October 2026.
 This records Vine Mix's distribution setup and its limits. The full upstream
 licences, rather than this summary, govern each component.
 
@@ -78,18 +78,42 @@ the visual rebrand does not rename settings paths or application protocols.
 
 ## Drivers and commercial use
 
-Distribute Vine Mix without driver installers or driver binaries. Users
-obtain their chosen virtual audio driver directly from the vendor. The
-application's source licence grants no extra rights to a driver or another
-vendor's branding.
+The portable application package contains no driver installers. The Windows
+setup built by `scripts/build-installer.ps1` includes the complete original base
+VB-CABLE Pack45 and VAC Lite 4.71 packages, restricted to the current **free,
+non-commercial distribution**. `installer/drivers.json` pins official URLs,
+archive/file hashes, hardware identities and reviewed vendor signatures. The
+preparation script verifies these before building; Setup retains their original
+packages and runs only missing, selected drivers through their interactive
+vendor installers. Existing drivers, including disabled/staged packages, are
+preserved. Driver installation is never part of unattended application setup.
+
+The application's MIT licence grants no extra rights to a driver or another
+vendor's branding. Keep the vendor credits, donation links and usage conditions
+visible in Setup, its required terms and installed driver notices. The driver
+packages are not published as source-code dependencies in this repository.
 
 [VB-Audio](https://vb-audio.com/Services/licensing.htm) publishes specific
 donationware, professional-use and distribution conditions. Its A+B/C+D driver
 packages cannot be bundled with another product under the published terms.
 [VAC Lite](https://vac.muzychenko.net/en/license.txt) is restricted to private
-home use without income generation. A source release of Vine Mix does not
+home use without income generation, and its
+[distribution policy](https://vac.muzychenko.net/en/manual/distrib.htm) permits
+unchanged non-commercial redistribution. A source release of Vine Mix does not
 require distributing either driver; a commercial user must choose a driver
-licence suitable for that user's activity.
+licence suitable for that user's activity. This installer is not cleared for
+paid, sponsored or donation-supported redistribution. Reassess the exact vendor
+conditions before changing that model; free/open-source status alone does not
+resolve commercial purpose or a customer's income-generating use.
+
+Inno Setup 7.1.0 builds the installer. Its
+[licence](https://jrsoftware.org/files/is/license.txt) permits use for any purpose,
+including commercial applications, with its distribution conditions. The tool's
+commercial purchase request is distinct from that published permission grant.
+The pinned signed compiler is prepared in project-local portable mode; it is
+not part of the application's runtime. Its licence is retained in SetupSupport.
+The self-contained setup helper uses the same .NET runtime licensing already
+included with the application package.
 
 ## Dependency changes and release checks
 

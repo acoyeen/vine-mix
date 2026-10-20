@@ -1,0 +1,41 @@
+Vine Mix: optional virtual audio drivers
+Reviewed 20 October 2026
+
+Vine Mix is a separate application. The two optional drivers included with this
+free, non-commercial installer belong to their respective vendors and keep
+their own licences. Vine Mix's MIT licence does not relicense these drivers.
+All original package files, documentation and vendor terms are preserved.
+
+VB-CABLE (base cable), by VB-Audio Software
+Origin: https://www.vb-cable.com/
+Product and download: https://vb-audio.com/Cable/
+Licensing and contribution information: https://vb-audio.com/Services/licensing.htm
+
+VB-CABLE is donationware; all contributions are welcome. Please support
+VB-Audio if you find it useful. Professional use and deployment have additional
+licensing conditions. Read the original readme.txt in the VB-CABLE package and
+the vendor's current licensing page before installing or deploying it.
+
+VB-CABLE carries sound from other applications into Vine Mix. This installer
+includes only the base cable, not the separately obtained A+B or C+D products.
+
+Virtual Audio Cable Lite 4.71, by Eugene Muzychenko
+Product and download: https://vac.muzychenko.net/en/download.htm
+Licence: https://vac.muzychenko.net/en/license.txt
+Distribution policy: https://vac.muzychenko.net/en/manual/distrib.htm
+
+VAC Lite is restricted to private home use unrelated to income generation.
+The complete, unchanged Lite package is included for free, non-commercial
+distribution. It must not be sold on its own or within another product.
+Read its original license.txt before installing. This is the Lite edition,
+not the Trial or paid edition. The vendor's terms govern your use.
+
+VAC Lite carries Vine Mix's mixed output into another application as a
+recording device or microphone.
+
+Driver installation is optional and uses the vendors' original installers.
+Each vendor's terms must be accepted separately. Existing compatible drivers
+should be retained; do not reinstall, replace, remove or rename them merely
+to install Vine Mix. Driver installation may require administrator approval
+and a Windows restart. Uninstalling Vine Mix should leave shared drivers in
+place so other applications can continue using them.

@@ -116,7 +116,7 @@ audio algorithm. Legacy compression/limiter mode, hidden settings and saved gain
 remain available, but neither interface has a detector selector or trigger input.
 Old Compressor sidechain edges are rejected; nodes are not automatically converted
 to Ducking. This intentional compatibility change is recorded in the explicit
-[IDEA-007 decision](IDEAS.md#idea-007-static-and-dynamic-modes-in-the-ducking-node).
+[IDEA-007 decision](IDEAS_IMPLEMENTED.md#idea-007-static-and-dynamic-modes-in-the-ducking-node).
 Reading these defaults never rewrites an old file; normal backup/save behavior
 is unchanged. Copy/paste carries the marker and all effect records.
 

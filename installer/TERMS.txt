@@ -1,0 +1,77 @@
+VINE MIX INSTALLATION TERMS AND LICENCE
+
+Vine Mix is experimental Windows audio software. Please read these terms
+before continuing. Selecting "I accept" acknowledges these terms. Acceptance
+does not reduce rights granted by the open-source licences included with Vine Mix.
+
+YOUR FILES AND SETTINGS
+
+Application files are installed in the folder shown by Setup. By default this is
+%LOCALAPPDATA%\Programs\Vine Mix. Your saved workspace, preferences, backups and
+logs remain in %LOCALAPPDATA%\AudioMixer, separately from application files.
+Existing saved settings are retained. Uninstalling Vine Mix retains these files.
+
+A copy already running from another folder shares the same settings and audio
+engine identity. Setup does not stop that copy or launch another one alongside
+it. Quit the existing copy from its tray menu before using the installed copy.
+
+OPTIONAL THIRD-PARTY DRIVERS
+
+VB-CABLE and Virtual Audio Cable (VAC) are independent proprietary products.
+Vine Mix's MIT licence does not cover them. Including them does not imply their
+vendors endorse Vine Mix. Their original packages and notices are preserved. Installing either
+driver requires your agreement to its vendor terms and Windows administrator
+approval. A restart may be needed. Existing installations are not replaced by
+this setup. Drivers remain installed when Vine Mix is uninstalled.
+
+VB-CABLE is made by VB-Audio. It is donationware; all contributions are welcome.
+You can identify the product and donate or obtain a licence from its vendor:
+https://vb-audio.com/Cable/
+https://vb-audio.com/Services/licensing.htm
+Professional deployment has additional licensing conditions.
+
+VAC Lite is made by Eugene Muzychenko. Its licence permits use only in a private
+home environment unrelated to income generation. It is unsuitable for monetised
+streaming, paid audio work or business use under that licence. Do not select its
+installation if those conditions do not fit your use. Vine Mix can be installed
+without either optional driver. VAC terms and product information:
+https://vac.muzychenko.net/en/license.txt
+https://vac.muzychenko.net/en/download.htm
+
+This setup contains original driver packages for free, non-commercial
+distribution. Redistribution for payment, sponsorship or a donation-supported
+bundle requires a separate review of vendor permissions. This notice does not
+grant any additional driver rights. Other dependencies retain their own licences
+in THIRD_PARTY_NOTICES.md and the licences folder.
+
+PRIVACY AND AUDIO
+
+Setup checks installed audio drivers and running Vine Mix processes locally.
+The included driver packages are available offline. Opening a vendor website
+uses your browser. Setup does not upload your audio, settings or saved workspaces.
+Vine Mix's routing and audio settings remain under your control. Review the user
+guide and test routing and levels before relying on it for important work.
+
+VINE MIX OPEN-SOURCE LICENCE
+
+MIT License
+
+Copyright (c) 2026 acoyeen
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

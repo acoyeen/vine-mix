@@ -1,0 +1,538 @@
+{
+  "schemaVersion": 1,
+  "reviewedDate": "2026-10-20",
+  "distributionChannel": "free-noncommercial",
+  "targetArchitecture": "x64",
+  "notes": [
+    "These proprietary drivers retain their original vendor terms, separate from Vine Mix MIT licence.",
+    "Complete vendor packages are preserved, including other architectures and documentation. No paid, Trial, A+B or C+D package is substituted.",
+    "Installer executables must be launched interactively only after the user opts in. The build preparation never executes them.",
+    "This channel is not cleared for paid, sponsored or donation-supported redistribution. Review vendor conditions before changing distribution."
+  ],
+  "drivers": [
+    {
+      "id": "vb-cable",
+      "displayName": "VB-CABLE (base cable)",
+      "version": "Pack45",
+      "driverVersion": "3.3.1.7",
+      "archiveName": "VBCABLE_Driver_Pack45.zip",
+      "downloadUrl": "https://download.vb-audio.com/Download_CABLE/VBCABLE_Driver_Pack45.zip",
+      "publisherUrl": "https://vb-audio.com/Cable/",
+      "licenseUrl": "https://vb-audio.com/Services/licensing.htm",
+      "payloadDirectory": "drivers/vb-cable",
+      "installExecutable": "VBCABLE_Setup_x64.exe",
+      "installArguments": "",
+      "hardwareIds": [
+        "VBAudioVACWDM"
+      ],
+      "serviceName": "VBAudioVACMME",
+      "provider": "VB-Audio Software",
+      "infFiles": [
+        "vbMmeCable64_win10.inf"
+      ],
+      "licenseFiles": [
+        "readme.txt"
+      ],
+      "usageNotice": "VB-CABLE by VB-Audio (www.vb-cable.com) is donationware; all contributions are welcome. End users must remain able to identify VB-CABLE and donate or pay for its licence. Professional deployment has additional conditions.",
+      "archiveSizeBytes": 1318877,
+      "archiveSha256": "B950E39F01AF1D04EA623C8F6D8EB9B6EA5C477C637295FABF20631C85116BFB",
+      "uncompressedSizeBytes": 3467579,
+      "archiveEntryCount": 31,
+      "files": [
+        {
+          "path": "pin_in.ico",
+          "sizeBytes": 7358,
+          "sha256": "934865449455103C1C5997D8220ACD160C3891F8A870F8E745B743D12681AC42"
+        },
+        {
+          "path": "pin_out.ico",
+          "sizeBytes": 7358,
+          "sha256": "E8728A811E1F1AF7D2BA31F77E47D449D5BBA091E3E89A0DF325AC7A3E67652C"
+        },
+        {
+          "path": "readme.txt",
+          "sizeBytes": 3846,
+          "sha256": "F865F3E78E37006D48E56C93F51EFF4CA79ACDA9969854400D79BFA3DB38A8D5"
+        },
+        {
+          "path": "vbaudio_cable_2003.cat",
+          "sizeBytes": 8868,
+          "sha256": "23A10E3BCD6FFE0DE6D3D67830BE4C447724B3299E13E954DD6BD2257CF55DA1"
+        },
+        {
+          "path": "vbaudio_cable_2003.sys",
+          "sizeBytes": 34024,
+          "sha256": "9650E20C38429D4680A7E603ECBE6601914EC4C94F8473112F21515BF53B84CF"
+        },
+        {
+          "path": "vbaudio_cable_vista.cat",
+          "sizeBytes": 8872,
+          "sha256": "810B30193A400B1559302C23F81EF8AAADF038B3CAF3AFF9BF200B59688A2DEF"
+        },
+        {
+          "path": "vbaudio_cable_vista.sys",
+          "sizeBytes": 34024,
+          "sha256": "8B02C26313B75CEB8FB9BD16B6B167CF70D7F3BC977DFC1986C0859F8C72B49F"
+        },
+        {
+          "path": "vbaudio_cable_win7.cat",
+          "sizeBytes": 8868,
+          "sha256": "1C38AFACF115818C925BC26FAF216E3563E85BBC4D6D793E5F76F2AA670D08E7"
+        },
+        {
+          "path": "vbaudio_cable_win7.sys",
+          "sizeBytes": 34024,
+          "sha256": "D047E3EE66E3EE023E598232EA22AA28DBB39ADEABE818ADFB2A72AB738DF0B9"
+        },
+        {
+          "path": "vbaudio_cable_xp.cat",
+          "sizeBytes": 8860,
+          "sha256": "51434EBBDA13CAF3C7617EF3035126BAACCA3E523FEAF6828B398D52503D70D2"
+        },
+        {
+          "path": "vbaudio_cable_xp.sys",
+          "sizeBytes": 34024,
+          "sha256": "9F9BC80A96CC94C761887749E51D9B4FB7EE6741CE624B8B2F9F85CD2E3FB02E"
+        },
+        {
+          "path": "vbaudio_cable64_2003.cat",
+          "sizeBytes": 8876,
+          "sha256": "70F88E34C857C999367EB5B0303E23F5676B15A79ED4054F374749232BAA0E3A"
+        },
+        {
+          "path": "vbaudio_cable64_2003.sys",
+          "sizeBytes": 41192,
+          "sha256": "5A726F3F1616F587C9F118BF337FD359DF3F7CB9FC967A14229D59A31F2A9720"
+        },
+        {
+          "path": "vbaudio_cable64_vista.cat",
+          "sizeBytes": 8880,
+          "sha256": "CC17731E91F2F071E4A108BBA34A2B8DCB69EA5975F4B9C39FCBC670E5CF15FB"
+        },
+        {
+          "path": "vbaudio_cable64_vista.sys",
+          "sizeBytes": 41192,
+          "sha256": "703572FA9E8AA1616E6B2ABD36B91A4718DE77EADC02AE05ED2C8F304D058AFC"
+        },
+        {
+          "path": "vbaudio_cable64_win10.cat",
+          "sizeBytes": 12862,
+          "sha256": "0A921EBADBE39CF3FA7C14FF37D1CA22565A9651244BD3AC177DC810BC99072E"
+        },
+        {
+          "path": "vbaudio_cable64_win10.sys",
+          "sizeBytes": 140760,
+          "sha256": "F01344602472F1B527DE5EE98F18987C03DB48FEA444E457D061E937F1D531D5"
+        },
+        {
+          "path": "vbaudio_cable64_win7.cat",
+          "sizeBytes": 8876,
+          "sha256": "800B541F06BBA3925BA058E7CC7CA837CFD4D845E073309EB2A9D36A2626403A"
+        },
+        {
+          "path": "vbaudio_cable64_win7.sys",
+          "sizeBytes": 41192,
+          "sha256": "C7F3BE383C81AB9AA642479F95872E40E19A4CFD72D4C8D7DE80ABC11B713E21"
+        },
+        {
+          "path": "vbaudio_cable64arm_win10.sys",
+          "sizeBytes": 149976,
+          "sha256": "2DC35DB3DFAD0F25771A3E59AF38E8B1268878EBE127476EA75FEE109F2927DD"
+        },
+        {
+          "path": "VBCABLE_ControlPanel.exe",
+          "sizeBytes": 930048,
+          "sha256": "F5B44706FE7BA2EED0516DEE791F826DC7A9891E997F6CE9704E2899300B14FF"
+        },
+        {
+          "path": "VBCABLE_Setup_x64.exe",
+          "sizeBytes": 937728,
+          "sha256": "734C35DFA6D98F48782A451633CEB471166EC70D60482FD89A1123D0EE3C4F41"
+        },
+        {
+          "path": "VBCABLE_Setup.exe",
+          "sizeBytes": 914176,
+          "sha256": "01FFC86B623FF3C75A883AA900C0215A89482988E1C8E55988FC0A9FB513DBED"
+        },
+        {
+          "path": "vbMmeCable_2003.inf",
+          "sizeBytes": 4586,
+          "sha256": "64B67F80535D92A1A8625B4C9B9F7302ED959CB375947CA993B8CBAF205D3569"
+        },
+        {
+          "path": "vbMmeCable_vista.inf",
+          "sizeBytes": 4142,
+          "sha256": "50761A7E817B3A5E96A4EB8E3D31FBC249B0601343DCB732DD3CBE0B0A70F232"
+        },
+        {
+          "path": "vbMmeCable_win7.inf",
+          "sizeBytes": 4138,
+          "sha256": "5664F33116C1021F4280CFDE1C571554FBB70B5480BD58A4FD53B281CD4F515C"
+        },
+        {
+          "path": "vbMmeCable_xp.inf",
+          "sizeBytes": 4576,
+          "sha256": "58D9737FA732C11C8CC52839A3F61ECF2CB2A98A7DFFFE423E3E591DE7F56D46"
+        },
+        {
+          "path": "vbMmeCable64_2003.inf",
+          "sizeBytes": 4596,
+          "sha256": "73AA40EEF245DA221C6FC6EA3299983421C9A9051DF8DA7414652304F01BB835"
+        },
+        {
+          "path": "vbMmeCable64_vista.inf",
+          "sizeBytes": 4150,
+          "sha256": "340FEB0CE66FFB7922595A763BF23D2FEC07BED9E50B6CB6327E559174C515D4"
+        },
+        {
+          "path": "vbMmeCable64_win10.inf",
+          "sizeBytes": 11361,
+          "sha256": "61C857BE74831CC299D9BE62F8D49D137F14063454FC54F859D5BC9B4B813DAF"
+        },
+        {
+          "path": "vbMmeCable64_win7.inf",
+          "sizeBytes": 4146,
+          "sha256": "DA35387CCFE813F5C553BB7E0CAF4E67ADBB4429E742C2BD3C2014F80E6EC516"
+        }
+      ],
+      "signatureChecks": [
+        {
+          "path": "VBCABLE_Setup_x64.exe",
+          "reviewedStatus": "Valid",
+          "signerSubject": "CN=BUREL VINCENT Entrepreneur individuel, O=BUREL VINCENT Entrepreneur individuel, STREET=21 avenue des Marguerites, L=Eymet, S=Dordogne, C=FR, OID.1.3.6.1.4.1.311.60.2.1.3=FR, SERIALNUMBER=423 734 177, OID.2.5.4.15=Private Organization",
+          "signerThumbprint": "A77952D93229D0EC36E2543081EEA7D125732B9C",
+          "timestampSignerSubject": "CN=Globalsign TSA for CodeSign1 - R6 - 202311, O=GlobalSign nv-sa, C=BE",
+          "signerNotAfterUtc": "2025-06-21T14:59:01Z"
+        },
+        {
+          "path": "vbaudio_cable64_win10.cat",
+          "reviewedStatus": "Valid",
+          "signerSubject": "CN=Microsoft Windows Hardware Compatibility Publisher, O=Microsoft Corporation, L=Redmond, S=Washington, C=US",
+          "signerThumbprint": "9A4A6CFEE73C6B65945FCAA083DFBCC1E9077E7E",
+          "timestampSignerSubject": "CN=Microsoft Time-Stamp Service, OU=nShield TSS ESN:4C1A-05E0-D947, OU=Microsoft Ireland Operations Limited, O=Microsoft Corporation, L=Redmond, S=Washington, C=US",
+          "signerNotAfterUtc": "2025-01-10T20:09:14Z"
+        },
+        {
+          "path": "vbaudio_cable64_win10.sys",
+          "reviewedStatus": "Valid",
+          "signerSubject": "CN=Microsoft Windows Hardware Compatibility Publisher, O=Microsoft Corporation, L=Redmond, S=Washington, C=US",
+          "signerThumbprint": "9A4A6CFEE73C6B65945FCAA083DFBCC1E9077E7E",
+          "timestampSignerSubject": "CN=Microsoft Time-Stamp Service, OU=nShield TSS ESN:4C1A-05E0-D947, OU=Microsoft Ireland Operations Limited, O=Microsoft Corporation, L=Redmond, S=Washington, C=US",
+          "signerNotAfterUtc": "2025-01-10T20:09:14Z"
+        }
+      ],
+      "directories": []
+    },
+    {
+      "id": "vac-lite",
+      "displayName": "Virtual Audio Cable Lite",
+      "version": "4.71",
+      "driverVersion": "4.71.0.14959",
+      "archiveName": "vac471lite.zip",
+      "downloadUrl": "https://software.muzychenko.net/freeware/vac471lite.zip",
+      "publisherUrl": "https://vac.muzychenko.net/en/download.htm",
+      "licenseUrl": "https://vac.muzychenko.net/en/license.txt",
+      "distributionPolicyUrl": "https://vac.muzychenko.net/en/manual/distrib.htm",
+      "payloadDirectory": "drivers/vac-lite",
+      "installExecutable": "setup64.exe",
+      "installArguments": "",
+      "hardwareIds": [
+        "VirtualAudioCable_83ed7f0e"
+      ],
+      "serviceName": "VirtualAudioCable_83ed7f0e",
+      "provider": "Eugene Muzychenko",
+      "infFiles": [
+        "vrtaucbl.inf",
+        "vrtaucbl6x.inf"
+      ],
+      "licenseFiles": [
+        "license.txt",
+        "readme.txt"
+      ],
+      "usageNotice": "VAC Lite by Eugene Muzychenko is for private home use unrelated to income generation. This complete unchanged Lite package is included only for free, non-commercial distribution. It must not be sold alone or within another product.",
+      "archiveSizeBytes": 1385091,
+      "archiveSha256": "1ED42A7E763BF6237438FB62191AE88B2922F014B37658B29D7801D72C9D5357",
+      "uncompressedSizeBytes": 2884406,
+      "archiveEntryCount": 53,
+      "files": [
+        {
+          "path": "arm64/audiorepeater_ks.exe",
+          "sizeBytes": 137848,
+          "sha256": "B4943EE68E0EE8F7F8DC58DFCABA8E7CCC29C26AB2B2AA8FCE40ECD5DB664E81"
+        },
+        {
+          "path": "arm64/audiorepeater.exe",
+          "sizeBytes": 116856,
+          "sha256": "2A876FF4D158E601DD724CDEE652CDA3BF31D95FDC02643E53862BC0C3061760"
+        },
+        {
+          "path": "arm64/vcctlpan.exe",
+          "sizeBytes": 193544,
+          "sha256": "B8AABC41DE68206CCD3A8855EE451424A36CCD27A90104CBB164F9DF1E8CE597"
+        },
+        {
+          "path": "arm64/vrtaucbl.sys",
+          "sizeBytes": 209096,
+          "sha256": "B13108C131A83654797813E8A58482B8388F4227798CFDBFC496BEAD07C3ABAE"
+        },
+        {
+          "path": "homepage.url",
+          "sizeBytes": 52,
+          "sha256": "88B9B45607A10C8175EBF51D230F8473372BF3CECD9A7DC704C548080F9F4F55"
+        },
+        {
+          "path": "license.txt",
+          "sizeBytes": 6105,
+          "sha256": "51C3D4F57039D28A4662F5A20D7A2663D8C31956D96CCF4F948489A36D1B1EC8"
+        },
+        {
+          "path": "readme.txt",
+          "sizeBytes": 2254,
+          "sha256": "AFCB6511E2F5554C53CAFD4245E53C8591F13EBF37FD1E51F9A29E21FFF0FCC8"
+        },
+        {
+          "path": "setup.exe",
+          "sizeBytes": 161912,
+          "sha256": "0E2F5646492D7EEC02F67E2EC184CB58A0FCCD3A4A234C8D3D19A312307ABB83"
+        },
+        {
+          "path": "setup.ini",
+          "sizeBytes": 2533,
+          "sha256": "CB459FF4BCEB8FB2D5B688D6B0C9D7CD2A729F52EA4E1B1AB5EC18644B67F5AF"
+        },
+        {
+          "path": "setup64.exe",
+          "sizeBytes": 178296,
+          "sha256": "5D5CAE815DF9EA895C8E7EEF48FD361803D8827C7C941B30642F53AEAA10CFFB"
+        },
+        {
+          "path": "setup64a.exe",
+          "sizeBytes": 174712,
+          "sha256": "C2BDB19EFCFB68B06878F4F4B1513393C405F2FA7C097535A1ADA31FAFE5A56F"
+        },
+        {
+          "path": "tools/delete_phantom.cmd",
+          "sizeBytes": 244,
+          "sha256": "7DFE264D2CA361319600F6C4FBABCE8F8A5EDC0F103DC4C1B0436C5E37585A39"
+        },
+        {
+          "path": "tools/delete_service.cmd",
+          "sizeBytes": 632,
+          "sha256": "51412A773C235AFE1FC4D81C25FDCDBDD945CD62FDAFB9C7FBFBE26A17386C12"
+        },
+        {
+          "path": "tools/delete_settings.cmd",
+          "sizeBytes": 595,
+          "sha256": "6D27D88A3B3B34DEBAD1F5E20994296CA5C14A48F0F3ACD348BC8CFF9ED99F3F"
+        },
+        {
+          "path": "tools/open_audio_properties.cmd",
+          "sizeBytes": 30,
+          "sha256": "E57726A4A11D650647FF812034C9CE76B4484F47E0EBB2EC88D4BC54C207C5D0"
+        },
+        {
+          "path": "tools/open_device_manager.cmd",
+          "sizeBytes": 32,
+          "sha256": "B8EF2B02F7C7714D5572F549305F9832419F226A7B29C55C4D48EC9DF717828C"
+        },
+        {
+          "path": "tools/set_audiodg_instance_count_report.cmd",
+          "sizeBytes": 429,
+          "sha256": "A3D53E4C0B75000F051DF9938277D285FDEF3D8ECB2CE8C45D2C64BCC66DE528"
+        },
+        {
+          "path": "tools/set_cable_signal_level_disable.cmd",
+          "sizeBytes": 428,
+          "sha256": "8AEEC619B044FC8BE6701556C5B4B0AE8228FEAFE9C9F324206CBD2C514E378F"
+        },
+        {
+          "path": "tools/set_check_level.cmd",
+          "sizeBytes": 255,
+          "sha256": "4081A8D8BB4CE4AD42BAE4E382DF484272B8D1F5A2815D5991BC080B09DA8365"
+        },
+        {
+          "path": "tools/set_connected_source_lines_mask.cmd",
+          "sizeBytes": 414,
+          "sha256": "0F373731F336B33FA2BE0256D989A29FA9D6C18A74D3998A5A2C0357C8AECDB4"
+        },
+        {
+          "path": "tools/set_debug_level.cmd",
+          "sizeBytes": 255,
+          "sha256": "786C6C3093CCFC265DAA5BB2F6E22C37FC19EA299F3E507272B9CEEEC0F97E00"
+        },
+        {
+          "path": "tools/set_format_attribute_policy.cmd",
+          "sizeBytes": 358,
+          "sha256": "DFF88342FBCD599E09EE767B1B905C77541C36446C61E1C28ACAD62A2BF388F1"
+        },
+        {
+          "path": "tools/set_hiding_mode.cmd",
+          "sizeBytes": 653,
+          "sha256": "940D6986A658B43C34521019FB9FB94B5AEF487BECE2260D43361F8E257C5F13"
+        },
+        {
+          "path": "tools/set_packet_mode.cmd",
+          "sizeBytes": 673,
+          "sha256": "442FDC3FFF7B44250664714C7F837258D0CC2FF091A95ACCDBD89414FAADEE71"
+        },
+        {
+          "path": "tools/set_port_type.cmd",
+          "sizeBytes": 659,
+          "sha256": "E461C2EA6AB45774A3B6AF76DE490D5E770DC6602B814CE1B2795C23C3ACFDF4"
+        },
+        {
+          "path": "tools/set_portcls_policy.cmd",
+          "sizeBytes": 424,
+          "sha256": "E234CFAFA6CB78C372200A8A0EC3E3C3B0D460BEF3535C7D69E7CCEE614E7EE3"
+        },
+        {
+          "path": "tools/set_restrict_affinity.cmd",
+          "sizeBytes": 539,
+          "sha256": "C57192DD02F0BD9D2CF7C832B56E9B7E85FCBBA1AB6B274CFA1A8A9E0BDF9A51"
+        },
+        {
+          "path": "tools/set_restrict_client_affinity.cmd",
+          "sizeBytes": 198,
+          "sha256": "2E24DB52EB783BD62A012B77733F59A22C397B840FC005848B7AAFC85D66CDDB"
+        },
+        {
+          "path": "tools/set_restrict_kmixer_affinity.cmd",
+          "sizeBytes": 198,
+          "sha256": "CF84039A0D7B7EC82B3359FBA2F0639CD22A4D85BCF3901C95FB6652AF8F3DBA"
+        },
+        {
+          "path": "tools/set_source_line_types_mask.cmd",
+          "sizeBytes": 409,
+          "sha256": "C9298ACD405B02EEC65DC570EF19D9EE1CF25244C7146E493E42FEF0F83EB323"
+        },
+        {
+          "path": "tools/set_split_dpc_processing.cmd",
+          "sizeBytes": 227,
+          "sha256": "EC5F4B4CB49D1744BA90F4781C937259B1389B7C918F183A73CA228F52D0CC2A"
+        },
+        {
+          "path": "tools/set_stream_signal_level_disable.cmd",
+          "sizeBytes": 429,
+          "sha256": "768EB1EB8E38038161A6FB984B456600A8112665877B026918D459B0EE166600"
+        },
+        {
+          "path": "tools/set_timer_precision_percent.cmd",
+          "sizeBytes": 261,
+          "sha256": "2A406214537089FE1B8035F24AC361DBE18D8B7ED1E620CEEEDC6873BDDCE8EB"
+        },
+        {
+          "path": "tools/set_timer_resolution_percent.cmd",
+          "sizeBytes": 263,
+          "sha256": "3D7C6D1A23EB9ADA4C9E5F72644075B0FC47810CEF78D0CC01584DE6CA568B32"
+        },
+        {
+          "path": "tools/setregdword.cmd",
+          "sizeBytes": 2882,
+          "sha256": "3B7272CA5A5D523FC0D0080FA828D964B06E4CEA6B0C18929E7B3FBF8ED71554"
+        },
+        {
+          "path": "tools/setvars.cmd",
+          "sizeBytes": 278,
+          "sha256": "91A41A2F650A596D0BB0ACCD646C046845E973649BCD79ED4A896FB1127A72B2"
+        },
+        {
+          "path": "vac.chm",
+          "sizeBytes": 382789,
+          "sha256": "7EDA05FDFBC4CF665157CFF19D95A5296609A2DB399E8EB6807C7E18E97AD072"
+        },
+        {
+          "path": "vrtaucbl.cat",
+          "sizeBytes": 12687,
+          "sha256": "A3A8783E1BCBC6DBF9EE58AB9096860F47D403573C420DFE23F0E3DD670B2056"
+        },
+        {
+          "path": "vrtaucbl.inf",
+          "sizeBytes": 2838,
+          "sha256": "EE5A5DAEFD917AE2CEF34C8CEBAD515707B3B2EDC27ABE704E547979565184F1"
+        },
+        {
+          "path": "vrtaucbl6x.cat",
+          "sizeBytes": 15914,
+          "sha256": "E5C520F5AA1D89FA25B406A90AF005E03A81BE5E5D5C18F8FA903EDCF4489EAB"
+        },
+        {
+          "path": "vrtaucbl6x.inf",
+          "sizeBytes": 3013,
+          "sha256": "8195B70351B33B86D23393D54D8D67AEA70FDE652364E7EC842C1EBA664F71AD"
+        },
+        {
+          "path": "x64/audiorepeater_ks.exe",
+          "sizeBytes": 138872,
+          "sha256": "70BCEF77E5A28F65AC865053F717C3473E2D5C8339215E049D02B31BC0321A5C"
+        },
+        {
+          "path": "x64/audiorepeater.exe",
+          "sizeBytes": 118392,
+          "sha256": "974E3DEC25FB71C4618FA257FDA23D303EBCDFA1A8383D3FA91FFC5F8C677154"
+        },
+        {
+          "path": "x64/vcctlpan.exe",
+          "sizeBytes": 198152,
+          "sha256": "DAA9706C21211C6DAE895C89BFEEB92F70534BA57271A9ECE6DDDCBB771F478C"
+        },
+        {
+          "path": "x64/vrtaucbl.sys",
+          "sizeBytes": 214728,
+          "sha256": "E463DDD1379E9CEB7EC0E495F1B14E08805D24DF750BC5E9A53CB541F197DBD8"
+        },
+        {
+          "path": "x86/audiorepeater_ks.exe",
+          "sizeBytes": 124536,
+          "sha256": "796DD38E05EC3757F40DA083A7558AF5473A8612A31A1FF8F85CFFC4FDD84BD5"
+        },
+        {
+          "path": "x86/audiorepeater.exe",
+          "sizeBytes": 104056,
+          "sha256": "23EBCFBE95A85505A09F120E550C846990202E1B69AE8021DCCAD1F9E3867C37"
+        },
+        {
+          "path": "x86/vcctlpan.exe",
+          "sizeBytes": 180744,
+          "sha256": "F26DB2061087FDA18CA9ABAFE85926BE1B3DBCC4B117ECB21B9EE98644554AD0"
+        },
+        {
+          "path": "x86/vrtaucbl.sys",
+          "sizeBytes": 192712,
+          "sha256": "A11F40620F69A0E305848161172391F81E38DE5B88C028A570B388A86F8EF027"
+        }
+      ],
+      "signatureChecks": [
+        {
+          "path": "setup64.exe",
+          "reviewedStatus": "Valid",
+          "signerSubject": "E=software@muzychenko.net, CN=Muzychenko Evgenii Viktorovich IP, O=Muzychenko Evgenii Viktorovich IP, L=Novosibirsk, S=Novosibirsk Oblast, C=RU, OID.1.3.6.1.4.1.311.60.2.1.2=Novosibirsk Oblast, OID.1.3.6.1.4.1.311.60.2.1.3=RU, SERIALNUMBER=316547600105556, OID.2.5.4.15=Business Entity",
+          "signerThumbprint": "618593B1A98D662C1FCF099FB7A4D51AE0F25D2C",
+          "timestampSignerSubject": "CN=Globalsign R45 TSA for CodeSign 202510, O=GlobalSign nv-sa, C=BE",
+          "signerNotAfterUtc": "2027-12-02T14:12:47Z"
+        },
+        {
+          "path": "vrtaucbl.cat",
+          "reviewedStatus": "Valid",
+          "signerSubject": "CN=Microsoft Windows Hardware Compatibility Publisher, O=Microsoft Corporation, L=Redmond, S=Washington, C=US",
+          "signerThumbprint": "6022340C9F4CB00307DF8DB036D392ADAC766212",
+          "timestampSignerSubject": "CN=Microsoft Time-Stamp Service, OU=nShield TSS ESN:591A-05E0-D947, OU=Microsoft Ireland Operations Limited, O=Microsoft Corporation, L=Redmond, S=Washington, C=US",
+          "signerNotAfterUtc": "2027-05-11T18:17:34Z"
+        },
+        {
+          "path": "x64/vrtaucbl.sys",
+          "reviewedStatus": "Valid",
+          "signerSubject": "CN=Microsoft Windows Hardware Compatibility Publisher, O=Microsoft Corporation, L=Redmond, S=Washington, C=US",
+          "signerThumbprint": "6022340C9F4CB00307DF8DB036D392ADAC766212",
+          "timestampSignerSubject": "CN=Microsoft Time-Stamp Service, OU=nShield TSS ESN:591A-05E0-D947, OU=Microsoft Ireland Operations Limited, O=Microsoft Corporation, L=Redmond, S=Washington, C=US",
+          "signerNotAfterUtc": "2027-05-11T18:17:34Z"
+        }
+      ],
+      "directories": [
+        "arm64",
+        "tools",
+        "x64",
+        "x86"
+      ]
+    }
+  ]
+}
