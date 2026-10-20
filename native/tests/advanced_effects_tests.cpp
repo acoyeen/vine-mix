@@ -29,7 +29,11 @@ void near(double value, double target, double tolerance, const std::string& mess
     require(std::isfinite(value) && std::abs(value-target) <= tolerance, message + " actual=" + std::to_string(value) + " expected=" + std::to_string(target));
 }
 template<class F> void rejects(F action, const std::string& message) { bool bad{}; try { action(); } catch (const std::exception&) { bad = true; } require(bad, message); }
-GraphNode node(const std::string& id, const std::string& kind) { GraphNode n; n.id = n.name = id; n.kind = kind; return n; }
+GraphNode node(const std::string& id, const std::string& kind) {
+    GraphNode n; n.id = n.name = id; n.kind = kind;
+    if (kind == "gate") n.expander.mode = "gate";
+    return n;
+}
 AudioGraph chain(const std::string& kind) {
     AudioGraph graph; graph.nodes = {node("in", "virtualInput"), node("fx", kind), node("out", "output")};
     graph.edges = {{"a", "in", "fx"}, {"b", "fx", "out"}}; return graph;
@@ -178,7 +182,7 @@ void reverberation() {
     near(rms(bypass,5000,10000),0,0,"Reverb bypass emits no old wet tail");
 }
 void stateAndRealtime() {
-    for(const char* kind:{"denoiser","deEsser","plosive","reverb"}) {
+    for(const char* kind:{"denoiser","deEsser","plosive","reverb","expander","gate"}) {
         auto graph=chain(kind); const auto plan=compileGraph(graph);
         auto a=std::make_unique<GraphProcessor>(),b=std::make_unique<GraphProcessor>(); a->prepare(plan);b->prepare(plan);
         std::array<Frame,quantumFrames> input{};GraphProcessor::Inputs views{};views[0]=input;
@@ -217,6 +221,87 @@ void validationAndPersistence() {
     invalid=config.graph;invalid.nodes[1].reverb.decaySeconds=std::numeric_limits<double>::infinity();rejects([&]{compileGraph(invalid);},"Non-finite reverb settings rejected");
     invalid=config.graph;invalid.nodes[1].eqBands[1].resetFrequencyHz=1;rejects([&]{compileGraph(invalid);},"Invalid EQ reset anchor rejected");
 }
+void dedicatedGate() {
+    auto legacy = chain("expander");
+    legacy.nodes[1].expander = {"gate", -40, 7, 3, 17, 40, 48, 6};
+    const auto savedLegacy = Json(legacy);
+    auto graph = legacy; graph.nodes[1].kind = "gate";
+    const auto legacyPlan = compileGraph(legacy), plan = compileGraph(graph);
+    require(plan.nodes[1].kind == GraphKind::gate && AdvancedEffect::supports(GraphKind::gate)
+        && !isSource(GraphKind::gate) && !isSink(GraphKind::gate),
+        "Dedicated Gate compiles as its own processor kind using the existing gate algorithm");
+    require(Json(legacy) == savedLegacy && Json(savedLegacy.get<AudioGraph>()) == savedLegacy,
+        "Existing Expander records saved in Gate mode retain their exact kind and controls without migration");
+    GraphChannels channels{}; channels[0] = 2;
+    require(graphSignalChannels(plan, channels) == graphSignalChannels(legacyPlan, channels),
+        "Dedicated Gate preserves the legacy gate's programme channel metadata");
+
+    auto old = std::make_unique<GraphProcessor>(), current = std::make_unique<GraphProcessor>();
+    old->prepare(legacyPlan); current->prepare(plan);
+    std::array<Frame, quantumFrames> input{}; GraphProcessor::Inputs inputs{}; inputs[0] = input;
+    bool identical = true, finite = true;
+    const auto beforeHeap = allocationOperations;
+    trackAllocations = true;
+    for (std::size_t block = 0; block < 180; ++block) {
+        // Cross the threshold in alternating stereo channels, including quiet
+        // intervals long enough to exercise hold, hysteresis and closing gain.
+        const bool voice = block % 60 < 20;
+        for (std::size_t frame = 0; frame < quantumFrames; ++frame) {
+            const auto sample = static_cast<float>((voice ? .08 : .0003) * sine(block * quantumFrames + frame, 377));
+            input[frame] = block % 2 ? Frame{sample, -.25f * sample} : Frame{.25f * sample, -sample};
+        }
+        old->process(legacyPlan, inputs); current->process(plan, inputs);
+        for (std::size_t frame = 0; frame < quantumFrames; ++frame) {
+            const auto first = old->output(2)[frame], second = current->output(2)[frame];
+            identical &= first.left == second.left && first.right == second.right;
+            finite &= std::isfinite(second.left) && std::isfinite(second.right);
+        }
+    }
+    input.fill({.0003f, -.00015f});
+    for (int block = 0; block < 100; ++block) { old->process(legacyPlan, inputs); current->process(plan, inputs); }
+    trackAllocations = false;
+    require(identical && finite, "Dedicated Gate is bit-exact with legacy gate DSP across stereo threshold/hold/closing transitions");
+    require(allocationOperations == beforeHeap, "Dedicated Gate processing performs no C++ heap operations");
+    require(current->meter(1).gainReductionDb > 40 && current->meter(1).detectorDb < -40,
+        "Dedicated Gate publishes actual gain-reduction and detector telemetry for quiet programme audio");
+    near(current->meter(1).gainReductionDb, old->meter(1).gainReductionDb, 0,
+        "Dedicated and legacy Gate share exact gain-reduction telemetry");
+
+    auto inherited = std::make_unique<GraphProcessor>(); inherited->prepare(plan);
+    const auto inheritHeap = allocationOperations;
+    trackAllocations = true;
+    inherited->inherit(*current, plan, plan);
+    current->process(plan, inputs); inherited->process(plan, inputs);
+    bool sameHistory = true;
+    for (std::size_t frame = 0; frame < quantumFrames; ++frame)
+        sameHistory &= current->output(2)[frame].left == inherited->output(2)[frame].left
+            && current->output(2)[frame].right == inherited->output(2)[frame].right;
+    trackAllocations = false;
+    require(sameHistory && allocationOperations == inheritHeap,
+        "Gate snapshot adoption retains exact detector/hold/envelope history without allocating");
+    graph.nodes[1].bypass = true; const auto bypass = compileGraph(graph);
+    auto dry = std::make_unique<GraphProcessor>(); dry->prepare(bypass); dry->inherit(*current, plan, bypass);
+    input.fill({.1f, -.05f});
+    for (int block = 0; block < 3; ++block) dry->process(bypass, inputs);
+    near(dry->output(2).back().left, .1, 1e-7, "Dedicated Gate bypass returns undelayed dry programme audio");
+    graph.nodes[1].muted = true; const auto muted = compileGraph(graph);
+    for (int block = 0; block < 3; ++block) dry->process(muted, inputs);
+    near(dry->output(2).back().left, 0, 0, "Dedicated Gate bypass preserves explicit mute safety");
+
+    auto config = defaultConfiguration(); config.graph = graph;
+    const auto document = Json(config); const auto reopened = document.get<Configuration>(); validateConfiguration(reopened);
+    require(Json(reopened) == document && reopened.graph.nodes[1].kind == "gate"
+        && reopened.graph.nodes[1].expander.mode == "gate",
+        "Gate kind and every existing gate control survive configuration save/load exactly");
+    auto invalid = graph; invalid.nodes[1].expander.mode = "expander";
+    rejects([&] { compileGraph(invalid); }, "A dedicated Gate cannot silently run Expander mode");
+    invalid = graph; invalid.nodes[1].expander.mode = "unknown";
+    rejects([&] { compileGraph(invalid); }, "Gate rejects unknown processing modes");
+    invalid = graph; invalid.nodes[1].expander.rangeDb = 81;
+    rejects([&] { compileGraph(invalid); }, "Gate validates the existing attenuation range contract");
+    invalid = graph; invalid.edges.push_back({"invalid-detector", "in", "fx", "sidechain"});
+    rejects([&] { compileGraph(invalid); }, "Gate has no detector-only cable input");
+}
 void timing() {
     AudioGraph graph;graph.nodes.push_back(node("in","virtualInput"));std::string previous="in";
     for(int i=0;i<8;++i){const char* kind=std::array{"denoiser","deEsser","plosive","reverb"}[i%4];std::string id="effect"+std::to_string(i);graph.nodes.push_back(node(id,kind));graph.edges.push_back({"edge"+std::to_string(i),previous,id});previous=id;}
@@ -250,4 +335,4 @@ void maximumGraphTiming() {
     }
 }
 }
-int main(){try{validationAndPersistence();spectralReduction();splitBand();reverberation();stateAndRealtime();transientsAndParameterEdits();timing();maximumGraphTiming();std::cout<<"PASS: "<<checks<<" advanced-effect assertions; no audio devices, personal settings or live processes accessed.\n";return 0;}catch(const std::exception& e){trackAllocations=false;std::cerr<<"FAIL after "<<checks<<" checks: "<<e.what()<<'\n';return 1;}}
+int main(){try{validationAndPersistence();dedicatedGate();spectralReduction();splitBand();reverberation();stateAndRealtime();transientsAndParameterEdits();timing();maximumGraphTiming();std::cout<<"PASS: "<<checks<<" advanced-effect assertions; no audio devices, personal settings or live processes accessed.\n";return 0;}catch(const std::exception& e){trackAllocations=false;std::cerr<<"FAIL after "<<checks<<" checks: "<<e.what()<<'\n';return 1;}}

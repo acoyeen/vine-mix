@@ -201,7 +201,7 @@ internal static class CableHoverBoundsVerification
         })
         {
             var source = GraphDefaults.NewNode(kind == "control" ? "control" : "microphone", from.X, from.Y);
-            var target = GraphDefaults.NewNode(kind == "sidechain" ? "compressor" : "mix", to.X, to.Y);
+            var target = GraphDefaults.NewNode(kind == "sidechain" ? "ducking" : "mix", to.X, to.Y);
             source.Id = id + "-from"; target.Id = id + "-to";
             graph.Nodes.Add(source); graph.Nodes.Add(target);
             graph.Edges.Add(new() { Id = id, From = source.Id, To = target.Id, Kind = kind, GainDb = -3.5, Muted = true });

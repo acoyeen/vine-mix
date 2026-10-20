@@ -65,11 +65,14 @@ internal static class EqEditorVerification
         before = edits;
         emptyMenu.Items.OfType<MenuItem>().Single(item => Equals(item.Header, "Reset EQ to flat"))
             .RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
-        require(edits == before + 1 && editor.BandCount == 5 && editor.SelectedBandIndex == -1
-            && editor.SnapshotBands().All(band => band.Enabled && band.GainDb == 0 && band.Type is "peak" or "lowShelf" or "highShelf")
+        require(edits == before + 1 && editor.BandCount == 0 && editor.SelectedBandIndex == -1
+            && editor.SelectedBandIndices.Count == 0
             && Enumerable.Range(0, 201).All(index => Math.Abs(EqualizerEditor.CombinedResponseDb(editor.SnapshotBands(), false,
                 20 * Math.Pow(1000, index / 200d))) < .000001),
-            "The actual empty-space Reset EQ to flat action replaces notch/pass filters with five zero-gain default bands and a genuinely flat 20 Hz–20 kHz response in one edit.");
+            "The actual empty-space Reset EQ to flat action removes every notch/pass/bell band, clears selection and produces a flat 20 Hz–20 kHz response in one edit.");
+        before = edits;
+        require(!editor.ResetEq() && edits == before && editor.BandCount == 0 && editor.SelectedBandIndex == -1,
+            "Resetting an already-empty EQ returns false without publishing another band edit.");
 
         var wide = new EqBand { FrequencyHz = 1000, GainDb = 12, Q = .5 };
         var narrow = new EqBand { FrequencyHz = 1000, GainDb = 12, Q = 4 };
@@ -78,6 +81,9 @@ internal static class EqEditorVerification
             && EqualizerEditor.ResponseDb(wide, 500) > EqualizerEditor.ResponseDb(narrow, 500) + 3,
             "Response rendering uses the real biquad bandwidth: changing Q alters the actual broadness while keeping the requested centre gain.");
 
+        // Keep the measured-spectrum regression fixture populated independently
+        // of the empty reset behavior checked above.
+        editor.Apply(defaults, false, -1);
         string settings = JsonSerializer.Serialize(editor.SnapshotBands(), Protocol.Json);
         before = edits;
         int refreshes = editor.SettingsRefreshCount;

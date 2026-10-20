@@ -17,6 +17,8 @@ public partial class App : Application
     private EventWaitHandle? _showEvent;
     private RegisteredWaitHandle? _showWait;
     private Forms.NotifyIcon? _tray;
+    private Forms.ContextMenuStrip? _trayMenu;
+    private TrayBranding? _trayBranding;
     private MixerViewModel? _mixer;
     private MainWindow? _window;
     private bool _quitting;
@@ -32,6 +34,7 @@ public partial class App : Application
 
     protected override void OnStartup(StartupEventArgs e)
     {
+        HoverHelp.Register();
         base.OnStartup(e);
         if (e.Args.Contains("--render-design", StringComparer.OrdinalIgnoreCase))
         {
@@ -93,12 +96,13 @@ public partial class App : Application
         _mixer = new MixerViewModel();
         _window = new MainWindow(_mixer);
         MainWindow = _window;
-        var menu = new Forms.ContextMenuStrip();
+        _trayBranding = new TrayBranding();
+        var menu = _trayMenu = new Forms.ContextMenuStrip { Font = _trayBranding.MenuFont };
         menu.Items.Add("Open Vine Mix", null, (_, _) => Dispatcher.BeginInvoke(new Action(ShowMixer)));
         menu.Items.Add("Windows sound settings", null, (_, _) => OpenExternal("ms-settings:sound"));
         menu.Items.Add(new Forms.ToolStripSeparator());
         menu.Items.Add("Quit Vine Mix", null, (_, _) => Dispatcher.BeginInvoke(new Action(async () => await QuitAsync())));
-        _tray = new Forms.NotifyIcon { Text = "Vine Mix", Icon = System.Drawing.SystemIcons.Application, ContextMenuStrip = menu, Visible = true };
+        _tray = new Forms.NotifyIcon { Text = "Vine Mix", Icon = _trayBranding.Icon, ContextMenuStrip = menu, Visible = true };
         _tray.DoubleClick += (_, _) => Dispatcher.BeginInvoke(new Action(ShowMixer));
         if (!e.Args.Contains("--background", StringComparer.OrdinalIgnoreCase)) _window.Show();
         else _mixer.IsVisible = false;
@@ -143,6 +147,8 @@ public partial class App : Application
         _showWait?.Unregister(null);
         _showEvent?.Dispose();
         _tray?.Dispose();
+        _trayMenu?.Dispose();
+        _trayBranding?.Dispose();
         _mixer?.Dispose();
         if (_instance is not null)
         {

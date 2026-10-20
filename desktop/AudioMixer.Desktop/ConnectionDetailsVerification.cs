@@ -86,7 +86,7 @@ internal static class ConnectionDetailsVerification
         workspace.EdgeChanged("detector", edge => edge.Kind = "audio"); await layout();
         require(ReferenceEquals(detectorTip, workspace.ConnectionToolTip("detector"))
             && Lines((StackPanel)detectorTip!).SequenceEqual([
-                "Renamed microphone with a deliberately long source label → Compressor"])
+                "Renamed microphone with a deliberately long source label → Ducking"])
             && AutomationProperties.GetHelpText(workspace.ConnectionPaths("detector")!.Value.Hit).StartsWith("Audio connection."),
             "Changing cable kind without changing its endpoint names reuses the route-only hover and refreshes the accessible role.");
 
@@ -161,7 +161,7 @@ internal static class ConnectionDetailsVerification
         var graph = new GraphConfiguration
         {
             Nodes = [Node("microphone", "source", "Microphone", 20, 20), Node("mix", "mix", "Main mix", 420, 20),
-                Node("control", "linked", "Linked level", 20, 390), Node("compressor", "processor", "Compressor", 820, 20),
+                Node("control", "linked", "Linked level", 20, 390), Node("ducking", "processor", "Ducking", 820, 20),
                 Node("mix", "alternate", "Alternative mix", 420, 390)],
             Edges = [new() { Id="audio", From="source", To="mix", GainDb=-9, Muted=true },
                 new() { Id="control", From="linked", To="mix", Kind="control", GainDb=2.5, Muted=true },

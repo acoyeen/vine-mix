@@ -36,6 +36,13 @@ public sealed class EqualizerEditor : FrameworkElement
     private int _primaryBeforeBox = -1;
     private bool _selectionAdditive, _selectionBoxMoved;
     private string? _feedback;
+    private ContextMenu? _activeMenu;
+    private string? _interactionInstructions;
+    internal string? InteractionInstructions
+    {
+        get => _interactionInstructions;
+        set { _interactionInstructions = value; AutomationProperties.SetHelpText(this, value ?? Instructions); UpdateToolTip(); }
+    }
     private Brush? _lastTextBrush;
     private readonly float[] _spectrum = new float[128];
     private ulong _spectrumFrame, _spectrumRevision;
@@ -44,7 +51,7 @@ public sealed class EqualizerEditor : FrameworkElement
     private Rect _responsePlot;
     private double _responseDpi;
     private StreamGeometry? _responseGeometry;
-    private readonly Dictionary<(string Text, double Size, Brush Brush, double Width), FormattedText> _textCache = [];
+    private readonly Dictionary<(string Text, double Size, Brush Brush, double Width, TextAlignment Alignment), FormattedText> _textCache = [];
     private FontFamily? _textCacheFamily;
     private Brush? _textCachePalette;
     private string _textCacheCulture = "";
@@ -88,6 +95,7 @@ public sealed class EqualizerEditor : FrameworkElement
     public void Apply(IReadOnlyList<EqBand> bands, bool bypassed, int selected)
     {
         ArgumentNullException.ThrowIfNull(bands);
+        bool clearFeedback = _feedback is not null && bands.Count < MaximumBands;
         int oldCount = _bands.Count;
         bool preserveSelection = _publishingEdit || oldCount == bands.Count
             && (_selected == selected || _dragged >= 0 || _selectionOrigin is not null);
@@ -102,10 +110,11 @@ public sealed class EqualizerEditor : FrameworkElement
                 && old.GainDb == next.GainDb && old.Q == next.Q
                 && old.ResetFrequencyHz == (next.ResetFrequencyHz > 0 ? next.ResetFrequencyHz : next.FrequencyHz);
         }
-        if (same && _selected == nextSelection && _bypassed == bypassed && ReferenceEquals(_lastTextBrush, textBrush)) return;
+        if (same && _selected == nextSelection && _bypassed == bypassed && ReferenceEquals(_lastTextBrush, textBrush) && !clearFeedback) return;
         _lastTextBrush = textBrush; SettingsRefreshCount++;
         if (!preserveSelection) EndPointerAdjustment();
         _bands = bands.Select(CopyBand).ToList();
+        if (clearFeedback) _feedback = null;
         _bypassed = bypassed;
         _responseDirty = true;
         _selected = nextSelection;
@@ -311,7 +320,8 @@ public sealed class EqualizerEditor : FrameworkElement
     {
         if (!IsEnabled) return false;
         EndPointerAdjustment();
-        _bands = EqBand.Defaults();
+        if (_bands.Count == 0) return false;
+        _bands = [];
         _selected = -1; _hovered = -1;
         _selection.Clear();
         PublishEdit(true); return true;
@@ -524,6 +534,22 @@ public sealed class EqualizerEditor : FrameworkElement
         if (IsMouseCaptured) ReleaseMouseCapture();
     }
 
+    internal bool TryCancelPracticeInteraction()
+    {
+        if (_activeMenu is { IsOpen: true }) { _activeMenu.IsOpen = false; return true; }
+        if (_dragged < 0 && _selectionOrigin is null && !IsMouseCaptured) return false;
+        EndBandSelection(cancel: true);
+        EndPointerAdjustment();
+        return true;
+    }
+
+    internal void SuspendPracticeInteraction()
+    {
+        if (_activeMenu is not null) _activeMenu.IsOpen = false;
+        EndBandSelection(cancel: true);
+        EndPointerAdjustment();
+    }
+
     protected override void OnMouseRightButtonDown(MouseButtonEventArgs e)
     {
         base.OnMouseRightButtonDown(e);
@@ -543,7 +569,9 @@ public sealed class EqualizerEditor : FrameworkElement
     private void ShowBandMenu(int index, Point point)
     {
         EndPointerAdjustment();
-        BuildBandMenu(index, point).IsOpen = true;
+        if (_activeMenu is not null) _activeMenu.IsOpen = false;
+        _activeMenu = BuildBandMenu(index, point);
+        _activeMenu.IsOpen = true;
     }
 
     /// <summary>Build the real band menu without opening a native popup.</summary>
@@ -560,7 +588,7 @@ public sealed class EqualizerEditor : FrameworkElement
                 shape.Items.Add(item);
             }
             if (_bands[index].Type is "highPass" or "lowPass")
-                shape.ToolTip = NodeToolTip.Create("Saved pass filter", "Kept until you change its shape", "Use a High-pass or Low-pass node for new filters");
+                shape.ToolTip = NodeToolTip.Create("Saved pass filter", BandEffect(_bands[index]), "Retains its saved filter shape");
             var toggle = new MenuItem { Header = _bands[index].Enabled ? "Disable band" : "Enable band" };
             toggle.Click += (_, _) => { if (index < _bands.Count) { _bands[index].Enabled = !_bands[index].Enabled; PublishEdit(false); } };
             var reset = new MenuItem { Header = "Reset position", InputGestureText = "Double-click" };
@@ -579,6 +607,7 @@ public sealed class EqualizerEditor : FrameworkElement
             reset.Click += (_, _) => ResetEq();
             menu.Items.Add(add); menu.Items.Add(new Separator()); menu.Items.Add(reset);
         }
+        MenuHoverHelp.Attach(menu);
         return menu;
     }
 
@@ -643,7 +672,8 @@ public sealed class EqualizerEditor : FrameworkElement
         dc.DrawRoundedRectangle(well, new Pen(ConsoleTheme.Get(IsKeyboardFocused ? "ConsoleFocusBrush" : "ConsoleControlBorderBrush"), 1), new Rect(.5, .5, Math.Max(0, ActualWidth - 1), Math.Max(0, ActualHeight - 1)), 3, 3);
         Rect plot = PlotBounds;
         string caption = _feedback ?? (_bands.Count == 0 ? "Flat EQ · no bands" : _bypassed ? "Bypassed · band settings retained" : _selected >= 0 ? SelectionDescription() : $"{_bands.Count} / {MaximumBands} bands · select a point");
-        DrawText(dc, caption, 13, text, new Point(8, 6), Math.Max(1, ActualWidth - 16));
+        // Keep chart text inside the plot's usable width, clear of both scales.
+        DrawText(dc, caption, 13, text, new Point(plot.Left + 8, 6), Math.Max(1, plot.Width - 16), TextAlignment.Center);
 
         var gridPen = new Pen(ConsoleTheme.Get("ConsoleControlBorderBrush"), .7);
         var zeroPen = new Pen(ConsoleTheme.Get("ConsoleBorderBrush"), 1.2);
@@ -707,7 +737,7 @@ public sealed class EqualizerEditor : FrameworkElement
         foreach (int index in _selection.Order()) if (index != _selected) DrawBand(dc, index);
         if (_selected >= 0) DrawBand(dc, _selected);
         if (_bands.Count == 0)
-            DrawText(dc, "Double-click to add a band", 13, muted, new Point(plot.Left + 8, plot.Top + plot.Height / 2 - 31), Math.Max(1, plot.Width - 16));
+            DrawText(dc, "Double-click to add a band", 13, muted, new Point(plot.Left + 8, plot.Top + plot.Height / 2 - 31), Math.Max(1, plot.Width - 16), TextAlignment.Center);
     }
 
     private StreamGeometry ResponseGeometry(Rect plot)
@@ -742,7 +772,8 @@ public sealed class EqualizerEditor : FrameworkElement
         if (!enabled) dc.DrawLine(new Pen(ConsoleTheme.Get("ConsoleMutedBrush"), 1), new Point(point.X - 6, point.Y + 7), new Point(point.X + 6, point.Y - 7));
     }
 
-    private FormattedText Format(string value, double size, Brush brush, double width = double.PositiveInfinity)
+    private FormattedText Format(string value, double size, Brush brush, double width = double.PositiveInfinity,
+        TextAlignment alignment = TextAlignment.Left)
     {
         // Live spectrum frames redraw the chart many times a second. Its axis
         // labels, point numbers and unchanged caption do not need fresh glyph
@@ -758,20 +789,22 @@ public sealed class EqualizerEditor : FrameworkElement
             _textCache.Clear(); _textCacheDpi = dpi; _textCacheFamily = family;
             _textCachePalette = palette; _textCacheCulture = culture;
         }
-        var key = (value, size, brush, width);
+        var key = (value, size, brush, width, alignment);
         if (_textCache.TryGetValue(key, out var cached)) return cached;
         if (_textCache.Count >= 96) _textCache.Clear();
         var text = new FormattedText(value, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight,
-            new Typeface(family, FontStyles.Normal, FontWeights.Normal, FontStretches.Normal), size, brush, dpi);
+            new Typeface(family, FontStyles.Normal, FontWeights.Normal, FontStretches.Normal), size, brush, dpi)
+            { TextAlignment = alignment };
         if (double.IsFinite(width))
         { text.MaxTextWidth = Math.Max(1, width); text.MaxLineCount = 1; text.Trimming = TextTrimming.CharacterEllipsis; }
         _textCache.Add(key, text); TextLayoutBuildCount++;
         return text;
     }
 
-    private void DrawText(DrawingContext dc, string value, double size, Brush brush, Point position, double width)
+    private void DrawText(DrawingContext dc, string value, double size, Brush brush, Point position, double width,
+        TextAlignment alignment = TextAlignment.Left)
     {
-        dc.DrawText(Format(value, size, brush, width), position);
+        dc.DrawText(Format(value, size, brush, width, alignment), position);
     }
 
     private string BandDescription(int index)
@@ -796,20 +829,35 @@ public sealed class EqualizerEditor : FrameworkElement
     {
         if (_feedback is not null)
         {
-            ToolTip = NodeToolTip.Create("All 8 bands are in use", "Remove a band before adding another");
+            ToolTip = NodeToolTip.Create("All 8 bands are in use", "Maximum EQ capacity · 8 bands");
             return;
         }
-        if (_hovered >= 0 && _hovered < _bands.Count)
+        int bandIndex = _hovered >= 0 && _hovered < _bands.Count ? _hovered : _selected;
+        if (bandIndex >= 0 && bandIndex < _bands.Count)
         {
-            ToolTip = NodeToolTip.Create($"Band {_hovered + 1}",
-                "Ctrl-click · Toggle selection", "Drag · Move selected bands", "Shift · Fine movement",
-                "Double-click · Reset position", "Right-click · Shape and options");
+            var band = _bands[bandIndex];
+            ToolTip = NodeToolTip.Create(bandIndex == _selected ? $"Selected band {bandIndex + 1}" : $"Band {bandIndex + 1}",
+                BandEffect(band), BandDescription(bandIndex),
+                _bypassed ? "Bypassed · EQ changes are not applied"
+                    : band.Enabled ? "Enabled · Contributes to the EQ response" : "Disabled · This band does not affect audio");
             return;
         }
-        ToolTip = NodeToolTip.Create("Equalizer", "Double-click empty space · Add a band",
-            "Drag empty space · Box-select bands", "Ctrl · Add to selection", "Ctrl+A · Select all bands",
-            "Right-click empty space · Reset to flat", "Shaded spectrum · Live output audio");
+        ToolTip = NodeToolTip.Create("Equalizer", "Shapes frequency balance with up to 8 bands",
+            "Line · Calculated EQ response on the left dB scale",
+            _interactionInstructions is null ? "Shaded spectrum · Measured output on the right dBFS scale" : "Practice only · Calculated response; no audio is measured or changed",
+            _bypassed ? "Bypassed · EQ settings retained"
+                : _bands.Count == 0 ? "No bands · Audio passes without EQ changes" : $"{_bands.Count} / {MaximumBands} bands");
     }
+
+    private static string BandEffect(EqBand band) => band.Type switch
+    {
+        "lowShelf" => "Boosts or cuts frequencies below its centre",
+        "highShelf" => "Boosts or cuts frequencies above its centre",
+        "notch" => "Rejects a narrow band around its centre",
+        "highPass" => "Reduces frequencies below its cutoff",
+        "lowPass" => "Reduces frequencies above its cutoff",
+        _ => "Boosts or cuts frequencies around its centre"
+    };
 
     protected override AutomationPeer OnCreateAutomationPeer() => new EditorAutomationPeer(this);
     private sealed class EditorAutomationPeer(EqualizerEditor owner) : FrameworkElementAutomationPeer(owner)

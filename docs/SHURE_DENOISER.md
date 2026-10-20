@@ -16,7 +16,7 @@ Microphone node:
 
 ```text
 MV7+ capsule → Shure hardware denoiser → MV7+ USB recording endpoint
-    → Audio Mixer Microphone node → chosen effects and outputs
+    → Vine Mix Microphone node → chosen effects and outputs
 ```
 
 The inference from Shure's documented hardware architecture is that this path

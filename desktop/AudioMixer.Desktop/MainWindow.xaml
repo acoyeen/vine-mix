@@ -1,28 +1,35 @@
 <Window x:Class="AudioMixer.Desktop.MainWindow"
  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
  xmlns:local="clr-namespace:AudioMixer.Desktop"
+ xmlns:controls="clr-namespace:AudioMixer.Desktop.Controls"
  xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
  Title="Vine Mix · Patch workspace" Width="1280" Height="800" MinWidth="900" MinHeight="580"
+ Icon="Assets/Branding/app.ico"
  ResizeMode="CanResize" SizeToContent="Manual" WindowStartupLocation="CenterScreen"
  Background="{DynamicResource ConsoleWindowBrush}" Foreground="{DynamicResource ConsoleTextBrush}"
  FontFamily="{DynamicResource NodeFontFamily}" FontSize="13" UseLayoutRounding="True" SnapsToDevicePixels="True"
  TextOptions.TextFormattingMode="Display" TextOptions.TextHintingMode="Fixed" TextOptions.TextRenderingMode="Auto">
- <Grid Margin="4">
+ <Grid Margin="4,0,4,4">
   <Grid.RowDefinitions><RowDefinition Height="{x:Static local:MainWindow.TitleBarRowHeight}"/><RowDefinition Height="1"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-  <Grid>
-   <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-   <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-    <TextBlock Text="Vine Mix" FontSize="16" FontWeight="Normal"/>
-    <Ellipse Width="6" Height="6" Margin="12,0,0,0" VerticalAlignment="Center" ToolTip="{Binding ConnectionStatus}" AutomationProperties.Name="{Binding ConnectionStatus}">
+  <Grid x:Name="HeaderBar">
+   <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="122"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+   <DockPanel Margin="0,0,12,0" LastChildFill="True">
+    <Ellipse x:Name="ConnectionIndicator" DockPanel.Dock="Left" Width="8" Height="8" Margin="16,0,12,0" VerticalAlignment="Center" ToolTip="{Binding ConnectionStatus}" AutomationProperties.Name="{Binding ConnectionStatus}">
      <Ellipse.Style><Style TargetType="Ellipse"><Setter Property="Fill" Value="{DynamicResource ConsoleMuteBrush}"/><Style.Triggers><DataTrigger Binding="{Binding CanEdit}" Value="True"><Setter Property="Fill" Value="{DynamicResource ConsoleABrush}"/></DataTrigger></Style.Triggers></Style></Ellipse.Style>
     </Ellipse>
-   </StackPanel>
-   <DockPanel Grid.Column="1" Margin="16,0,12,0" VerticalAlignment="Center" LastChildFill="True">
-    <TextBlock x:Name="SaveIndicator" DockPanel.Dock="Right" Margin="12,0,0,0" ToolTip="{Binding SaveStatus}" AutomationProperties.Name="{Binding SaveStatus}" Foreground="{DynamicResource ConsoleMutedBrush}" FontSize="12" VerticalAlignment="Center"/>
-    <TextBlock Text="{Binding Warning}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" FontSize="12" Foreground="{DynamicResource ConsoleAlertTextBrush}" ToolTip="{Binding Warning}" AutomationProperties.LiveSetting="Polite"/>
+    <TextBlock x:Name="HeaderWarning" Text="{Binding Warning}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" FontSize="12" VerticalAlignment="Center" Foreground="{DynamicResource ConsoleAlertTextBrush}" ToolTip="{Binding Warning}" AutomationProperties.LiveSetting="Polite"/>
    </DockPanel>
-   <Button Grid.Column="2" x:Name="SettingsButton" Content="Settings" Style="{StaticResource WorkspaceToolbarButton}" Width="78" Height="26" Margin="0,0,8,0" Click="Settings_Click" AutomationProperties.Name="Open settings" shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
-   <StackPanel Grid.Column="3" x:Name="WindowActions" Orientation="Horizontal" VerticalAlignment="Center"/>
+   <Button Grid.Column="1" x:Name="WebsiteButton" Style="{StaticResource BrandWebsiteButton}" Width="122" Height="20" MinHeight="20" Padding="8,0"
+      VerticalAlignment="Center" Click="Website_Click" AutomationProperties.Name="Open Vine Mix website"
+      AutomationProperties.HelpText="Opens https://vinemix.app in your browser." shell:WindowChrome.IsHitTestVisibleInChrome="True">
+     <controls:BrandWordmark x:Name="ApplicationBrandMark" Width="106" Height="20" IsHitTestVisible="False"/>
+   </Button>
+   <Grid Grid.Column="2">
+    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+    <TextBlock x:Name="SaveIndicator" Margin="12,0,12,0" TextAlignment="Right" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" ToolTip="{Binding SaveStatus}" AutomationProperties.Name="{Binding SaveStatus}" Foreground="{DynamicResource ConsoleMutedBrush}" FontSize="12" VerticalAlignment="Center"/>
+    <Button Grid.Column="1" x:Name="SettingsButton" Content="Settings" Style="{StaticResource WorkspaceToolbarButton}" Width="78" Height="26" Margin="0,0,8,0" Click="Settings_Click" AutomationProperties.Name="Open settings" shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
+    <StackPanel Grid.Column="2" x:Name="WindowActions" Orientation="Horizontal" VerticalAlignment="Center"/>
+   </Grid>
   </Grid>
   <Border Grid.Row="1" Background="{DynamicResource ConsoleBorderBrush}"/>
   <Grid Grid.Row="2" x:Name="ConsoleGrid"/>

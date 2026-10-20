@@ -42,6 +42,8 @@ struct CompressorSettings {
 };
 struct DuckingSettings {
     double thresholdDb = -30, amountDb = 18, attackMs = 10, releaseMs = 250;
+    std::string mode = "static";
+    double ratio = 4;
     bool operator==(const DuckingSettings&) const = default;
 };
 struct ExpanderSettings {

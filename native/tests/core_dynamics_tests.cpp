@@ -50,7 +50,9 @@ struct Runner {
     Frame last() const { return processor->output(1).back(); }
 };
 double db(double gain) { return 20 * std::log10(std::max(gain, 1e-20)); }
-void legacyCompressor() {
+// Keep bounded GraphPlan temporaries in separate test frames. Inlining these
+// independent fixtures into main can exceed Windows' default 1 MiB stack.
+__declspec(noinline) void legacyCompressor() {
     auto graph = chain("compressor"); auto original = Json(graph);
     for (auto& node : original["nodes"]) { node.erase("expander"); node.erase("alignmentDelay"); node.erase("ducking"); node.erase("dynamicsUiVersion");
         node["compressor"].erase("mode"); node["compressor"].erase("detector"); node["compressor"].erase("ceilingDb"); }
@@ -75,28 +77,41 @@ void legacyCompressor() {
     }
     check(exact, "Legacy compressor output remains bit-exact against original envelope/transfer implementation");
 }
-void sidechain() {
-    auto graph = chain("compressor"); GraphNode key; key.id = "key"; key.kind = "virtualInput"; graph.nodes.push_back(key);
+__declspec(noinline) void compressorOwnSignal() {
+    auto graph = chain("compressor");
     graph.nodes[1].compressor = {-30, 6, 10, 250, 0, "compress", "external", -1};
-    graph.edges.push_back({"detector", "key", "effect", "sidechain"}); Runner r(graph);
-    r.programme.fill({.1f, -.04f}); r.run(300); near(r.last().left, .1, 2e-8, "Silent external detector never falls back to programme");
-    r.key.fill({0, .5f}); r.run(300);
-    const double expected = std::pow(.5 / std::pow(10., -30. / 20), 1. / 6 - 1);
-    near(r.last().left / .1, expected, 1e-6, "Ducking preset follows external right-channel detector");
-    near(r.last().right / r.last().left, -.4, 1e-7, "Ducking preserves linked stereo programme balance");
-    check(r.processor->meter(1).gainReductionDb > 15 && r.processor->meter(1).detectorDb > -7, "Ducking reports measured external detector and attenuation");
-    r.programme.fill({}); r.run(10); near(r.last().left, 0, 0, "Sidechain never leaks to audible left"); near(r.last().right, 0, 0, "Sidechain never leaks to audible right");
-    GraphChannels capture{}; capture[0] = 1; capture[2] = 2;
-    check(graphSignalChannels(*r.plan, capture)[1] == 1, "Sidechain stereo does not alter mono programme metadata");
-    r.programme.fill({.1f, -.04f}); r.graph.edges.back().muted = true; r.update(); r.run(1000);
-    near(r.last().left, .1, 1e-7, "Muted sidechain releases smoothly back to programme unity");
-    r.graph.edges.pop_back(); r.update(); r.run(500); near(r.last().left, .1, 1e-7, "Disconnected external detector is silent and releases");
-    auto invalid = graph; invalid.edges.push_back({"duplicate", "source", "effect", "sidechain"}); rejects([&] { compileGraph(invalid); }, "Reject two detector connections");
-    invalid = graph; invalid.edges.back().to = "source"; rejects([&] { compileGraph(invalid); }, "Reject detector into non-Compressor");
-    invalid = graph; invalid.nodes[2].kind = "gain"; invalid.edges.push_back({"feedback", "effect", "key"}); rejects([&] { compileGraph(invalid); }, "Sidechain dependencies participate in feedback loop rejection");
-    invalid = graph; invalid.edges.back().kind = "audio"; check(!sameGraphTopology(compileGraph(graph), compileGraph(invalid)), "Changing sidechain to programme changes topology");
+    auto internal = graph; internal.nodes[1].compressor.detector = "internal";
+    check(compileGraph(graph) == compileGraph(internal), "Stored legacy external detector selection has no effect on Compressor processing");
+    Runner r(graph), reference(internal);
+    r.programme.fill({.1f, -.04f}); r.run(400);
+    const double expected = std::pow(static_cast<double>(r.programme[0].left) / std::pow(10., -30. / 20), 1. / 6 - 1);
+    near(r.last().left / .1, expected, 1e-6, "Compressor detects its own programme even when a saved detector field says external");
+    near(r.last().right / r.last().left, -.4, 1e-7, "Compressor own-signal attenuation preserves linked stereo programme balance");
+    near(r.processor->meter(1).gainReductionDb, -db(expected), 1e-5, "Compressor meter reports attenuation from its own programme");
+    near(r.processor->meter(1).detectorDb, -20, 1e-5, "Compressor detector meter measures its own programme peak");
+    r.programme.fill({.02f, -.5f}); r.run(400);
+    const double rightTarget = std::pow(.5 / std::pow(10., -30. / 20), 1. / 6 - 1);
+    near(r.last().left / .02, rightTarget, 1e-6, "Compressor own-signal detector includes the louder right programme channel");
+    // Fresh processors start at identical states; the persisted detector value alone cannot alter sound.
+    Runner stale(graph); std::mt19937 random(907); std::uniform_real_distribution<float> sample(-.7f, .7f); bool exact = true;
+    for (int block = 0; block < 80; ++block) {
+        for (auto& frame : stale.programme) frame = {sample(random), sample(random)};
+        reference.programme = stale.programme; stale.run(); reference.run();
+        for (std::size_t i = 0; i < quantumFrames; ++i) {
+            const auto a = stale.processor->output(1)[i], b = reference.processor->output(1)[i];
+            exact = exact && a.left == b.left && a.right == b.right;
+        }
+    }
+    check(exact, "Compressor output is bit-exact for internal and tolerated legacy external detector values");
+    auto invalid = graph; GraphNode key; key.id = "key"; key.kind = "virtualInput"; invalid.nodes.push_back(key);
+    invalid.edges.push_back({"detector", "key", "effect", "sidechain"});
+    rejects([&] { compileGraph(invalid); }, "Compressor rejects sidechain inputs because only Ducking accepts a trigger");
+    invalid.nodes[1].compressor.detector = "internal";
+    rejects([&] { compileGraph(invalid); }, "Compressor rejects sidechain inputs regardless of its stored detector field");
+    invalid.nodes[1].kind = "ducking"; invalid.nodes[1].ducking.mode = "dynamic";
+    check(compileGraph(invalid).nodes[1].sidechainEdge >= 0, "Dynamic Ducking accepts the dedicated external trigger connection");
 }
-void limiter(const std::string& kind) {
+__declspec(noinline) void limiter(const std::string& kind) {
     auto graph = chain(kind); auto& c = graph.nodes[1].compressor; c.mode = kind == "compressor" ? "limit" : "compress"; c.ceilingDb = -6; c.makeupDb = 24; c.detector = "external";
     graph.nodes[1].gainDb = 12; GraphNode control; control.kind = "control"; control.id = "control"; control.gainDb = 12;
     graph.nodes.push_back(control); graph.edges.push_back({"volume", "control", "effect", "control", 12}); Runner r(graph);
@@ -128,7 +143,7 @@ void limiter(const std::string& kind) {
     bool finite = true; for (const auto f : r.processor->output(1)) finite = finite && std::isfinite(f.left) && std::isfinite(f.right);
     check(finite, "Nonfinite input cannot poison limiter state");
 }
-void ducking() {
+__declspec(noinline) void ducking() {
     auto graph = chain("ducking"); GraphNode key; key.id = "key"; key.kind = "virtualInput"; graph.nodes.push_back(key);
     graph.edges.push_back({"trigger", "key", "effect", "sidechain"}); Runner r(graph);
     r.programme.fill({.1f, -.04f}); r.run(300);
@@ -186,7 +201,99 @@ void ducking() {
     invalid = graph; invalid.nodes[2].kind = "gain"; invalid.edges.push_back({"feedback", "effect", "key"});
     rejects([&] { compileGraph(invalid); }, "Ducking trigger participates in cycle validation");
 }
-void expansion() {
+__declspec(noinline) void legacyStaticDucking() {
+    auto graph = chain("ducking"); GraphNode key; key.id = "key"; key.kind = "virtualInput"; graph.nodes.push_back(key);
+    graph.edges.push_back({"trigger", "key", "effect", "sidechain"});
+    auto oldJson = Json(graph); for (auto& node : oldJson["nodes"]) { node["ducking"].erase("mode"); node["ducking"].erase("ratio"); }
+    const auto legacy = oldJson.get<AudioGraph>();
+    check(legacy.nodes[1].ducking.mode == "static" && legacy.nodes[1].ducking.ratio == 4,
+        "Legacy Ducking JSON defaults to Static with its stored four controls intact");
+    check(compileGraph(legacy) == compileGraph(graph), "Absent Ducking mode and ratio preserve the original compiled plan");
+    Runner r(legacy); double detector{}, gain = 1; bool active{}, exact = true;
+    std::mt19937 random(4521); std::uniform_real_distribution<float> programme(-.2f, .2f), trigger(-.08f, .08f);
+    for (int block = 0; block < 180; ++block) {
+        if (block == 90) { r.graph.nodes[1].ducking.ratio = 20; r.update(); }
+        for (std::size_t i = 0; i < quantumFrames; ++i) {
+            r.programme[i] = {programme(random), programme(random)};
+            // Alternate above/below threshold and silence to exercise both hysteresis edges.
+            r.key[i] = block % 30 < 10 ? Frame{trigger(random), trigger(random)}
+                : block % 30 < 20 ? Frame{.025f, -.02f} : Frame{};
+        }
+        r.run(); const auto output = r.processor->output(1); const auto& n = r.plan->nodes[1];
+        for (std::size_t i = 0; i < quantumFrames; ++i) {
+            const auto keyFrame = r.key[i];
+            const double peak = std::max(std::abs(static_cast<double>(keyFrame.left)), std::abs(static_cast<double>(keyFrame.right)));
+            const double detectorCoefficient = peak > detector ? .9958420018451100 : .9995834201268338;
+            detector = peak + detectorCoefficient * (detector - peak); if (detector < 1e-30) detector = 0;
+            if (detector >= n.threshold) active = true; else if (detector < n.duckingCloseThreshold) active = false;
+            const double target = active ? n.duckingAmount : 1.;
+            const double coefficient = target < gain ? n.attack : n.release;
+            gain = target + coefficient * (gain - target);
+            const double left = r.programme[i].left, right = r.programme[i].right;
+            exact = exact && output[i].left == static_cast<float>(left + (left * gain - left))
+                && output[i].right == static_cast<float>(right + (right * gain - right));
+        }
+    }
+    check(exact, "Legacy Static Ducking remains bit-exact against the original detector, hysteresis and gain envelope, including edits to the inactive Ratio control");
+}
+__declspec(noinline) void dynamicDucking() {
+    auto graph = chain("ducking"); graph.nodes[1].ducking.mode = "dynamic";
+    GraphNode key; key.id = "key"; key.kind = "virtualInput"; graph.nodes.push_back(key);
+    graph.edges.push_back({"trigger", "key", "effect", "sidechain"}); Runner r(graph);
+    r.programme.fill({.1f, -.04f}); r.run(300);
+    near(r.last().left, .1, 2e-8, "Dynamic Ducking with a silent trigger never detects the programme");
+    r.key.fill({0, .1f}); const double trigger = static_cast<double>(r.key[0].right);
+    const double target = std::pow(trigger / r.plan->nodes[1].threshold, 1. / 4 - 1);
+    r.run();
+    near(r.processor->output(1).front().left, .1 * (target + r.plan->nodes[1].attack * (1 - target)), 1e-8,
+        "Dynamic Ducking applies the external compressor curve from the first raw trigger sample");
+    r.run(); near(r.last().left / .1, target + (1 - target) * std::exp(-1.), 1e-7,
+        "Dynamic Ducking attack reaches one time constant after exactly 10 ms");
+    r.run(400); near(r.last().left / .1, target, 1e-7, "Dynamic Ducking reaches the external 4:1 compressor target");
+    near(r.last().right / r.last().left, -.4, 1e-7, "Dynamic Ducking preserves linked stereo programme balance");
+    near(r.processor->meter(1).gainReductionDb, -db(target), 1e-5, "Dynamic Ducking reports its measured ratio-based gain reduction");
+    r.graph.nodes[1].ducking.amountDb = 0; r.update(); r.run(400);
+    near(r.last().left / .1, target, 1e-7, "Dynamic Ducking ignores the preserved Static Amount setting");
+    r.graph.nodes[1].ducking.ratio = 1; r.update(); r.run(50);
+    near(r.last().left / .1, 1 + (target - 1) * std::exp(-1.), 1e-7,
+        "Ratio 1 smoothly releases Dynamic Ducking through the shared 250 ms envelope");
+    r.run(1500); near(r.last().left, .1, 2e-8, "Dynamic Ducking at Ratio 1 is transparent with an active trigger");
+    r.graph.nodes[1].ducking.ratio = 4; r.update(); r.key.fill({.8f, 0}); r.run(400);
+    const double stronger = std::pow(static_cast<double>(r.key[0].left) / r.plan->nodes[1].threshold, 1. / 4 - 1);
+    near(r.last().left / .1, stronger, 1e-7, "A stronger left-channel trigger produces proportionally more Dynamic attenuation");
+    check(stronger < target, "Dynamic Ducking attenuation grows with trigger level above threshold");
+    // This transition releases from a deeper Dynamic attenuation. Allow the
+    // 250 ms release to settle before asserting its eventual Static target.
+    r.graph.nodes[1].ducking.mode = "static"; r.graph.nodes[1].ducking.amountDb = 18; r.update(); r.run(1500);
+    const double fixed = std::pow(10., -18. / 20.);
+    near(r.last().left / .1, fixed, 1e-7, "Switching to Static restores its preserved fixed Amount");
+    r.graph.nodes[1].ducking.mode = "dynamic"; r.update(); r.run();
+    near(r.processor->output(1).front().left, .1 * (stronger + r.plan->nodes[1].attack * (fixed - stronger)), 1e-8,
+        "Static-to-Dynamic mode edits inherit the current gain and begin the existing attack without a jump");
+    r.run(400); r.graph.nodes[1].ducking.mode = "static"; r.update(); r.run();
+    near(r.processor->output(1).front().left, .1 * (fixed + r.plan->nodes[1].release * (stronger - fixed)), 1e-8,
+        "Dynamic-to-Static mode edits inherit the same gain and begin the existing release without a jump");
+    r.graph.nodes[1].ducking.mode = "dynamic"; r.update(); r.run(400);
+    r.programme.fill({}); r.run(10);
+    near(r.last().left, 0, 0, "Dynamic trigger never leaks into left programme output");
+    near(r.last().right, 0, 0, "Dynamic trigger never leaks into right programme output");
+    r.programme.fill({.1f, -.04f}); r.run(400);
+    const float beforeDetach = r.last().left; r.graph.edges.pop_back(); r.update(); r.run();
+    near(r.processor->output(1).front().left, .1 * (1 + r.plan->nodes[1].release * (stronger - 1)), 1e-8,
+        "Disconnecting Dynamic trigger starts release from retained attenuation on its first sample");
+    check(r.processor->output(1).front().left > beforeDetach && r.last().left < .02f,
+        "Disconnected Dynamic trigger recovers gradually instead of resetting to unity");
+    r.run(1500); near(r.last().left, .1, 2e-8, "Dynamic Ducking with a missing trigger fully releases without programme fallback");
+    r.graph.edges.push_back({"trigger", "key", "effect", "sidechain"}); r.update(); r.run(400);
+    r.graph.edges.back().muted = true; r.update(); r.run(1500);
+    near(r.last().left, .1, 2e-8, "Muted Dynamic trigger smoothly releases to unity");
+    r.graph.edges.back().muted = false; r.update(); r.run(400);
+    r.key.fill({std::numeric_limits<float>::infinity(), std::numeric_limits<float>::quiet_NaN()}); r.run(1500);
+    near(r.last().left, .1, 2e-8, "Nonfinite Dynamic trigger samples cannot poison detector or gain state");
+    r.key.fill({.01f, -.02f}); r.run(1500);
+    near(r.last().left, .1, 2e-8, "Dynamic trigger below threshold has unity target without Static hysteresis");
+}
+__declspec(noinline) void expansion() {
     auto graph = chain("expander"); auto& e = graph.nodes[1].expander; e.holdMs = 0; e.hysteresisDb = 0; e.releaseMs = 5;
     Runner r(graph); r.programme.fill({.001f, -.0005f}); r.run(200);
     near(db(r.last().left / .001), -20, .0001, "2:1 downward expansion attenuates a signal20dB below threshold by20dB");
@@ -204,7 +311,7 @@ void expansion() {
     r.run(200); check(r.last().left < .0001f * .002, "Gate eventually closes after detector decay and hold");
     r.graph.nodes[1].bypass = true; r.update(); r.run(10); near(r.last().left, .0001, 1e-10, "Expander bypass is dry");
 }
-void delay() {
+__declspec(noinline) void delay() {
     for (std::uint32_t samples : {0u, 1u, 48u, 239u, 240u, 241u, 48000u, 96000u}) {
         auto graph = chain("alignmentDelay"); graph.nodes[1].alignmentDelay.samples = samples; Runner r(graph);
         const std::size_t count = static_cast<std::size_t>(samples) + quantumFrames; std::vector<Frame> result;
@@ -221,7 +328,7 @@ void delay() {
     r.graph.nodes[1].alignmentDelay.samples = 0; r.update(); r.run(4); near(r.last().left, .123, 4e-9, "Latest rapidly retargeted delay settles within20ms without resetting history");
     r.graph.nodes[1].alignmentDelay.samples = 96000; r.graph.nodes[1].bypass = true; r.update(); r.run(10); near(r.last().left, .123, 4e-9, "Delay bypass has zero delay");
 }
-void historyAndRealtime() {
+__declspec(noinline) void historyAndRealtime() {
     for (const std::string kind : {"expander", "alignmentDelay", "compressor", "limiter", "ducking"}) {
         auto graph = chain(kind);
         if (kind == "ducking") { GraphNode key; key.id = "key"; key.kind = "virtualInput"; graph.nodes.push_back(key); graph.edges.push_back({"trigger", "key", "effect", "sidechain"}); }
@@ -235,6 +342,8 @@ void historyAndRealtime() {
             r.graph.nodes[1].compressor.mode = update % 3 ? "compress" : "limit";
             r.graph.nodes[1].ducking.amountDb = update % 2 ? 36 : 3;
             r.graph.nodes[1].ducking.thresholdDb = update % 3 ? -30 : 0;
+            r.graph.nodes[1].ducking.mode = update % 2 ? "static" : "dynamic";
+            r.graph.nodes[1].ducking.ratio = update % 3 ? 20 : 1;
             auto next = std::make_unique<GraphPlan>(compileGraph(r.graph));
             tracking = true; other->inherit(*r.processor, *r.plan, *next);
             r.processor->process(*next, r.inputs); other->process(*next, r.inputs);
@@ -252,12 +361,11 @@ void historyAndRealtime() {
         check(allocations == before, "Realtime reset does not allocate/free");
     }
 }
-void persistence() {
+__declspec(noinline) void persistence() {
     auto graph = chain("expander"); graph.nodes[1].expander = {"gate", -52, 7, 3, 81, 401, 72, 8}; graph.nodes[1].bypass = true;
     GraphNode d; d.id = "delay"; d.kind = "alignmentDelay"; d.alignmentDelay.samples = 12345; d.x = 82; d.y = -51; graph.nodes.push_back(d);
     GraphNode c; c.id = "compress"; c.kind = "compressor"; c.compressor = {-31, 8, 9, 270, 1, "limit", "external", -3.4}; graph.nodes.push_back(c);
-    graph.edges.push_back({"sidechain", "source", "compress", "sidechain"});
-    GraphNode duck; duck.id = "duck"; duck.kind = "ducking"; duck.name = "Custom Duck"; duck.ducking = {-33.3, 21.45, .25, 333.75};
+    GraphNode duck; duck.id = "duck"; duck.kind = "ducking"; duck.name = "Custom Duck"; duck.ducking = {-33.3, 21.45, .25, 333.75, "dynamic", 7.25};
     duck.gainDb = -4; duck.x = -123; duck.y = 456; duck.bypass = true; graph.nodes.push_back(duck);
     graph.edges.push_back({"trigger", "source", "duck", "sidechain", -2, true});
     GraphNode limit; limit.id = "limit"; limit.kind = "limiter"; limit.compressor.ceilingDb = -2.5; limit.compressor.releaseMs = 135.25; graph.nodes.push_back(limit);
@@ -280,7 +388,7 @@ void persistence() {
     invalid = graph; invalid.nodes[3].compressor.mode = "unknown"; rejects([&] { compileGraph(invalid); }, "Invalid compressor mode rejected");
     invalid = graph; invalid.nodes[3].compressor.detector = "auto"; rejects([&] { compileGraph(invalid); }, "Invalid detector rejected");
     invalid = graph; invalid.nodes[3].compressor.ceilingDb = 1; rejects([&] { compileGraph(invalid); }, "Unsafe positive ceiling rejected");
-    for (const auto field : {"thresholdDb", "amountDb", "attackMs", "releaseMs"}) {
+    for (const auto field : {"thresholdDb", "amountDb", "attackMs", "releaseMs", "ratio"}) {
         auto value = json; value["nodes"][4]["ducking"][field] = 999999;
         rejects([&] { compileGraph(value.get<AudioGraph>()); }, "Ducking rejects each out-of-range setting");
         value["nodes"][4]["ducking"][field] = nullptr;
@@ -288,13 +396,36 @@ void persistence() {
     }
     invalid = graph; invalid.nodes[4].ducking.amountDb = std::numeric_limits<double>::quiet_NaN();
     rejects([&] { compileGraph(invalid); }, "Ducking rejects nonfinite settings");
+    for (const auto mode : {"", "Dynamic", "compress", "unknown"}) {
+        invalid = graph; invalid.nodes[4].ducking.mode = mode;
+        rejects([&] { compileGraph(invalid); }, "Ducking rejects unsupported modes");
+    }
+    for (auto bad : {Json(nullptr), Json(1), Json(true)}) {
+        auto value = json; value["nodes"][4]["ducking"]["mode"] = bad;
+        rejects([&] { compileGraph(value.get<AudioGraph>()); }, "Ducking mode requires a string");
+    }
+    for (double ratio : {.99, 20.01, std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::infinity()}) {
+        invalid = graph; invalid.nodes[4].ducking.ratio = ratio;
+        rejects([&] { compileGraph(invalid); }, "Ducking rejects ratios outside the finite 1 to 20 range");
+    }
+    for (double ratio : {1., 20.}) {
+        invalid = graph; invalid.nodes[4].ducking.ratio = ratio;
+        check(compileGraph(invalid).nodes[4].ratio == ratio, "Dynamic Ducking accepts both inclusive ratio boundaries");
+    }
+    auto oldDucking = json; oldDucking["nodes"][4]["ducking"].erase("mode"); oldDucking["nodes"][4]["ducking"].erase("ratio");
+    const auto defaultDucking = oldDucking.get<AudioGraph>().nodes[4].ducking;
+    check(defaultDucking.mode == "static" && defaultDucking.ratio == 4 && defaultDucking.thresholdDb == -33.3
+        && defaultDucking.amountDb == 21.45 && defaultDucking.attackMs == .25 && defaultDucking.releaseMs == 333.75,
+        "Missing Ducking mode/ratio restore Static defaults while retaining all saved legacy controls");
+    const auto emptyDucking = Json::object().get<DuckingSettings>();
+    check(emptyDucking == DuckingSettings{}, "Empty Ducking object applies all schema defaults including Static and Ratio 4");
     auto missing = json; for (auto& node : missing["nodes"]) { node.erase("ducking"); node.erase("dynamicsUiVersion"); }
     const auto legacy = missing.get<AudioGraph>();
     check(legacy.nodes[3].kind == "compressor" && legacy.nodes[3].dynamicsUiVersion == 0 && legacy.nodes[3].compressor.mode == "limit"
-        && legacy.nodes[3].compressor.detector == "external", "Absent interface version leaves legacy compressor identity and modes unchanged");
-    check(Json(legacy.nodes[3].compressor) == Json(graph.nodes[3].compressor), "Legacy hidden compressor settings retain exact values");
+        && legacy.nodes[3].compressor.detector == "external", "Absent interface version preserves Compressor identity, mode and tolerated inactive detector field");
+    check(Json(legacy.nodes[3].compressor) == Json(graph.nodes[3].compressor), "Legacy Compressor mode and inactive detector field retain exact stored values");
 }
-void realtimeBudget() {
+__declspec(noinline) void realtimeBudget() {
     AudioGraph graph; GraphNode source; source.id = "source"; source.kind = "virtualInput"; graph.nodes.push_back(source);
     for (int i = 0; i < 30; ++i) { GraphNode node; node.id = "delay-" + std::to_string(i); node.kind = "alignmentDelay"; node.alignmentDelay.samples = 96000;
         graph.nodes.push_back(node); graph.edges.push_back({"edge-" + std::to_string(i), i ? "delay-" + std::to_string(i-1) : "source", node.id}); }
@@ -309,7 +440,7 @@ void realtimeBudget() {
 }
 }
 int main() {
-    try { legacyCompressor(); sidechain(); limiter("compressor"); limiter("limiter"); ducking(); expansion(); delay(); historyAndRealtime(); persistence(); realtimeBudget();
-        std::cout << "PASS: " << checks << " focused core dynamics/delay checks; legacy sound, fixed-depth ducking/trigger isolation, strict sample peaks, gate/expansion, exact alignment, histories, allocations, JSON/validation.\n"; return 0;
+    try { legacyCompressor(); compressorOwnSignal(); limiter("compressor"); limiter("limiter"); ducking(); legacyStaticDucking(); dynamicDucking(); expansion(); delay(); historyAndRealtime(); persistence(); realtimeBudget();
+        std::cout << "PASS: " << checks << " focused core dynamics/delay checks; legacy sound, Static/Dynamic ducking/trigger isolation, strict sample peaks, gate/expansion, exact alignment, histories, allocations, JSON/validation.\n"; return 0;
     } catch (const std::exception& e) { tracking = false; std::cerr << "FAIL: " << e.what() << '\n'; return 1; }
 }

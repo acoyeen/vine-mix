@@ -9,6 +9,7 @@ using System.Windows.Data;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Shell;
+using AudioMixer.Desktop.Controls;
 
 namespace AudioMixer.Desktop;
 
@@ -76,8 +77,8 @@ internal static class CaptionHitTestVerification
                                 || Classify(point) != "CLIENT") failures.Add($"{button.Content}: {point} hit {hit?.GetType().Name ?? "none"}");
                         }
                     }
-                    require(buttons.Length == 13 && failures.Count == 0,
-                        $"All thirteen caption/toolbar buttons, including disabled history controls, remain client targets at their centres and inner edges ({scope}). {string.Join("; ", failures.Take(4))}");
+                    require(buttons.Length == 14 && failures.Count == 0,
+                        $"All fourteen caption/toolbar buttons, including the website symbol and disabled history controls, remain client targets at their centres and inner edges ({scope}). {string.Join("; ", failures.Take(4))}");
 
                     failures.Clear();
                     var passive = Descendants<TextBlock>(root).Where(text => HasVisibleAncestors(text) && Bounds(text).Bottom <= canvas.Top
@@ -90,18 +91,57 @@ internal static class CaptionHitTestVerification
                             failures.Add($"Text {text.Text}: {Center(bounds)} -> {Classify(Center(bounds))}");
                     }
                     // Scan both full rows, skipping actual button rectangles.
-                    foreach (double y in new[] { 4 + MainWindow.TitleBarHeight / 2, canvas.Top - GraphWorkspace.ToolbarHeight / 2 })
+                    foreach (double y in new[] { Center(Bounds(window.HeaderBar)).Y, canvas.Top - GraphWorkspace.ToolbarHeight / 2 })
                     for (double x = 12; x < size.Width - 12; x += 17)
                     {
                         var point = new Point(x, y);
                         if (buttonBounds.Values.Any(bounds => bounds.Contains(point))) continue;
                         if (Classify(point) != "CAPTION") failures.Add($"Empty/passive {point} -> {Classify(point)}");
                     }
-                    require(passive.Any(text => text.Text == "Vine Mix")
+                    var brand = Descendants<BrandWordmark>(root).Single();
+                    var website = buttons.Single(button => button.Name == "WebsiteButton");
+                    Rect websiteBounds = Bounds(website);
+                    Rect headerBounds = Bounds(window.HeaderBar), brandBounds = Bounds(brand);
+                    Rect indicatorBounds = Bounds(window.ConnectionIndicator);
+                    Rect warningBounds = Bounds(window.HeaderWarning), saveBounds = Bounds(window.SaveIndicator);
+                    Rect settingsBounds = Bounds(window.SettingsButton), actionBounds = Bounds(window.WindowActions);
+                    double pixelTolerance = 96 / dpi + .001;
+                    Point headerCenter = Center(headerBounds), brandCenter = Center(brandBounds), websiteCenter = Center(websiteBounds);
+                    require(Math.Abs(headerCenter.X - root.Width / 2) <= pixelTolerance
+                        && Math.Abs(brandCenter.X - headerCenter.X) <= pixelTolerance
+                        && Math.Abs(brandCenter.Y - headerCenter.Y) <= pixelTolerance
+                        && Math.Abs(websiteCenter.X - headerCenter.X) <= pixelTolerance
+                        && Math.Abs(websiteCenter.Y - headerCenter.Y) <= pixelTolerance,
+                        $"The logo artwork and website target stay at the whole header's horizontal and vertical centre, independent of warning or right-side content ({scope}); header={headerBounds}, mark={brandBounds}, target={websiteBounds}.");
+                    require(Math.Abs(indicatorBounds.Width - 8) <= pixelTolerance
+                        && Math.Abs(indicatorBounds.Height - 8) <= pixelTolerance
+                        && Math.Abs(indicatorBounds.Left - (headerBounds.Left + 16)) <= pixelTolerance
+                        && Math.Abs(Center(indicatorBounds).Y - headerCenter.Y) <= pixelTolerance
+                        && indicatorBounds.Right < websiteBounds.Left,
+                        $"The larger 8 DIP connection indicator stays inset at the far left and vertically centred ({scope}); indicator={indicatorBounds}, header={headerBounds}.");
+                    require(window.HeaderWarning.TextTrimming == TextTrimming.CharacterEllipsis
+                        && window.HeaderWarning.TextWrapping == TextWrapping.NoWrap
+                        && warningBounds.Left >= indicatorBounds.Right - pixelTolerance
+                        && warningBounds.Right <= websiteBounds.Left + pixelTolerance
+                        && saveBounds.Left >= websiteBounds.Right - pixelTolerance
+                        && saveBounds.Right <= settingsBounds.Left + pixelTolerance
+                        && settingsBounds.Right <= actionBounds.Left + pixelTolerance
+                        && !Overlaps(warningBounds, saveBounds, pixelTolerance)
+                        && !Overlaps(saveBounds, websiteBounds, pixelTolerance)
+                        && !Overlaps(warningBounds, websiteBounds, pixelTolerance),
+                        $"Warning and saved status retain separate header space without overlapping the centred logo, Settings or window actions ({scope}); warning={warningBounds}, saved={saveBounds}, logo={websiteBounds}, settings={settingsBounds}, actions={actionBounds}.");
+                    require(WindowChrome.GetIsHitTestVisibleInChrome(website)
+                        && HasButtonAncestor(brand) && Classify(Center(Bounds(brand))) == "CLIENT"
+                        && website.Focusable && website.IsTabStop
+                        && websiteBounds.Left >= chrome.ResizeBorderThickness.Left
+                        && websiteBounds.Top >= chrome.ResizeBorderThickness.Top,
+                        $"The wide website logo has a keyboard-focusable client target inside the resize border ({scope}).");
+                    require(Classify(new Point(websiteBounds.Left - 1, websiteBounds.Top + websiteBounds.Height / 2)) == "CAPTION"
+                        && Classify(new Point(websiteBounds.Right + 1, websiteBounds.Top + websiteBounds.Height / 2)) == "CAPTION"
                         && passive.Any(text => text.Name == "SaveIndicator")
                         && passive.Any(text => BindingOperations.GetBinding(text, TextBlock.TextProperty)?.Path?.Path == nameof(MixerViewModel.Warning))
                         && failures.Count == 0,
-                        $"Title, save status, warning and unused space across both rows remain draggable ({scope}). {string.Join("; ", failures.Take(4))}");
+                        $"Save status, warning and unused space around the website button and across both rows remain draggable ({scope}). {string.Join("; ", failures.Take(4))}");
 
                     double captionBottom = chrome.ResizeBorderThickness.Top + chrome.CaptionHeight;
                     double firstCanvasPixel = Math.Ceiling(canvas.Top * dpi / 96) * 96 / dpi;
@@ -132,6 +172,9 @@ internal static class CaptionHitTestVerification
     }
 
     private static Point Center(Rect bounds) => new(bounds.Left + bounds.Width / 2, bounds.Top + bounds.Height / 2);
+    private static bool Overlaps(Rect first, Rect second, double tolerance) =>
+        Math.Min(first.Right, second.Right) - Math.Max(first.Left, second.Left) > tolerance
+        && Math.Min(first.Bottom, second.Bottom) - Math.Max(first.Top, second.Top) > tolerance;
     private static DependencyObject? Hit(Visual root, Point point)
     {
         DependencyObject? hit = null;

@@ -66,8 +66,8 @@ internal sealed class VoiceColorPad : FrameworkElement
         TextOptions.SetTextFormattingMode(this, TextFormattingMode.Ideal);
         TextOptions.SetTextHintingMode(this, TextHintingMode.Fixed);
         TextOptions.SetTextRenderingMode(this, TextRenderingMode.Grayscale);
-        ToolTip = NodeToolTip.Create("Voice Color", "Left / right · Warm / Bright", "Up / down · Broadcast / Natural",
-            "Arrow keys · Adjust; Shift · Fine", "Double-click or Home · Neutral");
+        ToolTip = NodeToolTip.Create("Voice Color", "Tone · Warm to Bright",
+            "Character · Natural to Broadcast", "Neutral · Original voice character");
         AutomationProperties.SetName(this, "Voice Color pad");
         AutomationProperties.SetHelpText(this,
             "Left and right adjust Warm to Bright. Up adds broadcast character; down keeps the voice natural. Arrow keys adjust by one percent; Shift uses a tenth of a percent. Home or double-click inside the pad resets to neutral. Tone and Character fields below accept exact values.");

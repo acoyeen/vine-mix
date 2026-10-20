@@ -15,7 +15,8 @@ packaging and update guidance is in [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md)
 | [SpeexDSP 1.2.1](https://downloads.xiph.org/releases/speex/) | Spectral noise suppression | BSD-3-Clause and source-file BSD notices; `licenses/SpeexDSP-COPYING.txt` and `SpeexDSP-source-notices.txt` |
 | [RNNoise v0.2](https://github.com/xiph/rnnoise/tree/v0.2) and matching default model `0b50c45` | Neural noise suppression | BSD-3-Clause and source-file BSD notices; `licenses/RNNoise-COPYING.txt` and `RNNoise-source-notices.txt` |
 | [nlohmann/json 3.12.0](https://github.com/nlohmann/json/tree/v3.12.0) | Configuration and control messages | MIT; `licenses/nlohmann-json-LICENSE` and `nlohmann-json-third-party-notices.txt`, including Florian Loitsch's Grisu2 and Evan Nemerson's Hedley credits |
-| [Inter 4.1](https://github.com/rsms/inter/releases/tag/v4.1) Regular and SemiBold | Embedded desktop fonts | SIL Open Font License 1.1; `licenses/Inter-OFL.txt` and `Assets/Fonts/LICENSE.txt` |
+| [IBM Plex](https://github.com/IBM/plex/tree/71f558992315a12ca1f06a2215d57962a1992162): Sans 3.005 Regular, Medium and SemiBold; Mono 2.005 Regular | Embedded interface typography and numeric readouts | SIL Open Font License 1.1; `licenses/IBM-Plex-OFL.txt` and `Assets/Fonts/IBM-Plex-LICENSE.txt`; [asset provenance](docs/IBM_PLEX_FONTS.md) |
+| [Inter 4.1](https://github.com/rsms/inter/releases/tag/v4.1) Regular and SemiBold | Retained embedded legacy font assets; the current interface uses IBM Plex | SIL Open Font License 1.1; `licenses/Inter-OFL.txt` and `Assets/Fonts/LICENSE.txt` |
 | .NET 10.0.13, WPF and Windows Forms | Self-contained desktop runtime | MIT and component terms; `licenses/dotnet-runtime-LICENSE.txt`, `dotnet-windowsdesktop-LICENSE.txt`, and the `dotnet-*-ThirdPartyNotices.txt` files |
 | [LLVM-MinGW 20261006 UCRT x86_64](https://github.com/mstorsjo/llvm-mingw/releases/tag/20261006) | Native C++/unwind runtime, compiler support and Windows runtime support | Apache-2.0 with LLVM exceptions, legacy LLVM terms, MinGW-w64 and component terms; `licenses/LLVM-runtime-LICENSE.txt`, `MinGW-w64-COPYING.txt`, `MinGW-runtime-COPYING.txt`, and `winpthreads-COPYING.txt` |
 
@@ -27,10 +28,14 @@ and Windows Forms releases, rather than the SDK licence. SDKs, compilers, CMake,
 training datasets, training checkpoints and virtual audio drivers are not
 included in the application package.
 
-Inter is unmodified. Copyright (c) 2016 The Inter Project Authors. The fonts are
+IBM Plex is unmodified; only the local filenames differ from upstream.
+Copyright © 2017 IBM Corp., with Reserved Font Name "Plex". Sans is used for
+interface text and Mono for numerical values and shortcuts. Inter is also
+unmodified. Copyright (c) 2016 The Inter Project Authors. Both families are
 embedded in the desktop application; they are not installed system-wide. Their
 OFL terms remain attached to the fonts and do not change the licence of the
-application source.
+application source. The forest-green split VM symbol is Vine Mix's application
+branding; the use of IBM Plex does not imply IBM's endorsement.
 
 ### Pinned denoiser provenance
 

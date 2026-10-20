@@ -1,14 +1,19 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <SolidColorBrush x:Key="BrandAccentBrush" Color="#3B8C66"/>
+  <SolidColorBrush x:Key="BrandActionBrush" Color="#2D6A4F"/>
+  <SolidColorBrush x:Key="BrandActionTextBrush" Color="#F5F8F6"/>
+  <SolidColorBrush x:Key="BrandHoverBrush" Color="#347B5B"/>
+  <SolidColorBrush x:Key="NodeSidechainBrush" Color="#B8A0D8"/>
   <SolidColorBrush x:Key="ConsoleWindowBrush" Color="#0C0D0F"/>
-  <SolidColorBrush x:Key="ConsolePanelBrush" Color="#121416"/>
-  <SolidColorBrush x:Key="ConsoleTextBrush" Color="#E3E6EA"/>
-  <SolidColorBrush x:Key="ConsoleMutedBrush" Color="#9CA3AD"/>
-  <SolidColorBrush x:Key="ConsoleBorderBrush" Color="#30353B"/>
-  <SolidColorBrush x:Key="ConsoleControlBorderBrush" Color="#343A42"/>
+  <SolidColorBrush x:Key="ConsolePanelBrush" Color="#15181E"/>
+  <SolidColorBrush x:Key="ConsoleTextBrush" Color="#E8EBF2"/>
+  <SolidColorBrush x:Key="ConsoleMutedBrush" Color="#A5ADBA"/>
+  <SolidColorBrush x:Key="ConsoleBorderBrush" Color="#303744"/>
+  <SolidColorBrush x:Key="ConsoleControlBorderBrush" Color="#343D49"/>
   <SolidColorBrush x:Key="ConsoleWellBrush" Color="#080A0C"/>
-  <SolidColorBrush x:Key="ConsoleButtonFaceBrush" Color="#24282D"/>
-  <SolidColorBrush x:Key="ConsoleButtonHoverBrush" Color="#323840"/>
+  <SolidColorBrush x:Key="ConsoleButtonFaceBrush" Color="#242A32"/>
+  <SolidColorBrush x:Key="ConsoleButtonHoverBrush" Color="#303B40"/>
   <SolidColorBrush x:Key="ConsoleEdgeLightBrush" Color="#444B54"/>
   <SolidColorBrush x:Key="ConsoleEdgeDarkBrush" Color="#101215"/>
   <SolidColorBrush x:Key="ConsoleHeaderBandBrush" Color="#171A1E"/>

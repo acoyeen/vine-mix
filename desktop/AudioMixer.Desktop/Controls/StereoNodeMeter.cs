@@ -20,6 +20,7 @@ internal class StereoNodeMeter : FrameworkElement
     private const double FreshnessSeconds = .5;
     private readonly DispatcherTimer _timer;
     private bool _initialized, _attached, _pending, _pendingClip;
+    private bool _practiceSnapshot;
     private double _targetLeft, _targetRight, _pendingLeft, _pendingRight;
     private double _holdLeft, _holdRight, _lastAdvance, _lastSample, _lastPresentation;
     private double _lastClipSample = double.NegativeInfinity;
@@ -40,13 +41,16 @@ internal class StereoNodeMeter : FrameworkElement
     public int Channels { get; private set; } = 1;
     internal bool IsAnimationRunning => _timer.IsEnabled;
 
+    internal void FreezePracticeSnapshot() { _practiceSnapshot = true; _timer.Stop(); }
+
     public StereoNodeMeter()
     {
         Width = 28; MinWidth = 24; MinHeight = 90;
         SnapsToDevicePixels = true; UseLayoutRounding = true;
         AutomationProperties.SetName(this, "Audio level");
         AutomationProperties.SetLiveSetting(this, AutomationLiveSetting.Off);
-        ToolTip = NodeToolTip.Create("Audio level", "Stereo · Left and right bars", "Yellow · Above −12 dB", "Red · Above −3 dB", "Lit cap · Recent clipping");
+        ToolTip = NodeToolTip.Create("Audio level", "Bars · Current channel sample peaks",
+            "Stereo · Separate left and right levels", "Yellow · Above −12 dBFS", "Red · Above −3 dBFS", "Lit cap · Recent clipping");
         _timer = new DispatcherTimer(DispatcherPriority.Render, Dispatcher);
         _timer.Tick += (_, _) => Advance(Now);
         Loaded += (_, _) =>
@@ -264,7 +268,7 @@ internal class StereoNodeMeter : FrameworkElement
 
     private void RefreshTimer()
     {
-        if (!_attached || !IsVisible || !_initialized || Muted || Level <= 0 && _pendingLeft <= 0 && _pendingRight <= 0 && !_pendingClip && !Clipped && ClipIndicatorOpacity <= 0)
+        if (_practiceSnapshot || !_attached || !IsVisible || !_initialized || Muted || Level <= 0 && _pendingLeft <= 0 && _pendingRight <= 0 && !_pendingClip && !Clipped && ClipIndicatorOpacity <= 0)
         {
             _timer.Stop(); return;
         }

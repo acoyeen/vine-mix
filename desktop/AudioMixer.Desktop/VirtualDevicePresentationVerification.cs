@@ -50,9 +50,9 @@ internal static class VirtualDevicePresentationVerification
         mixer.ApplyPreviewSnapshot(fixture); await layout();
         require(Name(inputId).Text == savedInput.Device.Name && mixer.GraphConfig.Nodes.Single(n => n.Id == inputId).Device.Id == savedInput.Device.Id,
             "A missing virtual device retains its saved name and identity.");
-        require(views[inputId].InputNoticeLabel == "INPUT MISSING" && views[inputId].InputWarningVisible
-            && !views[inputId].InputNoticeVisible && views[inputId].InputDeviceTextElement == Name(inputId)
-            && views[inputId].InputNoticeDetailTextElement.Visibility == Visibility.Hidden && views[inputId].RenderSize == sizes[inputId],
+        require(views[inputId].AvailabilityNoticeLabel == "INPUT MISSING" && views[inputId].AvailabilityWarningVisible
+            && !views[inputId].AvailabilityNoticeVisible && views[inputId].AvailabilityDeviceTextElement == Name(inputId)
+            && views[inputId].AvailabilityNoticeDetailTextElement.Visibility == Visibility.Hidden && views[inputId].RenderSize == sizes[inputId],
             "The missing virtual input highlights its saved device name with a subtle glow, without extra text or resizing.");
 
         var replacement = new Endpoint { Id = "replacement-cable", StableId = "replacement-stable", Name = "Replacement cable",
@@ -105,11 +105,10 @@ internal static class VirtualDevicePresentationVerification
         foreach (var view in Descendants<GraphNodeView>(workspace))
         {
             var node = mixer.GraphConfig.Nodes.Single(n => n.Id == view.Id);
-            require(node.Kind == "virtualInput"
-                ? !view.InputNoticeVisible && view.InputWarningVisible && view.InputNoticeLabel == "VB-CABLE NOT DETECTED"
-                    && view.InputDeviceTextElement is not null && view.InputNoticeDetailTextElement.Visibility == Visibility.Hidden
-                : Descendants<TextBlock>(view).Any(t => t.Visibility == Visibility.Visible && t.Text == "Waiting for VAC Lite"),
-                node.Kind + " retains its device name and appropriate waiting indication.");
+            require(!view.AvailabilityNoticeVisible && view.AvailabilityWarningVisible
+                && view.AvailabilityNoticeLabel == (node.Kind == "virtualInput" ? "VB-CABLE NOT DETECTED" : "VAC LITE NOT DETECTED")
+                && view.AvailabilityDeviceTextElement is not null && view.AvailabilityNoticeDetailTextElement.Visibility == Visibility.Hidden,
+                node.Kind + " retains its device name and matching unavailable-transport warning.");
         }
     }
     private static async Task CheckSharedSourcePickersAsync(GraphWorkspace workspace, MixerViewModel mixer,

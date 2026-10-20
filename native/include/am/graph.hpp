@@ -6,7 +6,7 @@
 
 namespace am {
 enum class GraphKind { microphone, virtualInput, appInput, mix, gain, output, virtualOutput, control,
-    eq, tone, compressor, pan, mono, reroute, highPass, lowPass, denoiser, deEsser, plosive, reverb, voiceColor, expander, alignmentDelay, limiter, ducking };
+    eq, tone, compressor, pan, mono, reroute, highPass, lowPass, denoiser, deEsser, plosive, reverb, voiceColor, expander, alignmentDelay, limiter, ducking, gate };
 bool isSource(GraphKind kind) noexcept;
 bool isSink(GraphKind kind) noexcept;
 
@@ -26,9 +26,10 @@ struct GraphPlan {
         std::array<Biquad, maximumEqBands> eq{};
         std::size_t eqCount{};
         double threshold = .12589254, ratio = 4, attack = .99791884, release = .9998264, makeup = 1;
-        bool limit{}, externalDetector{};
+        bool limit{};
         double ceiling = .8912509381337456;
         double duckingAmount = 1, duckingCloseThreshold{};
+        bool dynamicDucking{};
         ExpanderSettings expander{};
         AlignmentDelaySettings alignmentDelay{};
         float panLeft = 1, panRight = 1;

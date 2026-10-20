@@ -5,12 +5,16 @@ effects and listening or virtual microphone outputs using visible audio cables.
 
 ![Vine Mix workspace](docs/images/workspace.png)
 
+The interface uses the split VM symbol, IBM Plex typography and forest-green
+actions. Audio cables stay green; Ducking sidechains stay lavender. See the
+[branding guide and assets](docs/BRANDING.md).
+
 ## Features
 
 - Microphone, virtual cable and per-application loopback inputs.
 - Separate listening outputs and a virtual microphone output, with independent mutes.
-- 23 creatable node types, including EQ, RNNoise / SpeexDSP denoising, dynamics,
-  sidechain ducking, reverb, Voice Color and alignment delay.
+- 24 creatable node types, including EQ, RNNoise / SpeexDSP denoising, separate
+  Expander and Gate, Static/Dynamic ducking, reverb, Voice Color and alignment delay.
 - Up to 32 nodes and 96 connections; draggable controls, searchable nodes,
   copy/paste, Undo/Redo and automatic settings backups.
 - Local processing: a C++20 engine handles 48 kHz stereo audio; a .NET 10 WPF
@@ -54,6 +58,7 @@ Read the [distribution guide](docs/DISTRIBUTION.md) before sharing a package.
 
 ## Documentation
 
+- [Future development ideas and research notes](docs/IDEAS.md)
 - [User guide and shortcuts](docs/USER_GUIDE.md)
 - [Node workspace and architecture](docs/NODE_WORKSPACE.md)
 - [Planned installation, updates and release screens](docs/INSTALLATION_AND_UPDATES.md)

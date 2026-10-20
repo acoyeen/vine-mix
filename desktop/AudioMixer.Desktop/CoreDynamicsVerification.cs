@@ -26,7 +26,9 @@ internal static class CoreDynamicsVerification
         compressor.DynamicsUiVersion = 0; compressor.Compressor = CompressorSettings.Ducking();
         var expander = GraphDefaults.NewNode("expander", 850, 25);
         var delay = GraphDefaults.NewNode("alignmentDelay", 1270, 25);
-        fixture.Configuration.Graph = new() { Nodes = [source, compressor, expander, delay], Zoom = .75, PanX = 20, PanY = 20 };
+        var gate = GraphDefaults.NewNode("gate", 1740, 25);
+        var ducking = GraphDefaults.NewNode("ducking", 2200, 25);
+        fixture.Configuration.Graph = new() { Nodes = [source, compressor, expander, delay, gate, ducking], Zoom = .75, PanX = 20, PanY = 20 };
         fixture.Status.Nodes = fixture.Configuration.Graph.Nodes.Select(node => new GraphNodeStatus { Id = node.Id, Path = new() { State = "Running" } }).ToList();
         mixer.ApplyPreviewSnapshot(fixture); await layout();
         GraphNode Current(GraphNode original) => mixer.GraphConfig.Nodes.Single(node => node.Id == original.Id);
@@ -36,19 +38,21 @@ internal static class CoreDynamicsVerification
         Dictionary<string, RotaryValueControl> Numbers(GraphNodeView view) => Descendants<RotaryValueControl>(view)
             .GroupBy(number => AutomationProperties.GetName(Descendants<Slider>(number).Single())).ToDictionary(group => group.Key, group => group.First());
         var compressorView = View(compressor); var expanderView = View(expander); var delayView = View(delay);
+        var gateView = View(gate); var duckingView = View(ducking);
         var compressorNumbers = Numbers(compressorView); var expanderNumbers = Numbers(expanderView); var delayNumbers = Numbers(delayView);
-        var sizes = new[] { compressorView, expanderView, delayView }.ToDictionary(view => view.Id, view => view.RenderSize);
-        require(!Visible(expanderNumbers["Hold"], expanderView) && !Visible(expanderNumbers["Hysteresis"], expanderView)
-            && Visible(expanderNumbers["Ratio"], expanderView),
-            "Expander shows only its five applicable dials, with saved gate settings retained outside the visible layout.");
+        var gateNumbers = Numbers(gateView);
+        var sizes = new[] { compressorView, expanderView, delayView, gateView, duckingView }.ToDictionary(view => view.Id, view => view.RenderSize);
+        require(expanderNumbers.Count == 5 && !expanderNumbers.ContainsKey("Hold") && !expanderNumbers.ContainsKey("Hysteresis")
+            && Visible(expanderNumbers["Ratio"], expanderView) && !Descendants<ComboBox>(expanderView).Any(),
+            "Expander exposes its five applicable dials without a mode selector or gate-only controls.");
         render(expanderView, "expander-clean.png");
-        require(compressorView.FindSocket("sidechain", false) is not null && compressorView.FindSocket("audio", false) is not null
+        require(compressorView.FindSocket("sidechain", false) is null && compressorView.FindSocket("audio", false) is not null
             && compressorView.FindSocket("audio", true) is not null && compressorView.FindSocket("sidechain", true) is null,
-            "Compressor exposes a separate detector-only input while keeping its ordinary programme input/output.");
+            "A saved Compressor measures its main programme path and has no sidechain input.");
         require(Json(Current(compressor).Compressor) == Json(CompressorSettings.Ducking()) && mixer.GraphConfig.Edges.Count == 0,
-            "A saved external compressor keeps its original ratio-based ducking settings without creating audio routes.");
-        require(compressorView.DynamicsFeedbackText == "Connect a sidechain detector", "Ducking clearly indicates its missing external detector.");
-        var output = View(source).FindSocket("audio", true)!; var detector = compressorView.FindSocket("sidechain", false)!;
+            "Compressor presentation retains saved scalar values without creating audio routes.");
+        require(duckingView.DynamicsFeedbackText == "Connect a trigger", "Ducking clearly indicates its missing external trigger.");
+        var output = View(source).FindSocket("audio", true)!; var detector = duckingView.FindSocket("sidechain", false)!;
         Point Screen(GraphWorkspace.Socket socket) { var point = workspace.SocketPosition(socket); return new(point.X * mixer.GraphConfig.Zoom + mixer.GraphConfig.PanX, point.Y * mixer.GraphConfig.Zoom + mixer.GraphConfig.PanY); }
         require(workspace.FindSnapSocket(Screen(detector) + new Vector(8, 0), output) == detector
             && workspace.FindSnapSocket(Screen(output) + new Vector(8, 0), detector) == output,
@@ -61,32 +65,31 @@ internal static class CoreDynamicsVerification
         string edgeId = mixer.GraphConfig.Edges[0].Id;
         require(GraphConnectionEditing.InsertionError(mixer.GraphConfig, delay.Id, edgeId).Length > 0,
             "Dropping a processing node on a detector cable cannot insert it into a programme path.");
-        render(compressorView, "compressor-ducking.png");
+        render(duckingView, "ducking-trigger.png");
         Select(Choice(compressorView, "Compressor mode"), "limit"); await layout();
         require(Current(compressor).Compressor.Mode == "limit" && Current(compressor).Compressor.Detector == "external"
-            && !Choice(compressorView, "Compressor detector").IsEnabled
+            && !Descendants<ComboBox>(compressorView).Any(item => AutomationProperties.GetName(item) == "Compressor detector")
             && !Visible(compressorNumbers["Threshold"], compressorView)
             && Visible(compressorNumbers["Ceiling"], compressorView)
             && mixer.GraphConfig.Edges.Single().Id == edgeId && compressorView.RenderSize == sizes[compressorView.Id],
-            "Limit exposes its ceiling and release, hides inapplicable compression controls, and preserves the detector cable and node dimensions.");
+            "Legacy Limit exposes ceiling and release while preserving node dimensions and the separate Ducking trigger cable.");
         require(compressorNumbers["Ceiling"].TryCommitText("-7.3 dBFS") && Math.Abs(Current(compressor).Compressor.CeilingDb + 7.3) < 1e-12,
             "Limit's actual inline editor commits a precise ceiling.");
         render(compressorView, "compressor-limit.png");
         Select(Choice(compressorView, "Compressor mode"), "compress");
-        require(Current(compressor).Compressor.Ratio == 6 && Current(compressor).Compressor.ThresholdDb == -30
-            && Choice(compressorView, "Compressor detector").IsEnabled, "Returning to Compress retains the saved Ducking controls and detector selection.");
-        Select(Choice(expanderView, "Expander mode"), "gate"); await layout();
-        require(Current(expander).Expander.Mode == "gate" && !expanderNumbers["Ratio"].IsEnabled
-            && !Visible(expanderNumbers["Ratio"], expanderView) && Visible(expanderNumbers["Hold"], expanderView)
-            && Visible(expanderNumbers["Hysteresis"], expanderView) && expanderView.RenderSize == sizes[expanderView.Id],
-            "Gate replaces Ratio with its Hold and Hysteresis dials in the same two-row layout, without losing saved settings or moving sockets.");
-        require(expanderNumbers["Threshold"].TryCommitText("-45.5") && expanderNumbers["Hold"].TryCommitText("125")
-            && expanderNumbers["Hysteresis"].TryCommitText("4.2") && Current(expander).Expander.ThresholdDb == -45.5
-            && Current(expander).Expander.HoldMs == 125 && Math.Abs(Current(expander).Expander.HysteresisDb - 4.2) < 1e-12,
+        require(Current(compressor).Compressor.Ratio == 6 && Current(compressor).Compressor.ThresholdDb == -30,
+            "Returning to Compress retains the saved compression controls.");
+        require(Current(gate).Expander.Mode == "gate" && gateNumbers.Count == 6 && !gateNumbers.ContainsKey("Ratio")
+            && Visible(gateNumbers["Hold"], gateView) && Visible(gateNumbers["Hysteresis"], gateView)
+            && !Descendants<ComboBox>(gateView).Any(),
+            "The separate Gate exposes six applicable dials without Ratio or a mode selector.");
+        require(gateNumbers["Threshold"].TryCommitText("-45.5") && gateNumbers["Hold"].TryCommitText("125")
+            && gateNumbers["Hysteresis"].TryCommitText("4.2") && Current(gate).Expander.ThresholdDb == -45.5
+            && Current(gate).Expander.HoldMs == 125 && Math.Abs(Current(gate).Expander.HysteresisDb - 4.2) < 1e-12,
             "Gate threshold, hold and hysteresis editors update the intended engine parameters.");
-        render(expanderView, "expander-gate.png");
-        Select(Choice(expanderView, "Expander mode"), "expander");
-        require(expanderNumbers["Ratio"].IsEnabled && Current(expander).Expander.HoldMs == 125, "Expander restores ratio adjustment while retaining envelope settings.");
+        render(gateView, "gate-clean.png");
+        require(expanderNumbers["Ratio"].IsEnabled && Current(expander).Expander.Mode == "expander",
+            "Editing Gate leaves the separate Expander's Ratio control and mode unchanged.");
         require(delayNumbers["Milliseconds"].TryCommitText("12.375 ms") && Current(delay).AlignmentDelay.Samples == 594
             && Descendants<TextBox>(delayNumbers["Samples"]).Single().Text == "594", "Milliseconds edits quantize once to exact 48 kHz samples and synchronize the sample editor.");
         require(delayNumbers["Samples"].TryCommitText("1") && Current(delay).AlignmentDelay.Samples == 1
@@ -95,7 +98,7 @@ internal static class CoreDynamicsVerification
             && !delayNumbers["Samples"].TryCommitText("96001") && !delayNumbers["Milliseconds"].TryCommitText("-1"),
             "Alignment editors enforce the two-second buffer boundary.");
         delayNumbers["Samples"].TryCommitText("594"); render(delayView, "alignment-delay.png");
-        foreach (var view in new[] { compressorView, expanderView, delayView })
+        foreach (var view in new[] { compressorView, expanderView, delayView, gateView })
         {
             var button = Descendants<Button>(view).Single(item => AutomationProperties.GetName(item) == "Bypass");
             button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
@@ -106,11 +109,12 @@ internal static class CoreDynamicsVerification
                 "Reset restores processing defaults while retaining the sidechain and workspace routing.");
         }
         require(Json(Current(compressor).Compressor) == Json(new CompressorSettings()) && Json(Current(expander).Expander) == Json(new ExpanderSettings())
-            && Current(delay).AlignmentDelay.Samples == 0, "Whole-node reset restores each new mode, detector and delay default.");
+            && Json(Current(gate).Expander) == Json(GraphDefaults.NewNode("gate", 0, 0).Expander)
+            && Current(delay).AlignmentDelay.Samples == 0, "Whole-node reset restores each processor and exact delay default.");
         foreach (double zoom in new[] { .3, .4, .5, .6, .75, .9, 1, 1.1, 1.25, 1.5, 1.75, 2 })
         {
             mixer.Edit(config => config.Graph.Zoom = zoom); await layout();
-            foreach (var view in new[] { compressorView, expanderView, delayView })
+            foreach (var view in new[] { compressorView, expanderView, delayView, gateView, duckingView })
                 require(view.RenderSize == sizes[view.Id] && view.DetailsVisible,
                     $"{view.Id} keeps complete controls and fixed node geometry at {zoom * 100:0}% zoom.");
         }
@@ -136,7 +140,8 @@ internal static class CoreDynamicsVerification
     {
         var a = GraphDefaults.NewNode("mix", 1, 2); var b = GraphDefaults.NewNode("compressor", 3, 4);
         var c = GraphDefaults.NewNode("expander", 5, 6); var d = GraphDefaults.NewNode("alignmentDelay", 7, 8);
-        var graph = new GraphConfiguration { Nodes = [a, b, c, d], Edges = [new() { Id = "side", From = a.Id, To = b.Id, Kind = "sidechain" }] };
+        var triggerTarget = GraphDefaults.NewNode("ducking", 9, 10);
+        var graph = new GraphConfiguration { Nodes = [a, b, c, d, triggerTarget], Edges = [new() { Id = "side", From = a.Id, To = triggerTarget.Id, Kind = "sidechain" }] };
         b.Compressor = CompressorSettings.Ducking(); b.Compressor.Mode = "limit"; b.Compressor.CeilingDb = -5.7;
         c.Expander = new() { Mode = "gate", ThresholdDb = -52.5, Ratio = 7, AttackMs = 4.5, HoldMs = 81, ReleaseMs = 370, RangeDb = 48, HysteresisDb = 4 };
         d.AlignmentDelay.Samples = 719; d.Bypass = true;
@@ -154,13 +159,13 @@ internal static class CoreDynamicsVerification
         require(GraphClipboard.TryCreatePaste(older.ToJsonString(), new(), new(), out var legacy, out _)
             && legacy.Nodes[0].Compressor.Mode == "compress" && legacy.Nodes[0].Compressor.Detector == "internal",
             "Older copied graphs without new fields keep ordinary internal compression and receive inert defaults.");
-        require(GraphDefaults.ConnectionError(graph, new() { From = c.Id, To = b.Id, Kind = "sidechain" }).Length > 0,
+        require(GraphDefaults.ConnectionError(graph, new() { From = c.Id, To = triggerTarget.Id, Kind = "sidechain" }).Length > 0,
             "A second external sidechain is rejected instead of silently mixing detectors.");
-        require(GraphDefaults.ConnectionError(graph, new() { From = b.Id, To = a.Id }).Length > 0,
+        require(GraphDefaults.ConnectionError(graph, new() { From = triggerTarget.Id, To = a.Id }).Length > 0,
             "Sidechain dependencies participate in cycle detection.");
         require(GraphDefaults.ConnectionError(graph, new() { From = a.Id, To = c.Id, Kind = "sidechain" }).Length > 0,
             "Expander rejects detector-only cables.");
-        require(!GraphConnectionEditing.TryPrepareDetach(graph, b.Id, out _, out string detachError) && detachError.Contains("detector"),
+        require(!GraphConnectionEditing.TryPrepareDetach(graph, triggerTarget.Id, out _, out string detachError) && detachError.Contains("detector"),
             "Detaching a sidechain-dependent node cannot create an automatic audible bridge.");
         var bad = new Action<GraphNode>[] { n => n.Compressor.Mode = "other", n => n.Compressor.Detector = "other", n => n.Compressor.CeilingDb = 1,
             n => n.Expander.Mode = "other", n => n.Expander.ThresholdDb = -81, n => n.Expander.Ratio = 21, n => n.Expander.AttackMs = 0,

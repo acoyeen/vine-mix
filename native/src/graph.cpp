@@ -35,6 +35,7 @@ GraphKind parseKind(const std::string& kind) {
     if (kind == "reverb") return GraphKind::reverb;
     if (kind == "voiceColor") return GraphKind::voiceColor;
     if (kind == "expander") return GraphKind::expander;
+    if (kind == "gate") return GraphKind::gate;
     if (kind == "alignmentDelay") return GraphKind::alignmentDelay;
     throw std::runtime_error("Unknown node type: " + kind);
 }
@@ -159,6 +160,7 @@ GraphPlan compileGraph(const AudioGraph& graph) {
         plan.nodes[i].voiceColor = source.voiceColor;
         const auto& expander = source.expander;
         if (expander.mode != "expander" && expander.mode != "gate") throw std::runtime_error("Unknown Expander / Gate mode.");
+        if (source.kind == "gate" && expander.mode != "gate") throw std::runtime_error("Gate nodes require Gate mode.");
         range(expander.thresholdDb, -80, 0, "Expander threshold must be between -80 and 0 dB.");
         range(expander.ratio, 1, 20, "Expander ratio must be between 1 and 20.");
         range(expander.attackMs, .1, 200, "Expander attack must be between 0.1 and 200 ms.");
@@ -231,9 +233,10 @@ GraphPlan compileGraph(const AudioGraph& graph) {
         if (comp.mode != "compress" && comp.mode != "limit") throw std::runtime_error("Unknown Compressor mode.");
         if (comp.detector != "internal" && comp.detector != "external") throw std::runtime_error("Unknown Compressor detector.");
         range(comp.ceilingDb, -24, 0, "Limiter ceiling must be between -24 and 0 dB.");
-        // Dedicated Limiter is always the existing limiter algorithm. Legacy
-        // Compressor mode/detector values retain their original semantics.
-        plan.nodes[i].limit = source.kind == "limiter" || comp.mode == "limit"; plan.nodes[i].externalDetector = comp.detector == "external";
+        // Dedicated Limiter and saved Compressor limit mode retain the same
+        // algorithm. Saved detector metadata remains readable, but Compressor
+        // always listens to its own programme; external triggers use Ducking.
+        plan.nodes[i].limit = source.kind == "limiter" || comp.mode == "limit";
         plan.nodes[i].ceiling = std::pow(10., comp.ceilingDb / 20.);
         plan.nodes[i].threshold = std::pow(10., comp.thresholdDb / 20.);
         plan.nodes[i].ratio = comp.ratio;
@@ -241,6 +244,8 @@ GraphPlan compileGraph(const AudioGraph& graph) {
         plan.nodes[i].release = std::exp(-1. / (comp.releaseMs * .001 * sampleRate));
         plan.nodes[i].makeup = std::pow(10., comp.makeupDb / 20.);
         const auto& duck = source.ducking;
+        if (duck.mode != "static" && duck.mode != "dynamic") throw std::runtime_error("Unknown Ducking mode.");
+        range(duck.ratio, 1, 20, "Dynamic Ducking ratio must be between 1 and 20.");
         range(duck.thresholdDb, -60, 0, "Ducking threshold must be between -60 and 0 dB.");
         range(duck.amountDb, 0, 60, "Duck amount must be between 0 and 60 dB.");
         range(duck.attackMs, .1, 200, "Ducking attack must be between 0.1 and 200 ms.");
@@ -248,6 +253,8 @@ GraphPlan compileGraph(const AudioGraph& graph) {
         if (source.kind == "ducking") {
             auto& node = plan.nodes[i];
             node.threshold = std::pow(10., duck.thresholdDb / 20.);
+            node.dynamicDucking = duck.mode == "dynamic";
+            node.ratio = duck.ratio;
             node.duckingCloseThreshold = std::pow(10., (duck.thresholdDb - 3.) / 20.);
             node.duckingAmount = std::pow(10., -duck.amountDb / 20.);
             node.attack = std::exp(-1. / (duck.attackMs * .001 * sampleRate));
@@ -275,10 +282,10 @@ GraphPlan compileGraph(const AudioGraph& graph) {
             if (controlEdge >= 0) throw std::runtime_error("An audio node can have one shared control connection.");
             controlEdge = static_cast<int>(i);
         } else if (sidechain) {
-            if ((!isSource(fromKind) && !processor(fromKind)) || (toKind != GraphKind::compressor && toKind != GraphKind::ducking))
-                throw std::runtime_error("A sidechain connects an audio source or effect to a Compressor detector or Ducking trigger.");
+            if ((!isSource(fromKind) && !processor(fromKind)) || toKind != GraphKind::ducking)
+                throw std::runtime_error("A sidechain connects an audio source or effect to a Ducking trigger.");
             auto& detector = plan.nodes[to->second].sidechainEdge;
-            if (detector >= 0) throw std::runtime_error("A dynamics node can have one external detector cable.");
+            if (detector >= 0) throw std::runtime_error("A Ducking node can have one trigger cable.");
             detector = static_cast<int>(i);
         } else {
             if ((!isSource(fromKind) && !processor(fromKind)) || (!processor(toKind) && !isSink(toKind)))
@@ -401,7 +408,7 @@ void GraphProcessor::process(const GraphPlan& plan, const Inputs& inputs) noexce
     for (std::size_t p = 0; p < plan.nodeCount; ++p) {
         const auto i = plan.order[p]; const auto& node = plan.nodes[i];
         const bool source = isSource(node.kind), sink = isSink(node.kind);
-        const bool dynamics = compressorProcessor(node.kind) || node.kind == GraphKind::ducking || node.kind == GraphKind::expander || node.kind == GraphKind::deEsser || node.kind == GraphKind::plosive;
+        const bool dynamics = compressorProcessor(node.kind) || node.kind == GraphKind::ducking || node.kind == GraphKind::expander || node.kind == GraphKind::gate || node.kind == GraphKind::deEsser || node.kind == GraphKind::plosive;
         bool dynamicsAudible = dynamics && !node.bypass && !node.muted;
         if (node.controlEdge >= 0) {
             const auto& controlEdge = plan.edges[static_cast<std::size_t>(node.controlEdge)];
@@ -452,19 +459,12 @@ void GraphProcessor::process(const GraphPlan& plan, const Inputs& inputs) noexce
                     left = oldLeft * (1 - mix) + left * mix; right = oldRight * (1 - mix) + right * mix;
                 }
             } else if (compressorProcessor(node.kind)) {
-                double peak = std::max(std::abs(left), std::abs(right));
-                if (node.sidechainEdge >= 0) {
-                    const auto edge = static_cast<std::size_t>(node.sidechainEdge);
-                    const auto detectorGain = edgeRamps_[edge].next();
-                    const auto detector = buffers_[plan.edges[edge].from][frame];
-                    if (node.externalDetector && !node.limit)
-                        peak = std::max(std::abs(static_cast<double>(detector.left)), std::abs(static_cast<double>(detector.right))) * detectorGain;
-                } else if (node.externalDetector && !node.limit) peak = 0;
+                const double peak = std::max(std::abs(left), std::abs(right));
                 if (!node.limit) detectorPeak = std::max(detectorPeak, peak);
                 const auto makeup = effect.makeup.next();
                 {
                     // Preserve the established compressor's exact transfer and
-                    // envelope for existing graphs. Only its detector may change.
+                    // envelope, driven by its own stereo programme signal.
                     const double target = peak > node.threshold ? std::pow(peak / node.threshold, 1. / node.ratio - 1.) : 1.;
                     const double coefficient = target < effect.compressionGain ? node.attack : node.release;
                     effect.compressionGain = target + coefficient * (effect.compressionGain - target);
@@ -492,10 +492,16 @@ void GraphProcessor::process(const GraphPlan& plan, const Inputs& inputs) noexce
                 if (node.sidechainEdge < 0) effect.duckingActive = false;
                 else if (effect.duckingDetector >= node.threshold) effect.duckingActive = true;
                 else if (effect.duckingDetector < node.duckingCloseThreshold) effect.duckingActive = false;
-                const double target = effect.duckingActive ? node.duckingAmount : 1.;
+                // Dynamic ducking uses the established external compressor
+                // curve on the raw stereo trigger, with no programme fallback
+                // or make-up gain. Keep the Static detector warm in both modes
+                // and share the gain envelope so mode changes retain continuity.
+                const double target = node.dynamicDucking
+                    ? (triggerPeak > node.threshold ? std::pow(triggerPeak / node.threshold, 1. / node.ratio - 1.) : 1.)
+                    : (effect.duckingActive ? node.duckingAmount : 1.);
                 const double coefficient = target < effect.duckingGain ? node.attack : node.release;
                 effect.duckingGain = target + coefficient * (effect.duckingGain - target);
-                detectorPeak = std::max(detectorPeak, effect.duckingDetector);
+                detectorPeak = std::max(detectorPeak, node.dynamicDucking ? triggerPeak : effect.duckingDetector);
                 left *= effect.duckingGain; right *= effect.duckingGain;
             } else if (node.kind == GraphKind::pan) {
                 left *= effect.panLeft.next(); right *= effect.panRight.next();

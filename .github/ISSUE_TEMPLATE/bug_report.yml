@@ -1,11 +1,11 @@
 name: Bug report
-description: Report a reproducible problem with Audio Mixer.
+description: Report a reproducible problem with Vine Mix.
 body:
   - type: input
     id: version
     attributes:
       label: App and Windows versions
-      placeholder: Audio Mixer 0.2.0, Windows 11
+      placeholder: Vine Mix 0.2.0, Windows 11
     validations:
       required: true
   - type: textarea

@@ -345,7 +345,7 @@ void Engine::mixLoop() {
                 if (meter.clipped) runtime->meters[i]->clipped.store(true, std::memory_order_relaxed);
                 const auto& node = runtime->plan.nodes[i];
                 if (node.kind == GraphKind::compressor || node.kind == GraphKind::limiter || node.kind == GraphKind::ducking
-                    || node.kind == GraphKind::expander || node.kind == GraphKind::deEsser || node.kind == GraphKind::plosive) {
+                    || node.kind == GraphKind::expander || node.kind == GraphKind::gate || node.kind == GraphKind::deEsser || node.kind == GraphKind::plosive) {
                     // Hold brief consonant peaks between UI polls, then consume
                     // them once. Never accumulate a historical maximum.
                     raisePeak(runtime->meters[i]->gainReductionDb, meter.gainReductionDb);

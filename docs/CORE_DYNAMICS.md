@@ -1,12 +1,13 @@
 # Dynamics and alignment
 
-The Effects library offers separate **Compressor**, **Limiter** and **Ducking**
-nodes, alongside **Expander / Gate** and **Alignment Delay**. New compressors
-expose compression controls without a Compress/Limit selector or Ducking preset.
-Existing saved compressors retain their original modes, detector, settings and
-routing. Their mode and detector selectors share one row, without a technical
-compatibility banner. Updating does not insert effects,
-convert external compressors into Ducking nodes or rewrite saved workspaces.
+The Effects library offers separate **Compressor**, **Limiter**, **Ducking**,
+**Expander**, **Gate** and **Alignment Delay** nodes. The Add/search library has
+24 creatable types and supports 26 types including legacy Gain and Reroute.
+Compressor always measures its own audio, with no detector selector or sidechain
+input. Ducking owns the external trigger workflow through its **Static ducking**
+and **Dynamic ducking** modes. Existing compressor records may retain their
+Compress/Limit selector; the saved detector field remains serialized but no
+longer changes processing.
 
 These processors use the existing node appearance, meters, grouped numeric dials,
 bottom Bypass button and context-menu reset. Copy/paste and save/load carry their
@@ -28,43 +29,46 @@ Attack times and ratios retain decimals, Q retains hundredths and delay shows
 milliseconds to three places. Entering an unchanged exact value preserves the
 stored precision. The wheel zooms the canvas; it does not edit parameters.
 
-## Expander / Gate
+## Expander and Gate
 
-Use this node to reduce quiet background sound between phrases. **Expander**
-progressively turns down audio below Threshold. **Gate** switches between an
-open target and the chosen attenuation floor, with attack/release smoothing.
-Both modes link the two stereo channels, preserving their relative balance.
+Use these separate Add/search entries to reduce quiet background sound between
+phrases. **Expander** progressively turns down audio below Threshold. **Gate**
+switches between an open target and the chosen attenuation floor, with
+attack/release smoothing. Both link the two stereo channels, preserving their
+relative balance. Neither node has a mode dropdown.
 
-| Control | Default | Range | Purpose |
-|---|---:|---:|---|
-| Mode | Expander | Expander / Gate | Gradual downward expansion or gating |
-| Threshold | −40 dBFS | −80–0 dBFS | Level where the gate opens / expansion stops |
-| Ratio | 2:1 | 1:1–20:1 | Amount of downward expansion; not used in Gate |
-| Attack | 5 ms | 0.1–200 ms | How quickly attenuation opens |
-| Hold | 50 ms | 0–1000 ms | Keeps Gate open before attenuation returns |
-| Release | 150 ms | 5–2000 ms | How quickly attenuation closes |
-| Range | 60 dB | 0–80 dB | Maximum attenuation, not an upward gain |
-| Hysteresis | 3 dB | 0–12 dB | Gate closes below Threshold minus this margin |
+| Control | Applies to | Default | Range | Purpose |
+|---|---|---:|---:|---|
+| Threshold | Both | −40 dBFS | −80–0 dBFS | Level where the gate opens / expansion stops |
+| Ratio | Expander | 2:1 | 1:1–20:1 | Amount of downward expansion |
+| Attack | Both | 5 ms | 0.1–200 ms | How quickly attenuation opens |
+| Hold | Gate | 50 ms | 0–1000 ms | Keeps Gate open before attenuation returns |
+| Release | Both | 150 ms | 5–2000 ms | How quickly attenuation closes |
+| Range | Both | 60 dB | 0–80 dB | Maximum attenuation, not an upward gain |
+| Hysteresis | Gate | 3 dB | 0–12 dB | Gate closes below Threshold minus this margin |
 
 Set Threshold above the unwanted background level and below normal speech.
 The detector and Reduction readouts help show why the node is opening or closing.
 Range limits how far quiet sound is reduced; it is not necessarily digital
 silence. Range zero disables attenuation. Expander Ratio 1:1 also gives unity.
-Expander shows five relevant dials; Gate shows six. Hold and Hysteresis are
-hidden in Expander mode, and Ratio is hidden in Gate mode. Hidden values remain
-saved. Both modes use two rows and keep the same node height.
-A gate cannot remove noise while speech
-is keeping it open, and fast settings can chop consonants or produce audible
-modulation. This node introduces no lookahead buffer and cannot anticipate a
+Expander has five dials: Threshold, Ratio, Range, Attack and Release. Gate has
+six: Threshold, Hysteresis, Range, Attack, Hold and Release. Other saved fields
+remain retained without appearing as controls. Both use the same two-row layout
+and node dimensions. An older `expander` record with `expander.mode: "gate"`
+renders Gate controls and keeps its saved kind and settings; loading does not
+migrate it into a new `gate` record. Reset keeps that older Gate's gate mode.
+A gate cannot remove noise while speech is keeping it open, and fast settings
+can chop consonants or produce audible modulation. These processors introduce
+no lookahead buffer and cannot anticipate a
 transient before it arrives.
 
 The stereo-linked detector has a 0.5 ms attack and 20 ms decay, reducing sensitivity
-to individual waveform zero crossings. In Expander mode, the target attenuation
+to individual waveform zero crossings. For Expander, the target attenuation
 below Threshold is `(Ratio − 1) × (Threshold − detector level)` in decibels,
 capped by Range. Above Threshold it targets unity. Gate targets either unity or
 the Range floor, using separate opening/closing thresholds and Hold. The selected
 Attack and Release smooth the gain rather than adding a fixed buffer delay.
-Continuous parameter targets and mode changes ramp over 10 ms.
+Continuous parameter targets ramp over 10 ms.
 
 The controls follow established gate/expander terminology; see the original
 vendor explanations of [threshold, ratio and range](https://prod.fabfilter.com/help/pro-g/using/dynamiccontrols)
@@ -75,8 +79,9 @@ gate algorithm.
 ## Compressor
 
 The Compressor applies the established stereo-linked feed-forward hard-knee
-curve. Reduction varies with detector level above Threshold according to Ratio.
-This differs from the dedicated Ducking node's fixed attenuation target.
+curve to its own main input. Reduction varies with the larger absolute stereo
+peak above Threshold according to Ratio. It has no detector selector or
+sidechain socket; use Dynamic ducking for compression driven by another signal.
 
 | Control | Default | Range |
 |---|---:|---:|
@@ -85,12 +90,11 @@ This differs from the dedicated Ducking node's fixed attenuation target.
 | Attack | 10 ms | 0.1–200 ms |
 | Release | 120 ms | 5–2000 ms |
 | Make-up | 0 dB | 0–24 dB |
-| Detector | Main audio | Main audio / Sidechain |
 
-Main-audio detection measures the main input. Sidechain detection uses only its
-separate detector input; a missing or silent source releases compression toward
-unity without falling back to the main input. Make-up and saved/linked gains
-remain separate from that reduction. Detector level and reduction are visible.
+Make-up and saved/linked gains remain separate from compression reduction.
+Detector level and reduction are visible. Saved `compressor.detector` metadata
+remains in settings and copies, but both `internal` and `external` values now
+measure the Compressor's own input.
 
 ## Ducking
 
@@ -102,39 +106,56 @@ Use **Ducking** to lower one signal when another becomes active:
 3. Adjust Threshold while watching trigger level and reduction. Route the
    microphone separately if it should also be audible.
 
-| Control | Default | Range | Purpose |
-|---|---:|---:|---|
-| Threshold | −30 dBFS | −60–0 dBFS | Trigger level that activates ducking |
-| Duck amount | 18 dB | 0–60 dB | Fixed attenuation target while active |
-| Attack | 10 ms | 0.1–200 ms | How quickly main audio turns down |
-| Release | 250 ms | 5–2000 ms | How quickly main audio recovers |
+The **Ducking mode** dropdown offers **Static ducking** (the default) and
+**Dynamic ducking**. Threshold, Attack and Release appear in both modes. The
+mode-specific dial is Duck amount in Static or Ratio in Dynamic. Switching keeps node
+geometry and all sockets fixed, and retains both mode-specific values.
 
-An active trigger targets `10^(−Duck amount / 20)` gain, independent of how far
-the trigger exceeds Threshold. There is no compressor ratio in this model.
-The detector measures the larger absolute stereo channel, smooths rises over
-5 ms and falls over 50 ms, and activates at Threshold. It deactivates below
-Threshold minus a fixed 3 dB hysteresis margin, preventing chatter. A separate
-gain envelope approaches the active target with Attack and unity with Release.
-These are smoothing time constants rather than fixed delays or lookahead.
-Both audible channels share the same gain and preserve their stereo balance.
+| Control | Applies to | Default | Range | Purpose |
+|---|---|---:|---:|---|
+| Threshold | Both | −30 dBFS | −60–0 dBFS | Trigger level that activates ducking |
+| Duck amount | Static | 18 dB | 0–60 dB | Fixed attenuation target while active |
+| Ratio | Dynamic | 4:1 | 1:1–20:1 | Reduction as the trigger exceeds Threshold |
+| Attack | Both | 10 ms | 0.1–200 ms | How quickly main audio turns down |
+| Release | Both | 250 ms | 5–2000 ms | How quickly main audio recovers |
 
-Missing or disconnected triggers immediately request release toward unity;
-connected silent triggers first let the detector decay below the closing
-threshold. The main audio is never used as a fallback detector. Zero Duck amount
-targets unity; an already attenuated signal returns smoothly. Trigger audio is
-never summed into the output, including when the main input is silent. Bypass
-returns the main dry signal with the established 10 ms transition. Parameter
-edits preserve detector/gain history, and trigger edges use the existing gain
-transition so changes do not reset the audible envelope. There is no additional
-lookahead, buffering latency, Hold control or adjustable hysteresis.
+**Static ducking** lowers the audio by a set amount when the trigger sound
+crosses the threshold. An active trigger targets `10^(−Duck amount / 20)` gain,
+independent of how far the trigger exceeds Threshold. Its detector measures the
+larger absolute stereo channel, smooths rises over 5 ms and falls over 50 ms,
+and activates at Threshold. It deactivates below Threshold minus a fixed 3 dB
+hysteresis margin. This existing Static behavior is unchanged.
+
+**Dynamic ducking** lowers the audio more as the trigger sound gets louder above
+the threshold. It uses the raw larger absolute stereo trigger peak, without
+Static's detector smoothing or hysteresis. Above the linear threshold, its gain
+target is `pow(peak / threshold, 1 / ratio − 1)`; at or below Threshold it targets
+unity. Ratio 1:1 also targets unity.
+
+Both modes share one gain envelope: Attack approaches a lower target and
+Release approaches a higher target. These are smoothing time constants rather
+than fixed delays or lookahead. Switching modes retains the current gain and
+detector history; the gain envelope approaches the new target without a reset.
+Static's detector continues updating while Dynamic is selected.
+Both audible channels share the gain and preserve their stereo balance.
+
+Missing or disconnected triggers request release toward unity. A connected
+silent trigger lets Static's detector decay below its closing threshold;
+Dynamic targets unity as soon as its raw peak is at or below Threshold. The main
+audio is never used as a fallback detector. Zero Duck amount targets unity in
+Static. Trigger audio is never summed into the output, including when the main
+input is silent. Bypass returns the main dry signal with the established 10 ms
+transition. Parameter edits preserve detector/gain history, and trigger edges
+use the existing gain transition. There is no additional lookahead, buffering
+latency, Hold control or adjustable hysteresis.
 
 The node shows **Connect a trigger**, **Below threshold** or **Ducking**, with
 trigger level and current reduction. These are passive readouts. The bottom
 Bypass button remains distinct from parameters.
 
-Compressor and Ducking each accept one sidechain connection. Combine multiple
-detector sources in a Mix first. The diamond socket and lavender cable identify
-audio used only for detection; square Linked control sockets carry parameter
+Ducking accepts one trigger connection. Compressor accepts none. Combine
+multiple trigger sources in a Mix first. The diamond socket and lavender cable
+identify audio used only for detection; square Linked control sockets carry parameter
 control. Audio outputs may fan out to both audible and detector destinations.
 Sidechain edges participate in cycle checks and copy/paste. Rewiring preserves
 edge type. Ducking can be inserted into an ordinary audio cable, including while
@@ -169,22 +190,19 @@ processing or unrelated latency change is introduced by this redesign.
 ## Existing compressor compatibility
 
 `dynamicsUiVersion` is a presentation marker. An absent marker reads as `0`,
-retaining the existing compressor controls, including Compress/Limit selection.
-Mode and detector share one selector row, with no technical compatibility banner.
-Newly created compressors use `1` and have no mode selector or
-Ducking preset. The marker does not change DSP behavior. Existing internal and
-external compression and limiter-mode nodes keep their identity, custom name,
-position, cables, bypass, make-up, ceiling, inherited node gain and linked controls.
-Settings hidden by the currently selected mode remain saved and effective when
-that mode is selected again. A legacy limiter remains a compressor-kind record.
+retaining Compress/Limit selection. Newly created compressors use `1` and have
+no mode selector or Ducking preset. Neither presentation has a detector selector
+or sidechain socket. A legacy limiter remains a compressor-kind record.
 
-No automatic conversion interprets an external compressor or old Ducking preset
-as fixed-depth Ducking: the two attenuation models are not equivalent. Loading
-does not migrate or rewrite settings. Copy/paste preserves the marker and hidden
-settings. An explicit node reset resets sound controls while retaining identity,
-position, connections and the legacy presentation marker. Configuration stays
-at version 2; the original-version and rolling last-good backup conventions
-remain unchanged. The first later user edit follows the ordinary save path.
+The saved `compressor.detector` field remains serialized but is ignored by
+processing; all Compressors use their own main signal. A sidechain edge must now
+target Ducking. No automatic conversion turns an old external compressor or
+Ducking preset into a Ducking node. Hidden compression/limiting settings remain
+saved and become effective when that legacy mode is selected again. Copies
+retain the marker and saved metadata. Explicit reset resets sound controls
+while retaining identity, position, connections and the presentation marker.
+Configuration stays at version 2; ordinary save and backup conventions remain
+unchanged.
 
 ## Alignment Delay
 
@@ -226,16 +244,21 @@ when absent from older node records:
 
 - `expander`: `mode`, `thresholdDb`, `ratio`, `attackMs`, `holdMs`, `releaseMs`,
   `rangeDb`, `hysteresisDb`.
+- `gate` is a separate node kind using the same `expander` settings record;
+  its `expander.mode` must be `gate`. Older `expander` records may still use
+  gate mode without changing their kind.
 - `alignmentDelay`: integer `samples`.
 - `compressor`: adds `mode` (`compress` or `limit`), `detector` (`internal` or
   `external`) and `ceilingDb`; existing compressor fields are preserved.
 - New node kinds `limiter` and `ducking` are offered separately; the Limiter
   reuses `compressor.ceilingDb` and `compressor.releaseMs` storage.
-- `ducking`: `thresholdDb`, `amountDb`, `attackMs`, `releaseMs`.
+- `ducking`: `thresholdDb`, `amountDb`, `attackMs`, `releaseMs`, plus optional
+  `mode` (`static` or `dynamic`, default `static`) and `ratio` (default `4`).
+  Both amount and ratio remain saved regardless of the selected mode.
 - `dynamicsUiVersion`: `0` for legacy compressor presentation (also the missing
   default), `1` for newly created compressors.
-- A detector connection uses edge `kind: "sidechain"` and targets a Compressor
-  or Ducking node. It remains separate from both audible and linked-control edges.
+- A trigger connection uses edge `kind: "sidechain"` and targets only a Ducking
+  node. It remains separate from both audible and linked-control edges.
 
 Native validation rejects malformed modes, non-finite values, out-of-range
 settings, fractional sample counts, incompatible endpoints and cycles. Delay
@@ -245,10 +268,11 @@ file access, allocation, device opening or waiting inside the processing loop.
 
 ## Verification and listening boundary
 
-Focused synthetic checks cover trigger isolation, absent/disconnected/silent
-triggers, threshold/depth/timing, stereo linking, zero amount, bypass and live
-edits; standalone and legacy limiter ceilings with inherited/linked gain;
-legacy internal/external compressors; exact delay; persistence and validation.
+Focused verification cases cover Static/Dynamic trigger isolation,
+absent/disconnected/silent triggers, threshold/depth/ratio/timing, stereo linking,
+zero amount, unity ratio, bypass and live edits; separate Expander/Gate controls;
+standalone and legacy limiter ceilings with inherited/linked gain; main-signal
+compression; exact delay; persistence and validation.
 Detached preview graphs cover dial precision/bounds/defaults, routed keyboard
 events, focus, wheel behavior, copy/reset, insertion, rewiring, cycle rejection,
 and stable layouts at supported zoom, DPI and minimum window size.

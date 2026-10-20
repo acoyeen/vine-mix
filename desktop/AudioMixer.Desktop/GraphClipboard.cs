@@ -284,7 +284,14 @@ internal static class GraphClipboard
             foreach (var optional in new[] { "mode", "detector", "ceilingDb" })
                 if (compressor.TryGetProperty(optional, out _)) compressorFields = [.. compressorFields, optional];
             if (!Properties(compressor, compressorFields)) return false;
-            if (node.TryGetProperty("ducking", out var ducking) && !Properties(ducking, "thresholdDb", "amountDb", "attackMs", "releaseMs")) return false;
+            if (node.TryGetProperty("ducking", out var ducking))
+            {
+                if (ducking.ValueKind != JsonValueKind.Object) return false;
+                string[] duckingFields = ["thresholdDb", "amountDb", "attackMs", "releaseMs"];
+                foreach (var optional in new[] { "mode", "ratio" })
+                    if (ducking.TryGetProperty(optional, out _)) duckingFields = [.. duckingFields, optional];
+                if (!Properties(ducking, duckingFields)) return false;
+            }
             if (node.TryGetProperty("denoiser", out var denoiser))
             {
                 if (denoiser.ValueKind != JsonValueKind.Object) return false;

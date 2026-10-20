@@ -10,11 +10,21 @@ separate session; see [testing](../TESTING.md).
 
 The application opens at 1280 × 800 DIPs, resizes down to 900 × 580, and includes
 maximise/restore in its own caption controls. Black and near-black surfaces use
-muted green signal accents. Coloured category
+restrained forest-green branding. The split VM symbol appears in the header
+without a repeated wordmark; the Windows title and accessible name retain
+**Vine Mix**. Audio cables stay light green (`#78BE98`), Ducking's detector-only
+sidechain cables stay lavender (`#B8A0D8`), and control links retain their own
+neutral colour. Coloured category
 headers, grouped rotary parameters and edge sockets follow Blender's node-editor
 structure; see [the visual implementation notes](BLENDER_NODE_STYLE.md). The canvas pans and zooms
-inside the window. Bundled Inter 4.1 uses scalable font metrics and grayscale
-rendering for fractional zoom. Zoom uniformly scales complete nodes, preserving
+inside the window. Bundled **IBM Plex Sans** supplies interface labels, menus,
+help and tooltips; **IBM Plex Mono** supplies numerical values and shortcuts.
+The fonts are embedded without system installation; see
+[font provenance and licences](IBM_PLEX_FONTS.md). Scalable font metrics and
+grayscale rendering support fractional zoom. Windows high contrast replaces
+operational surfaces, branding and route colours with the user's system
+palette, while socket shapes and route labels retain their meaning.
+Zoom uniformly scales complete nodes, preserving
 their proportions and every visible control. It does not automatically fold or
 hide details. Text naturally becomes smaller at low zoom; Ctrl+0 returns to 100%.
 Nodes stay expanded; there is no collapse button or H shortcut. Older saved
@@ -54,9 +64,32 @@ is in the node context menu. It centers their rendered bounds at 30–100% zoom,
 without moving nodes or creating an Undo entry. Fit and Home still frame all
 nodes. With no selection, F gives a short instruction and leaves the view alone.
 Open **Settings → Help & shortcuts**, or press **F1** outside text entry, for
-the keyboard and mouse reference. It scrolls in smaller windows and closes with
-Escape or Close. The workspace is unavailable for editing while help is open;
-audio continues running. Closing help restores keyboard focus when possible.
+six topics: **Controls**, **Dials & values**, **Buttons & menus**,
+**Search & results**, **Equalizer**, and **Meters & status**. Controls shows one
+group at a time, with clearly separated action/key rows and explanations on
+selection. The other topics embed the real controls with suggested actions,
+backed by temporary sample values. Examples are silent, use illustrative devices
+and meter readings, and do not affect live routing, settings or Undo history.
+**Reset example** restores the current lesson. Switching topics or closing and
+reopening Help discards practice state and creates a fresh example.
+
+The wheel scrolls Help, including over example dials and closed selectors;
+open menus and dropdowns keep their own scrolling.
+
+**Escape** cancels an active practice draft, gesture or open choice first, then
+closes Help when nothing remains to cancel. **Close** ends the lesson directly.
+The topic sidebar becomes a dropdown at narrower widths, and the content scrolls
+at the supported minimum 900 × 580 window size. The live workspace is unavailable
+for editing while Help is open; audio continues running. Closing Help restores
+keyboard focus when possible.
+
+Settings includes **Search settings and help**. Queries filter the existing
+settings and search the same reference entries shown by Controls. A query such
+as **Zoom** displays its instructions in the popup. Up/Down chooses a help result;
+Enter or double-click opens and highlights its Controls row. Tab moves to matching
+settings and Shift+Tab returns to search. Filtering is read-only and remains
+usable when the audio engine is offline.
+
 **Settings → Find node…** or **Ctrl+F** outside text entry opens a search of the
 current graph by name, type, device or app. Up/Down chooses a result; Enter or
 Go to node selects that node and frames it. Duplicate names remain separate
@@ -90,8 +123,8 @@ selectors, parameter groups, feedback and actions live inside their nodes in
 separate areas. Numeric parameters use a common dial with a persistent label
 and value/unit entry. EQ's three dials, level and tone controls, and primary effect
 controls use 86-DIP faces; secondary effect controls use 58-DIP faces. Primary
-controls are Threshold for Compressor, Expander, De-esser and Plosive remover;
-Ceiling for Limiter; Duck amount for Ducking; Cutoff for filters; Reduction for
+controls are Threshold for Compressor, Expander, Gate, De-esser and Plosive remover;
+Ceiling for Limiter; Duck amount or Ratio for Ducking; Cutoff for filters; Reduction for
 Denoiser; Mix for Reverb; L/R balance; and Milliseconds for Alignment Delay.
 
 The top-right **Settings** menu contains workspace preferences, start-at-login,
@@ -101,13 +134,13 @@ edits before restarting when possible; edits that cannot be saved remain queued
 for reconnection. The action remains available when the engine is offline and
 is disabled during a restart. The workspace message reports progress and the result.
 
-An unavailable input gently flashes its existing source name red, with a faint
+An unavailable input or output gently flashes its existing device/app name red, with a faint
 outer glow around the node and a red warning triangle above the volume meter.
 Hover the source for the reason and recovery step.
 The ordinary layout, header and white selection border remain intact. Reduced
 animation keeps the source text steadily highlighted. Node sizes and socket
-positions stay fixed, and healthy muted inputs retain their usual appearance.
-See [input availability](INPUT_AVAILABILITY.md) for the state distinctions.
+positions stay fixed, and healthy muted inputs and outputs retain their usual appearance.
+See [input and output availability](INPUT_AVAILABILITY.md) for the state distinctions.
 
 **Settings → Right-click drag to pan** adds right-button panning on
 empty canvas while retaining middle-drag. It is off by default. With the option
@@ -126,6 +159,8 @@ as they happen. Messages wrap at narrow window sizes and remain until replaced
 or dismissed. Dismiss returns to the essential dial instructions: vertical
 drag, Shift for fine adjustment, exact entry, Enter/Escape and reset.
 Nodes omit repeated gesture instructions and parameter-category headings.
+Tooltips describe a control's audio role or current state, including the dial
+face and its numeric field. Gesture and shortcut references are in Help & shortcuts.
 Arrow and Page Up/Down keys adjust focused dials; Home and double-click reset.
 Dial and entry focus are visible; numeric-entry borders stay quiet until hover
 or focus, while validation remains visible. Thresholds consistently use dBFS;
@@ -176,14 +211,14 @@ range, the existing connections stay intact.
 
 ## Node library
 
-The Add menu offers 23 types, using the same category mapping as node headers:
+The Add menu offers 24 types, using the same category mapping as node headers:
 Inputs (microphone, virtual input, running app), Outputs (physical and virtual),
-Effects (EQ, tone, Voice Color, high/low-pass, Compressor, Limiter, Ducking, Expander / Gate,
+Effects (EQ, tone, Voice Color, high/low-pass, Compressor, Limiter, Ducking, Expander, Gate,
 Alignment Delay, denoiser, de-esser, plosive remover, reverb), Mixing (Mix, Balance,
 Mono), and Controls (linked control).
 Gain / Multiply and Reroute are hidden from creation because Mix covers their
 volume role with one incoming connection. Both remain supported for existing
-graphs and copied legacy nodes, making 25 compatible types. Category submenus
+graphs and copied legacy nodes, making 26 compatible types. Category submenus
 keep the initial menu compact; typing searches
 both node names and category names. Down/Enter/Escape navigate, add and dismiss.
 
@@ -228,10 +263,11 @@ and screen-space snapping remain unchanged.
 | Low-pass filter | Cutoff and resonance/Q; starts at 12 kHz and Q 0.70710678; bypass |
 | Low / Mid / High | Three gain dials, each −12 to +12 dB: 200 Hz low shelf, 1 kHz bell and 5 kHz high shelf; node bypass |
 | Voice Color | Warm–Bright / Natural–Broadcast grid; body/presence contour, low-mid cut, compression, density and subtle doubling, with a small room; exact Tone/Character values, neutral reset and bypass |
-| Compressor | Stereo-linked compression; threshold, ratio, attack, release and make-up; optional detector-only sidechain; bypass |
+| Compressor | Stereo-linked compression of its own main input; threshold, ratio, attack, release and make-up; no detector selector or sidechain input; bypass |
 | Limiter | Sample-peak ceiling and release, with no lookahead; reduction feedback and bypass |
-| Ducking | Lower main audio to a fixed attenuation target when its separate Trigger becomes active; threshold, duck amount, attack and release; bypass |
-| Expander / Gate | Reduce quiet sound with downward expansion or a gate; five Expander dials or six Gate dials show only settings relevant to the selected mode; bypass |
+| Ducking | Static or Dynamic dropdown; threshold, duck amount or ratio, attack and release; separate detector-only Trigger; bypass |
+| Expander | Gradual reduction of quiet sound; five dials: threshold, ratio, range, attack and release; no mode selector; bypass |
+| Gate | Open/close attenuation below threshold; six dials: threshold, hysteresis, range, attack, hold and release; no mode selector; bypass |
 | Alignment Delay | One exact stereo delay, edited in milliseconds or samples; 0–96,000 samples / 0–2 seconds at 48 kHz; bypass |
 | Denoiser | Algorithm dropdown: SpeexDSP with Reduction, or RNNoise with Mix; adds 20 / 30 ms respectively, including bypass |
 | De-esser | Stereo-linked dynamic high-band reduction for loud sibilants; frequency, threshold and maximum reduction |
@@ -265,15 +301,22 @@ the destination's own level. An audio node accepts at most one linked control.
 Saved legacy control mutes still silence their destinations until explicitly
 cleared, preserving the safety of existing routes.
 
-A Compressor accepts one **Sidechain** connection; Ducking accepts one
-**Trigger / Sidechain · detector only** connection. Their diamond sockets carry
-audio for detection, never the audible sum. Square Linked control sockets carry
+Ducking accepts one **Trigger / Sidechain · detector only** connection.
+Compressor has no sidechain socket and always detects its own main signal.
+The trigger's diamond socket carries audio for detection, never the audible sum.
+Square Linked control sockets carry
 parameter control. For Ducking, connect Music → Audio input → Audio output →
 Output and Microphone → Trigger. The microphone can also feed an audible
 destination independently. Missing or silent triggers release to unity without
-falling back to main-audio detection. Ducking targets a fixed Duck amount while
-active; a Compressor's ratio instead varies reduction with detector level.
-Trigger smoothing is 5 ms rising / 50 ms falling with fixed 3 dB hysteresis.
+falling back to main-audio detection. **Static ducking** is the default and
+targets a fixed Duck amount while active: 18 dB by default, with Threshold
+−30 dBFS. Its trigger smoothing remains 5 ms rising / 50 ms falling with fixed
+3 dB hysteresis. **Dynamic ducking** instead uses the raw stereo peak and Ratio
+(4:1 by default): reduction increases with the trigger level above Threshold.
+It does not use Static's detector smoothing or hysteresis. Both modes share the
+Attack/Release gain envelope and keep its current gain when switching. Only
+the applicable Duck amount or Ratio dial is visible; both values stay saved,
+and switching keeps the same geometry and main/trigger sockets.
 Sidechain cables participate in cycle validation and copy with selected nodes.
 
 **Limiter** applies instantaneous stereo-linked peak reduction followed by
@@ -282,8 +325,12 @@ chosen sample ceiling at that node while enabled, including saved node/control
 gain. Bypass removes limiting; downstream boosts and later summing can exceed
 the ceiling. It has no lookahead or oversampled true-peak detection. New
 compressors do not contain a Compress/Limit selector or Ducking preset; legacy
-compressors retain their original modes and all saved settings. Their mode and
-detector selectors share one row, without a technical compatibility banner.
+compressors may retain their Compress/Limit selector and hidden mode settings.
+The saved detector field remains serialized but is ignored; no Compressor has
+a detector selector or accepts a trigger cable. **Expander** and **Gate** are
+separate Add/search entries. An older `expander` record with gate mode renders
+Gate's six controls without migrating its kind or settings. Reset preserves
+that older node's gate mode.
 **Alignment Delay** crossfades delay changes, and its bypass removes the delay;
 the rest of the graph is not automatically delay-compensated. See
 [dynamics and alignment](CORE_DYNAMICS.md) for defaults, exact ranges, routing,
@@ -338,8 +385,11 @@ future additions rather than nonfunctional entries in the node library.
 The EQ supports zero to eight stereo biquads at the engine's 48 kHz processing
 rate. The node is 620 DIPs wide and its editor is 300 DIPs high; those dimensions
 stay fixed in canvas coordinates. Existing configurations retain every saved
-band. New EQs use five default flat bands, with Q 1 for their bells. Removing
-every band also produces a flat response without disconnecting the node.
+band. New EQs start flat with no bands. A centred hint explains how to add the
+first band; the band information above the plot is also centred within its
+usable width, clear of the decibel scales. Long details use a single-line
+ellipsis while the complete values remain accessible. Removing every band also
+produces a flat response without disconnecting the node.
 
 Double-click an empty part of the plot to add a bell band at that frequency and
 gain. Ctrl-click points to toggle selection, drag empty plot space to box-select
@@ -363,8 +413,9 @@ Double-clicking a band is the same as **Reset position**: its frequency returns
 to its saved reset anchor and gain returns to zero, preserving shape, Q and
 enabled state. New points retain their creation frequency as that anchor; an
 older point without one adopts its existing frequency when edited. Right-click
-empty plot space for **Reset EQ to flat**, which restores the five default flat
-bands. Resetting the curve keeps the node's connections and other sound controls.
+empty plot space for **Reset EQ to flat**, which clears every band. Resetting
+the curve keeps the node's connections and other sound controls. **Reset node
+to defaults** also clears the EQ bands, matching a newly created EQ.
 
 Frequency, Band gain and Width/Q use the larger 86-DIP dials below the plot;
 these dials edit the active band only, including when several bands are
@@ -442,13 +493,16 @@ response time can extend the interval; this is not an end-to-end audio latency
 guarantee. The offline cadence check includes sustained edits, slow replies and
 revision-conflict retries.
 
-The **Compressor** links both stereo channels using the larger
-instantaneous detector peak. It retains the original feed-forward hard-knee
-curve and attack/release smoothing, with an optional external detector. The
+The **Compressor** links both stereo channels using the larger instantaneous
+peak of its own main audio. It retains the feed-forward hard-knee curve and
+attack/release smoothing, without an external detector. The
 separate **Limiter** enforces the selected sample ceiling at its output; saved
-compressors in Limit mode retain the same limiter behavior. **Ducking** uses a
-smoothed trigger and a fixed attenuation target with a stereo-linked gain
-envelope. None uses lookahead or oversampled true-peak detection. The engine also
+compressors in Limit mode retain the same limiter behavior. **Static ducking**
+uses its smoothed trigger and a fixed attenuation target. **Dynamic ducking**
+uses `pow(peak / threshold, 1 / ratio − 1)` above Threshold and unity otherwise,
+where peak is the raw larger absolute stereo trigger channel and threshold is
+linear amplitude. Both use one stereo-linked Attack/Release gain envelope,
+preserved across mode changes. None uses lookahead or oversampled true-peak detection. The engine also
 saturates final hardware output samples and reports clipping; enough headroom
 is still needed when summing routes or boosting after a limiter.
 
@@ -459,12 +513,12 @@ bursts; **Reverb** produces a stereo room tail. Their algorithms, controls and
 limits are documented in [EFFECTS_RESEARCH.md](EFFECTS_RESEARCH.md). A physical
 pop filter remains useful because processing cannot recover a clipped microphone.
 
-De-esser, Plosive remover, Compressor, Limiter, Ducking and Expander / Gate use
+De-esser, Plosive remover, Compressor, Limiter, Ducking, Expander and Gate use
 one compact telemetry line: reduction or state on the left and detector/trigger
 level in dBFS on the right. Ducking shows **Connect a trigger**, **Below threshold**
 or **Ducking** in that line. Hover help supplies further detail.
 **Below threshold** means the node is active but the detected signal is too
-quiet to trigger compression or band reduction. Expander / Gate instead
+quiet to trigger compression or band reduction. Expander and Gate instead
 attenuates below its threshold and displays **Open** at unity. Lower the
 de-esser/plosive Threshold (make it more negative) to catch quieter consonants,
 then use Maximum reduction to limit the effect. The high/low
@@ -553,15 +607,22 @@ version 2; the original version-1 settings are retained separately, as well as
 the ordinary rolling last-good backup. The graph becomes authoritative after
 migration; historical fixed-console fields are retained for the migration record.
 
-The dynamics redesign does not migrate existing compressors. Missing
-`dynamicsUiVersion` reads as `0` and retains the existing mode and detector controls;
-new compressors use `1`. This presentation marker does not alter processing.
-IDs, names, positions, internal/external detection, limiter mode, hidden mode
-settings, sidechain cables, saved gain, linked controls and bypass are preserved.
-An external compressor is never inferred to be fixed-depth Ducking. Reading
-does not rewrite settings; later edits use the existing save/backup conventions.
-Copy/paste retains the marker and hidden settings. Explicit reset changes sound
-controls, preserving identity, routing and the legacy presentation marker.
+Missing `dynamicsUiVersion` reads as `0` and retains the Compressor's legacy
+Compress/Limit controls; new compressors use `1`. Neither presentation includes
+a detector selector or sidechain input. Saved `compressor.detector` metadata
+remains serialized but is ignored: every Compressor measures its own audio.
+Trigger cables target only Ducking. An old external compressor is not
+automatically converted to a Ducking node.
+
+Ducking's optional `mode` and `ratio` fields default to `static` and `4` when
+absent, preserving older fixed-depth Ducking behavior. Amount and Ratio both
+remain saved. New Gates use kind `gate` with `expander.mode: "gate"`; validation
+requires that mode. Older `expander` records with gate mode keep their saved
+kind and render Gate controls without migration. Copy/paste retains these
+settings and the presentation marker. Explicit reset preserves identity,
+routing, the legacy presentation marker and an older Gate's processing mode.
+Reading does not rewrite settings; later edits use the existing save/backup
+conventions.
 
 The interface and engine remain separate processes. Closing the window hides it
 to the tray, and explicit Quit stops mixing. A controller failure does not stop

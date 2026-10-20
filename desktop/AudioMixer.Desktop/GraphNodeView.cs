@@ -25,23 +25,24 @@ internal sealed class GraphNodeView : Border
     private readonly Grid _content = new() { Margin = new Thickness(12, 7, 12, 10) };
     private readonly StackPanel _inputs = new() { Margin = new Thickness(0, 3, 0, 7) };
     private readonly NodeSelectionOutline _selectionOutline = new() { IsHitTestVisible = false, Visibility = Visibility.Hidden };
-    private readonly InputWarningGlow _inputWarningGlow = new() { IsHitTestVisible = false, Visibility = Visibility.Hidden };
-    private readonly System.Windows.Shapes.Path _inputWarningIcon = new()
+    private readonly AvailabilityWarningGlow _availabilityWarningGlow = new() { IsHitTestVisible = false, Visibility = Visibility.Hidden };
+    private readonly System.Windows.Shapes.Path _availabilityWarningIcon = new()
     {
         Width = 18, Height = 16, Stretch = Stretch.Fill, Margin = new Thickness(17, 0, 0, 0),
         HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center,
         IsHitTestVisible = false, Visibility = Visibility.Hidden
     };
-    private InputAvailability? _inputNotice;
-    private string _inputNoticePathMessage = "";
-    private object? _inputNoticeHelp, _inputDefaultHelp;
-    private readonly SolidColorBrush _inputWarningText = new();
-    private AnimationClock? _inputPulseClock;
-    private Color _inputPulseRed, _inputPulseNormal;
-    private bool _inputPulseReduced, _inputTextWarned;
+    private AudioAvailability? _availabilityNotice;
+    private string _availabilityNoticePathMessage = "";
+    private object? _availabilityNoticeHelp, _availabilityDefaultHelp;
+    private readonly SolidColorBrush _availabilityWarningText = new();
+    private AnimationClock? _availabilityPulseClock;
+    private Color _availabilityPulseRed, _availabilityPulseNormal;
+    private bool _availabilityPulseReduced, _availabilityTextWarned;
     private readonly Canvas _grabLayer = new();
     private readonly Border _grabTop = GrabArea(), _grabLeft = GrabArea(), _grabRight = GrabArea();
     private readonly List<(GraphWorkspace.Socket Socket, FrameworkElement Row)> _portAnchors = [];
+    private readonly bool _gatePresentation, _legacyCompressorPresentation;
     private readonly Grid? _outputRow;
     private bool _socketLayoutDirty;
     private readonly TextBlock _title, _status;
@@ -59,7 +60,6 @@ internal sealed class GraphNodeView : Border
     private float _dynamicsReduction, _dynamicsDetector = -96;
     private bool _dynamicsValid;
     private double _lastDynamicsTime = double.NegativeInfinity;
-    private string _titleTipName = "";
     private StackPanel? _dynamicsTip;
     private object? _savedLevelTip;
     internal double VisibleReductionDb { get; private set; }
@@ -105,25 +105,30 @@ internal sealed class GraphNodeView : Border
     }
     internal bool SelectionOutlineVisible => _selectionOutline.Visibility == Visibility.Visible;
     internal double SelectionOutlineScreenThickness => _selectionOutline.StrokeThickness * _viewScale;
-    internal string InputNoticeLabel => _inputNotice?.Label ?? "";
-    internal string InputNoticeDetail => _inputNotice?.Detail ?? "";
-    internal bool InputNoticeVisible => false;
-    internal bool InputWarningVisible => _inputWarningGlow.Visibility == Visibility.Visible;
-    internal bool InputWarningIconVisible => _inputWarningIcon.Visibility == Visibility.Visible;
-    internal System.Windows.Shapes.Path InputWarningIconElement => _inputWarningIcon;
-    internal bool InputWarningPulseActive => _inputPulseClock is not null;
-    internal object? InputWarningPulseIdentity => _inputPulseClock;
-    internal const double InputWarningPulsePeriodSeconds = 1.6;
-    internal double InputWarningScreenRadius => InputWarningGlow.ScreenRadius;
-    internal FrameworkElement InputGlowElement => _inputWarningGlow;
-    internal FrameworkElement? InputDeviceElement => _kind switch
+    internal string AvailabilityNoticeLabel => _availabilityNotice?.Label ?? "";
+    internal string AvailabilityNoticeDetail => _availabilityNotice?.Detail ?? "";
+    internal bool AvailabilityNoticeVisible => false;
+    internal bool AvailabilityWarningVisible => _availabilityWarningGlow.Visibility == Visibility.Visible;
+    internal bool AvailabilityWarningIconVisible => _availabilityWarningIcon.Visibility == Visibility.Visible;
+    internal System.Windows.Shapes.Path AvailabilityWarningIconElement => _availabilityWarningIcon;
+    internal bool AvailabilityWarningPulseActive => _availabilityPulseClock is not null;
+    internal object? AvailabilityWarningPulseIdentity => _availabilityPulseClock;
+    internal const double AvailabilityWarningPulsePeriodSeconds = 1.6;
+    internal double AvailabilityWarningScreenRadius => AvailabilityWarningGlow.ScreenRadius;
+    internal FrameworkElement AvailabilityGlowElement => _availabilityWarningGlow;
+    internal FrameworkElement? AvailabilityDeviceElement => _kind switch
     {
-        "microphone" => _device, "appInput" => _app, "virtualInput" => _virtualDevice, _ => null
+        "microphone" or "output" => _device, "appInput" => _app,
+        "virtualInput" or "virtualOutput" => _virtualDevice, _ => null
     };
-    internal TextBlock? InputDeviceTextElement => InputDeviceElement is TextBlock text ? text
-        : InputDeviceElement is ComboBox combo ? SelectedSourceText(combo) : null;
-    internal TextBlock InputNoticeDetailTextElement => _status;
+    internal TextBlock? AvailabilityDeviceTextElement => AvailabilityDeviceElement is TextBlock text ? text
+        : AvailabilityDeviceElement is ComboBox combo ? SelectedSourceText(combo) : null;
+    internal TextBlock AvailabilityNoticeDetailTextElement => _status;
     internal MeterPeakDisplay PeakMeterDisplay => _meterPeakDisplay;
+    internal bool MatchesPresentation(GraphNode node) => node.Kind == _kind
+        && (_kind is not ("expander" or "gate") || _gatePresentation == IsGate(node))
+        && (_kind != "compressor" || _legacyCompressorPresentation == (node.DynamicsUiVersion == 0));
+    private static bool IsGate(GraphNode node) => node.Kind == "gate" || node.Kind == "expander" && node.Expander.Mode == "gate";
     internal double HeaderGrabTopPadding => 8;
     internal double HeaderGrabSidePadding => 6;
     internal Point GetHeaderGrabTestPoint() => new(ActualWidth / 2, -HeaderGrabTopPadding / _viewScale / 2);
@@ -131,7 +136,8 @@ internal sealed class GraphNodeView : Border
     public GraphNodeView(GraphWorkspace owner, GraphNode node)
     {
         _owner = owner; _node = node; _kind = node.Kind;
-        Width = node.Kind switch { "eq" => 620, "compressor" or "expander" => 428, "voiceColor" => 392, "tone" => 376, "gain" or "pan" or "mono" or "reroute" => 316, "control" => 280, "mix" => 316, _ => 356 };
+        _gatePresentation = IsGate(node); _legacyCompressorPresentation = node.DynamicsUiVersion == 0;
+        Width = node.Kind switch { "eq" => 620, "compressor" or "expander" or "gate" => 428, "voiceColor" => 392, "tone" => 376, "gain" or "pan" or "mono" or "reroute" => 316, "control" => 280, "mix" => 316, _ => 356 };
         BorderThickness = new Thickness(1); CornerRadius = new CornerRadius(5); SnapsToDevicePixels = true; UseLayoutRounding = true;
         // Whole-node effects put text into an intermediate render target.
         // Keep the control tree directly rendered at the display's DPI.
@@ -148,7 +154,12 @@ internal sealed class GraphNodeView : Border
         _root.RowDefinitions.Add(new() { Height = new GridLength(GraphDefaults.HasAudioOutput(node.Kind) || node.Kind == "control" ? 28 : 0) });
         _root.RowDefinitions.Add(new() { Height = GridLength.Auto }); _root.RowDefinitions.Add(new() { Height = GridLength.Auto });
         _root.RowDefinitions.Add(new() { Height = GridLength.Auto });
-        var header = new Grid { Cursor = Cursors.Arrow, ToolTip = NodeDescription(node.Kind) };
+        var header = new Grid { Cursor = Cursors.Arrow, ToolTip = NodeDescription(_gatePresentation ? "gate" : node.Kind) };
+        if (node.Kind == "ducking")
+        {
+            var staticHelp = DuckingDescription("static"); var dynamicHelp = DuckingDescription("dynamic");
+            _effectUpdates.Add(n => header.ToolTip = n.Ducking.Mode == "dynamic" ? dynamicHelp : staticHelp);
+        }
         var headerFace = new Border { CornerRadius = new CornerRadius(4, 4, 0, 0), Child = header }; headerFace.SetResourceReference(BackgroundProperty, HeaderBrushKey);
         _title = GraphWorkspace.Text(node.Name, 15, true); _title.Margin = new Thickness(12, 0, 12, 0); _title.VerticalAlignment = VerticalAlignment.Center;
         _title.TextTrimming = TextTrimming.CharacterEllipsis; _title.TextWrapping = TextWrapping.NoWrap; header.Children.Add(_title);
@@ -164,7 +175,10 @@ internal sealed class GraphNodeView : Border
             AddSocket(node.Kind == "control" ? "control" : "audio", true, _outputRow);
         }
         if (GraphDefaults.HasAudioInput(node.Kind)) { var row = PortRow("Audio", false); _inputs.Children.Add(row); AddSocket("audio", false, row); }
-        if (node.Kind is "compressor" or "ducking") { var row = PortRow(node.Kind == "ducking" ? "Trigger / Sidechain · detector only" : "Sidechain · detector only", false); _inputs.Children.Add(row); AddSocket("sidechain", false, row); }
+        if (GraphDefaults.HasSidechainInput(node))
+        {
+            var row = PortRow("Trigger / Sidechain · detector only", false); _inputs.Children.Add(row); AddSocket("sidechain", false, row);
+        }
         if (node.Kind != "control") { var row = PortRow("Level control", false); _inputs.Children.Add(row); AddSocket("control", false, row); }
         Grid.SetRow(_inputs, 3); _root.Children.Add(_inputs);
         _status = GraphWorkspace.Text("Not assigned", 13); _status.Height = 18; _status.TextWrapping = TextWrapping.NoWrap;
@@ -232,7 +246,7 @@ internal sealed class GraphNodeView : Border
             };
             _app.ToolTip = NodeToolTip.Create("App capture", "Captures a copy of the app's audio", "Original playback continues", "Same speakers on both paths = doubled audio");
         }
-        if (node.Kind is "deEsser" or "plosive" or "compressor" or "limiter" or "ducking" or "expander")
+        if (node.Kind is "deEsser" or "plosive" or "compressor" or "limiter" or "ducking" or "expander" or "gate")
         {
             // Reuse the existing status slot: live feedback never changes the
             // node's size or moves a control/socket while audio arrives.
@@ -245,6 +259,7 @@ internal sealed class GraphNodeView : Border
             Grid.SetColumnSpan(_reductionStrip, 2);
             feedback.Children.Add(_reductionStrip); _body.Children.Add(feedback);
             _detectorReadout = GraphWorkspace.Text("— dBFS", 11);
+            _detectorReadout.SetResourceReference(TextBlock.FontFamilyProperty, "NodeNumericFontFamily");
             _detectorReadout.Width = 92; _detectorReadout.TextAlignment = TextAlignment.Right;
             _detectorReadout.VerticalAlignment = VerticalAlignment.Center;
             _detectorReadout.TextWrapping = TextWrapping.NoWrap;
@@ -259,7 +274,9 @@ internal sealed class GraphNodeView : Border
         {
             var divider = new Border { Height = 1, Margin = new Thickness(0, 4, 0, 10) }; divider.SetResourceReference(BackgroundProperty, "ConsoleBorderBrush"); _body.Children.Add(divider);
             _gain = new RotaryValueControl("Level", -60, 12, .1, "dB", GraphDefaults.NewNode(node.Kind, 0, 0).GainDb,
-                v => _owner.NodeChanged(Id, n => n.GainDb = v), smallChange: .5, largeChange: 3)
+                v => _owner.NodeChanged(Id, n => n.GainDb = v), smallChange: .5, largeChange: 3,
+                description: node.Kind == "control" ? "Adjusts the linked node levels while each node keeps its own level setting."
+                    : "Adjusts this node's audio level. 0 dB leaves it unchanged.")
                 { Margin = new Thickness(0, 0, 0, 6) }; TrackEditGesture(_gain); _body.Children.Add(_gain);
         }
         if (IsDeviceNode(node.Kind))
@@ -272,25 +289,38 @@ internal sealed class GraphNodeView : Border
         }
         _meter = new NodeMeter { Width = 28, MinHeight = 90, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Stretch, IsHitTestVisible = false };
         _meterPeakDisplay = new MeterPeakDisplay(_meter);
+        bool outputDevice = node.Kind is "output" or "virtualOutput";
+        // Outputs have no top Audio socket row. Reserve the same warning space
+        // inside their meter column so showing it never moves the node or ports.
+        if (outputDevice) _meterPeakDisplay.Margin = new Thickness(0, 28, 0, 0);
         _content.ColumnDefinitions.Add(new() { Width = new GridLength(node.Kind == "control" ? 0 : 36) });
         _content.ColumnDefinitions.Add(new() { Width = new GridLength(1, GridUnitType.Star) });
         if (node.Kind != "control") _content.Children.Add(_meterPeakDisplay);
         Grid.SetColumn(_body, 1); _content.Children.Add(_body);
         Grid.SetRow(_content, 2); _root.Children.Add(_content);
-        if (InputDeviceElement is not null)
+        if (AvailabilityDeviceElement is not null)
         {
             // A compact triangle with an open exclamation mark occupies the
             // existing space above the meter, without moving bars or controls.
             var symbol = Geometry.Parse("F0 M9,0 L18,16 L0,16 Z M8,5 L10,5 L10,10.5 L8,10.5 Z M8,12 L10,12 L10,14 L8,14 Z");
-            symbol.Freeze(); _inputWarningIcon.Data = symbol;
-            _inputWarningIcon.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, "ConsoleMeterHighBrush");
-            Grid.SetRow(_inputWarningIcon, 1); _root.Children.Add(_inputWarningIcon);
+            symbol.Freeze(); _availabilityWarningIcon.Data = symbol;
+            _availabilityWarningIcon.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, "ConsoleMeterHighBrush");
+            if (outputDevice)
+            {
+                _availabilityWarningIcon.Margin = new Thickness(5, 0, 0, 0);
+                _availabilityWarningIcon.VerticalAlignment = VerticalAlignment.Top;
+                _content.Children.Add(_availabilityWarningIcon);
+            }
+            else
+            {
+                Grid.SetRow(_availabilityWarningIcon, 1); _root.Children.Add(_availabilityWarningIcon);
+            }
         }
         if (_effectToggle is not null) { Grid.SetRow(_effectToggle, 4); _root.Children.Add(_effectToggle); }
         // Sockets sit above the header and body so their generous hit targets remain usable.
         var outer = new Grid { ClipToBounds = false };
-        _inputWarningGlow.SetResourceReference(InputWarningGlow.GlowBrushProperty, "ConsoleMuteBrush");
-        outer.Children.Add(_inputWarningGlow); outer.Children.Add(_root);
+        _availabilityWarningGlow.SetResourceReference(AvailabilityWarningGlow.GlowBrushProperty, "ConsoleMuteBrush");
+        outer.Children.Add(_availabilityWarningGlow); outer.Children.Add(_root);
         _selectionOutline.SetResourceReference(NodeSelectionOutline.StrokeProperty, "NodeSelectedBrush");
         outer.Children.Add(_selectionOutline);
         foreach (var area in new[] { _grabTop, _grabLeft, _grabRight })
@@ -301,8 +331,8 @@ internal sealed class GraphNodeView : Border
         outer.Children.Add(_grabLayer);
         foreach (var socket in _sockets) { var layer = new Canvas { IsHitTestVisible = true }; layer.Children.Add(socket); outer.Children.Add(layer); }
         Child = outer; SizeChanged += (_, _) => { PositionSockets(); UpdateInteractionAdornments(); _owner.UpdateWires(); };
-        Unloaded += (_, _) => StopInputWarningPulse();
-        Loaded += (_, _) => UpdateInputWarningText();
+        Unloaded += (_, _) => StopAvailabilityWarningPulse();
+        Loaded += (_, _) => UpdateAvailabilityWarningText();
         _root.LayoutUpdated += (_, _) => PositionSockets();
         MouseLeftButtonDown += (_, e) => { if (!e.Handled && IsNodeDragSurface(e.OriginalSource as DependencyObject)) _owner.BeginDrag(this, e); };
         // Passive labels and grab targets keep an ordinary pointer until an
@@ -319,9 +349,16 @@ internal sealed class GraphNodeView : Border
             _owner.PopulateNodeMenu(context, Id, () => { _rename.Text = _node.Name; _rename.Visibility = Visibility.Visible; _rename.Focus(); _rename.SelectAll(); });
         };
         AutomationProperties.SetName(this, node.Name + " node");
-        if (InputDeviceElement is FrameworkElement source) ToolTipService.SetShowOnDisabled(source, true);
+        if (AvailabilityDeviceElement is FrameworkElement source) ToolTipService.SetShowOnDisabled(source, true);
     }
 
+
+    internal bool CancelPracticeRename()
+    {
+        if (_rename.Visibility != Visibility.Visible) return false;
+        _rename.Visibility = Visibility.Collapsed;
+        return true;
+    }
 
     private Grid PortRow(string name, bool output)
     {
@@ -331,7 +368,7 @@ internal sealed class GraphNodeView : Border
     private static object NodeDescription(string kind) => kind switch
     {
         "mono" => NodeToolTip.Create("Mono", "Combines left and right equally"),
-        "control" => NodeToolTip.Create("Control", "Square sockets · Link several node levels", "Each node keeps its own level setting"),
+        "control" => NodeToolTip.Create("Control", "Links several node levels", "Each node keeps its own level setting"),
         "gain" => NodeToolTip.Create("Gain", "Adjusts the incoming level", "0 dB · Unchanged"),
         "mix" => NodeToolTip.Create("Mix", "Combines incoming audio", "Level · Adjusts the combined volume"),
         "highPass" => NodeToolTip.Create("High-pass", "Reduces sound below the cutoff"),
@@ -341,14 +378,19 @@ internal sealed class GraphNodeView : Border
         "plosive" => NodeToolTip.Create("Plosive remover", "Tames low P and B thumps", "Acts above the threshold"),
         "reverb" => NodeToolTip.Create("Reverb", "Adds room-like decay", "Mix · Blends dry sound and reverb"),
         "voiceColor" => NodeToolTip.Create("Voice Color", "Warm / Bright · Tone", "Natural / Broadcast · Character", "Body, clarity and controlled thickening", "Bottom centre · Neutral"),
-        "compressor" => NodeToolTip.Create("Compressor", "Reduce loud passages", "Ratio controls reduction above threshold", "External detector never joins the audible signal"),
+        "compressor" => NodeToolTip.Create("Compressor", "Reduces its own louder passages", "Ratio controls reduction above threshold"),
         "limiter" => NodeToolTip.Create("Limiter", "Sample-peak ceiling · No lookahead", "Bypass removes limiting", "Later gain can exceed this ceiling"),
-        "ducking" => NodeToolTip.Create("Ducking", "Lower one signal when another becomes active", "Trigger audio is detector only", "Fixed duck amount · Stereo linked"),
-        "expander" => NodeToolTip.Create("Expander / Gate", "Expander · Reduce quieter passages", "Gate · Close below the threshold", "Range · Maximum attenuation"),
+        "ducking" => DuckingDescription("static"),
+        "expander" => NodeToolTip.Create("Expander", "Reduces quieter passages below the threshold", "Ratio · Reduction below threshold", "Range · Maximum attenuation"),
+        "gate" => NodeToolTip.Create("Gate", "Closes below the threshold", "Hold · Keeps the gate open briefly", "Hysteresis · Separate closing threshold", "Range · Maximum attenuation"),
         "alignmentDelay" => NodeToolTip.Create("Alignment Delay", "Delay one path to align it with another", "48 samples = 1 ms · Up to 2 seconds", "Bypass · Undelayed audio"),
         "reroute" => NodeToolTip.Create("Reroute", "A junction for organizing cables"),
         _ => NodeCatalog.Title(kind)
     };
+    private static object DuckingDescription(string mode) => NodeToolTip.Create(mode == "dynamic" ? "Dynamic ducking" : "Static ducking",
+        mode == "dynamic" ? "Lowers the audio more as the trigger sound gets louder above the threshold."
+            : "Lowers the audio by a set amount when the trigger sound crosses the threshold.",
+        "Trigger audio is detector only", "Stereo linked");
     internal void SetViewScale(double scale)
     {
         // Zoom belongs to the canvas transform. Never resize fonts, rows,
@@ -358,13 +400,13 @@ internal sealed class GraphNodeView : Border
         _viewScale = next;
         UpdateInteractionAdornments();
     }
-    private static Border GrabArea() => new() { Background = Brushes.Transparent, Cursor = Cursors.Arrow, ToolTip = "Drag to move node" };
+    private static Border GrabArea() => new() { Background = Brushes.Transparent, Cursor = Cursors.Arrow };
     private void UpdateInteractionAdornments()
     {
         // Drawing and hit-test overlays live outside normal layout. Their
         // screen-space sizes stay useful without resizing the node contents.
         _selectionOutline.StrokeThickness = 2 / _viewScale;
-        _inputWarningGlow.ViewScale = _viewScale;
+        _availabilityWarningGlow.ViewScale = _viewScale;
         double top = HeaderGrabTopPadding / _viewScale, side = HeaderGrabSidePadding / _viewScale;
         double width = Math.Max(0, ActualWidth), headerHeight = _root.RowDefinitions[0].Height.Value + 2;
         Canvas.SetLeft(_grabTop, -BorderThickness.Left - side); Canvas.SetTop(_grabTop, -BorderThickness.Top - top);
@@ -446,11 +488,6 @@ internal sealed class GraphNodeView : Border
                 socket.SetConnected(_owner.Graph.Edges.Any(edge => socket.Output
                     ? edge.From == Id && (socket.Kind == "audio" ? edge.Kind is "audio" or "sidechain" : edge.Kind == socket.Kind)
                     : edge.To == Id && edge.Kind == socket.Kind));
-            if (_titleTipName != node.Name)
-            {
-                _titleTipName = node.Name;
-                _title.ToolTip = NodeToolTip.Create(node.Name, "Drag · Move", "Double-click · Rename");
-            }
             _gain?.SetValue(node.GainDb);
             // The legacy Collapsed setting remains serialized, but nodes now
             // always present their complete controls and normal port positions.
@@ -466,8 +503,8 @@ internal sealed class GraphNodeView : Border
             if (_mono is not null)
             {
                 bool mono = node.Mono || node.Device.Channel >= 0;
-                _mono.Background = ConsoleTheme.Get(mono ? "ConsoleABrush" : "ConsoleButtonFaceBrush");
-                _mono.Foreground = ConsoleTheme.Get(mono ? "ConsoleInkBrush" : "ConsoleTextBrush");
+                _mono.Background = ConsoleTheme.Get(mono ? "BrandActionBrush" : "ConsoleButtonFaceBrush");
+                _mono.Foreground = ConsoleTheme.Get(mono ? "BrandActionTextBrush" : "ConsoleTextBrush");
                 AutomationProperties.SetItemStatus(_mono, mono ? "On" : "Off");
             }
             bool deviceNode = IsDeviceNode(node.Kind);
@@ -496,7 +533,7 @@ internal sealed class GraphNodeView : Border
             if (_gain is null && node.GainDb != 0 && !legacyMuted && _owner.Mixer.CanEdit && status?.Clipped != true)
             {
                 _status.Text = $"Saved level {node.GainDb:0.#} dB · right-click";
-                statusHelp = _savedLevelTip ??= NodeToolTip.Create("Saved effect level", "Retained from an older version", "Right-click · Inspect or reset", "Use Mix for new level adjustments");
+                statusHelp = _savedLevelTip ??= NodeToolTip.Create("Saved effect level", "Retained level adjustment from an older version");
                 _status.Visibility = Visibility.Visible;
                 AutomationProperties.SetItemStatus(this, _status.Text);
             }
@@ -515,7 +552,7 @@ internal sealed class GraphNodeView : Border
                 status?.Clipped ?? false, node.Muted || linkedMute || !_owner.Mixer.CanEdit || status?.Path.State != "Running",
                 _owner.Mixer.ReducedAnimation, Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency, observePeak);
             ApplyChoices(node);
-            ApplyInputAvailability(node, status);
+            ApplyAvailability(node, status);
             foreach (var update in _effectUpdates) update(node);
             _eqPlot?.ApplySpectrum(status?.SpectrumDb, status?.SpectrumFrame ?? 0, status?.SpectrumRevision ?? 0,
                 fresh: _owner.Mixer.CanEdit && status?.Path.State == "Running");
@@ -561,83 +598,93 @@ internal sealed class GraphNodeView : Border
         }
         return true;
     }
-    private void ApplyInputAvailability(GraphNode node, GraphNodeStatus? status)
+    private void ApplyAvailability(GraphNode node, GraphNodeStatus? status)
     {
-        if (InputDeviceElement is not FrameworkElement source) return;
-        var notice = InputAvailability.Evaluate(node, status, _owner.Mixer.Endpoints, _owner.Mixer.Applications, _owner.Mixer.CanEdit);
+        if (AvailabilityDeviceElement is not FrameworkElement source) return;
+        var notice = node.Kind is "output" or "virtualOutput"
+            ? OutputAvailability.Evaluate(node, status, _owner.Mixer.Endpoints, _owner.Mixer.CanEdit)
+            : InputAvailability.Evaluate(node, status, _owner.Mixer.Endpoints, _owner.Mixer.Applications, _owner.Mixer.CanEdit);
         string pathMessage = status?.Path.Message ?? "";
-        bool changed = notice != _inputNotice;
+        // Older engine diagnostics use microphone privacy wording for every
+        // E_ACCESSDENIED, including playback. Keep output help accurate.
+        if (node.Kind is "output" or "virtualOutput" && status?.Path.State == "AccessDenied"
+            && pathMessage == "Microphone access blocked; check Windows microphone privacy settings")
+            pathMessage = "Output access blocked; check Windows sound device settings";
+        bool changed = notice != _availabilityNotice;
         // Keep the original selector and layout. Availability is conveyed by
         // its existing device text, with detail available on hover/accessibility.
-        if (!ReferenceEquals(source.ToolTip, _inputNoticeHelp)) _inputDefaultHelp = source.ToolTip;
-        _inputNotice = notice;
-        if (changed || pathMessage != _inputNoticePathMessage)
+        if (!ReferenceEquals(source.ToolTip, _availabilityNoticeHelp)) _availabilityDefaultHelp = source.ToolTip;
+        _availabilityNotice = notice;
+        if (changed || pathMessage != _availabilityNoticePathMessage)
         {
-            _inputNoticePathMessage = pathMessage;
-            _inputNoticeHelp = notice.Kind == InputNoticeKind.None ? null : NodeToolTip.Create(notice.Label, notice.Detail,
+            _availabilityNoticePathMessage = pathMessage;
+            _availabilityNoticeHelp = notice.Kind == AvailabilityNoticeKind.None ? null : NodeToolTip.Create(notice.Label, notice.Detail,
                 pathMessage == notice.Detail ? "" : pathMessage);
         }
-        source.ToolTip = notice.Kind is InputNoticeKind.None or InputNoticeKind.Muted ? _inputDefaultHelp : _inputNoticeHelp;
-        string accessibleStatus = notice.Kind == InputNoticeKind.None ? "Connected" : notice.Label + ". " + notice.Detail;
+        source.ToolTip = notice.Kind is AvailabilityNoticeKind.None or AvailabilityNoticeKind.Muted ? _availabilityDefaultHelp : _availabilityNoticeHelp;
+        string accessibleStatus = notice.Kind == AvailabilityNoticeKind.None ? "Connected" : notice.Label + ". " + notice.Detail;
         AutomationProperties.SetItemStatus(source, accessibleStatus);
         AutomationProperties.SetHelpText(source, accessibleStatus);
         AutomationProperties.SetLiveSetting(source, AutomationLiveSetting.Off);
-        if (notice.Kind != InputNoticeKind.None)
+        if (notice.Kind != AvailabilityNoticeKind.None)
         {
-            _status.Visibility = Visibility.Hidden;
+            // Keep the existing connected/muted status on healthy virtual
+            // outputs. Only availability feedback replaces their status ink.
+            if (notice.Kind != AvailabilityNoticeKind.Muted || node.Kind is not ("output" or "virtualOutput"))
+                _status.Visibility = Visibility.Hidden;
             AutomationProperties.SetItemStatus(this, accessibleStatus);
         }
-        _inputWarningGlow.Visibility = notice.Kind == InputNoticeKind.Problem ? Visibility.Visible : Visibility.Hidden;
-        _inputWarningIcon.Visibility = _inputWarningGlow.Visibility;
-        UpdateInputWarningText();
+        _availabilityWarningGlow.Visibility = notice.Kind == AvailabilityNoticeKind.Problem ? Visibility.Visible : Visibility.Hidden;
+        _availabilityWarningIcon.Visibility = _availabilityWarningGlow.Visibility;
+        UpdateAvailabilityWarningText();
     }
-    private void UpdateInputWarningText()
+    private void UpdateAvailabilityWarningText()
     {
-        if (InputDeviceElement is not FrameworkElement source) return;
+        if (AvailabilityDeviceElement is not FrameworkElement source) return;
         var property = source is Control ? Control.ForegroundProperty : TextBlock.ForegroundProperty;
-        if (_inputNotice?.Kind != InputNoticeKind.Problem)
+        if (_availabilityNotice?.Kind != AvailabilityNoticeKind.Problem)
         {
-            StopInputWarningPulse();
-            if (_inputTextWarned) source.SetResourceReference(property, "ConsoleTextBrush");
-            _inputTextWarned = false;
+            StopAvailabilityWarningPulse();
+            if (_availabilityTextWarned) source.SetResourceReference(property, "ConsoleTextBrush");
+            _availabilityTextWarned = false;
             return;
         }
         Color red = (ConsoleTheme.Get("ConsoleMeterHighBrush") as SolidColorBrush)?.Color ?? Colors.IndianRed;
         Color normal = (ConsoleTheme.Get("ConsoleTextBrush") as SolidColorBrush)?.Color ?? Colors.White;
         bool reduced = _owner.Mixer.ReducedAnimation || !SystemParameters.ClientAreaAnimation;
-        bool changed = _inputPulseRed != red || _inputPulseNormal != normal || _inputPulseReduced != reduced;
-        if (changed || (!reduced && _inputPulseClock is null))
+        bool changed = _availabilityPulseRed != red || _availabilityPulseNormal != normal || _availabilityPulseReduced != reduced;
+        if (changed || (!reduced && _availabilityPulseClock is null))
         {
-            StopInputWarningPulse();
-            _inputPulseRed = red; _inputPulseNormal = normal; _inputPulseReduced = reduced;
-            _inputWarningText.Color = red;
+            StopAvailabilityWarningPulse();
+            _availabilityPulseRed = red; _availabilityPulseNormal = normal; _availabilityPulseReduced = reduced;
+            _availabilityWarningText.Color = red;
             if (!reduced)
             {
                 // Only the selected device glyphs change colour. The selector
                 // face, arrow, popup choices and node body do not flash or fade.
-                var pulse = new ColorAnimation(red, normal, TimeSpan.FromSeconds(InputWarningPulsePeriodSeconds / 2))
+                var pulse = new ColorAnimation(red, normal, TimeSpan.FromSeconds(AvailabilityWarningPulsePeriodSeconds / 2))
                 {
                     AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever,
                     EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut }
                 };
-                _inputPulseClock = (AnimationClock)pulse.CreateClock(true);
-                _inputWarningText.ApplyAnimationClock(SolidColorBrush.ColorProperty, _inputPulseClock);
+                _availabilityPulseClock = (AnimationClock)pulse.CreateClock(true);
+                _availabilityWarningText.ApplyAnimationClock(SolidColorBrush.ColorProperty, _availabilityPulseClock);
             }
         }
-        if (!ReferenceEquals(source.GetValue(property), _inputWarningText)) source.SetValue(property, _inputWarningText);
-        _inputTextWarned = true;
+        if (!ReferenceEquals(source.GetValue(property), _availabilityWarningText)) source.SetValue(property, _availabilityWarningText);
+        _availabilityTextWarned = true;
     }
-    private void StopInputWarningPulse()
+    private void StopAvailabilityWarningPulse()
     {
-        if (_inputPulseClock is null) return;
-        _inputPulseClock?.Controller?.Remove();
-        _inputPulseClock = null;
-        _inputWarningText.BeginAnimation(SolidColorBrush.ColorProperty, null);
+        if (_availabilityPulseClock is null) return;
+        _availabilityPulseClock?.Controller?.Remove();
+        _availabilityPulseClock = null;
+        _availabilityWarningText.BeginAnimation(SolidColorBrush.ColorProperty, null);
     }
-    internal void SeekInputWarningPulse(double seconds)
+    internal void SeekAvailabilityWarningPulse(double seconds)
     {
         if (!_owner.Mixer.IsPreview) throw new InvalidOperationException("Only detached preview checks may seek the warning animation.");
-        _inputPulseClock?.Controller?.SeekAlignedToLastTick(TimeSpan.FromSeconds(seconds), TimeSeekOrigin.BeginTime);
+        _availabilityPulseClock?.Controller?.SeekAlignedToLastTick(TimeSpan.FromSeconds(seconds), TimeSeekOrigin.BeginTime);
     }
     private static TextBlock? SelectedSourceText(DependencyObject parent)
     {
@@ -671,16 +718,14 @@ internal sealed class GraphNodeView : Border
         if (!presentationAvailable) return;
         string band = node.Kind == "deEsser" ? "High-band" : node.Kind == "plosive" ? "Low-band" : "Signal";
         bool limiting = node.Kind == "limiter" || node.Kind == "compressor" && node.Compressor.Mode == "limit";
-        double threshold = node.Kind == "ducking" ? node.Ducking.ThresholdDb : node.Kind == "deEsser" ? node.DeEsser.ThresholdDb : node.Kind == "plosive" ? node.Plosive.ThresholdDb : node.Kind == "expander" ? node.Expander.ThresholdDb : limiting ? node.Compressor.CeilingDb : node.Compressor.ThresholdDb;
+        double threshold = node.Kind == "ducking" ? node.Ducking.ThresholdDb : node.Kind == "deEsser" ? node.DeEsser.ThresholdDb : node.Kind == "plosive" ? node.Plosive.ThresholdDb : node.Kind is "expander" or "gate" ? node.Expander.ThresholdDb : limiting ? node.Compressor.CeilingDb : node.Compressor.ThresholdDb;
         _status.Text = node.Muted || linkedMute ? "Muted" : node.Bypass ? "Bypassed" : !valid ? "Waiting for audio" : VisibleReductionDb >= .05
-            ? $"Reduction {VisibleReductionDb:0.0} dB" : node.Kind == "expander" ? "Open · Reduction 0.0 dB" : _dynamicsDetector <= threshold ? "Below threshold" : "Reduction 0.0 dB";
-        if (node.Kind == "compressor" && node.Compressor.Mode == "compress" && node.Compressor.Detector == "external"
-            && !node.Bypass && !node.Muted && !_owner.Graph.Edges.Any(edge => edge.Kind == "sidechain" && edge.To == node.Id && !edge.Muted))
-            _status.Text = "Connect a sidechain detector";
+            ? $"Reduction {VisibleReductionDb:0.0} dB" : node.Kind is "expander" or "gate" ? "Open · Reduction 0.0 dB" : _dynamicsDetector <= threshold ? "Below threshold" : "Reduction 0.0 dB";
         if (node.Kind == "ducking" && !node.Bypass && !node.Muted && !linkedMute)
             _status.Text = !_owner.Graph.Edges.Any(edge => edge.Kind == "sidechain" && edge.To == node.Id && !edge.Muted)
                 ? "Connect a trigger" : !valid ? "Waiting for trigger audio" : VisibleReductionDb >= .05
-                ? "Ducking" : node.Ducking.AmountDb == 0 ? "No attenuation · amount 0 dB" : "Below threshold";
+                ? "Ducking" : node.Ducking.Mode == "dynamic" && node.Ducking.Ratio == 1 ? "No attenuation · ratio 1:1"
+                : node.Ducking.Mode != "dynamic" && node.Ducking.AmountDb == 0 ? "No attenuation · amount 0 dB" : "Below threshold";
         string detectorLine = $"{(node.Kind == "ducking" ? "Trigger" : "Detector")} · {(valid ? _dynamicsDetector.ToString("0.0") : "—")} dBFS";
         if (_detectorReadout is not null)
         {
@@ -691,7 +736,7 @@ internal sealed class GraphNodeView : Border
         if (_dynamicsTip is null)
         {
             _dynamicsTip = NodeToolTip.Create(band + " reduction", detectorLine, thresholdLine,
-                node.Kind is "compressor" or "limiter" or "ducking" or "expander" ? "Gain reduction · Bar 0–24 dB" : "Shelf amount · Bar 0–24 dB");
+                node.Kind is "compressor" or "limiter" or "ducking" or "expander" or "gate" ? "Gain reduction · Bar 0–24 dB" : "Shelf amount · Bar 0–24 dB");
         }
         else
         {
@@ -752,8 +797,8 @@ internal sealed class GraphNodeView : Border
             : node.Device.Name.Length > 0 ? node.Device.Name
             : node.Kind == "virtualInput" ? "CABLE Output" : "Line 1";
         _virtualDevice.ToolTip = NodeToolTip.Create(_virtualDevice.Text,
-            node.Kind == "virtualInput" ? "In your apps · Select the matching CABLE Input" : "In Discord or games · Select the matching Line 1 recording device",
-            "Right-click this node · Troubleshooting");
+            node.Kind == "virtualInput" ? "Receives audio sent to the matching CABLE Input playback device"
+                : "Sends audio to the matching Line 1 recording device for Discord or games");
     }
     private static bool IsDeviceNode(string kind) => kind is "microphone" or "virtualInput" or "appInput" or "output" or "virtualOutput";
 
@@ -788,7 +833,7 @@ internal sealed class GraphNodeView : Border
                 bool value = _node.Muted || !_node.Bypass;
                 _owner.NodeChanged(Id, n => { n.Muted = false; n.Bypass = value; });
             };
-            var previouslyMutedTip = NodeToolTip.Create("Previously muted", "Click · Restore audio with bypass on");
+            var previouslyMutedTip = NodeToolTip.Create("Previously muted", "Restores audio with this node's processing bypassed");
             _effectUpdates.Add(n =>
             {
                 bypass.Background = ConsoleTheme.Get(n.Bypass ? "ConsoleMuteBrush" : "ConsoleButtonFaceBrush");
@@ -808,7 +853,7 @@ internal sealed class GraphNodeView : Border
         if (kind == "compressor") BuildCompressor();
         if (kind == "limiter") BuildLimiter();
         if (kind == "ducking") BuildDucking();
-        if (kind == "expander") BuildExpander();
+        if (kind is "expander" or "gate") BuildExpander();
         if (kind == "alignmentDelay")
         {
             EffectNumber("Milliseconds", 0, 2000, .001, "ms", n => n.AlignmentDelay.Milliseconds, (n, v) => n.AlignmentDelay.Samples = AlignmentDelaySettings.FromMilliseconds(v), primary: true);
@@ -827,8 +872,7 @@ internal sealed class GraphNodeView : Border
             EffectNumber("Reduction", 0, 40, 1, "dB", n => -n.Denoiser.SuppressionDb, (n, v) => n.Denoiser.SuppressionDb = -v, primary: true);
             var spectral = _dialGroup!; _body.Children.Remove(spectral);
             StartDialGroup(1);
-            var mix = EffectNumber("Mix", 0, 100, 1, "%", n => n.Denoiser.RnnoiseMix * 100, (n, v) => n.Denoiser.RnnoiseMix = v / 100, primary: true);
-            mix.ToolTip = NodeToolTip.Create("RNNoise Mix", "0% · Original sound", "100% · Fully denoised", "Lower values retain more room noise and vocal detail");
+            EffectNumber("Mix", 0, 100, 1, "%", n => n.Denoiser.RnnoiseMix * 100, (n, v) => n.Denoiser.RnnoiseMix = v / 100, primary: true);
             var neural = _dialGroup!; _body.Children.Remove(neural);
             var controls = new Grid(); controls.Children.Add(spectral); controls.Children.Add(neural); _body.Children.Add(controls);
             var delay = GraphWorkspace.Text("", 12); delay.Margin = new Thickness(0, 0, 0, 5); _body.Children.Add(delay);
@@ -877,22 +921,9 @@ internal sealed class GraphNodeView : Border
         // Missing presentation version means a saved legacy processor. No audio
         // settings are inferred or rewritten to simplify its interface.
         bool legacy = _node.DynamicsUiVersion == 0;
-        ComboBox? mode = null;
         if (legacy)
         {
-            mode = EffectChoice("Compressor mode", [("compress", "Compress"), ("limit", "Limit")], n => n.Compressor.Mode, (n, value) => n.Compressor.Mode = value);
-        }
-        var detector = EffectChoice("Compressor detector", [("internal", "Detector · Main audio"), ("external", "Detector · Sidechain")], n => n.Compressor.Detector, (n, value) => n.Compressor.Detector = value);
-        detector.ToolTip = NodeToolTip.Create("Detector", "Sidechain is audio for detection only", "No sidechain · Release to unity", "Limit always measures the audible signal");
-        if (mode is not null)
-        {
-            _body.Children.Remove(mode); _body.Children.Remove(detector);
-            var selectors = new Grid();
-            selectors.ColumnDefinitions.Add(new() { Width = new GridLength(1, GridUnitType.Star) });
-            selectors.ColumnDefinitions.Add(new() { Width = new GridLength(1.5, GridUnitType.Star) });
-            mode.Margin = new Thickness(0, 0, 6, 5);
-            Grid.SetColumn(detector, 1); selectors.Children.Add(mode); selectors.Children.Add(detector);
-            _body.Children.Add(selectors);
+            EffectChoice("Compressor mode", [("compress", "Compress"), ("limit", "Limit")], n => n.Compressor.Mode, (n, value) => n.Compressor.Mode = value);
         }
         int start = _body.Children.Count;
         StartDialGroup(3);
@@ -916,7 +947,6 @@ internal sealed class GraphNodeView : Border
             bool limit = node.Compressor.Mode == "limit";
             compression.Visibility = limit ? Visibility.Hidden : Visibility.Visible;
             limiting.Visibility = limit ? Visibility.Visible : Visibility.Hidden;
-            detector.IsEnabled = !limit;
         });
         _dialGroup = null;
     }
@@ -929,12 +959,29 @@ internal sealed class GraphNodeView : Border
     }
     private void BuildDucking()
     {
+        var mode = EffectChoice("Ducking mode", [("static", "Static ducking"), ("dynamic", "Dynamic ducking")],
+            n => n.Ducking.Mode, (n, value) => n.Ducking.Mode = value);
+        foreach (var item in mode.Items.OfType<ComboBoxItem>()) item.ToolTip = DuckingDescription((string)item.Tag);
+        var staticHelp = DuckingDescription("static"); var dynamicHelp = DuckingDescription("dynamic");
         StartDialGroup(2);
         EffectNumber("Threshold", -60, 0, .1, "dBFS", n => n.Ducking.ThresholdDb, (n, v) => n.Ducking.ThresholdDb = v);
-        EffectNumber("Duck amount", 0, 60, .1, "dB", n => n.Ducking.AmountDb, (n, v) => n.Ducking.AmountDb = v, primary: true);
+        var amount = EffectNumber("Duck amount", 0, 60, .1, "dB", n => n.Ducking.AmountDb, (n, v) => n.Ducking.AmountDb = v, primary: true);
+        var ratio = EffectNumber("Ratio", 1, 20, .1, ":1", n => n.Ducking.Ratio, (n, v) => n.Ducking.Ratio = v, primary: true);
+        // Overlay the alternative controls in the same measured slot. Hidden
+        // controls retain their size and saved values across either mode.
+        _dialGroup!.Children.Remove(amount); _dialGroup.Children.Remove(ratio);
+        var depth = new Grid(); depth.Children.Add(amount); depth.Children.Add(ratio); _dialGroup.Children.Add(depth);
         StartDialGroup(2);
         EffectNumber("Attack", .1, 200, .1, "ms", n => n.Ducking.AttackMs, (n, v) => n.Ducking.AttackMs = v, true);
         EffectNumber("Release", 5, 2000, 1, "ms", n => n.Ducking.ReleaseMs, (n, v) => n.Ducking.ReleaseMs = v, true);
+        _effectUpdates.Add(node =>
+        {
+            bool dynamic = node.Ducking.Mode == "dynamic";
+            amount.Visibility = dynamic ? Visibility.Hidden : Visibility.Visible;
+            ratio.Visibility = dynamic ? Visibility.Visible : Visibility.Hidden;
+            amount.IsEnabled = !dynamic; ratio.IsEnabled = dynamic;
+            mode.ToolTip = dynamic ? dynamicHelp : staticHelp;
+        });
     }
     private void AddNote(string text)
     {
@@ -951,26 +998,24 @@ internal sealed class GraphNodeView : Border
     }
     private void BuildExpander()
     {
-        EffectChoice("Expander mode", [("expander", "Expander"), ("gate", "Gate")], n => n.Expander.Mode, (n, value) => n.Expander.Mode = value);
         StartDialGroup(3);
         EffectNumber("Threshold", -80, 0, .5, "dBFS", n => n.Expander.ThresholdDb, (n, v) => n.Expander.ThresholdDb = v, primary: true);
-        var ratio = EffectNumber("Ratio", 1, 20, .1, ":1", n => n.Expander.Ratio, (n, v) => n.Expander.Ratio = v);
-        ratio.ToolTip = NodeToolTip.Create("Ratio", "Expander · Reduction below the threshold", "Gate · Uses Range instead");
-        var hysteresis = EffectNumber("Hysteresis", 0, 12, .1, "dB", n => n.Expander.HysteresisDb, (n, v) => n.Expander.HysteresisDb = v);
+        if (_gatePresentation)
+        {
+            EffectNumber("Hysteresis", 0, 12, .1, "dB", n => n.Expander.HysteresisDb, (n, v) => n.Expander.HysteresisDb = v);
+        }
+        else
+        {
+            EffectNumber("Ratio", 1, 20, .1, ":1", n => n.Expander.Ratio, (n, v) => n.Expander.Ratio = v);
+        }
         EffectNumber("Range", 0, 80, .5, "dB", n => n.Expander.RangeDb, (n, v) => n.Expander.RangeDb = v);
         StartDialGroup(3);
         EffectNumber("Attack", .1, 200, .1, "ms", n => n.Expander.AttackMs, (n, v) => n.Expander.AttackMs = v, true);
-        var hold = EffectNumber("Hold", 0, 1000, 1, "ms", n => n.Expander.HoldMs, (n, v) => n.Expander.HoldMs = v);
-        EffectNumber("Release", 5, 2000, 1, "ms", n => n.Expander.ReleaseMs, (n, v) => n.Expander.ReleaseMs = v, true);
-        hold.ToolTip = NodeToolTip.Create("Hold · Gate only", "Keeps the gate open after the signal drops");
-        hysteresis.ToolTip = NodeToolTip.Create("Hysteresis · Gate only", "Closes this many dB below the opening threshold");
-        _effectUpdates.Add(node =>
+        if (_gatePresentation)
         {
-            bool gate = node.Expander.Mode == "gate";
-            ratio.IsEnabled = !gate; ratio.Visibility = gate ? Visibility.Collapsed : Visibility.Visible;
-            hold.IsEnabled = hysteresis.IsEnabled = gate;
-            hold.Visibility = hysteresis.Visibility = gate ? Visibility.Visible : Visibility.Collapsed;
-        });
+            EffectNumber("Hold", 0, 1000, 1, "ms", n => n.Expander.HoldMs, (n, v) => n.Expander.HoldMs = v);
+        }
+        EffectNumber("Release", 5, 2000, 1, "ms", n => n.Expander.ReleaseMs, (n, v) => n.Expander.ReleaseMs = v, true);
     }
     private void BuildPassFilter(string kind)
     {
@@ -1005,7 +1050,7 @@ internal sealed class GraphNodeView : Border
         var control = new RotaryValueControl(label, min, max, step, suffix, get(GraphDefaults.NewNode(_kind, 0, 0)),
             v => _owner.NodeChanged(Id, n => set(n, v)), logarithmic: logarithmic, tile: true, integer: integer,
             format: suffix is "ms" or "s" ? "0.###" : suffix == ":1" ? "0.0##" : label.Contains("Q") ? "0.0###" : null,
-            primary: primary);
+            primary: primary, description: EffectDescription(label));
         TrackEditGesture(control);
         if (_dialGroup!.Columns == 3) control.Width = 120;
         _dialGroup!.Children.Add(control); _effectUpdates.Add(n => control.SetValue(get(n)));
@@ -1013,6 +1058,48 @@ internal sealed class GraphNodeView : Border
         foreach (RotaryValueControl peer in _dialGroup.Children) peer.SetDialRowHeight(_dialGroupHeight);
         return control;
     }
+    private string EffectDescription(string label) => (_kind, label) switch
+    {
+        ("alignmentDelay", _) => "Delays this audio path to align it with another.",
+        ("pan", _) => "Balances audio between the left and right channels.",
+        ("denoiser", "Reduction") => "Sets how strongly SpeexDSP reduces steady background noise.",
+        ("denoiser", "Mix") => "Blends original and RNNoise audio. 0% is original; 100% is fully denoised.",
+        ("deEsser", "Frequency") => "Sets the frequency of the harsh S and SH sounds to reduce.",
+        ("deEsser", "Threshold") => "Sets the level above which harsh S and SH sounds are reduced.",
+        ("plosive", "Frequency limit") => "Sets the upper frequency of the low P and B thumps to reduce.",
+        ("plosive", "Threshold") => "Sets the level above which low P and B thumps are reduced.",
+        (_, "Max reduction") => "Limits the amount of attenuation applied to detected sounds.",
+        ("reverb", "Mix") => "Blends original audio with the reverberated sound.",
+        ("reverb", "Decay") => "Sets how long the reverberation lasts.",
+        ("reverb", "Damping") => "Softens high frequencies in the reverb tail.",
+        ("reverb", "Pre-delay") => "Sets the gap before reverberation begins.",
+        ("compressor", "Threshold") => "Sets the level above which louder passages are reduced.",
+        ("compressor", "Ratio") => "Sets how strongly audio above the threshold is reduced.",
+        ("compressor", "Make-up") => "Adds level after compression to compensate for the reduction.",
+        (_, "Ceiling") => "Sets the sample-peak limit.",
+        ("ducking", "Threshold") => "Sets the trigger level above which ducking reduces the main audio.",
+        ("ducking", "Duck amount") => "Sets the fixed reduction while the trigger is above the threshold.",
+        ("ducking", "Ratio") => "Sets how strongly the main audio is reduced as the trigger rises above the threshold.",
+        ("ducking", "Attack") => "Sets how quickly the main audio becomes quieter when the trigger is active.",
+        ("ducking", "Release") => "Sets how quickly the main audio returns to its original level after the trigger falls.",
+        ("expander" or "gate", "Threshold") => _gatePresentation
+            ? "Sets the signal level that opens the gate."
+            : "Sets the level below which quieter passages are reduced.",
+        ("expander" or "gate", "Ratio") => "Sets how strongly audio below the threshold is reduced.",
+        ("expander" or "gate", "Hysteresis") => "Closes the gate this many dB below its opening threshold.",
+        ("expander" or "gate", "Range") => "Limits how far the signal can be turned down.",
+        ("expander" or "gate", "Attack") => "Sets how quickly the signal returns to full level above the threshold.",
+        ("expander" or "gate", "Hold") => "Keeps the gate open briefly after the signal drops.",
+        ("expander" or "gate", "Release") => "Sets how quickly the signal becomes quieter below the threshold.",
+        ("highPass", "Cutoff") => "Sets the frequency below which sound is reduced.",
+        ("lowPass", "Cutoff") => "Sets the frequency above which sound is reduced.",
+        (_, "Resonance / Q") => "Sets the emphasis around the cutoff frequency.",
+        ("voiceColor", "Tone") => "Shifts the voice from warm to bright.",
+        ("voiceColor", "Character") => "Adds a fuller broadcast character to the voice.",
+        (_, "Attack") => "Sets how quickly gain reduction responds to louder audio.",
+        (_, "Release") => "Sets how quickly the audio returns to its original level after gain reduction.",
+        _ => "Adjusts " + label.ToLowerInvariant() + "."
+    };
     private void BuildTone()
     {
         var dials = new StackPanel { Margin = new Thickness(0, 5, 0, 8) };
@@ -1114,10 +1201,10 @@ internal sealed class GraphNodeView : Border
         }
     }
 
-    private sealed class InputWarningGlow : FrameworkElement
+    private sealed class AvailabilityWarningGlow : FrameworkElement
     {
         internal const double ScreenRadius = 10;
-        internal static readonly DependencyProperty GlowBrushProperty = DependencyProperty.Register(nameof(GlowBrush), typeof(Brush), typeof(InputWarningGlow),
+        internal static readonly DependencyProperty GlowBrushProperty = DependencyProperty.Register(nameof(GlowBrush), typeof(Brush), typeof(AvailabilityWarningGlow),
             new FrameworkPropertyMetadata(Brushes.Transparent, FrameworkPropertyMetadataOptions.AffectsRender));
         internal Brush GlowBrush { get => (Brush)GetValue(GlowBrushProperty); set => SetValue(GlowBrushProperty, value); }
         private double _viewScale = 1;

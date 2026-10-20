@@ -20,7 +20,7 @@ AssertDestinationStopped
 # Distribution is part of a successful build. A package without mandatory
 # copyright and licence notices must never be reported as ready to share.
 $licenseNames = @(
-    'Inter-OFL.txt', 'libsamplerate-LICENSE', 'libsamplerate-source-notices.txt',
+    'IBM-Plex-OFL.txt', 'Inter-OFL.txt', 'libsamplerate-LICENSE', 'libsamplerate-source-notices.txt',
     'SpeexDSP-COPYING.txt', 'SpeexDSP-source-notices.txt',
     'RNNoise-COPYING.txt', 'RNNoise-source-notices.txt',
     'nlohmann-json-LICENSE', 'nlohmann-json-third-party-notices.txt',
@@ -32,7 +32,8 @@ $licenseNames = @(
     'Microsoft-Windows-classic-samples-LICENSE.txt'
 )
 foreach ($relative in @('LICENSE', 'THIRD_PARTY_NOTICES.md', 'docs\DISTRIBUTION.md',
-    'desktop\AudioMixer.Desktop\Assets\Fonts\LICENSE.txt') + @($licenseNames | ForEach-Object { 'licenses\' + $_ })) {
+    'desktop\AudioMixer.Desktop\Assets\Fonts\LICENSE.txt',
+    'desktop\AudioMixer.Desktop\Assets\Fonts\IBM-Plex-LICENSE.txt') + @($licenseNames | ForEach-Object { 'licenses\' + $_ })) {
     $required = Join-Path $projectRoot $relative
     if (-not (Test-Path -LiteralPath $required -PathType Leaf) -or (Get-Item -LiteralPath $required).Length -eq 0) {
         throw "Required distribution notice is missing or empty: $relative"

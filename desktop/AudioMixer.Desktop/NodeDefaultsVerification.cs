@@ -25,6 +25,8 @@ internal static class NodeDefaultsVerification
             { Id = from + "-" + to, From = Node(from).Id, To = Node(to).Id, Kind = kind, GainDb = -7, Muted = true };
         foreach (var node in graph.Nodes)
         {
+            // This reset fixture represents an already configured five-band EQ.
+            if (node.Kind == "eq") node.EqBands = EqBand.Defaults();
             node.Name = "Saved " + node.Kind;
             node.Device = new() { Id = "preview-device-" + node.Kind, StableId = "preview-stable-" + node.Kind, Name = "Saved device", Channel = 2 };
             node.App = new() { Name = "Saved application", ProcessId = 42, ExecutablePath = @"C:\Preview\Application.exe" };
@@ -53,6 +55,7 @@ internal static class NodeDefaultsVerification
             var expected = mixer.GraphConfig.Copy();
             var target = expected.Nodes.Single(node => node.Id == original.Id);
             var defaults = GraphDefaults.NewNode(original.Kind, original.X, original.Y);
+            if (original.Kind == "expander" && original.Expander.Mode == "gate") defaults.Expander.Mode = "gate";
             defaults.Id = original.Id; defaults.Name = original.Name;
             defaults.DynamicsUiVersion = original.DynamicsUiVersion;
             if (original.Kind == "denoiser") defaults.Denoiser.Algorithm = original.Denoiser.Algorithm;
@@ -75,6 +78,8 @@ internal static class NodeDefaultsVerification
             "Whole-node reset uses safe muted destination defaults and restores stereo source selection without dropping device bindings.");
         require(mixer.GraphConfig.Nodes.Single(node => node.Kind == "denoiser").Denoiser is { Algorithm: "speex", SuppressionDb: -18, RnnoiseMix: 1 },
             "Resetting the saved Speex fixture restores both control sets while preserving its processor choice.");
+        require(mixer.GraphConfig.Nodes.Single(node => node.Kind == "eq").EqBands.Count == 0,
+            "Resetting a configured EQ removes all bands while preserving its saved identity and weighted/muted connections.");
         await layout();
         var cases = new (string Kind, string Label, double Value, Action<GraphNode> Expected)[]
         {

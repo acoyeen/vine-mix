@@ -21,7 +21,7 @@ internal static class NodeDialRedesignVerification
             "The dial redesign is verified with a detached preview and no audio engine.");
         var expectedCounts = new Dictionary<string, int>
         {
-            ["compressor"] = 5, ["limiter"] = 2, ["ducking"] = 4, ["expander"] = 7,
+            ["compressor"] = 5, ["limiter"] = 2, ["ducking"] = 5, ["expander"] = 5, ["gate"] = 6,
             ["highPass"] = 2, ["lowPass"] = 2, ["denoiser"] = 2, ["deEsser"] = 3,
             ["plosive"] = 3, ["reverb"] = 4, ["pan"] = 1, ["alignmentDelay"] = 2,
             ["voiceColor"] = 2, ["tone"] = 3, ["eq"] = 3
@@ -31,6 +31,7 @@ internal static class NodeDialRedesignVerification
             Nodes = expectedCounts.Keys.Select((kind, index) => GraphDefaults.NewNode(kind, index * 800, 40)).ToList(),
             Zoom = 1, PanX = 20, PanY = 20
         };
+        graph.Nodes.Single(node => node.Kind == "eq").EqBands = EqBand.Defaults(); // Existing five-band dial fixture.
         mixer.ApplyPreviewSnapshot(Snapshot(graph)); await layout();
         GraphNode Current(string kind) => mixer.GraphConfig.Nodes.Single(node => node.Kind == kind);
         GraphNodeView View(string kind) => Descendants<GraphNodeView>(workspace).Single(view => view.Id == Current(kind).Id);
@@ -93,15 +94,15 @@ internal static class NodeDialRedesignVerification
         workspace.ResetNode(Current("eq").Id); await layout();
         var compressorView = View("compressor"); var limiterView = View("limiter"); var duckingView = View("ducking");
         require(Dials(compressorView).Select(Label).SequenceEqual(["Threshold", "Ratio", "Make-up", "Attack", "Release"])
-            && Descendants<ComboBox>(compressorView).Count() == 1
-            && AutomationProperties.GetName(Descendants<ComboBox>(compressorView).Single()) == "Compressor detector"
+            && !Descendants<ComboBox>(compressorView).Any() && compressorView.FindSocket("sidechain", false) is null
             && !Descendants<FrameworkElement>(compressorView).Any(element => AutomationProperties.GetName(element).Contains("preset", StringComparison.OrdinalIgnoreCase)),
-            "A new Compressor has five sound dials and its detector choice, without the legacy mode selector or Ducking preset.");
+            "A new Compressor has five sound dials and measures its own audio, without detector or legacy mode selectors.");
         require(Dials(limiterView).Select(Label).SequenceEqual(["Ceiling", "Release"])
             && !Descendants<ComboBox>(limiterView).Any() && limiterView.FindSocket("sidechain", false) is null
             && Descendants<TextBlock>(limiterView).Any(text => text.Text.Contains("No lookahead") && text.Text.Contains("Bypass removes limiting")),
             "A new Limiter has only Ceiling and Release, no detector input, and visible sample-peak/bypass guidance.");
-        require(Dials(duckingView).Select(Label).SequenceEqual(["Threshold", "Duck amount", "Attack", "Release"])
+        require(Dials(duckingView).Where(dial => Visible(dial, duckingView)).Select(Label).SequenceEqual(["Threshold", "Duck amount", "Attack", "Release"])
+            && Descendants<ComboBox>(duckingView).Single() is var duckMode && AutomationProperties.GetName(duckMode) == "Ducking mode"
             && duckingView.FindSocket("audio", false) is not null && duckingView.FindSocket("audio", true) is not null
             && duckingView.FindSocket("sidechain", false) is not null && duckingView.FindSocket("control", false) is not null
             && duckingView.FindSocket("sidechain", true) is null

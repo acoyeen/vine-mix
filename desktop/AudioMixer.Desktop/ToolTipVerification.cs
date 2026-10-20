@@ -33,10 +33,16 @@ internal static class ToolTipVerification
             });
             return tip;
         }
-        Add(NodeToolTip.Create("Level", "Drag up/down · Adjust", "Shift · Fine adjustment", "Double-click · Reset to 0 dB"));
+        var level = new RotaryValueControl("Level", -60, 12, .1, "dB", 0, _ => { });
+        Add(Descendants<Slider>(level).Single().ToolTip);
         var eq = new EqualizerEditor();
         Add(eq.ToolTip);
+        eq.Apply([new EqBand { Type = "lowShelf", FrequencyHz = 180, GainDb = -3, Q = .7 }], false, 0);
+        Add(eq.ToolTip);
+        var voice = new VoiceColorPad();
+        Add(voice.ToolTip);
         Add(new StereoNodeMeter().ToolTip);
+        Add(new MeterPeakDisplay(new StereoNodeMeter()).ToolTip);
         const string error = "The selected USB microphone is unavailable. Reconnect the device or choose another microphone in this node. Your saved selection has been kept.";
         var diagnostic = Add(error);
         root.Measure(new Size(380, double.PositiveInfinity));
@@ -53,7 +59,7 @@ internal static class ToolTipVerification
             "A full device-error message wraps over multiple lines without being shortened or clipped to one line.");
         require(eq.ToolTip is StackPanel eqContent && eqContent.Children.OfType<TextBlock>().All(block => block.Text.Length < 80)
             && System.Windows.Automation.AutomationProperties.GetHelpText(eq).Contains("Arrow keys", StringComparison.Ordinal),
-            "EQ hover help stays brief while its full keyboard instructions remain accessible.");
+            "EQ hover describes the active band's effect briefly while full keyboard instructions remain accessible.");
         return root;
     }
 

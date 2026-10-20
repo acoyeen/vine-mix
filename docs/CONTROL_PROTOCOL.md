@@ -62,7 +62,7 @@ legacy A/B controls expecting a graph change.
 This object is stored under `configuration.graph`, alongside the retained legacy
 fields. IDs are stable and independent of names or positions. Node kinds:
 `microphone`, `virtualInput`, `appInput`, `mix`, `eq`, `tone`, `highPass`, `lowPass`,
-`compressor`, `limiter`, `ducking`, `expander`, `alignmentDelay`, `denoiser`, `deEsser`, `plosive`, `reverb`, `voiceColor`, `pan`, `mono`, `output`,
+`compressor`, `limiter`, `ducking`, `expander`, `gate`, `alignmentDelay`, `denoiser`, `deEsser`, `plosive`, `reverb`, `voiceColor`, `pan`, `mono`, `output`,
 `virtualOutput`, `control`. Legacy `gain` and `reroute` remain supported for
 existing graphs and clipboard compatibility, but are absent from the Add menu.
 
@@ -79,7 +79,11 @@ Values are finite and validated before plan construction.
 | `voiceColor` | `tone: 0, ambience: 0` | −1–1; 0–1 |
 | `expander` | `mode: "expander", thresholdDb: -40, ratio: 2, attackMs: 5, holdMs: 50, releaseMs: 150, rangeDb: 60, hysteresisDb: 3` | Mode `expander` / `gate`; −80–0 dB; 1–20; 0.1–200 ms; 0–1000 ms; 5–2000 ms; 0–80 dB; 0–12 dB |
 | `alignmentDelay` | `samples: 0` | Integer 0–96000, measured at the internal 48 kHz rate |
-| `ducking` | `thresholdDb: -30, amountDb: 18, attackMs: 10, releaseMs: 250` | −60–0 dBFS; 0–60 dB attenuation; 0.1–200 ms; 5–2000 ms |
+| `ducking` | `thresholdDb: -30, amountDb: 18, attackMs: 10, releaseMs: 250, mode: "static", ratio: 4` | −60–0 dBFS; 0–60 dB attenuation; 0.1–200 ms; 5–2000 ms; mode `static` / `dynamic`; ratio 1–20 |
+
+The `gate` kind requires `expander.mode: "gate"`; it shares the Expander settings
+record. Older `expander` nodes already in gate mode retain their kind and settings
+and use Gate controls. Reset preserves that legacy gate mode.
 
 Voice Color keeps its existing wire fields and ranges. The UI labels
 `voiceColor.ambience` as **Character**, from Natural to Broadcast; it coordinates
@@ -91,22 +95,28 @@ processing. See [the Voice Color mapping](VOICE_COLOR.md).
 
 The existing `compressor` record adds optional `mode: "compress"`,
 `detector: "internal"`, and `ceilingDb: -1`. Mode accepts `compress` / `limit`,
-detector accepts `internal` / `external`, and ceiling spans −24–0 dBFS. These
-defaults preserve an older compressor's original processing. Limit uses its
+detector accepts `internal` / `external`, and ceiling spans −24–0 dBFS. The saved
+detector field is retained but ignored: Compressor always measures its own audio.
+Limit uses its
 programme signal and ceiling, independently of the saved detector selection,
 threshold, ratio, attack and makeup. Its release setting remains active.
 The standalone `limiter` kind always runs this limiter algorithm and reuses
 `compressor.ceilingDb` and `compressor.releaseMs` storage, independent of mode.
-The `ducking` kind uses its own record and a fixed attenuation target, not a
-compressor ratio. Its stereo-linked detector uses fixed 5 ms rise / 50 ms fall
-smoothing and 3 dB hysteresis; its gain envelope uses the configured attack/release.
+The `ducking` kind uses its own record. Static mode uses a fixed attenuation
+target with stereo-linked detector smoothing of 5 ms rise / 50 ms fall and
+3 dB hysteresis. Dynamic mode uses the raw larger absolute stereo trigger channel
+and `pow(peak / threshold, 1 / ratio - 1)` above the linear-amplitude threshold,
+or unity below it. Both modes share the configured attack/release gain envelope
+and retain its current gain when switching; Amount and Ratio both remain saved.
 
 Optional node `dynamicsUiVersion` accepts integer `0` or `1`, defaulting to `0`
 when absent. It is presentation metadata: `0` retains the legacy compressor
 mode interface, and newly created compressors use `1`. It does not select an
-audio algorithm. Legacy compression, external detection, limiter mode, hidden
-controls, saved gain and cables retain their behavior. Older Ducking-preset
-compressor records are not converted into fixed-depth `ducking` records.
+audio algorithm. Legacy compression/limiter mode, hidden settings and saved gain
+remain available, but neither interface has a detector selector or trigger input.
+Old Compressor sidechain edges are rejected; nodes are not automatically converted
+to Ducking. This intentional compatibility change is recorded in the explicit
+[IDEA-007 decision](IDEAS.md#idea-007-static-and-dynamic-modes-in-the-ducking-node).
 Reading these defaults never rewrites an old file; normal backup/save behavior
 is unchanged. Copy/paste carries the marker and all effect records.
 
@@ -130,22 +140,21 @@ A target accepts one control edge. No edge can reference a missing node,
 duplicate another connection or introduce feedback. Muted audio edges also
 participate in cycle checks.
 
-An edge with `kind: "sidechain"` carries audio only to a Compressor detector or
-Ducking trigger.
+An edge with `kind: "sidechain"` carries audio only to a Ducking trigger.
 It must originate at an audio-producing source or processor and terminate at
-`compressor` or `ducking`; at most one sidechain edge targets each such node. It is kept
+`ducking`; at most one sidechain edge targets each Ducking node. It is kept
 outside the programme input list, contributes no audible samples, and does not
 change the main signal's channel layout. Sidechain dependencies take part in
 topological ordering and cycle validation even when muted. The same source may
 have distinct audio and sidechain edges to one detector-capable node. Sidechain gain and
 mute use the existing bounded edge fields, without becoming audible sends.
-External detection with no usable sidechain supplies silence. There is no
+Trigger detection with no usable sidechain supplies silence. There is no
 automatic main-input fallback. Ducking with a missing/disconnected trigger
-releases toward unity; a connected silent trigger lets the smoothed detector
-fall below its closing threshold before release. Zero amount targets unity.
-Legacy Limit ignores external detection while retaining the saved cable and
-detector setting for a later return to Compress; standalone `limiter` has no
-sidechain socket. All these dependencies remain subject to cycle validation.
+releases toward unity. In Static mode, a connected silent trigger lets the
+smoothed detector fall below its closing threshold before release, and zero
+amount targets unity. In Dynamic mode, a trigger at or below Threshold targets
+unity and Ratio controls attenuation. Compressor and Limiter have no sidechain
+socket. All trigger dependencies remain subject to cycle validation.
 
 All device endpoints remain explicit. `microphone`/`output` accept physical
 devices, `virtualInput` accepts VB-CABLE capture, and `virtualOutput` accepts
@@ -198,7 +207,7 @@ frame; `spectrumRevision` is a continuity token that changes across reset or
 recreation, including engine restart. A repeated frame is not new audio. These
 fields are transient and never saved. See [spectrum details](EQ_SPECTRUM_ANALYZER.md).
 
-Compressor, Limiter, Ducking, Expander / Gate, de-esser and plosive nodes publish actual dynamics state:
+Compressor, Limiter, Ducking, Expander, Gate, de-esser and plosive nodes publish actual dynamics state:
 `gainReductionDb` is nonnegative attenuation (before compressor makeup),
 `detectorDb` is the level used to trigger dynamics in dBFS, and `dynamicsFrame`
 identifies the latest processed audio block. Measurements are held between
@@ -207,10 +216,11 @@ data; the desktop retains the last reading briefly, then clears stalled data.
 Muted, bypassed and unavailable paths show no active reduction. De-esser/plosive
 reduction describes the shelf plateau, not the overall signal or attenuation at
 every frequency. Denoiser/reverb do not invent a scalar reduction measurement.
-For external compression, `detectorDb` describes the sidechain; for Ducking it
-describes the smoothed trigger. For standalone Limiter and legacy Limit it
-describes the programme peak used by the limiter. Alignment Delay does not
-publish a fabricated gain-reduction reading.
+For Compressor, `detectorDb` describes its own programme peak. For Ducking it
+describes the smoothed trigger in Static mode or raw stereo trigger peak in
+Dynamic mode. For standalone Limiter and legacy Limit it describes the programme
+peak used by the limiter. Alignment Delay does not publish a fabricated
+gain-reduction reading.
 
 ## Commit and realtime boundary
 

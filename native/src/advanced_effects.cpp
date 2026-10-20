@@ -468,7 +468,7 @@ struct AdvancedEffect::State {
 };
 bool AdvancedEffect::supports(GraphKind kind) noexcept {
     return kind == GraphKind::denoiser || kind == GraphKind::deEsser || kind == GraphKind::plosive
-        || kind == GraphKind::reverb || kind == GraphKind::voiceColor || kind == GraphKind::expander || kind == GraphKind::alignmentDelay;
+        || kind == GraphKind::reverb || kind == GraphKind::voiceColor || kind == GraphKind::expander || kind == GraphKind::gate || kind == GraphKind::alignmentDelay;
 }
 AdvancedEffect::AdvancedEffect(GraphKind kind) : state_(std::make_unique<State>(kind)) {}
 AdvancedEffect::~AdvancedEffect() = default;
@@ -482,7 +482,7 @@ void AdvancedEffect::configure(const GraphPlan::Node& node) noexcept {
     state_->plosiveSettings = node.plosive; state_->reverbSettings = node.reverb; state_->configured = true;
     state_->voiceColorSettings = node.voiceColor;
     state_->expanderSettings = node.expander; state_->alignmentDelaySettings = node.alignmentDelay;
-    if (state_->kind == GraphKind::expander) { state_->expander.configure(node.expander); return; }
+    if (state_->kind == GraphKind::expander || state_->kind == GraphKind::gate) { state_->expander.configure(node.expander); return; }
     if (state_->alignmentDelay) { state_->alignmentDelay->configure(node.alignmentDelay.samples); return; }
     if (state_->voiceColor) state_->voiceColor->configure(node);
     if (state_->denoise) {
@@ -508,7 +508,7 @@ AdvancedEffect::Result AdvancedEffect::process(Frame input) noexcept {
     input.left = static_cast<float>(clean(input.left)); input.right = static_cast<float>(clean(input.right));
     if (state_->denoise) return state_->denoise->process(input);
     if (state_->alignmentDelay) return {state_->alignmentDelay->process(input), input};
-    if (state_->kind == GraphKind::expander) return {state_->expander.process(input), input};
+    if (state_->kind == GraphKind::expander || state_->kind == GraphKind::gate) return {state_->expander.process(input), input};
     if (state_->voiceColor) return {state_->reverb->process(state_->voiceColor->process(input)), input};
     return {state_->reverb ? state_->reverb->process(input) : state_->band.process(input), input};
 }
@@ -541,12 +541,12 @@ void AdvancedEffect::reset() noexcept {
     state_->configured = false;
 }
 float AdvancedEffect::gainReductionDb() const noexcept {
-    if (state_->kind == GraphKind::expander) return static_cast<float>(-20 * std::log10(std::clamp(state_->expander.attenuation, 1e-12, 1.)));
+    if (state_->kind == GraphKind::expander || state_->kind == GraphKind::gate) return static_cast<float>(-20 * std::log10(std::clamp(state_->expander.attenuation, 1e-12, 1.)));
     if (state_->kind != GraphKind::deEsser && state_->kind != GraphKind::plosive) return 0;
     return static_cast<float>(-20 * std::log10(std::clamp(state_->band.attenuation, 1e-12, 1.)));
 }
 float AdvancedEffect::detectorDb() const noexcept {
-    if (state_->kind == GraphKind::expander) return static_cast<float>(20 * std::log10(std::max(state_->expander.envelope, 1.584893192461114e-5)));
+    if (state_->kind == GraphKind::expander || state_->kind == GraphKind::gate) return static_cast<float>(20 * std::log10(std::max(state_->expander.envelope, 1.584893192461114e-5)));
     if (state_->kind != GraphKind::deEsser && state_->kind != GraphKind::plosive) return -96;
     return static_cast<float>(20 * std::log10(std::max(state_->band.envelope, 1.584893192461114e-5)));
 }

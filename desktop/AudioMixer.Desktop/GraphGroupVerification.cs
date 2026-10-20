@@ -408,7 +408,9 @@ internal static class GraphGroupVerification
 
     private static GraphNode Node(string kind, string id, double x, double y)
     {
-        var node = GraphDefaults.NewNode(kind, x, y); node.Id = id; node.Name = id; node.Collapsed = true; return node;
+        var node = GraphDefaults.NewNode(kind, x, y);
+        if (kind == "eq") node.EqBands = EqBand.Defaults(); // Existing configured group fixture.
+        node.Id = id; node.Name = id; node.Collapsed = true; return node;
     }
     private static GraphEdge Edge(string id, GraphNode from, GraphNode to, string kind = "audio", double gain = 0) =>
         new() { Id = id, From = from.Id, To = to.Id, Kind = kind, GainDb = gain };

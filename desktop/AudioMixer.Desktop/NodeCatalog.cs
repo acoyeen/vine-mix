@@ -17,7 +17,7 @@ internal static class NodeCatalog
     [
         new("Inputs", "NodeInputHeaderBrush", ["microphone", "virtualInput", "appInput"]),
         new("Outputs", "NodeOutputHeaderBrush", ["output", "virtualOutput"]),
-        new("Effects", "NodeProcessorHeaderBrush", ["eq", "tone", "voiceColor", "highPass", "lowPass", "compressor", "limiter", "ducking", "expander", "alignmentDelay", "denoiser", "plosive", "deEsser", "reverb"]),
+        new("Effects", "NodeProcessorHeaderBrush", ["eq", "tone", "voiceColor", "highPass", "lowPass", "compressor", "limiter", "ducking", "expander", "gate", "alignmentDelay", "denoiser", "plosive", "deEsser", "reverb"]),
         new("Mixing", "NodeUtilityHeaderBrush", ["mix", "pan", "mono"]),
         new("Controls", "NodeControllerHeaderBrush", ["control"])
     ];
@@ -28,9 +28,11 @@ internal static class NodeCatalog
     internal static string Title(string kind) => GraphDefaults.KindLabel(kind);
     internal static string Description(string kind) => kind switch
     {
-        "compressor" => "Reduce dynamic range with threshold, ratio, attack, release and make-up gain.",
+        "compressor" => "Reduce louder passages of its own audio with threshold, ratio, attack, release and make-up gain.",
         "limiter" => "Limit stereo sample peaks to a ceiling, with no lookahead.",
-        "ducking" => "Lower one signal when another becomes active. Trigger audio is detector only.",
+        "ducking" => "Static ducking lowers by a fixed amount; dynamic ducking follows trigger loudness above threshold. Trigger audio is detector only.",
+        "expander" => "Gradually reduce quiet audio below the threshold using downward expansion.",
+        "gate" => "Reduce quiet audio using a noise gate with hold, range and hysteresis.",
         _ => ""
     };
     internal static bool MatchesSearch(string kind, string query)

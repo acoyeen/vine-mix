@@ -144,7 +144,7 @@ internal static class GraphConnectionVerification
     {
         var graph = new GraphConfiguration
         {
-            Nodes = [Node("mix", "music"), Node("microphone", "voice"), Node("ducking", "duck"), Node("compressor", "compress"), Node("limiter", "limit"), Node("output", "listen")],
+            Nodes = [Node("mix", "music"), Node("microphone", "voice"), Node("ducking", "duck"), Node("ducking", "other-duck"), Node("compressor", "compress"), Node("limiter", "limit"), Node("output", "listen")],
             Edges = [Edge("main", "music", "listen", -7, true), new() { Id = "trigger", From = "voice", To = "duck", Kind = "sidechain", GainDb = -2 }]
         };
         require(GraphDefaults.Validate(graph).Length == 0, "A Ducking trigger is a valid independent detector cable.");
@@ -152,6 +152,8 @@ internal static class GraphConnectionVerification
             "Ducking accepts exactly one trigger cable.");
         require(GraphDefaults.ConnectionError(graph, new() { From = "voice", To = "limit", Kind = "sidechain" }).Length > 0,
             "Limiter rejects detector inputs because its ceiling follows the main signal.");
+        require(GraphDefaults.ConnectionError(graph, new() { From = "voice", To = "compress", Kind = "sidechain" }).Length > 0,
+            "Compressor rejects trigger cables because it follows its own main signal.");
         require(GraphDefaults.ConnectionError(graph, new() { From = "voice", To = "duck", Kind = "control" }).Length > 0,
             "Detector audio cannot be relabelled as a linked parameter control.");
         string original = JsonSerializer.Serialize(graph);
@@ -166,17 +168,17 @@ internal static class GraphConnectionVerification
         require(GraphDefaults.ConnectionError(graph, new() { From = "duck", To = "music", Kind = "audio" }).Length > 0,
             "Ducking main-path cycles are rejected.");
         var trigger = graph.Edges.Single(e => e.Id == "trigger");
-        require(GraphConnectionEditing.TryPrepareRewire(graph, trigger, "compress", out var rewire, out _)
+        require(GraphConnectionEditing.TryPrepareRewire(graph, trigger, "other-duck", out var rewire, out _)
             && GraphConnectionEditing.TryApply(graph, rewire!, out _)
             && graph.Edges.Single(e => e.Id == "trigger").Kind == "sidechain"
             && graph.Edges.Single(e => e.Id == "trigger").GainDb == -2,
-            "Rewiring a trigger to Compressor keeps its detector-only kind, cable identity and level.");
+            "Rewiring a trigger to another Ducking node keeps its detector-only kind, cable identity and level.");
         require(!GraphConnectionEditing.TryPrepareRewire(graph, graph.Edges.Single(e => e.Id == "trigger"), "limit", out _, out _),
             "Rewiring a detector to Limiter cannot turn it into an audible connection.");
         require(GraphConnectionEditing.TryPrepareDetach(graph, "duck", out var detach, out _)
             && GraphConnectionEditing.TryApply(graph, detach!, out _)
             && graph.Edges.Any(e => e.From == "music" && e.To == "listen" && e.Kind == "audio")
-            && graph.Edges.Single(e => e.Id == "trigger").To == "compress",
+            && graph.Edges.Single(e => e.Id == "trigger").To == "other-duck",
             "Ducking detaches normally after its detector is removed, without touching other detector connections.");
 
         graph = new GraphConfiguration { Nodes = [Node("mix", "music"), Node("ducking", "duck"), Node("mix", "after")],

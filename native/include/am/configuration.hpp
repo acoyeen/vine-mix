@@ -14,11 +14,12 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ProcessBinding, processId, execu
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_ONLY_SERIALIZE(ApplicationInfo, processId, executablePath, name, hasAudioSession)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(EqBand, type, enabled, frequencyHz, gainDb, q, resetFrequencyHz)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(CompressorSettings, thresholdDb, ratio, attackMs, releaseMs, makeupDb, mode, detector, ceilingDb)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_ONLY_SERIALIZE(DuckingSettings, thresholdDb, amountDb, attackMs, releaseMs)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_ONLY_SERIALIZE(DuckingSettings, thresholdDb, amountDb, attackMs, releaseMs, mode, ratio)
 inline void from_json(const Json& value, DuckingSettings& settings) {
     if (!value.is_object()) throw std::runtime_error("Ducking settings must be an object.");
     settings.thresholdDb = value.value("thresholdDb", -30.); settings.amountDb = value.value("amountDb", 18.);
     settings.attackMs = value.value("attackMs", 10.); settings.releaseMs = value.value("releaseMs", 250.);
+    settings.mode = value.value("mode", std::string("static")); settings.ratio = value.value("ratio", 4.);
 }
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_ONLY_SERIALIZE(ExpanderSettings, mode, thresholdDb, ratio, attackMs, holdMs, releaseMs, rangeDb, hysteresisDb)
 inline void from_json(const Json& value, ExpanderSettings& settings) {

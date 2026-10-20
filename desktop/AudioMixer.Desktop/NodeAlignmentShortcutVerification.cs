@@ -28,6 +28,7 @@ internal static class NodeAlignmentShortcutVerification
             input.Id = ids[0]; input.GainDb = -4;
             input.Device = new() { Id = "preview-mic1", Name = "Studio microphone" };
             var eq = GraphDefaults.NewNode("eq", tall ? -160 : 0, tall ? 200 : -80);
+            eq.EqBands = EqBand.Defaults(); // Configured EQ geometry fixture.
             eq.Id = ids[1]; eq.EqBands[1].GainDb = 3;
             var control = GraphDefaults.NewNode("control", tall ? -80 : 600, tall ? 700 : 0);
             control.Id = ids[2]; control.GainDb = -2;

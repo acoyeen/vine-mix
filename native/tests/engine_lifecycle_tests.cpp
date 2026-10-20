@@ -296,6 +296,9 @@ int main() {
         GraphNode expansion; expansion.id = "expansion"; expansion.kind = "expander";
         const auto expansionIndex = config.graph.nodes.size(); config.graph.nodes.push_back(expansion);
         config.graph.edges.push_back({"expansion-input", "mic1", "expansion"});
+        GraphNode gate; gate.id = "gate"; gate.kind = "gate"; gate.expander.mode = "gate";
+        const auto gateIndex = config.graph.nodes.size(); config.graph.nodes.push_back(gate);
+        config.graph.edges.push_back({"gate-input", "mic1", "gate"});
         GraphNode delay; delay.id = "alignment"; delay.kind = "alignmentDelay";
         const auto delayIndex = config.graph.nodes.size(); config.graph.nodes.push_back(delay);
         config.graph.edges.push_back({"alignment-input", "expansion", "alignment"});
@@ -311,7 +314,6 @@ int main() {
         dynamics.compressor = {-30, 6, 10, 250, 0, "compress", "external", -12};
         const auto dynamicsIndex = config.graph.nodes.size(); config.graph.nodes.push_back(dynamics);
         config.graph.edges.push_back({"dynamics-input", "mic1", "dynamics"});
-        config.graph.edges.push_back({"dynamics-key", "alignment", "dynamics", "sidechain"});
         GraphNode layoutDenoiser; layoutDenoiser.id = "layout-denoiser"; layoutDenoiser.kind = "denoiser";
         config.graph.nodes.push_back(layoutDenoiser);
         GraphNode spectrumEq; spectrumEq.id = "spectrum-eq"; spectrumEq.kind = "eq";
@@ -443,9 +445,12 @@ int main() {
             for (int i = 0; i < 32; ++i) {
                 config.graph.nodes[expansionIndex].expander.mode = i % 2 ? "gate" : "expander";
                 config.graph.nodes[expansionIndex].expander.thresholdDb = -40 + i % 12;
+                config.graph.nodes[gateIndex].expander.thresholdDb = -40 + i % 12;
                 config.graph.nodes[delayIndex].alignmentDelay.samples = static_cast<std::uint32_t>(i * 48);
                 config.graph.nodes[dynamicsIndex].compressor.mode = i % 2 ? "compress" : "limit";
                 config.graph.nodes[duckingIndex].ducking.amountDb = 12 + i % 12;
+                config.graph.nodes[duckingIndex].ducking.mode = i % 2 ? "dynamic" : "static";
+                config.graph.nodes[duckingIndex].ducking.ratio = 2 + i % 8;
                 config.graph.nodes[limiterIndex].compressor.ceilingDb = -6 - i % 12;
                 engine.configure(config, config.revision); ++config.revision; test::wait(7);
             }
@@ -453,21 +458,25 @@ int main() {
             const auto additions = engine.snapshot();
             test::check(test::created == existingWorkers && additions["status"]["audioFrames"].get<std::uint64_t>() > colorSnapshot["status"]["audioFrames"].get<std::uint64_t>(),
                 "Ducking, Limit, Gate and Alignment live commits preserve healthy workers and advancing timeline");
-            for (const auto index : {expansionIndex, delayIndex, dynamicsIndex, duckingIndex, limiterIndex})
+            for (const auto index : {expansionIndex, gateIndex, delayIndex, dynamicsIndex, duckingIndex, limiterIndex})
                 test::check(additions["status"]["nodes"][index]["path"]["state"] == "Running" && additions["status"]["nodes"][index]["peak"].get<float>() > 0,
                     "Every new processing path runs and meters in the actual engine");
             test::check(additions["status"]["nodes"][expansionIndex]["dynamicsFrame"].get<std::uint64_t>() > 0
+                && additions["status"]["nodes"][gateIndex]["dynamicsFrame"].get<std::uint64_t>() > 0
                 && additions["status"]["nodes"][dynamicsIndex]["dynamicsFrame"].get<std::uint64_t>() > 0,
-                "Gate and external detector publish current dynamics telemetry");
+                "Dedicated Gate, legacy gate-mode Expander and own-signal Compressor publish current dynamics telemetry");
             for (const auto index : {duckingIndex, limiterIndex})
                 test::check(additions["status"]["nodes"][index]["dynamicsFrame"].get<std::uint64_t>() > 0
                     && additions["status"]["nodes"][index]["gainReductionDb"].get<float>() > 0,
                     "Dedicated Ducking and Limiter publish real attenuation and current telemetry");
             const auto additionsSaved = ConfigurationStore(path).load();
             test::check(additionsSaved.graph.nodes[expansionIndex].expander == config.graph.nodes[expansionIndex].expander
+                && additionsSaved.graph.nodes[gateIndex].kind == "gate"
+                && additionsSaved.graph.nodes[gateIndex].expander == config.graph.nodes[gateIndex].expander
                 && additionsSaved.graph.nodes[delayIndex].alignmentDelay == config.graph.nodes[delayIndex].alignmentDelay
                 && Json(additionsSaved.graph.nodes[dynamicsIndex].compressor) == Json(config.graph.nodes[dynamicsIndex].compressor)
-                && additionsSaved.graph.edges[additionsSaved.graph.edges.size()-2].kind == "sidechain",
+                && std::any_of(additionsSaved.graph.edges.begin(), additionsSaved.graph.edges.end(), [](const auto& edge) {
+                    return edge.id == "ducking-trigger" && edge.kind == "sidechain"; }),
                 "Actual engine commits persist dynamics, exact delay and detector cables in private settings");
             test::check(additionsSaved.graph.nodes[duckingIndex].ducking == config.graph.nodes[duckingIndex].ducking
                 && additionsSaved.graph.nodes[limiterIndex].compressor.ceilingDb == config.graph.nodes[limiterIndex].compressor.ceilingDb

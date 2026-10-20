@@ -61,7 +61,7 @@ internal sealed class MeterPeakDisplay : ContentControl
         // The meter's existing tooltip can be a parented UIElement. Keep a
         // separate panel for this control and update its existing text blocks.
         PeakToolTipContent = NodeToolTip.Create("Highest observed peak", "No readings yet", "Right",
-            "Over 0 dBFS detected", "Sample peaks");
+            "Over 0 dBFS detected", "Highest sample level observed per channel");
         _firstReading = (TextBlock)PeakToolTipContent.Children[1];
         _secondReading = (TextBlock)PeakToolTipContent.Children[2];
         _clipReading = (TextBlock)PeakToolTipContent.Children[3];

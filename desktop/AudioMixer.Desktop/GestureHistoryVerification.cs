@@ -267,6 +267,7 @@ internal static class GestureHistoryVerification
         {
             var snapshot = UiPreview.CreateSnapshot([]);
             var node = GraphDefaults.NewNode(kind, 20, 20);
+            if (kind == "eq") node.EqBands = EqBand.Defaults(); // Existing multi-band gesture fixture.
             snapshot.Configuration.Graph = new GraphConfiguration { Nodes = [node] };
             snapshot.Status.Nodes = [new GraphNodeStatus { Id = node.Id, Path = new() { State = "Running" }, Channels = 2 }];
             Mixer.ApplyPreviewSnapshot(snapshot);

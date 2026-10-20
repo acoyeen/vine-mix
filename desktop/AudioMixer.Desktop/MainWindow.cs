@@ -13,9 +13,13 @@ namespace AudioMixer.Desktop;
 
 public partial class MainWindow : Window
 {
-    public const double TitleBarHeight = 32;
+    // Include the former outer top inset so centering uses the full visible
+    // header while its divider and the workspace keep their existing position.
+    public const double TitleBarHeight = 36;
+    public const string WebsiteUrl = "https://vinemix.app";
     public static GridLength TitleBarRowHeight => new(TitleBarHeight);
     private readonly MixerViewModel _mixer;
+    private readonly Action<string> _openExternal;
     private readonly ContextMenu _settingsMenu;
     private readonly Border _helpOverlay;
     private readonly Border _searchOverlay;
@@ -26,14 +30,14 @@ public partial class MainWindow : Window
     internal NodeSearchView SearchView { get; }
     internal bool IsNodeSearchOpen => _searchOverlay.Visibility == Visibility.Visible;
     public GraphWorkspace Workspace { get; }
-    public MainWindow(MixerViewModel mixer)
+    public MainWindow(MixerViewModel mixer, Action<string>? openExternal = null)
     {
         // CaptionHeight starts below the native resize border, not at y=0.
         // Use both header rows, ending exactly at the canvas; only real buttons
         // opt into client hit testing. Passive text must never create drag holes.
         ConsoleTheme.Initialize();
-        NativeCaption.Attach(this, 4 + TitleBarHeight + 1 + GraphWorkspace.ToolbarHeight - NativeCaption.ResizeBorderSize, resizable: true);
-        _mixer = mixer; InitializeComponent(); DataContext = mixer;
+        NativeCaption.Attach(this, TitleBarHeight + 1 + GraphWorkspace.ToolbarHeight - NativeCaption.ResizeBorderSize, resizable: true);
+        _mixer = mixer; _openExternal = openExternal ?? App.OpenExternal; InitializeComponent(); DataContext = mixer;
         SaveIndicator.SetBinding(TextBlock.TextProperty, new Binding(nameof(MixerViewModel.SaveStatus)) { Converter = CompactSaveStatus.Instance });
         if (mixer.IsPreview) Title = "Vine Mix · UI Preview";
         var minimise = NativeCaption.WindowButton(this, close: false);
@@ -46,14 +50,14 @@ public partial class MainWindow : Window
             caption: mixer.IsPreview ? "Close UI preview" : "Close to tray — audio keeps running"));
         foreach (Button button in WindowActions.Children) { button.SetResourceReference(StyleProperty, "WorkspaceToolbarButton"); button.Margin = new Thickness(0); }
         Workspace = new GraphWorkspace(mixer);
-        _settingsMenu = CreateSettingsMenu(mixer, Workspace.SetMessage, OpenHelp, OpenNodeSearch);
+        _settingsMenu = CreateSettingsMenu(mixer, Workspace.SetMessage, OpenHelp, OpenNodeSearch, OpenHelpEntry);
         ConsoleGrid.Children.Add(Workspace);
-        HelpView = new WorkspaceHelpView(CloseHelp) { MaxWidth = 760, MaxHeight = 690,
-            HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Stretch };
+        HelpView = new WorkspaceHelpView(CloseHelp) { MaxWidth = 960, MaxHeight = 680,
+            HorizontalAlignment = HorizontalAlignment.Stretch, VerticalAlignment = VerticalAlignment.Stretch };
         _helpOverlay = new Border
         {
             Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromArgb(190, 0, 0, 0)),
-            Padding = new Thickness(24, 16, 24, 16), Child = HelpView, Visibility = Visibility.Collapsed
+            Padding = new Thickness(16, 12, 16, 12), Child = HelpView, Visibility = Visibility.Collapsed
         };
         System.Windows.Shell.WindowChrome.SetIsHitTestVisibleInChrome(_helpOverlay, true);
         KeyboardNavigation.SetTabNavigation(_helpOverlay, KeyboardNavigationMode.Cycle);
@@ -90,6 +94,7 @@ public partial class MainWindow : Window
         _settingsMenu.IsOpen = true;
     }
     private void Settings_Click(object sender, RoutedEventArgs e) => OpenSettings();
+    private void Website_Click(object sender, RoutedEventArgs e) => _openExternal(WebsiteUrl);
     internal void OpenHelp()
     {
         if (IsNodeSearchOpen) return;
@@ -99,13 +104,20 @@ public partial class MainWindow : Window
         Workspace.CancelActiveGesture();
         Workspace.IsEnabled = false;
         SettingsButton.IsEnabled = false;
+        HelpView.BeginSession();
         _helpOverlay.Visibility = Visibility.Visible;
         // Detached verification must never focus or create a native window.
         if (PresentationSource.FromVisual(this) is not null) HelpView.CloseButton.Focus();
     }
+    internal void OpenHelpEntry(string entryId)
+    {
+        OpenHelp();
+        if (IsHelpOpen) HelpView.ShowEntry(entryId);
+    }
     internal void CloseHelp()
     {
         if (!IsHelpOpen) return;
+        HelpView.EndSession();
         _helpOverlay.Visibility = Visibility.Collapsed;
         Workspace.IsEnabled = true;
         SettingsButton.IsEnabled = true;
@@ -122,7 +134,11 @@ public partial class MainWindow : Window
         // Blurring a numeric entry discards its uncommitted draft. Let the
         // editor finish before F1 opens a reference that would take its focus.
         if (key == Key.F1 && !GraphWorkspace.IsTextEditor(focused)) { OpenHelp(); return true; }
-        if (key == Key.Escape && IsHelpOpen) { CloseHelp(); return true; }
+        if (key == Key.Escape && IsHelpOpen)
+        {
+            if (HelpView.TryCancelInteraction()) return true;
+            CloseHelp(); return true;
+        }
         return false;
     }
     internal void OpenNodeSearch()
@@ -168,10 +184,22 @@ public partial class MainWindow : Window
         if (GraphWorkspace.IsTextEditor(focused) || !Workspace.CanOpenNodeSearch) return false;
         OpenNodeSearch(); return IsNodeSearchOpen;
     }
-    internal static ContextMenu CreateSettingsMenu(MixerViewModel mixer, Action<string, bool>? feedback = null, Action? showHelp = null, Action? findNode = null)
+    internal static ContextMenu CreateSettingsMenu(MixerViewModel mixer, Action<string, bool>? feedback = null,
+        Action? showHelp = null, Action? findNode = null, Action<string>? showHelpEntry = null)
     {
-        var menu = new ContextMenu { Width = 340 };
+        var menu = new ContextMenu { Width = 380, MaxHeight = 560 };
         AutomationProperties.SetName(menu, "Vine Mix settings");
+        var find = new MenuItem { Header = "Find node…", InputGestureText = "Ctrl+F",
+            ToolTip = "Find a node by name, type, device or app." };
+        find.Click += (_, _) => findNode?.Invoke();
+        menu.Items.Add(find);
+        var help = new MenuItem { Header = "Help & shortcuts", InputGestureText = "F1",
+            ToolTip = "Keyboard shortcuts and silent control practice." };
+        AutomationProperties.SetHelpText(help, "Open shortcuts and practice controls. Escape first cancels an active example, then closes Help.");
+        help.Click += (_, _) => showHelp?.Invoke();
+        menu.Items.Add(help);
+        menu.Items.Add(new Separator());
+
         MenuItem Preference(string title, string property, string help, ItemCollection? items = null)
         {
             var item = new MenuItem { Header = title, IsCheckable = true, StaysOpenOnClick = true,
@@ -181,8 +209,9 @@ public partial class MainWindow : Window
             (items ?? menu.Items).Add(item);
             return item;
         }
-        Preference("Right-click drag to pan", nameof(MixerViewModel.RightClickDragToPan),
+        var rightPan = Preference("Right-click drag to pan", nameof(MixerViewModel.RightClickDragToPan),
             "Right-drag empty canvas to pan; release without dragging for its menu.");
+        rightPan.ToolTip = NodeToolTip.Create("Right-click drag to pan", "Enables right-button canvas panning");
         Preference("Reduce meter animation", nameof(MixerViewModel.ReducedAnimation), "Use less motion in audio meters.");
         const string visibilityHelp = "Choose which extra audio devices appear in the input and output lists. Your assigned device always remains visible. These preferences do not change Windows devices or audio routing.";
         var visibility = new MenuItem { Header = "Audio device visibility", ToolTip = NodeToolTip.Create("Audio device visibility", visibilityHelp) };
@@ -198,7 +227,7 @@ public partial class MainWindow : Window
             "Automatically start the mixer when you sign in to Windows.");
         startup.SetBinding(IsEnabledProperty, new Binding(nameof(MixerViewModel.CanEdit)) { Source = mixer });
         menu.Items.Add(new Separator());
-        var sound = new MenuItem { Header = "Windows sound settings" };
+        var sound = new MenuItem { Header = "Windows sound settings", ToolTip = "Open the Windows audio device settings." };
         sound.Click += (_, _) => App.OpenExternal("ms-settings:sound"); menu.Items.Add(sound);
         var retry = new MenuItem { Header = "Retry assigned devices", ToolTip = "Reconnect the audio devices already assigned to your nodes." };
         retry.SetBinding(IsEnabledProperty, new Binding(nameof(MixerViewModel.CanEdit)) { Source = mixer });
@@ -216,15 +245,10 @@ public partial class MainWindow : Window
             feedback?.Invoke(result.Message, !result.Success);
         };
         menu.Items.Add(restart);
-        menu.Items.Add(new Separator());
-        var find = new MenuItem { Header = "Find node…", InputGestureText = "Ctrl+F" };
-        find.Click += (_, _) => findNode?.Invoke();
-        menu.Items.Add(find);
-        var help = new MenuItem { Header = "Help & shortcuts", InputGestureText = "F1",
-            ToolTip = "Keyboard shortcuts, canvas gestures and running in the tray." };
-        AutomationProperties.SetHelpText(help, "Open the keyboard and mouse reference. Escape closes it.");
-        help.Click += (_, _) => showHelp?.Invoke();
-        menu.Items.Add(help);
+        Action<string>? openEntry = showHelpEntry;
+        if (openEntry is null && showHelp is not null) openEntry = _ => showHelp();
+        SettingsSearchView.Attach(menu, openEntry);
+        MenuHoverHelp.Attach(menu);
         return menu;
     }
     private void UpdateVisibility() => _mixer.IsVisible = IsVisible && WindowState != WindowState.Minimized;

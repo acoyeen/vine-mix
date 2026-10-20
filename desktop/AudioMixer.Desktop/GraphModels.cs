@@ -104,6 +104,8 @@ public sealed class CompressorSettings
 }
 public sealed class DuckingSettings
 {
+    public string Mode { get; set; } = "static";
+    public double Ratio { get; set; } = 4;
     public double ThresholdDb { get; set; } = -30;
     public double AmountDb { get; set; } = 18;
     public double AttackMs { get; set; } = 10;
@@ -199,13 +201,14 @@ public sealed class GraphNodeStatus
 public static class GraphDefaults
 {
     public const int MaximumEqBands = 8;
-    public static readonly string[] Kinds = ["microphone", "virtualInput", "appInput", "mix", "gain", "eq", "tone", "highPass", "lowPass", "compressor", "limiter", "ducking", "pan", "mono", "reroute", "output", "virtualOutput", "control", "denoiser", "deEsser", "plosive", "reverb", "voiceColor", "expander", "alignmentDelay"];
-    public static bool HasAudioInput(string kind) => kind is "mix" or "gain" or "output" or "virtualOutput" or "eq" or "tone" or "highPass" or "lowPass" or "compressor" or "limiter" or "ducking" or "pan" or "mono" or "reroute" or "denoiser" or "deEsser" or "plosive" or "reverb" or "voiceColor" or "expander" or "alignmentDelay";
-    public static bool HasAudioOutput(string kind) => kind is "microphone" or "virtualInput" or "appInput" or "mix" or "gain" or "eq" or "tone" or "highPass" or "lowPass" or "compressor" or "limiter" or "ducking" or "pan" or "mono" or "reroute" or "denoiser" or "deEsser" or "plosive" or "reverb" or "voiceColor" or "expander" or "alignmentDelay";
-    public static bool HasSidechainInput(string kind) => kind is "compressor" or "ducking";
+    public static readonly string[] Kinds = ["microphone", "virtualInput", "appInput", "mix", "gain", "eq", "tone", "highPass", "lowPass", "compressor", "limiter", "ducking", "pan", "mono", "reroute", "output", "virtualOutput", "control", "denoiser", "deEsser", "plosive", "reverb", "voiceColor", "expander", "gate", "alignmentDelay"];
+    public static bool HasAudioInput(string kind) => kind is "mix" or "gain" or "output" or "virtualOutput" or "eq" or "tone" or "highPass" or "lowPass" or "compressor" or "limiter" or "ducking" or "pan" or "mono" or "reroute" or "denoiser" or "deEsser" or "plosive" or "reverb" or "voiceColor" or "expander" or "gate" or "alignmentDelay";
+    public static bool HasAudioOutput(string kind) => kind is "microphone" or "virtualInput" or "appInput" or "mix" or "gain" or "eq" or "tone" or "highPass" or "lowPass" or "compressor" or "limiter" or "ducking" or "pan" or "mono" or "reroute" or "denoiser" or "deEsser" or "plosive" or "reverb" or "voiceColor" or "expander" or "gate" or "alignmentDelay";
+    public static bool HasSidechainInput(string kind) => kind == "ducking";
+    public static bool HasSidechainInput(GraphNode node) => HasSidechainInput(node.Kind);
     public static string KindLabel(string kind) => kind switch
     {
-        "microphone" => "Microphone", "virtualInput" => "Virtual input", "appInput" => "Running app", "expander" => "Expander / Gate", "alignmentDelay" => "Alignment Delay",
+        "microphone" => "Microphone", "virtualInput" => "Virtual input", "appInput" => "Running app", "expander" => "Expander", "gate" => "Gate", "alignmentDelay" => "Alignment Delay",
         "mix" => "Mix", "gain" => "Gain", "output" => "Listening output", "virtualOutput" => "Virtual output", "control" => "Linked control",
         "eq" => "Equalizer", "tone" => "Low / Mid / High", "highPass" => "High-pass filter", "lowPass" => "Low-pass filter", "compressor" => "Compressor", "limiter" => "Limiter", "ducking" => "Ducking", "pan" => "Balance", "mono" => "Mono", "reroute" => "Reroute", "denoiser" => "Denoiser", "deEsser" => "De-esser", "plosive" => "Plosive remover", "reverb" => "Reverb", "voiceColor" => "Voice Color", _ => kind
     };
@@ -215,9 +218,13 @@ public static class GraphDefaults
         Device = new() { Channel = -1 },
         Denoiser = new() { Algorithm = kind == "denoiser" ? "rnnoise" : "speex" },
         DynamicsUiVersion = kind == "compressor" ? 1 : 0,
+        Expander = new() { Mode = kind == "gate" ? "gate" : "expander" },
         GainDb = kind == "output" ? -24 : 0,
         Muted = kind is "output" or "virtualOutput",
-        EqBands = kind == "tone" ? EqBand.ToneDefaults() : kind is "highPass" or "lowPass" ? EqBand.FilterDefaults(kind) : EqBand.Defaults()
+        // Keep GraphNode's initializer for older saved nodes that omit EqBands;
+        // newly created or explicitly reset EQs start empty.
+        EqBands = kind == "eq" ? [] : kind == "tone" ? EqBand.ToneDefaults()
+            : kind is "highPass" or "lowPass" ? EqBand.FilterDefaults(kind) : EqBand.Defaults()
     };
     public static void ResetNodeSettings(GraphNode node)
     {
@@ -225,6 +232,8 @@ public static class GraphDefaults
         // Reset both processors' controls without switching the chosen processor
         // or changing its latency. RNNoise is the default for creation only.
         if (node.Kind == "denoiser") defaults.Denoiser.Algorithm = node.Denoiser.Algorithm;
+        // Earlier Gate nodes were saved as expander records with gate mode.
+        if (node.Kind == "expander" && node.Expander.Mode == "gate") defaults.Expander.Mode = "gate";
         // Reset sound controls, never identity, routing, placement or assignment.
         node.GainDb = defaults.GainDb; node.Muted = defaults.Muted;
         node.Mono = defaults.Mono; node.Device.Channel = -1;
@@ -274,7 +283,7 @@ public static class GraphDefaults
         }
         if (candidate.Kind == "sidechain")
         {
-            if (!HasAudioOutput(from.Kind) || !HasSidechainInput(to.Kind)) return "Connect an audio output to a Compressor sidechain or Ducking trigger input.";
+            if (!HasAudioOutput(from.Kind) || !HasSidechainInput(to.Kind)) return "Connect an audio output to a Ducking trigger input.";
             if (graph.Edges.Any(e => e.Kind == "sidechain" && e.To == to.Id)) return "This node already has a detector cable. Remove that connection first.";
         }
         else if (candidate.Kind != "audio" || !HasAudioOutput(from.Kind) || !HasAudioInput(to.Kind)) return "Connect an audio output on the right to an audio input on the left.";
@@ -309,13 +318,15 @@ public static class GraphDefaults
                 || node.Compressor is null || node.Compressor.Mode is not ("compress" or "limit") || node.Compressor.Detector is not ("internal" or "external")
                 || !InRange(node.Compressor.CeilingDb, -24, 0) || !InRange(node.Compressor.ThresholdDb, -60, 0) || !InRange(node.Compressor.Ratio, 1, 20)
                 || !InRange(node.Compressor.AttackMs, .1, 200) || !InRange(node.Compressor.ReleaseMs, 5, 2000) || !InRange(node.Compressor.MakeupDb, 0, 24)
-                || node.Ducking is null || !InRange(node.Ducking.ThresholdDb, -60, 0) || !InRange(node.Ducking.AmountDb, 0, 60)
+                || node.Ducking is null || node.Ducking.Mode is not ("static" or "dynamic") || !InRange(node.Ducking.Ratio, 1, 20)
+                || !InRange(node.Ducking.ThresholdDb, -60, 0) || !InRange(node.Ducking.AmountDb, 0, 60)
                 || !InRange(node.Ducking.AttackMs, .1, 200) || !InRange(node.Ducking.ReleaseMs, 5, 2000)
                 || node.Expander is null || node.Expander.Mode is not ("expander" or "gate") || !InRange(node.Expander.ThresholdDb, -80, 0) || !InRange(node.Expander.Ratio, 1, 20)
                 || !InRange(node.Expander.AttackMs, .1, 200) || !InRange(node.Expander.HoldMs, 0, 1000) || !InRange(node.Expander.ReleaseMs, 5, 2000)
                 || !InRange(node.Expander.RangeDb, 0, 80) || !InRange(node.Expander.HysteresisDb, 0, 12)
                 || node.AlignmentDelay is null || node.AlignmentDelay.Samples is < 0 or > 96000)
                 return "An effect contains an invalid setting.";
+            if (node.Kind == "gate" && node.Expander.Mode != "gate") return "A Gate node requires gate processing mode.";
             if (node.EqBands is null || node.EqBands.Count > MaximumEqBands) return "An EQ node supports up to eight bands.";
             foreach (var band in node.EqBands)
                 if (band is null || band.Type is not ("peak" or "lowShelf" or "highShelf" or "highPass" or "lowPass" or "notch")

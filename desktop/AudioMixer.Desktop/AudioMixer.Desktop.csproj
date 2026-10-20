@@ -14,6 +14,7 @@
     <AssemblyTitle>Vine Mix</AssemblyTitle>
     <Description>Windows audio mixer with a node workspace and local audio processing.</Description>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets/Branding/app.ico</ApplicationIcon>
     <Platforms>x64</Platforms>
     <PlatformTarget>x64</PlatformTarget>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
@@ -21,6 +22,9 @@
   </PropertyGroup>
   <ItemGroup>
     <Resource Include="Assets/Fonts/*.ttf"/>
+    <Resource Include="Assets/Branding/*.ico"/>
+    <Resource Include="Assets/Branding/*.svg"/>
     <Content Include="Assets/Fonts/LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest"/>
+    <Content Include="Assets/Fonts/IBM-Plex-LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest"/>
   </ItemGroup>
 </Project>

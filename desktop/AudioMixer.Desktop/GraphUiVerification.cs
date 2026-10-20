@@ -67,6 +67,7 @@ internal static class GraphUiVerification
             Checks.Add("All 64 prior routing combinations preserve independent send levels and enabled states");
             window.Workspace.FitAll(); await Layout(window);
             Require(Descendants<GraphNodeView>(window).Count() == 8, "The actual canvas renders every migrated node");
+            await MenuHoverHelpVerification.RunAsync(window, mixer, () => Layout(window), Require);
             Render(window, Path.Combine(directory, "workspace.png"));
 
             var fresh = UiPreview.CreateSnapshot([]); fresh.Configuration.Graph = new(); mixer.ApplyPreviewSnapshot(fresh); await Layout(window);
@@ -89,7 +90,7 @@ internal static class GraphUiVerification
                 && mixer.GraphConfig.Nodes.Single(n => n.Kind == "output").Device.Id == ""
                 && mixer.GraphConfig.Nodes.Single(n => n.Kind == "virtualOutput").Device.Id == fresh.Configuration.VirtualOutputRender.Id,
                 "New destinations begin muted; physical outputs need selection and the virtual output binds its unique cable automatically");
-            Require(mixer.GraphConfig.Nodes.Single(n => n.Kind == "eq").EqBands.Count == 5, "EQ has five independently configurable bands");
+            Require(mixer.GraphConfig.Nodes.Single(n => n.Kind == "eq").EqBands.Count == 0, "New EQ nodes begin with no bands");
             Require(workspace.ConnectNodes(spawned["microphone"], spawned["eq"], "audio").Length == 0, "Source connects to EQ using the editor's connection action");
             Require(workspace.ConnectNodes(spawned["eq"], spawned["compressor"], "audio").Length == 0 && workspace.ConnectNodes(spawned["compressor"], spawned["mix"], "audio").Length == 0, "Effects connect into an Add/Mix node");
             Require(workspace.ConnectNodes(spawned["mix"], spawned["output"], "audio").Length == 0 && workspace.ConnectNodes(spawned["mix"], spawned["virtualOutput"], "audio").Length == 0, "One mix fans out to independent physical and virtual destinations");
@@ -100,7 +101,7 @@ internal static class GraphUiVerification
             Require(workspace.ConnectNodes(spawned["control"], spawned["eq"], "control").Length == 0, "A shared control connects through the separate control path");
             Require(workspace.ConnectNodes(spawned["control"], spawned["mix"], "audio").Length > 0, "Control signals cannot enter audio sockets");
 
-            workspace.NodeChanged(spawned["eq"], n => { n.EqBands[2].FrequencyHz = 1800; n.EqBands[2].GainDb = -6; n.EqBands[2].Q = 1.4; n.Bypass = true; });
+            workspace.NodeChanged(spawned["eq"], n => { n.EqBands = EqBand.Defaults(); n.EqBands[2].FrequencyHz = 1800; n.EqBands[2].GainDb = -6; n.EqBands[2].Q = 1.4; n.Bypass = true; });
             workspace.NodeChanged(spawned["compressor"], n => { n.Compressor.ThresholdDb = -22; n.Compressor.Ratio = 3; });
             workspace.NodeChanged(spawned["pan"], n => n.Balance = -.4);
             workspace.NodeChanged(spawned["microphone"], n => { n.X = 150; n.Y = 200; });
@@ -144,7 +145,7 @@ internal static class GraphUiVerification
             var appChooser = Descendants<ComboBox>(appView).Single();
             var selectedApp = appChooser.SelectedItem as AudioApplication;
             Require(selectedApp is { ProcessId: 99 } && selectedApp.ExecutablePath == savedApp.App.ExecutablePath && selectedApp.Name.Contains("saved selection")
-                && appView.InputNoticeLabel == "CHOOSE APP INSTANCE"
+                && appView.AvailabilityNoticeLabel == "CHOOSE APP INSTANCE"
                 && ambiguousApp.Applications.All(candidate => !ReferenceEquals(candidate, selectedApp))
                 && ambiguousApp.Applications.Select(a => a.Label).Distinct().Count() == ambiguousApp.Applications.Count,
                 "Ambiguous app restarts retain a saved placeholder; recycled PIDs do not bind; process labels distinguish every candidate");

@@ -69,6 +69,7 @@ internal static class NodeRefinementVerification
         var fixture = UiPreview.CreateSnapshot([]);
         string[] kinds = ["eq", "tone", "compressor", "pan", "mono", "highPass", "lowPass", "mix", "gain", "reroute", "control", "denoiser", "deEsser", "plosive", "reverb"];
         var nodes = kinds.Select((kind, index) => GraphDefaults.NewNode(kind, (index % 3) * 680, (index / 3) * 760)).ToList();
+        nodes.Single(node => node.Kind == "eq").EqBands = EqBand.Defaults(); // Configured dial/menu fixture.
         var source = GraphDefaults.NewNode("microphone", -400, 0); nodes.Add(source);
         var edge = new GraphEdge { Id = "legacy-weight", From = source.Id, To = nodes[0].Id, GainDb = -9, Muted = true };
         fixture.Configuration.Graph = new() { Nodes = nodes, Edges = [edge], Zoom = 1 };

@@ -11,6 +11,7 @@ internal static class WorkspaceHistoryVerification
     {
         var input = GraphDefaults.NewNode("microphone", 20, 30); input.Id = "history-input";
         var effect = GraphDefaults.NewNode("eq", 400, 30); effect.Id = "history-effect";
+        effect.EqBands = EqBand.Defaults(); // Existing nested-settings isolation fixture.
         var output = GraphDefaults.NewNode("output", 800, 30); output.Id = "history-output";
         return new()
         {

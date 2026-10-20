@@ -2,9 +2,179 @@
 
 ## Run the current checks
 
+The GitHub synchronization review on **20 October 2026** rebuilt the current
+source and passed all **17 native offline suites** and **10,806 detached desktop
+checks / 215 renders / zero binding errors**. Reports:
+`artifacts/github-sync-20261020/offline/results.json` and
+`artifacts/github-sync-20261020/offline/ui/results.json`.
+
+A separate self-contained package build reproduced both installed executables
+byte for byte: desktop SHA-256
+`2D94EFE8F2C67D5658515F152550E75EB5CC2B525D6B681598D07CB6459DA01F`
+and engine SHA-256
+`8937839894EC93A92831294DE587F9075B1DE0D223A4DD6059ABEB84E39E6875`.
+The normal and 200% workspace renders, minimum-size Controls view and Settings
+menu were visually inspected. Repository screenshots now use these detached
+fixtures and show the current wide logo and Settings search. The logo has no
+hover tooltip; its website action and accessible identity remain.
+
+Verification used synthetic audio, temporary settings, fake devices and detached
+controls. It did not stop or replace the installed application, use its control
+pipe, change personal settings, or perform audible/hardware qualification.
+
+The Controls hierarchy update on 20 October 2026 passed **10,812 detached
+checks / 215 renders / zero binding errors**:
+`artifacts/controls-hierarchy-20261020/ui-final/results.json`.
+Section headers use flat shaded bars and larger right-side chevrons; action rows
+are indented beneath a vertical guide. Alignment was captured without a selected
+action at normal size, minimum size and in high contrast; those layouts were
+visually inspected. Existing Controls selection, help and tooltip checks remain
+enabled. The self-contained executable was hash-stable during verification.
+No Computer Use, physical input or shown-window automation was performed.
+Engine and runtime bytes are unchanged.
+
+The ordinary-control tooltip correction on 20 October 2026 passed **10,794
+detached checks / 212 renders / zero binding errors**:
+`artifacts/tooltip-owners-20261020/ui-final/results.json`.
+The exact Controls → View & zoom reference buttons are checked before recording
+injection to prove production native-service suppression. Every adjacent pair
+is exercised in both directions, with immediate visible handoff, no extra move,
+late leave, pending retarget and unchanged same-owner deadlines. Checks also
+cover all Help-topic tooltip owners, stationary scrolling, collapse/topic/reopen,
+actual Static/Dynamic and disabled device choices, non-hit-testable meter internals
+and live feedback-tooltip replacement. The startup-registration omission variant
+fails before test setup can install replacement behavior:
+`artifacts/tooltip-owners-20261020/regression-no-registration/results.json`.
+The previous context-menu regression remains enabled over the shared core.
+Source inventory: `artifacts/tooltip-owners-20261020/tooltip-inventory.txt`.
+No Computer Use, physical input, native popup/window or focus automation was
+performed. Native pointer presentation remains outside detached verification.
+The self-contained executable was hash-stable and engine/runtime bytes unchanged.
+
+The menu-tooltip handoff correction on 20 October 2026 passed **10,481 detached
+checks / 212 renders / zero binding errors**:
+`artifacts/tooltip-handoff-20261020/ui-final/results.json`.
+Controlled pointer samples hit-test real Settings, device-submenu, Help-example
+and Add-menu geometry. Installed routed handlers are exercised upward/downward,
+without extra movement, in both enter/leave orders, with stale pending owners,
+same-row deadlines, separators, search fields, disabled rows, filtering, closure,
+unload and regenerated menu rows. Two legacy behavior variants independently fail
+the intended entry-scheduling and pending-retarget assertions; reports are under
+`artifacts/tooltip-handoff-20261020/regression-*`.
+Menu commands, graph, preferences, save state, history and keyboard focus remain
+unchanged. The recording presenter opens no native tooltip or menu. No Computer
+Use, physical input or shown-window automation was performed; native pointer/root
+selection and popup placement remain outside these detached checks. Engine and
+runtime bytes are unchanged.
+
+The simplified Controls and Settings search update on 20 October 2026 passed
+**10,347 detached checks / 212 renders / zero binding errors**:
+`artifacts/controls-search-20261020/ui-final/results.json`.
+Help now exposes six topics; the removed Voice Color, Nodes & cables and Canvas
+navigation lessons are absent. Controls checks cover one expanded section,
+separated action/key rows, selected explanations and exact-entry links. Settings
+checks cover inline Zoom/reset instructions, aliases, case/whitespace/multiword
+queries, matching submenu reachability, keyboard decisions, query cleanup,
+offline use and unchanged mixer state. The no-match message is checked against
+ancestor clipping as well as its logical text. Normal, minimum-size and
+high-contrast Controls, Settings and search renders were inspected.
+The self-contained binary was hash-stable throughout verification. No Computer
+Use, native input or shown-window automation was performed. Native popup/focus
+behavior remains outside detached verification; engine/runtime bytes are unchanged.
+
+The flat menu presentation update on 20 October 2026 passed **10,399 detached
+checks / 220 renders / zero binding errors**:
+`artifacts/menu-style-20261020/ui-final-2/results.json`.
+Help topics, compact/minimum-size layouts, EQ/Voice Color examples and the
+Settings, Add, Activity and Find node surfaces were visually inspected using
+detached renders. The existing suite continues to verify shortcut decisions,
+search, tutorial editing/reset/isolation and high-contrast resources. No Computer
+Use or shown-window automation was performed for this revision. Native input,
+focus and popup placement remain outside detached verification. Audio processing
+and the running engine/runtime are unchanged.
+
+The interactive Help & shortcuts update on 20 October 2026 passed **10,399
+detached desktop checks / 220 renders / zero binding errors**:
+`artifacts/help-menu-20261020/ui-final-2/results.json`.
+All nine topics have normal and minimum-window renders. Dial, EQ, Voice Color
+and canvas examples also render at 144/192 DPI; reference, buttons, EQ, Voice
+Color and connections have process-local high-contrast renders. The rendered
+layouts were inspected. The checks cover actual reusable controls, exact-entry
+validation and cancellation, local reset/reopen, control synchronization, wheel
+routing, private node copy/paste, local graph history and unchanged real-mixer
+state. Canvas examples stay disabled until explicitly entered. Final verification
+uses detached WPF fixtures rather than desktop input or shown-window automation;
+native pointer/focus behavior and screen-reader use remain separate checks.
+No native audio code or engine/runtime binary changed for this update.
+
+The tooltip simplification on 20 October 2026 passed **9,945 detached desktop
+checks / 189 renders / zero binding errors**:
+`artifacts/tooltip-purpose-20261020/ui-final-2/results.json`.
+The real dial, EQ/band, Voice Color and meter tooltip renders were inspected.
+Hover text describes purpose, settings and diagnostics; gesture references and
+accessible keyboard help remain available. No native processing changed.
+The interface update is running; the same engine process, advancing audio,
+configuration, previously running paths, audio settings and UI preferences were
+preserved. Evidence: `artifacts/tooltip-purpose-20261020/activation.json`.
+
+The dynamics organization candidate on 20 October 2026 passed all **17 native
+offline suites** and **9,945 detached desktop checks / 189 renders / zero binding
+errors**. Evidence:
+`artifacts/dynamics-organization-20261020/native-final/results.json` and
+`artifacts/dynamics-organization-20261020/ui-final-2/results.json`.
+Checks cover dedicated Gate parity with the earlier algorithm, Static ducking
+compatibility, Dynamic ratio/threshold behavior and mode transitions, trigger
+isolation and missing-trigger release, self-detecting Compressor, allocation-free
+processing, persistence, clipboard, reset/Undo/Redo and fixed mode-change geometry.
+Expander, Gate, both Ducking modes and the self-only Compressor renders were
+visually inspected. Hardware/listening checks remain separate.
+
+The matched interface/engine package was activated at 13:29 UTC+10. The new
+engine became ready in 0.39 seconds, all ten previously running paths resumed,
+and the frame counter advanced. Configuration matched with only the new omitted
+Ducking defaults normalized; the saved settings file was byte-for-byte unchanged.
+The new interface opened and responded. Evidence:
+`artifacts/dynamics-organization-20261020/activation/result.json`.
+
+The EQ reset correction on 20 October 2026 passed **9,701 detached desktop
+checks / 182 renders / zero binding errors**:
+`artifacts/eq-reset-empty-20261020/ui-final/results.json`.
+Both reset menus clear populated EQs to zero bands, deselect the editor and
+disable band controls. Undo/Redo restores and clears the exact custom bands;
+empty resets do not add edits. Node reset also clears stale maximum-band help.
+Saved/legacy EQ compatibility and Tone/filter behavior remain covered.
+Interface-only activation preserved the engine, configuration, running paths
+and personal files: `artifacts/eq-reset-empty-20261020/activation.json`.
+
+The empty-EQ/centred-text candidate on 20 October 2026 passed **9,692 detached
+desktop checks / 182 renders / zero binding errors**:
+`artifacts/eq-empty-centred-20261020/ui-final/results.json`.
+Coverage includes new zero-band creation, persistence, legacy/saved-band retention,
+first-band controls, clipboard, Undo/Redo and both unchanged reset commands.
+Actual rendered glyph bounds verify centred hints/captions clear of both axis
+gutters at 320/540 DIP widths and 96/144/192 DPI, including narrow multiselect
+ellipsis, measured spectrum labels and high contrast. Full-node empty/first-band
+renders were inspected. No native processing changed or hardware checks ran.
+Interface-only activation retained the original audio engine, advancing frames,
+running paths, configuration and personal files:
+`artifacts/eq-empty-centred-20261020/activation.json`.
+
+The output-availability candidate on 20 October 2026 passed **9,507 detached
+desktop checks / 174 renders / zero binding errors**:
+`artifacts/output-availability-20261020/ui-final-3/results.json`.
+Physical and virtual output warning cases cover missing/disabled/unplugged
+devices, healthy mute and silence, muted failure, connection attempts, stale
+inventory versus running playback, VAC Lite absence, reduced animation, high
+contrast, offline help, stable geometry, and unchanged graph/history/edit queues.
+The output warning renders were visually inspected beside the existing inputs.
+No native processing changed; no new live audio or hardware checks were run.
+Interface-only activation retained the original engine process, previously
+running paths, advancing audio frames, configuration, settings and UI preferences.
+Evidence: `artifacts/output-availability-20261020/activation.json`.
+
 Use PowerShell 7 on Windows 11 x64. On a fresh checkout, run
 `scripts/build.ps1` first to obtain the project-local tools, then run
-`scripts/verify-offline.ps1`. This builds and runs 14 native suites and the detached
+`scripts/verify-offline.ps1`. This builds and runs 17 native suites and the detached
 desktop checks. Use `-NativeOnly` for the native portion or `-SkipBuild` only when
 the matching verification binaries have already been built. Reports and renders
 are written to a new directory under `artifacts/`.
@@ -25,8 +195,8 @@ is preserved in [V1_TESTING_HISTORY.md](docs/V1_TESTING_HISTORY.md) for referenc
 The current graph supports up to 32 nodes and 96 cables; the old fixed slot counts
 are no longer acceptance requirements.
 
-The current Add/search library has 23 types. Gain / Multiply and Reroute remain
-supported only for existing graphs, giving 25 compatible engine types. Effects,
+The current Add/search library has 24 types. Gain / Multiply and Reroute remain
+supported only for existing graphs, giving 26 compatible engine types. Effects,
 Balance and Mono have no generic Level row. See [the workspace guide](docs/NODE_WORKSPACE.md),
 [effect research](docs/EFFECTS_RESEARCH.md) and [the measured EQ analyzer](docs/EQ_SPECTRUM_ANALYZER.md)
 before qualifying the expanded effects library.
@@ -309,13 +479,13 @@ checks, not a claim that the current candidate has already passed:
 
 | Area | Required evidence |
 |---|---|
-| Catalogue | 23 creatable / 25 supported types; separate Compressor, Limiter and Ducking entries and searchable descriptions |
+| Catalogue | 24 creatable / 26 supported types; separate Expander, Gate, Compressor, Limiter and Ducking entries and searchable descriptions |
 | Ducking isolation | Main-only, trigger-only, missing/disconnected/silent trigger, zero amount; trigger never enters output and no main-detector fallback |
-| Ducking curve and time | Fixed target at several above-threshold levels; threshold bounds, 3 dB hysteresis, 5/50 ms detector smoothing, attack/release, stereo linking, bypass, edits and trigger changes |
+| Ducking curve and time | Static fixed target, 3 dB hysteresis and 5/50 ms detector smoothing; Dynamic raw-peak ratio curve and unity below threshold; shared attack/release envelope, mode changes, stereo linking, bypass, edits and trigger changes |
 | Limiter | First-sample and steady ceiling enforcement with inherited and linked gain; release and bypass; ceiling edits; accurately disclosed no-lookahead sample-peak behavior |
-| Legacy compatibility | Internal/external compressors, old Ducking-preset settings and limiter-mode records retain effective processing, IDs, names, positions, cables, gains, hidden settings and bypass; loading leaves files untouched |
+| Legacy compatibility | Compressor always measures its own audio; saved detector metadata remains readable but is ignored, and old Compressor trigger edges are rejected without converting nodes. Preserve legacy Compress/Limit behavior, IDs, names, positions, gains, hidden settings and bypass; loading leaves files untouched. Older Expander records in gate mode retain that mode and their settings. See the explicit compatibility decision in [IDEA-007](docs/IDEAS.md#idea-007-static-and-dynamic-modes-in-the-ducking-node). |
 | Routing | Audio insertion with an attached trigger; typed rewiring; detector cycle rejection, including muted edges; detach refusal with detector/control connections and unchanged graph on failure |
-| Persistence | Temporary save/load, copy/paste and explicit reset for both new kinds; marker 0 legacy / 1 new compressor; unchanged backup conventions |
+| Persistence | Temporary save/load, copy/paste and explicit reset for dedicated dynamics kinds and both Ducking modes; absent Ducking fields default to Static/4:1; marker 0 legacy / 1 new compressor; unchanged backup conventions |
 | Dials | Bounds, parameter defaults, vertical/Shift drag, exact entry, routed Enter/Escape and arrow/Page/Home keys, visible focus, accessible names and wheel-only canvas zoom |
 | Precision | Fractional attack/ratio/Q, three-decimal delay, round-trip unchanged edits, rejection of fractional sample entries, integer drag/key/accessible writes |
 | Layout | Label–dial–value reading order; compact related groups; distinct selectors/actions/toggles/readouts; persistent instructions; stable dimensions during telemetry; bottom Bypass and usable sockets |
@@ -439,7 +609,7 @@ and a new continuity token after an engine restart. These tests do not record au
 
 In detached preview fixtures, also check the following before any live session:
 
-1. Add/search exposes 23 types and excludes Gain / Multiply and Reroute. A copied
+1. Add/search exposes 24 types and excludes Gain / Multiply and Reroute. A copied
    legacy graph still loads, renders, processes and copy/pastes both types without
    changing their values or connections. Mix with one input acts as volume;
    several inputs sum. Category colours and keyboard search remain consistent.
@@ -531,8 +701,9 @@ fixtures, preserving the personal live graph:
 5. Add through eight bands and confirm a ninth is refused. Remove all bands:
    response becomes flat, and adding a new point still works. Reload a copied
    five-band configuration and compare every saved band value. Right-click empty
-   space and **Reset EQ to flat**: five default flat bands return, with routes and
-   other node controls retained.
+   space and **Reset EQ to flat**: every band is cleared, with routes and
+   other node controls retained. **Reset node to defaults** also clears all bands;
+   Undo/Redo restores and clears their exact saved values.
 6. Spawn Low / Mid / High. Adjust each −12 to +12 dB dial independently by
    dragging and exact entry; Shift must refine movement. Confirm 0 dB defaults,
    low shelf 200 Hz, bell 1 kHz and high shelf 5 kHz. The bottom Bypass toggle must retain
@@ -743,7 +914,7 @@ identity. It writes statistics, never audio samples.
 | EQ edit while streaming | Add/remove/drag bands without persistent silence, unstable samples or disruptive discontinuity; zero bands returns flat audio |
 | EQ shape and width | Bell/shelves/notch and Width / Q modify only the selected band; smooth response line agrees with the processed signal; default bell Q is 1 |
 | EQ measured spectrum | Shaded underlay follows actual post-EQ energy at the right frequencies; EQ boost/cut/bypass change measurement where sound exists; silence and stale/restarted telemetry clear correctly |
-| EQ reset gestures | Point double-click and Reset position restore anchor frequency/zero gain; empty-space Reset EQ to flat restores five default flat bands; routes remain intact |
+| EQ reset gestures | Point double-click and Reset position restore anchor frequency/zero gain; Reset EQ to flat and Reset node to defaults clear every band; routes remain intact and Undo/Redo restores exact bands |
 | High-pass / Low-pass | Adjustable cutoff/Q, 12 dB/octave response, stereo independence and node bypass match the offline results |
 | Low / Mid / High | Each −12 to +12 dB dial independently controls its fixed 200 Hz shelf, 1 kHz bell or 5 kHz shelf; bypass retains values |
 | Compressor | Threshold/ratio/attack/release and makeup behave as documented; stereo remains linked |
@@ -1322,3 +1493,98 @@ minimum-period reliability, hotplug and endurance remain manual qualifications.
 The separate candidate package does not replace or restart the running app.
 See [audio latency](docs/AUDIO_LATENCY.md) for policy, diagnostics and primary
 Windows API references.
+
+
+## Vine Mix rebrand - 20 October 2026
+
+The staged Release package built without desktop warnings or errors. All 17
+native offline suites passed (`artifacts/rebrand-20261020-native/results.json`).
+Detached WPF passed **10,012 checks**, produced **189 renders** and reported
+**zero binding errors**. The shown-window harness passed **43 checks**, also
+with zero binding errors. Final UI report paths and installed identity are in
+[the implementation record](docs/BRANDING_IMPLEMENTATION_PLAN.md).
+
+`BrandingVerification` inspects real packaged Plex Sans Regular/Medium/SemiBold
+and Mono Regular without simulated styles, numeric glyph alignment, real
+node/menu/tooltip fonts, EQ/Voice Color drawing at 96/144/192 DPI, independent
+vector pieces, all nine ICO sizes, contrast and high-contrast restoration. It
+checks green audio/lavender sidechain roles and the actual unchecked-checkbox
+outline. Caption checks include the mark. Existing full-suite coverage for
+routing, editing/history, all creatable nodes, controls, search/help, unavailable
+devices, zoom and window sizes passed. Sparse text validation checks contrasting
+ink when the antialias palette is small.
+
+Computer Use exercised actual preview Fit, Settings, Ctrl+F/filtering, Escape,
+F1, maximise/restore and close, then inspected the installed workspace and
+Settings popup. Activation evidence records the verified UI hash, responsive UI,
+unchanged engine PID/binary and advancing frames. Configuration, revision, exact
+settings bytes and device path states were unchanged. The candidate engine is
+byte-identical to the running engine.
+
+No real audio test signal, device changes, audible measurement, screen-reader
+speech check, physical monitor transition or hardware soak was performed. The
+rebrand preserves functionality within these measured bounds.
+
+## Caption and Settings help - 20 October 2026
+
+The final Release UI passed **10,051 detached checks**, **189 renders** and
+**77 shown-window checks**, with zero binding errors. Evidence:
+`artifacts/caption-menu-20261020/ui-final-2/results.json` and
+`artifacts/caption-menu-20261020/native-ui-final/results.json`.
+
+Caption checks exercise the actual website-button handler with an intercepted
+external opener, requiring exactly `https://vinemix.app`, and retain native
+dragging/resize checks at each display scale. The mark is 20 x 20 DIPs with inset
+button bounds. The shared menu tick is a drawn path, independent of font glyphs.
+
+`MenuHoverHelpVerification` opens the real Settings/submenu presentation surfaces
+on an inert preview. It checks focus, shared popup ownership, adjacent structured
+and string help, modifier/F10 chord processing, dismissal/reopening, ordinary-key
+passthrough, submenu/root cleanup and cancellation of a pending timer. Graph,
+preferences, save status, dispatches and history must remain unchanged. It does
+not inject native input or connect to the engine.
+
+Computer Use additionally verified real pointer transitions in both directions,
+submenu children, returning to the parent menu, disabled rows and closure. The
+installed UI was checked for its inset mark, drawn tick, adjacent-row handoff,
+keyboard navigation and actual Ctrl+Shift+F10 dismissal/reopening. Activation
+preserved the engine process/binary, advancing frames, committed configuration,
+revision 5983 and exact settings bytes. This follow-up changes only the UI;
+native audio suites were not rerun. Activation evidence:
+`artifacts/caption-menu-20261020-activation/result.json`.
+
+## Settings separator close regression - 20 October 2026
+
+The new regression fails against the previous cleanup order: it observes tooltip
+content or placement being cleared while the native presentation source still
+exists and before `ToolTip.Closed`. It hits the real separator geometry, checks
+the no-owner dismissal path, rapid close/reopen, eventual reference release and
+pending-help cancellation. The corrected UI passes **90 shown-window checks**
+and **10,051 detached checks**, with **189 renders** and zero binding errors.
+Evidence: `artifacts/tooltip-separator-20261020/regression-before/results.json`,
+`artifacts/tooltip-separator-20261020/native-ui-final/results.json` and
+`artifacts/tooltip-separator-20261020/ui-final/results.json`.
+
+The logo's dedicated template has no underline; a separate keyboard-only focus
+outline remains. Existing caption, branding and website-handler checks pass.
+Validation used source review and application-owned WPF tests without desktop
+input injection or Computer Use tools. No visual hover test was performed.
+Activation preserved engine PID/binary, advancing frames, configuration, revision
+5986 and exact settings bytes:
+`artifacts/tooltip-separator-20261020-activation/result.json`.
+
+## Header alignment - 20 October 2026
+
+Release passed **10,105 detached checks**, **189 renders** and **90 shown-window
+checks**, with zero binding errors. New assertions cover whole-header logo
+centering, equal vertical spacing, the larger left connection dot and separation
+of warning/status/action regions at three window sizes, three display scales and
+both empty/long warnings. Existing website activation, 14-button hit targets,
+caption dragging, native resize edges and menu lifecycle checks pass.
+
+Reports: `artifacts/header-alignment-20261020/ui-final/results.json` and
+`artifacts/header-alignment-20261020/native-ui-final/results.json`. The detached
+workspace image was inspected; no Computer Use or desktop input injection was
+used. Activation preserved the engine process/binary, advancing frames,
+configuration, revision 5986 and exact settings bytes:
+`artifacts/header-alignment-20261020-activation/result.json`.

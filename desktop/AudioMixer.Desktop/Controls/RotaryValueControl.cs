@@ -18,7 +18,7 @@ internal class RotaryValueControl : StackPanel
     private readonly Action<double> _changed;
     private readonly double _minimum, _maximum, _step, _smallChange, _largeChange;
     private readonly bool _logarithmic, _integer;
-    private readonly string _label, _unit, _format;
+    private readonly string _label, _unit, _format, _description;
     private bool _applying, _dragging, _entryHovered, _entryFocused, _entryInvalid;
     private double _lastY, _dragPosition, _defaultValue;
     private Brush? _lastTextBrush;
@@ -37,7 +37,8 @@ internal class RotaryValueControl : StackPanel
     public RotaryValueControl(string label, double minimum, double maximum, double step, string unit,
         double defaultValue, Action<double> changed, bool logarithmic = false, bool compact = false,
         string detail = "", double? smallChange = null, double? largeChange = null,
-        bool tile = false, bool integer = false, string? format = null, bool primary = false)
+        bool tile = false, bool integer = false, string? format = null, bool primary = false,
+        string description = "")
     {
         if (!double.IsFinite(minimum) || !double.IsFinite(maximum) || minimum >= maximum
             || !double.IsFinite(step) || step <= 0 || (logarithmic && minimum <= 0))
@@ -55,6 +56,17 @@ internal class RotaryValueControl : StackPanel
             _largeChange = Math.Max(1, Math.Round(_largeChange));
         }
         _label = label; _unit = unit; _changed = changed;
+        _description = description.Length > 0 ? description : label switch
+        {
+            "Level" => "Adjusts the audio level. 0 dB leaves it unchanged.",
+            "Low" => "Boosts or cuts bass around the 200 Hz shelf.",
+            "Mid" => "Boosts or cuts midrange around 1 kHz.",
+            "High" => "Boosts or cuts treble around the 5 kHz shelf.",
+            "Frequency" => "Sets the frequency affected by the selected EQ band.",
+            "Band gain" => "Boosts or cuts the selected EQ band.",
+            "Width / Q" => "Sets the band's width. Higher Q affects a narrower range of frequencies.",
+            _ => "Adjusts " + label.ToLowerInvariant() + "."
+        };
         _defaultValue = Bound(defaultValue);
         _format = integer ? "0" : format ?? StepFormat(step, unit);
         Margin = new Thickness(0, 0, 0, 4);
@@ -68,10 +80,10 @@ internal class RotaryValueControl : StackPanel
         labels.Children.Add(title);
         if (!string.IsNullOrWhiteSpace(detail))
         {
-            var description = GraphWorkspace.Text(detail, 12);
-            description.Margin = new Thickness(0, 5, 0, 0);
-            description.SetResourceReference(TextBlock.ForegroundProperty, "ConsoleMutedBrush");
-            labels.Children.Add(description);
+            var detailText = GraphWorkspace.Text(detail, 12);
+            detailText.Margin = new Thickness(0, 5, 0, 0);
+            detailText.SetResourceReference(TextBlock.ForegroundProperty, "ConsoleMutedBrush");
+            labels.Children.Add(detailText);
         }
         // Importance selects the face size independently of row/tile layout.
         // All variants retain the same exact-entry styling and behavior.
@@ -249,7 +261,7 @@ internal class RotaryValueControl : StackPanel
             return key == Key.Enter;
         }
         _entryInvalid = true; RefreshEntryBorder(); RefreshEntryAccessibility();
-        _entry.ToolTip = NodeToolTip.Create("Invalid value", EntryRequirement(), "Enter or Tab · Apply", "Escape · Cancel");
+        _entry.ToolTip = NodeToolTip.Create("Invalid value", EntryRequirement());
         return true;
     }
 
@@ -278,6 +290,21 @@ internal class RotaryValueControl : StackPanel
         _entry.Text = FormatExact(_range.Value); _entry.SelectAll();
         _entryInvalid = false; RefreshEntryBorder(); RefreshEntryAccessibility();
         _entry.ToolTip = _entryHelp;
+    }
+
+    internal bool TryCancelPracticeInteraction()
+    {
+        bool active = _dragging || _entryInvalid
+            || _entry.IsKeyboardFocusWithin && _entry.Text != FormatExact(_range.Value);
+        if (active) SuspendPracticeInteraction();
+        return active;
+    }
+
+    internal void SuspendPracticeInteraction()
+    {
+        StopAdjustment();
+        if (_entry.IsMouseCaptured) _entry.ReleaseMouseCapture();
+        RenderEntry();
     }
 
     private void StopAdjustment()
@@ -317,8 +344,7 @@ internal class RotaryValueControl : StackPanel
     }
     private void RefreshHelp()
     {
-        _range.ToolTip = NodeToolTip.Create(_label, "Drag up/down · Adjust", "Shift · Fine adjustment",
-            $"Double-click or Home · Reset to {Format(_defaultValue)}");
+        _range.ToolTip = NodeToolTip.Create(_label, _description);
         AutomationProperties.SetHelpText(_range,
             $"{Format(_minimum)} to {Format(_maximum)}. Drag vertically; Shift for fine adjustment. Arrow keys adjust; Page Up and Page Down adjust by {Format(_largeChange)}. Home or double-click resets to {Format(_defaultValue)}.");
         RefreshEntryAccessibility();
@@ -334,9 +360,7 @@ internal class RotaryValueControl : StackPanel
             (error.Length > 0 ? error + " " : (_integer ? "Whole numbers only. " : "") + $"{Format(_minimum)} to {Format(_maximum)}. ")
             + $"Enter applies; Tab or Shift+Tab applies and moves between controls; Escape cancels. Double-click resets to {Format(_defaultValue)}.");
     }
-    private object EntryHelp() => NodeToolTip.Create("Enter " + _label.ToLowerInvariant(),
-        $"{Format(_minimum)} to {Format(_maximum)}", "Enter · Apply", "Tab / Shift+Tab · Apply and move", "Escape · Cancel",
-        $"Double-click · Reset to {Format(_defaultValue)}");
+    private object EntryHelp() => NodeToolTip.Create(_label, _description);
     private void Render()
     {
         _lastTextBrush = ConsoleTheme.Get("ConsoleTextBrush"); FaceRefreshCount++;

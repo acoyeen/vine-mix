@@ -22,7 +22,7 @@ internal static class SocketPresentationVerification
             "Socket presentation checks use a detached preview without an audio engine or native window.");
         var fixture = UiPreview.CreateSnapshot([]);
         var microphone = Node("microphone", "socket-mic", 80.25, 80.4);
-        var compressor = Node("compressor", "socket-compressor", 560.2, -80.35);
+        var compressor = Node("ducking", "socket-ducking", 560.2, -80.35);
         var control = Node("control", "socket-control", -80.25, 650.2);
         var output = Node("output", "socket-output", 1100.1, 80.4);
         var denoiser = Node("denoiser", "socket-denoiser", 560.3, 950.35);
@@ -81,7 +81,7 @@ internal static class SocketPresentationVerification
                 Point local = socket.TranslatePoint(Center(socket.RenderSize), view);
                 Rect geometry = shape.RenderedGeometry.Bounds;
                 Point glyph = shape.TranslatePoint(new(geometry.X + geometry.Width / 2, geometry.Y + geometry.Height / 2), view);
-                string label = socket.Kind == "audio" ? "Audio" : socket.Kind == "sidechain" ? "Sidechain · detector only"
+                string label = socket.Kind == "audio" ? "Audio" : socket.Kind == "sidechain" ? "Trigger / Sidechain · detector only"
                     : socket.Output ? "Control" : "Level control";
                 var row = Descendants<TextBlock>(view).Where(text => text.Text == label
                     && text.HorizontalAlignment == (socket.Output ? HorizontalAlignment.Right : HorizontalAlignment.Left))
@@ -234,7 +234,7 @@ internal static class SocketPresentationVerification
                         require(Near(local.X, renderedEdge) && Near(local, glyph)
                             && Near(shape.ActualWidth, shape.ActualHeight) && socket.RenderSize == new Size(24, 20),
                             context + " centers its symmetric glyph and full target on the measured border after DPI layout rounding.");
-                        string label = socket.Kind == "audio" ? "Audio" : socket.Kind == "sidechain" ? "Sidechain · detector only"
+                        string label = socket.Kind == "audio" ? "Audio" : socket.Kind == "sidechain" ? "Trigger / Sidechain · detector only"
                             : socket.Output ? "Control" : "Level control";
                         var row = Descendants<TextBlock>(view).Where(text => text.Text == label
                             && text.HorizontalAlignment == (socket.Output ? HorizontalAlignment.Right : HorizontalAlignment.Left))

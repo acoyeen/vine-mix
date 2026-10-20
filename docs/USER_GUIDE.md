@@ -11,13 +11,13 @@ the WPF desktop handles editing, telemetry and tray behavior.
 - **Mixing:** Mix, stereo balance and mono; a linked control adjusts several levels together.
 - **Processing:** interactive EQ with up to eight bands, High-pass, Low-pass,
   Low / Mid / High tone controls, Voice Color, Compressor, Limiter, Ducking,
-  Expander / Gate, Alignment Delay, denoiser, de-esser, plosive remover and reverb.
+  Expander, Gate, Alignment Delay, denoiser, de-esser, plosive remover and reverb.
 - **Outputs:** physical listening output and VAC Lite virtual microphone output.
 
-The creation menu contains **23 node types**. Mix acts as a volume control with
+The creation menu contains **24 node types**. Mix acts as a volume control with
 one incoming connection and combines sound when several connections arrive.
 Gain / Multiply and Reroute are no longer offered for creation; existing saved
-nodes still work, bringing the compatible engine library to 25 types.
+nodes still work, bringing the compatible engine library to 26 types.
 
 The graph supports up to **32 nodes and 96 connections**. Sources can feed several
 destinations, and each listening output has independent buffering and recovery.
@@ -32,12 +32,12 @@ independent per node, and duplication supports Undo/Redo. Copy/paste also retain
 input assignments. If you route several copies into one destination, their audio
 adds together.
 
-Unavailable inputs gently flash their existing device/app name red and have a
+Unavailable inputs and outputs gently flash their existing device/app name red and have a
 faint red outer glow, with a red warning triangle above the volume meter.
-Hover the source for the reason and recovery guidance.
+Hover the device/app name for the reason and recovery guidance.
 Reduced animation keeps the text steadily highlighted. A connected but muted
-input keeps its ordinary appearance; silence alone never marks an input missing.
-The warning clears when capture reconnects. Device and app selectors remain
+input or output keeps its ordinary appearance; silence alone never marks a device missing.
+The warning clears when capture or playback reconnects. Device and app selectors remain
 available while the engine is connected.
 
 Hover a node's volume meter to see its highest observed left/right sample peaks
@@ -82,17 +82,43 @@ is retained, and sample counts accept whole numbers only. The wheel zooms the
 canvas without changing parameters. Essential dial instructions remain visible
 inside nodes. Selectors, action buttons, toggles and passive readouts have
 separate shapes and positions; the EQ graph and Voice Color pad remain interactive.
-Hover help uses short titled rows. Open **Settings** at the top right for workspace
-preferences, start-at-login, Windows sound settings and device recovery.
+Tooltips describe each control's purpose or current state. Mouse and keyboard
+instructions are in **Settings → Help & shortcuts**. Open **Settings** at the top
+right for workspace preferences, start-at-login, Windows sound settings and
+device recovery.
 
 Physical device dropdowns show available devices by default. Under
 **Settings → Audio device visibility**, optionally show disabled, disconnected
 or advanced endpoints. Current saved selections stay visible while unavailable;
 the filters never clear assignments or change audio routes. See the
 [device visibility guide](DEVICE_VISIBILITY.md) for categories and recovery.
-**Settings → Help & shortcuts** (or **F1** while not typing a value) opens a
-scrollable keyboard and mouse reference. **Escape** closes it and returns to
-the workspace. Framing and reading help do not change audio routes or Undo history.
+
+**Settings → Help & shortcuts** (or **F1** outside text entry) opens six topics:
+**Controls**, **Dials & values**, **Buttons & menus**, **Search & results**,
+**Equalizer**, and **Meters & status**. Controls shows one group at a time.
+Shaded section headers have expand arrows; indented rows show each action and
+its keys. Select an action row for its explanation.
+The remaining topics use real controls with temporary sample values. Examples
+do not play or record audio or change your live mix or its Undo history.
+
+Choose **Reset example** to restore a lesson's starting values. Changing topics,
+or closing and reopening Help, starts a fresh example; practice values are not
+saved. Help remembers which topic you were viewing for the current app session.
+
+The wheel scrolls Help, including over example dials and closed selectors;
+open dropdowns and menus keep their own scrolling. **Escape** first
+cancels an unfinished practice edit, gesture or open choice, then closes Help
+when there is nothing to cancel. **Close** returns directly to the workspace.
+Your live workspace is unavailable for editing while Help is open, and audio
+continues running. At narrower sizes, the topic list becomes a dropdown and
+the content scrolls, including at the supported minimum window size of 900 × 580.
+
+Use **Search settings and help** at the top of Settings to find options and
+instructions. For example, **Zoom** shows mouse-wheel zoom and zoom-reset help.
+Information appears directly in the menu. Use Up/Down to choose an instruction,
+then Enter or double-click to open its entry in Controls. Tab moves to matching
+settings; Shift+Tab returns to search. Searching does not run commands or change
+settings.
 
 **Settings → Find node…** (or **Ctrl+F** outside text entry) searches the current
 workspace by node name, type, assigned device or app. Choose a result to select
@@ -138,7 +164,9 @@ devices reconnect, selection changes or parameter values change.
 Layout-only saves preserve the active audio processing state; moving or naming
 nodes no longer rebuilds their effect histories.
 
-In an EQ node, double-click an empty part of the plot to add a bell band.
+New EQ nodes start flat with no bands. Double-click an empty part of the plot
+to add a bell band. The hint and band information are centred between the
+decibel scales.
 Ctrl-click points to toggle selection, drag empty plot space to box-select
 (hold Ctrl to add), or press Ctrl+A with the plot focused to select all bands.
 Drag a selected point or use the arrow keys to move the selection together;
@@ -148,8 +176,8 @@ positions, and Escape cancels a selection box. The Frequency, Band gain and
 point for **Shape** (Bell, Low shelf, High shelf, Notch), enable,
 **Reset position** and removal. Double-click a band to return its frequency to
 its reset anchor and its gain to zero; its shape and Q remain intact.
-Right-click empty plot space and choose **Reset EQ to flat** to restore the
-five default flat bands.
+Right-click empty plot space and choose **Reset EQ to flat** to clear all bands.
+The node's **Reset node to defaults** action also returns it to an empty EQ.
 The EQ node is 620 DIPs wide with a 300-DIP-high editor, a smooth calculated
 response line and a separate measured post-EQ audio spectrum underneath.
 Bell Q remains 1 by default; lower Q broadens a bell. Width presets are removed.
@@ -192,19 +220,35 @@ coordinates are retained and intentionally use the new sound treatment. This
 original mapping does not reproduce Intellipan's exact sound or alter pitch.
 See [Voice Color controls and mapping](VOICE_COLOR.md).
 
-**Expander / Gate** reduces quiet audio between phrases, with a choice of gradual
-downward expansion or gating. **Compressor** exposes threshold, ratio, timing and
-make-up gain, with an optional external detector. **Limiter** exposes Ceiling and
-Release and enforces a sample-peak ceiling with no lookahead. Bypass removes
-limiting, and later gain can exceed this node's ceiling. **Ducking** lowers main
-audio by a fixed amount while a separate trigger is active: Music → Ducking →
-Output, with Microphone → Trigger. Trigger audio never joins the audible mix;
-missing or silent triggers release to unity. Older compressors keep their saved
-compression/limiting mode, detector, gains and routing in a labelled legacy
-interface; they are not converted to fixed-depth Ducking. **Alignment Delay** offers linked millisecond/sample
-editing from zero to two seconds at 48 kHz. Settings, bypass, reset and copying
-follow the existing node conventions. See [dynamics and alignment](CORE_DYNAMICS.md)
-for controls, sidechain wiring, timing and the limitations of sample-peak limiting.
+**Expander** and **Gate** are separate Add/search entries for reducing quiet
+audio between phrases, with no mode dropdown. Expander has five dials:
+Threshold, Ratio, Range, Attack and Release. Gate has six: Threshold, Hysteresis,
+Range, Attack, Hold and Release. An older saved Expander in gate mode still
+shows Gate controls and retains its saved settings without conversion.
+
+**Compressor** reduces its own louder audio using Threshold, Ratio, Attack,
+Release and Make-up gain. It has no detector selector or sidechain input.
+Older compressors may keep their Compress/Limit selector; their saved detector
+field no longer changes processing. **Limiter** exposes Ceiling and Release
+and enforces a sample-peak ceiling with no lookahead. Bypass removes limiting,
+and later gain can exceed this node's ceiling.
+
+**Ducking** lowers main audio in response to a separate trigger: Music → Ducking
+→ Output, with Microphone → Trigger. Choose **Static ducking** for a set Duck
+amount after the trigger crosses Threshold, or **Dynamic ducking** for reduction
+that grows with the trigger's level according to Ratio. Both show Threshold,
+Attack and Release, with either Duck amount or Ratio. Static is the default,
+with Threshold −30 dBFS and Duck amount 18 dB; Dynamic's Ratio starts at 4:1.
+Switching modes keeps both values, the current gain envelope, node size and
+connections. Trigger audio never joins the audible mix, and the main audio
+never substitutes for a missing trigger. Missing or silent triggers release
+toward unity. Only Ducking accepts a trigger cable.
+
+**Alignment Delay** offers linked millisecond/sample editing from zero to two
+seconds at 48 kHz. Settings, bypass, reset and copying follow the existing node
+conventions. See [dynamics and alignment](CORE_DYNAMICS.md) for exact controls,
+Static's detector smoothing/hysteresis, Dynamic's peak curve, trigger wiring,
+timing and the limitations of sample-peak limiting.
 
 The Shure MV7+'s **Real-time Denoiser runs inside the microphone**. Configure it
 in MOTIV Mix and select the physical MV7+ USB input here to receive its processed

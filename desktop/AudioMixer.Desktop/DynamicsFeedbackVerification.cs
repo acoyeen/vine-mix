@@ -13,7 +13,7 @@ internal static class DynamicsFeedbackVerification
         Action<GraphNodeView, string> renderNode)
     {
         var fixture = UiPreview.CreateSnapshot([]);
-        fixture.Configuration.Graph = new() { Nodes = new[] { "deEsser", "plosive", "compressor", "denoiser", "reverb" }
+        fixture.Configuration.Graph = new() { Nodes = new[] { "deEsser", "plosive", "compressor", "expander", "gate", "denoiser", "reverb" }
             .Select((kind, index) => GraphDefaults.NewNode(kind, index * 400, 0)).ToList() };
         fixture.Status.Nodes = fixture.Configuration.Graph.Nodes.Select(node => new GraphNodeStatus { Id = node.Id, Path = new() { State = "Running" } }).ToList();
         mixer.ApplyPreviewSnapshot(fixture); await layout();
@@ -54,7 +54,8 @@ internal static class DynamicsFeedbackVerification
             status.Path.State = "Running"; status.DynamicsFrame++; status.GainReductionDb = float.NaN; view.ApplyDynamicsFeedbackAt(node, status, 3, true);
             require(view.VisibleReductionDb == 0, node.Kind + " rejects nonfinite telemetry.");
             status.DynamicsFrame++; status.GainReductionDb = 0; status.DetectorDb = -70; view.ApplyDynamicsFeedbackAt(node, status, 4, true);
-            require(view.DynamicsFeedbackText == "Below threshold", node.Kind + " explains why a quiet detector is not reducing audio.");
+            require(view.DynamicsFeedbackText == (node.Kind is "expander" or "gate" ? "Open · Reduction 0.0 dB" : "Below threshold"),
+                node.Kind + " explains its measured zero-reduction state without inventing attenuation from signal level.");
             require(helpContent is not null && ReferenceEquals(helpContent, view.DynamicsHelpContent),
                 node.Kind + " reuses its structured hover help while updating live detector and threshold values in place.");
             status.DynamicsFrame++; status.GainReductionDb = 8; view.ApplyDynamicsFeedbackAt(node, status, 5, false);

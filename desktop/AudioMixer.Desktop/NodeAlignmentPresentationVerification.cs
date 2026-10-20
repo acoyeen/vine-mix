@@ -23,6 +23,7 @@ internal static class NodeAlignmentPresentationVerification
         var input = GraphDefaults.NewNode("microphone", -480, -260); input.Id = "align-input";
         input.Device = new() { Id = "preview-mic1", Name = "Studio microphone" }; input.GainDb = -5.5;
         var eq = GraphDefaults.NewNode("eq", 380, 200); eq.Id = "align-eq";
+        eq.EqBands = EqBand.Defaults(); // Configured EQ geometry fixture.
         eq.EqBands[1].GainDb = 3; eq.GainDb = -2;
         var control = GraphDefaults.NewNode("control", -80, 620); control.Id = "align-control"; control.GainDb = -1;
         var output = GraphDefaults.NewNode("output", -1200, -900); output.Id = "align-output";

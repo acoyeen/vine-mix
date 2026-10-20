@@ -97,7 +97,8 @@ internal sealed class OffscreenDesignRenderer
             // Show, Activate, Focus, EnsureHandle, or Window.Measure/Arrange.
             // NativeCaption registers callbacks, but no SourceInitialized event
             // can occur while the window has no HWND.
-            var window = new MainWindow(mixer);
+            var openedWebsites = new List<string>();
+            var window = new MainWindow(mixer, openedWebsites.Add);
             Render(RotaryControlVerification.Run(Require), "rotary-controls.png");
             Render(ToolTipVerification.Run(Require), "tooltips.png");
             CheckNumericResetAndEntryTemplates();
@@ -121,9 +122,9 @@ internal sealed class OffscreenDesignRenderer
                 UseLayoutRounding = true, SnapsToDevicePixels = true
             };
             TextElement.SetFontFamily(root, window.FontFamily);
-            Require(new Typeface(window.FontFamily, FontStyles.Normal, FontWeights.Normal, FontStretches.Normal).TryGetGlyphTypeface(out var interTypeface)
-                && interTypeface.FontUri.ToString().Contains("inter-regular", StringComparison.OrdinalIgnoreCase),
-                "The main interface resolves the bundled Inter font rather than silently falling back to a system font.");
+            Require(new Typeface(window.FontFamily, FontStyles.Normal, FontWeights.Normal, FontStretches.Normal).TryGetGlyphTypeface(out var interfaceTypeface)
+                && interfaceTypeface.FontUri.ToString().Contains("IBM-Plex-Sans-Regular", StringComparison.OrdinalIgnoreCase),
+                "The main interface resolves the bundled IBM Plex Sans font rather than silently falling back to a system font.");
             TextElement.SetFontSize(root, window.FontSize);
             root.SetResourceReference(TextElement.ForegroundProperty, "ConsoleTextBrush");
             root.SetResourceReference(Border.BackgroundProperty, "ConsoleWindowBrush");
@@ -148,6 +149,12 @@ internal sealed class OffscreenDesignRenderer
             Require(Descendants<GraphNodeView>(root).Count() == 8, "The detached main workspace lays out all eight migrated fixture nodes.");
             Require(mixer.GraphConfig.Edges.Count == 9 && GraphDefaults.Validate(mixer.GraphConfig).Length == 0,
                 "The migrated preview graph retains nine structurally valid connections.");
+            await MenuHoverHandoffVerification.RunAsync(window, mixer, root, () => Layout(root), Require);
+            await OrdinaryHoverHelpVerification.RunAsync(window, mixer, root, () => Layout(root), Require);
+            await BrandingVerification.RunAsync(window, root, () => Layout(root), Require);
+            window.WebsiteButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Require(openedWebsites.SequenceEqual(new[] { "https://vinemix.app" }),
+                "Activating the actual caption button opens exactly the public Vine Mix website through the injected browser launcher.");
             Render(root, "workspace.png");
             Render(root, "workspace-144dpi.png", 144);
             Render(root, "workspace-192dpi.png", 192);
@@ -164,8 +171,11 @@ internal sealed class OffscreenDesignRenderer
             await CheckCanvasRetention(root, workspace, mixer);
             await CheckDropdownWheelRouting(root, workspace, mixer);
             Render(EqEditorVerification.Run(Require), "eq-editor-spectrum.png");
+            EqTextLayoutVerification.Run(Require, (element, name, dpi) => Render(element, name, dpi));
             Render(EqBandSelectionVerification.Run(Require), "eq-band-multiselection.png");
             Render(EqBandSelectionVerification.MarqueePreview(), "eq-band-box-selection.png");
+            await EqDefaultsVerification.RunAsync(workspace, mixer, () => Layout(root), Require,
+                (view, name) => RenderNode(view, workspace, name));
             await NodeDefaultsVerification.RunAsync(workspace, mixer, () => Layout(root), Require);
             await NumericTabCommitVerification.RunAsync(workspace, mixer, () => Layout(root), Require);
             await DenoiserSelectionVerification.RunAsync(workspace, mixer, () => Layout(root), Require,
@@ -187,7 +197,11 @@ internal sealed class OffscreenDesignRenderer
             InputAvailabilityVerification.Run(Require);
             await InputAvailabilityPresentationVerification.RunAsync(workspace, mixer, () => Layout(root), Require,
                 (view, name) => RenderNode(view, workspace, name,
-                    inputPulseSeconds: name.Contains("pulse-normal", StringComparison.Ordinal) ? .8 : 0));
+                    availabilityPulseSeconds: name.Contains("pulse-normal", StringComparison.Ordinal) ? .8 : 0));
+            OutputAvailabilityVerification.Run(Require);
+            await OutputAvailabilityPresentationVerification.RunAsync(workspace, mixer, () => Layout(root), Require,
+                (view, name) => RenderNode(view, workspace, name,
+                    availabilityPulseSeconds: name.Contains("pulse-normal", StringComparison.Ordinal) ? .8 : 0));
             VirtualDeviceBindingVerification.Run(Require);
             await VirtualDevicePresentationVerification.RunAsync(workspace, mixer, () => Layout(root), Require,
                 (view, name) => RenderNode(view, workspace, name));
@@ -195,6 +209,8 @@ internal sealed class OffscreenDesignRenderer
                 (view, name) => RenderNode(view, workspace, name));
             await CheckVoiceColorRendering(root, workspace, mixer);
             await CoreDynamicsVerification.RunAsync(workspace, mixer, () => Layout(root), Require,
+                (node, name) => RenderNode(node, workspace, name));
+            await DynamicsOrganizationVerification.RunAsync(workspace, mixer, () => Layout(root), Require,
                 (node, name) => RenderNode(node, workspace, name));
             await NodeDialRedesignVerification.RunAsync(workspace, mixer, () => Layout(root), Require,
                 (node, name) => {
@@ -223,7 +239,8 @@ internal sealed class OffscreenDesignRenderer
             await PendingPasteVerification.RunAsync(workspace, mixer, () => Layout(root), Require);
             await CanvasNavigationVerification.RunAsync(workspace, mixer, () => Layout(root), Require);
             await FrameSelectionVerification.RunAsync(workspace, mixer, () => Layout(root), Require, name => Render(root, name));
-            await WorkspaceHelpVerification.RunAsync(window, mixer, root, () => Layout(root), Require, name => Render(root, name));
+            await WorkspaceHelpVerification.RunAsync(window, mixer, root, () => Layout(root), Require, name => Render(root, name), (name, dpi) => Render(root, name, dpi));
+            await SettingsSearchVerification.RunAsync(window, mixer, root, () => Layout(root), Require, (menu, name) => RenderMenu(menu, name));
             await NodeSearchPresentationVerification.RunAsync(window, mixer, root, () => Layout(root), Require, name => Render(root, name));
             await NodeAlignmentPresentationVerification.RunAsync(workspace, mixer, () => Layout(root), Require, name => Render(root, name));
             await NodeAlignmentReplayVerification.RunAsync(workspace, mixer, () => Layout(root), Require);
@@ -261,6 +278,7 @@ internal sealed class OffscreenDesignRenderer
 
             var effects = UiPreview.CreateSnapshot([]);
             var eq = GraphDefaults.NewNode("eq", 30, 35);
+            eq.EqBands = EqBand.Defaults(); // Existing configured effects and band-interaction fixture.
             eq.EqBands[0].GainDb = 3;
             eq.EqBands[2].FrequencyHz = 1800; eq.EqBands[2].GainDb = -6; eq.EqBands[2].Q = 1.4;
             eq.EqBands[4].GainDb = 2;
@@ -948,13 +966,20 @@ internal sealed class OffscreenDesignRenderer
     {
         // Render the real menu tree without opening its Popup or a native window.
         menu.Visibility = Visibility.Visible; menu.ApplyTemplate();
+        // The same Settings menu is captured with several queries. Let each
+        // filtered tree shrink before fixing its detached bitmap dimensions.
+        menu.Height = double.NaN;
+        menu.InvalidateMeasure();
         menu.Measure(new Size(440, 520));
-        menu.Width = Math.Max(280, menu.DesiredSize.Width); menu.Height = Math.Min(menu.MaxHeight, Math.Max(80, menu.DesiredSize.Height + 4));
+        menu.Width = Math.Max(280, menu.DesiredSize.Width);
+        // Fix the width before measuring wrapped item headers and feedback.
+        menu.Measure(new Size(menu.Width, 520));
+        menu.Height = Math.Min(menu.MaxHeight, Math.Max(80, menu.DesiredSize.Height + 4));
         Render(menu, filename);
         Require(!menu.IsOpen && PresentationSource.FromVisual(menu) is null, "Menu preview remains detached from the desktop.");
     }
 
-    private void RenderNode(GraphNodeView node, GraphWorkspace workspace, string filename, double dpi = 96, double? inputPulseSeconds = null)
+    private void RenderNode(GraphNodeView node, GraphWorkspace workspace, string filename, double dpi = 96, double? availabilityPulseSeconds = null)
     {
         RequireNoNativeWindow(node);
         // A VisualBrush of a Canvas child carries its layout offset into the
@@ -1001,7 +1026,7 @@ internal sealed class OffscreenDesignRenderer
             Require(Math.Abs(closeup.ActualHeight - node.ActualHeight) < 1,
                 "The 100% EQ close-up preserves the actual node's expanded/collapsed dimensions without reparenting the original view.");
         RecordDpi(closeup, filename, dpi, width, height);
-        if (inputPulseSeconds is double seconds) closeup.SeekInputWarningPulse(seconds);
+        if (availabilityPulseSeconds is double seconds) closeup.SeekAvailabilityWarningPulse(seconds);
         var bitmap = new RenderTargetBitmap(Pixels(width, dpi), Pixels(height, dpi), dpi, dpi, PixelFormats.Pbgra32);
         bitmap.Render(host);
         SaveBitmap(bitmap, filename);
@@ -1067,15 +1092,39 @@ internal sealed class OffscreenDesignRenderer
         var colours = new HashSet<int>();
         for (int offset = 0; offset < pixels.Length; offset += 4 * 17)
             colours.Add(BitConverter.ToInt32(pixels, offset));
-        // Sparse, text-only tooltips can fall between the coarse samples.
-        // Keep the same nonblank threshold, scanning densely only if needed.
+        // Sparse text may fall between samples. A small, correctly rasterized
+        // Plex label can also use fewer than sixteen colours, so check actual
+        // contrasting ink rather than requiring a particular antialias palette.
+        bool contrastingInk = false;
         if (colours.Count < 16)
+        {
             for (int offset = 0; offset < pixels.Length && colours.Count < 16; offset += 4)
                 colours.Add(BitConverter.ToInt32(pixels, offset));
+            if (colours.Count < 16)
+            {
+                var histogram = new Dictionary<int, int>();
+                for (int offset = 0; offset < pixels.Length; offset += 4)
+                {
+                    int colour = BitConverter.ToInt32(pixels, offset);
+                    histogram[colour] = histogram.GetValueOrDefault(colour) + 1;
+                }
+                byte[] background = BitConverter.GetBytes(histogram.MaxBy(pair => pair.Value).Key);
+                int ink = 0, left = width, right = 0, top = height, bottom = 0;
+                for (int offset = 0; offset < pixels.Length; offset += 4)
+                {
+                    if (pixels[offset + 3] < 128 || Math.Abs(pixels[offset] - background[0])
+                        + Math.Abs(pixels[offset + 1] - background[1]) + Math.Abs(pixels[offset + 2] - background[2]) < 120) continue;
+                    int x = offset / 4 % width, y = offset / 4 / width;
+                    ink++; left = Math.Min(left, x); right = Math.Max(right, x);
+                    top = Math.Min(top, y); bottom = Math.Max(bottom, y);
+                }
+                contrastingInk = ink >= 24 && right - left >= 8 && bottom - top >= 4;
+            }
+        }
         var png = new PngBitmapEncoder(); png.Frames.Add(BitmapFrame.Create(bitmap));
         using var file = new FileStream(Path.Combine(_directory, filename), FileMode.CreateNew, FileAccess.Write, FileShare.None);
         png.Save(file);
-        Require(colours.Count >= 16, filename + $" contains a nonblank {width} x {height} rendered layout at {bitmap.DpiX:0} DPI ({colours.Count} sampled colours).");
+        Require(colours.Count >= 16 || contrastingInk, filename + $" contains a nonblank {width} x {height} rendered layout at {bitmap.DpiX:0} DPI ({colours.Count} sampled colours; contrasting text checked when sparse).");
         _images.Add(filename);
         _imageSizes.Add(new { file = filename, width, height, dpiX = bitmap.DpiX, dpiY = bitmap.DpiY,
             logicalWidth = width * 96 / bitmap.DpiX, logicalHeight = height * 96 / bitmap.DpiY });

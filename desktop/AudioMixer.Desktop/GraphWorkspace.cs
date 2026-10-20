@@ -33,10 +33,10 @@ public sealed class GraphWorkspace : UserControl
     private const string DialInstructions = "Dials: drag ↑↓ · Shift: fine · Double-click: reset · Click value: type · Enter: apply · Esc: cancel";
     private readonly TextBlock _feedback = new() { FontSize = 12, TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center };
     private readonly Button _dismissFeedback = new() { Content = "Dismiss", MinHeight = 26, Padding = new Thickness(8, 1, 8, 1), Margin = new Thickness(12, 0, 0, 0), Visibility = Visibility.Collapsed };
-    private readonly Button _undo = new() { Content = "Undo", ToolTip = "Undo (Ctrl+Z)" };
-    private readonly Button _redo = new() { Content = "Redo", ToolTip = "Redo (Ctrl+Y or Ctrl+Shift+Z)" };
+    private readonly Button _undo = new() { Content = "Undo", ToolTip = "Reverts the last workspace edit." };
+    private readonly Button _redo = new() { Content = "Redo", ToolTip = "Restores the last undone workspace edit." };
     private readonly Button _history = new() { Content = "Activity", ToolTip = "Recent workspace edits and messages" };
-    private readonly Button _zoomReset = new() { Width = 62, Height = 26, MinHeight = 26, Padding = new Thickness(4, 1, 4, 1), Margin = new Thickness(4, 0, 4, 0), FontSize = 13, ToolTip = NodeToolTip.Create("Reset zoom", "Click or Ctrl+0 · Return to 100%") };
+    private readonly Button _zoomReset = new() { Width = 62, Height = 26, MinHeight = 26, Padding = new Thickness(4, 1, 4, 1), Margin = new Thickness(4, 0, 4, 0), FontSize = 13, ToolTip = NodeToolTip.Create("Reset zoom", "Restores 100% canvas zoom") };
     private readonly TextBlock _countText = new() { VerticalAlignment = VerticalAlignment.Center, FontSize = 13, Margin = new Thickness(16, 0, 0, 0) };
     private static readonly double[] ZoomStops = [.3, .4, .5, .6, .75, .9, 1, 1.1, 1.25, 1.5, 1.75, 2];
     private readonly Border _empty;
@@ -107,16 +107,47 @@ public sealed class GraphWorkspace : UserControl
     internal (System.Windows.Shapes.Path Visible, System.Windows.Shapes.Path Hit, System.Windows.Shapes.Path Outline)? ConnectionPaths(string id)
         => _wires.TryGetValue(id, out var wire) ? (wire.Visible, wire.Hit, wire.Outline) : null;
 
-    public GraphWorkspace(MixerViewModel mixer)
+    private readonly bool _useSystemClipboard;
+    private string? _practiceClipboard;
+    private readonly List<ContextMenu> _practiceMenus = [];
+    internal bool HasActiveGesture => _pendingSocket is not null || _dragged is not null
+        || _boxSelecting || _cutting || _panButton is not null || _socketDragging;
+    internal bool ClosePracticeMenus()
     {
+        bool closed = false;
+        foreach (var menu in _practiceMenus.ToArray())
+            if (menu.IsOpen) { menu.IsOpen = false; closed = true; }
+        return closed;
+    }
+    internal void ResetPracticeState()
+    {
+        if (_useSystemClipboard) throw new InvalidOperationException("Practice reset is available only in an isolated workspace.");
+        ClosePracticeMenus(); CancelActiveGesture();
+        _practiceClipboard = null; _lastPastedPayload = null; _pasteRepeat = 0;
+        SetNodeSelection([]);
+        SetMessage("Practice reset. Connect, select or move a sample node.");
+    }
+    private ContextMenu TrackPracticeMenu(ContextMenu menu)
+    {
+        if (!_useSystemClipboard)
+        {
+            _practiceMenus.Add(menu);
+            menu.Closed += (_, _) => _practiceMenus.Remove(menu);
+        }
+        return menu;
+    }
+
+    public GraphWorkspace(MixerViewModel mixer, bool useSystemClipboard = true)
+    {
+        _useSystemClipboard = useSystemClipboard;
         _mixer = mixer; Focusable = true; UseLayoutRounding = true; SnapsToDevicePixels = true;
         TextOptions.SetTextFormattingMode(this, TextFormattingMode.Display);
         TextOptions.SetTextHintingMode(this, TextHintingMode.Fixed);
         var root = new Grid(); root.RowDefinitions.Add(new() { Height = new GridLength(ToolbarHeight) }); root.RowDefinitions.Add(new());
         root.RowDefinitions.Add(new() { Height = GridLength.Auto, MinHeight = 28 });
         var toolbar = new DockPanel { Margin = new Thickness(8, 4, 8, 4), LastChildFill = false };
-        _add = Button("Add", "Add nodes (Shift+A)"); _add.Click += (_, _) => ShowAddMenu(_add, VisibleCenter()); toolbar.Children.Add(_add);
-        _delete = Button("Remove", "Remove selection (Delete)"); _delete.Margin = new Thickness(7, 0, 0, 0); _delete.Click += (_, _) => DeleteSelection(); toolbar.Children.Add(_delete);
+        _add = Button("Add", "Opens the node library."); _add.Click += (_, _) => ShowAddMenu(_add, VisibleCenter()); toolbar.Children.Add(_add);
+        _delete = Button("Remove", "Removes the selected nodes or cable."); _delete.Margin = new Thickness(7, 0, 0, 0); _delete.Click += (_, _) => DeleteSelection(); toolbar.Children.Add(_delete);
         void AddHistoryButton(Button button)
         {
             // A disabled history button must remain client area rather than
@@ -131,7 +162,7 @@ public sealed class GraphWorkspace : UserControl
         _history.Click += (_, _) => ShowHistoryMenu(); toolbar.Children.Add(_history);
         _countText.Margin = new Thickness(16, 0, 0, 0); _countText.SetResourceReference(TextBlock.ForegroundProperty, "ConsoleMutedBrush"); toolbar.Children.Add(_countText);
         var zoomTools = new StackPanel { Orientation = Orientation.Horizontal }; DockPanel.SetDock(zoomTools, Dock.Right);
-        var fit = Button("Fit", "Bring every node into view (Home)."); fit.Click += (_, _) => FitAll(); zoomTools.Children.Add(fit);
+        var fit = Button("Fit", "Brings every node into view."); fit.Click += (_, _) => FitAll(); zoomTools.Children.Add(fit);
         var minus = Button("−", "Zoom out"); minus.Width = 32; minus.Margin = new Thickness(8, 0, 0, 0); minus.Click += (_, _) => StepZoom(new Point(_viewport.ActualWidth / 2, _viewport.ActualHeight / 2), -1); zoomTools.Children.Add(minus);
         _zoomReset.Click += (_, _) => ResetZoom(); AutomationProperties.SetName(_zoomReset, "Reset canvas zoom to 100 percent"); zoomTools.Children.Add(_zoomReset);
         var plus = Button("+", "Zoom in"); plus.Width = 32; plus.Click += (_, _) => StepZoom(new Point(_viewport.ActualWidth / 2, _viewport.ActualHeight / 2), 1); zoomTools.Children.Add(plus);
@@ -146,7 +177,8 @@ public sealed class GraphWorkspace : UserControl
         TextOptions.SetTextRenderingMode(_world, TextRenderingMode.Grayscale);
         _empty = new Border { Padding = new Thickness(24), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Visibility = Visibility.Collapsed };
         var emptyText = new StackPanel();
-        var start = Button("＋  Add node", "Choose an input, processor or output (Shift+A)."); start.Click += (_, _) => ShowAddMenu(start, VisibleCenter()); emptyText.Children.Add(start);
+        _add.SetResourceReference(StyleProperty, "PrimaryWorkspaceToolbarButton");
+        var start = Button("+  Add node", "Opens the node library."); start.Click += (_, _) => ShowAddMenu(start, VisibleCenter()); emptyText.Children.Add(start);
         var emptyHint = Text("Connect an input to an output.", 13); emptyHint.Margin = new Thickness(0, 10, 0, 0); emptyHint.SetResourceReference(TextBlock.ForegroundProperty, "ConsoleMutedBrush"); emptyText.Children.Add(emptyHint); _empty.Child = emptyText; _viewport.Children.Add(_empty);
         _selectionBox.SetResourceReference(Border.BorderBrushProperty, "NodeSelectedBrush");
         _cutStroke.SetResourceReference(Shape.StrokeProperty, "NodeSelectedBrush");
@@ -214,6 +246,10 @@ public sealed class GraphWorkspace : UserControl
             foreach (var missing in _nodes.Keys.Where(id => graph.Nodes.All(n => n.Id != id)).ToArray()) { _world.Children.Remove(_nodes[missing]); _nodes.Remove(missing); _selectedNodes.Remove(missing); _dragOrigins.Remove(missing); wireAnchorsChanged = true; }
             foreach (var node in graph.Nodes)
             {
+                if (_nodes.TryGetValue(node.Id, out var previous) && !previous.MatchesPresentation(node))
+                {
+                    _world.Children.Remove(previous); _nodes.Remove(node.Id); wireAnchorsChanged = true;
+                }
                 if (!_nodes.TryGetValue(node.Id, out var view)) { view = new GraphNodeView(this, node); _nodes.Add(node.Id, view); _world.Children.Add(view); view.SetViewScale(_zoom); wireAnchorsChanged = true; }
                 view.Apply(node, _mixer.GraphStatus.FirstOrDefault(s => s.Id == node.Id), _selectedNodes.Contains(node.Id));
                 if (!_dragOrigins.ContainsKey(node.Id))
@@ -377,7 +413,7 @@ public sealed class GraphWorkspace : UserControl
     {
         var frame = new MenuItem { Header = "Frame selection", InputGestureText = "F",
             IsEnabled = CanFrameSelection && _selectedNodes.Any(id => _nodes.ContainsKey(id) && Graph.Nodes.Any(node => node.Id == id)),
-            ToolTip = NodeToolTip.Create("Frame selection", "Bring the selected nodes into view", "F · With the canvas focused") };
+            ToolTip = NodeToolTip.Create("Frame selection", "Brings the selected nodes into view") };
         frame.Click += (_, _) => FrameSelection();
         return frame;
     }
@@ -463,8 +499,8 @@ public sealed class GraphWorkspace : UserControl
     {
         _undo.IsEnabled = _mixer.CanUndo; _redo.IsEnabled = _mixer.CanRedo;
         string undo = _mixer.UndoDescription, redo = _mixer.RedoDescription;
-        _undo.ToolTip = undo.Length > 0 ? "Undo: " + undo + " (Ctrl+Z)" : "Nothing to undo";
-        _redo.ToolTip = redo.Length > 0 ? "Redo: " + redo + " (Ctrl+Y or Ctrl+Shift+Z)" : "Nothing to redo";
+        _undo.ToolTip = undo.Length > 0 ? "Undo: " + undo : "Nothing to undo";
+        _redo.ToolTip = redo.Length > 0 ? "Redo: " + redo : "Nothing to redo";
         AutomationProperties.SetName(_undo, undo.Length > 0 ? "Undo: " + undo : "Undo");
         AutomationProperties.SetName(_redo, redo.Length > 0 ? "Redo: " + redo : "Redo");
     }
@@ -483,7 +519,7 @@ public sealed class GraphWorkspace : UserControl
     }
     internal ContextMenu CreateHistoryMenu()
     {
-        var menu = new ContextMenu { MaxHeight = 500, Width = 440 };
+        var menu = TrackPracticeMenu(new ContextMenu { MaxHeight = 500, Width = 440 });
         menu.Items.Add(new MenuItem { Header = "Activity · this session", IsEnabled = false });
         menu.Items.Add(new Separator());
         if (_mixer.EditHistory.Entries.Count == 0) menu.Items.Add(new MenuItem { Header = "No edits yet", IsEnabled = false });
@@ -494,6 +530,7 @@ public sealed class GraphWorkspace : UserControl
             menu.Items.Add(new Separator());
             menu.Items.Add(new MenuItem { Header = new TextBlock { Text = _lastMessage, TextWrapping = TextWrapping.Wrap, MaxWidth = 380 }, IsEnabled = false });
         }
+        MenuHoverHelp.Attach(menu);
         return menu;
     }
     private void ShowHistoryMenu() { var menu = CreateHistoryMenu(); menu.PlacementTarget = _history; menu.IsOpen = true; }
@@ -750,7 +787,7 @@ public sealed class GraphWorkspace : UserControl
         Socket from = first.Output ? first : second, to = first.Output ? second : first;
         string error = ConnectNodes(from.NodeId, to.NodeId, to.Kind);
         if (error.Length > 0) { SetMessage(error, isError: true); CancelCable(); return; }
-        CancelCable(); SetMessage(to.Kind == "control" ? "Linked control connected. Its level now applies to that node." : to.Kind == "sidechain" ? "Detector cable connected. Ducking uses its trigger; Compressor uses it with External detector. This cable adds no audible audio." : "Audio connected.");
+        CancelCable(); SetMessage(to.Kind == "control" ? "Linked control connected. Its level now applies to that node." : to.Kind == "sidechain" ? "Ducking trigger connected. This cable controls reduction and adds no audible audio." : "Audio connected.");
     }
     private static bool CompatibleSockets(Socket first, Socket second)
     {
@@ -1119,8 +1156,12 @@ public sealed class GraphWorkspace : UserControl
         try
         {
             string payload = CopySelection();
-            var data = new DataObject(); data.SetData(GraphClipboard.FormatName, payload, autoConvert: false);
-            Clipboard.SetDataObject(data, true);
+            if (_useSystemClipboard)
+            {
+                var data = new DataObject(); data.SetData(GraphClipboard.FormatName, payload, autoConvert: false);
+                Clipboard.SetDataObject(data, true);
+            }
+            else _practiceClipboard = payload;
             _lastPastedPayload = null; _pasteRepeat = 0;
             SetMessage($"Copied {_selectedNodes.Count} {(_selectedNodes.Count == 1 ? "node" : "nodes")} and their internal connections.");
         }
@@ -1131,7 +1172,9 @@ public sealed class GraphWorkspace : UserControl
     {
         try
         {
-            if (!Clipboard.TryGetData<string>(GraphClipboard.FormatName, out string? payload) || payload is null) { SetMessage("Copy nodes in Vine Mix before pasting."); return; }
+            string? payload = _practiceClipboard;
+            if (_useSystemClipboard) Clipboard.TryGetData<string>(GraphClipboard.FormatName, out payload);
+            if (payload is null) { SetMessage("Copy nodes in Vine Mix before pasting."); return; }
             int repeat = payload == _lastPastedPayload ? _pasteRepeat : 0;
             Point target = anchor ?? (_viewport.IsMouseOver ? ToWorld(Mouse.GetPosition(_viewport)) : VisibleCenter());
             if (anchor is null) target += new Vector(repeat * 24, repeat * 24);
@@ -1142,6 +1185,7 @@ public sealed class GraphWorkspace : UserControl
     }
     private bool ClipboardHasNodes()
     {
+        if (!_useSystemClipboard) return _practiceClipboard is not null;
         try { return Clipboard.ContainsData(GraphClipboard.FormatName); }
         catch (Exception error) when (error is ExternalException or System.Security.SecurityException) { return false; }
     }
@@ -1262,17 +1306,18 @@ public sealed class GraphWorkspace : UserControl
             menu.Items.Add(CreateVirtualDeviceMenu(node));
         if (node is not null && !NodeCatalog.HasLevelControl(node.Kind) && node.GainDb != 0)
         {
-            var legacy = new MenuItem { Header = $"Saved level: {node.GainDb:0.#} dB", ToolTip = NodeToolTip.Create("Saved level", "Retained from an older version", "Use Mix for new volume adjustments") };
+            var legacy = new MenuItem { Header = $"Saved level: {node.GainDb:0.#} dB", ToolTip = NodeToolTip.Create("Saved level", "Applies an additional level retained from an older version") };
             var clear = new MenuItem { Header = "Reset saved level to 0 dB", IsEnabled = _mixer.CanEdit };
             clear.Click += (_, _) => NodeChanged(id, n => n.GainDb = 0);
             legacy.Items.Add(clear); menu.Items.Add(legacy);
         }
+        MenuHoverHelp.Attach(menu);
     }
     private MenuItem CreateVirtualDeviceMenu(GraphNode node)
     {
         var troubleshooting = new MenuItem { Header = "Troubleshooting", IsEnabled = _mixer.CanEdit && _selectedNodes.Count == 1 };
         var devices = new MenuItem { Header = "Reassign device",
-            ToolTip = NodeToolTip.Create("Virtual device", "Use after a driver reinstall or with duplicate devices", "Saved selections stay assigned while disconnected") };
+            ToolTip = NodeToolTip.Create("Virtual device", "Changes the virtual endpoint assigned to this node", "Saved selections stay assigned while disconnected") };
         troubleshooting.Items.Add(devices);
         foreach (var endpoint in _mixer.Endpoints.Where(e => VirtualDeviceBindings.Matches(node.Kind, e))
             .OrderBy(e => e.State != "Active").ThenBy(e => e.Name))
@@ -1316,10 +1361,11 @@ public sealed class GraphWorkspace : UserControl
     private void ShowCanvasMenu(Point position)
     {
         Focus();
-        var menu = new ContextMenu();
+        var menu = TrackPracticeMenu(new ContextMenu());
         var add = new MenuItem { Header = "Add node", InputGestureText = "Shift+A", IsEnabled = _mixer.CanEdit && Graph.Nodes.Count < 32 };
         add.Click += (_, _) => ShowAddMenu(_viewport, position); menu.Items.Add(add); menu.Items.Add(new Separator());
         AddSelectionMenuItems(menu, position);
+        MenuHoverHelp.Attach(menu);
         menu.PlacementTarget = _viewport; menu.IsOpen = true;
     }
     private void ShowAddMenu(FrameworkElement anchor, Point position)
@@ -1328,11 +1374,13 @@ public sealed class GraphWorkspace : UserControl
     }
     internal ContextMenu CreateAddMenu(Point position)
     {
-        var menu = new ContextMenu { Width = 300, MaxHeight = 520 };
-        var search = new TextBox { Width = 200, Height = 30, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(3), ToolTip = "Search node names, categories or purpose" }; AutomationProperties.SetName(search, "Search nodes");
+        var menu = TrackPracticeMenu(new ContextMenu { Width = 300, MaxHeight = 520 });
+        const string searchHelp = "Search node names, categories or purpose";
+        var search = new TextBox { Width = 200, Height = 30, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(3) };
+        AutomationProperties.SetName(search, "Search nodes"); AutomationProperties.SetHelpText(search, searchHelp);
         var searchBox = new Grid(); searchBox.Children.Add(search);
         var placeholder = Text("Search nodes…", 13); placeholder.Margin = new Thickness(11, 0, 0, 0); placeholder.VerticalAlignment = VerticalAlignment.Center; placeholder.IsHitTestVisible = false; placeholder.SetResourceReference(TextBlock.ForegroundProperty, "ConsoleMutedBrush"); searchBox.Children.Add(placeholder);
-        var searchItem = new MenuItem { StaysOpenOnClick = true, Header = searchBox }; menu.Items.Add(searchItem); menu.Items.Add(new Separator());
+        var searchItem = new MenuItem { StaysOpenOnClick = true, Header = searchBox, ToolTip = searchHelp }; menu.Items.Add(searchItem); menu.Items.Add(new Separator());
         var items = new List<(string Kind, MenuItem Item)>();
         var groups = new List<MenuItem>();
         MenuItem NodeItem(string kind)
@@ -1365,6 +1413,7 @@ public sealed class GraphWorkspace : UserControl
             else if (e.Key == Key.Escape) { menu.IsOpen = false; e.Handled = true; }
         };
         menu.Opened += (_, _) => search.Focus();
+        MenuHoverHelp.Attach(menu);
         return menu;
     }
     public string Spawn(string kind, Point position)
@@ -1383,7 +1432,7 @@ public sealed class GraphWorkspace : UserControl
     }
     internal ContextMenu CreateEdgeMenu(string id)
     {
-        var menu = new ContextMenu(); var edge = Graph.Edges.FirstOrDefault(e => e.Id == id); if (edge is null) return menu;
+        var menu = TrackPracticeMenu(new ContextMenu()); var edge = Graph.Edges.FirstOrDefault(e => e.Id == id); if (edge is null) return menu;
         var expected = edge.Copy();
         bool Current() => _mixer.CanEdit && Graph.Edges.Any(e => SameConnection(e, expected));
         MenuItem AddAction(string header, Action click)
@@ -1408,6 +1457,7 @@ public sealed class GraphWorkspace : UserControl
         }
         AddAction("Remove connection", () => ChangeConnectionFromMenu(expected,
             (graph, current) => graph.Edges.Remove(current), "Connection removed.", allowMissing: true));
+        MenuHoverHelp.Attach(menu);
         return menu;
     }
     private static bool SameConnection(GraphEdge current, GraphEdge expected)
@@ -1689,10 +1739,12 @@ public sealed class GraphWorkspace : UserControl
             GotKeyboardFocus += (_, _) => UpdateHighlight();
             LostKeyboardFocus += (_, _) => UpdateHighlight();
             Content = shape; Cursor = Cursors.Cross; ToolTip = kind == "control"
-                ? NodeToolTip.Create(output ? "Linked level output" : "Linked level input", "Connect to another control socket")
-                : kind == "sidechain" ? NodeToolTip.Create("Trigger / Sidechain detector", "Accepts one audio output; detector only", "Never adds audible audio", "Ducking uses this trigger; Compressor requires External detector")
-                : output ? NodeToolTip.Create("Audio output", "Drag to an audio or sidechain input")
-                    : NodeToolTip.Create("Audio input", "Accepts multiple audio connections");
+                ? NodeToolTip.Create(output ? "Linked level output" : "Linked level input", output
+                    ? "Shares this controller's level adjustment with connected nodes"
+                    : "Applies a connected controller's level adjustment to this node")
+                : kind == "sidechain" ? NodeToolTip.Create("Trigger / Sidechain detector", "Uses one audio source to control Static or Dynamic ducking", "Trigger audio stays out of the audible output")
+                : output ? NodeToolTip.Create("Audio output", "Carries this node's audio to connected audio or trigger inputs")
+                    : NodeToolTip.Create("Audio input", "Combines audio from connected outputs");
             AutomationProperties.SetName(this, (output ? "Output" : "Input") + " " + kind + " socket");
             AutomationProperties.SetItemStatus(this, "Not connected");
             PreviewMouseLeftButtonDown += (_, e) => owner.SocketPressed(this, e);

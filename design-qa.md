@@ -2,6 +2,303 @@
 
 17 October 2026, UTC+10.
 
+## 20 October — Clearer Controls section hierarchy
+
+The maintainer's screenshot showed section headers and individual actions sharing almost
+the same appearance. Headers now have flat shaded bars and larger drawn chevrons
+at the right edge. Expanded action rows sit beneath them with indentation and a
+vertical guide. The existing palette, full-width targets, single-open-section
+behavior, selected explanations and tooltip handling are retained.
+
+Detached Alignment renders were inspected at normal and minimum window sizes
+and in high contrast. In high contrast, indentation, the guide, bold headings
+and chevrons retain the hierarchy even when background fills converge. No cards
+or extra instructional text were added.
+
+The final self-contained Release passed **10,812 detached checks / 215 renders /
+zero binding errors**: `artifacts/controls-hierarchy-20261020/ui-final/results.json`.
+Its executable stayed hash-stable during verification. No Computer Use, native
+input, shown-window or focus automation was performed. Native pointer presentation
+remains outside detached verification; engine/runtime bytes are unchanged.
+
+## 20 October — Ordinary tooltip owners, including Controls
+
+The previous tooltip-handoff build was running (controller 20768, executable
+SHA-256 `FC213C5A7F7FE0F23F6D2F19E686C9169BE91CA1853BC5C1C05C534055F55E02`).
+The maintainer identified the remaining failure in Help → Controls → View & zoom. Those
+reference rows were ordinary buttons, outside the ContextMenu adapter. The
+earlier audit missed ordinary controls and dropdown choices, so its scope was
+insufficient for the request to check elsewhere.
+
+Pinned WPF source shows that its native tooltip service builds a safe area
+between owner and popup. Movement toward a popup below the owner can retain the
+old tooltip while repeatedly delaying the next owner; upward movement can leave
+that area and trigger a different handoff. This supports the reported direction
+asymmetry during movement, without claiming to reproduce physical input. Source:
+[PopupControlService, .NET 10](https://github.com/dotnet/wpf/blob/v10.0.0/src/Microsoft.DotNet.Wpf/src/PresentationFramework/System/Windows/Controls/PopupControlService.cs),
+researched **2026-10-20**.
+
+Ordinary tooltip handling is now registered at application startup. Loaded
+controls disable native help; a native-opening guard covers delayed requests.
+The nearest eligible hit owner supplies its original text through a shared
+session, also used by the context-menu adapter. Adjacent ordinary owners reuse
+the visible popup immediately, without an owner-to-popup safe area. Live
+one-way content binding preserves changing meter/status/validation help.
+Visibility, unload, scrolling, layout and window deactivation clear or reconcile
+ownership. Hit testing excludes hidden/non-interactive overlay branches while
+retaining disabled owners that explicitly permit explanatory help.
+
+The source inventory is `artifacts/tooltip-owners-20261020/tooltip-inventory.txt`.
+It covers all 68 current assignment sites, including Help sections and examples,
+header/toolbars, search, node controls, dial fields, meters, status, sockets and
+cables, device choices and Ducking mode items. Current owners use text or content
+panels. Explicit ToolTip-valued owners retain their own lifecycle; none are
+assigned by current application code. Managed ContextMenus retain their adapter;
+the WinForms tray commands have no separate tooltip-bearing items.
+
+The regression uses the actual six View & zoom buttons and every adjacent pair
+in both directions. Before the recording environment is installed, actual Loaded
+callbacks must suppress native service ownership on the real Help controls and
+dropdown choices. Removing startup registration fails that assertion, preventing
+test setup from silently supplying a missing production integration. Further
+coverage includes stationary scrolling, collapse/rebuild/reopen, Static/Dynamic
+choices, disabled choices, peak-meter wrapper ownership and live feedback reset.
+No Computer Use, native windows/popups, focus injection or physical-pointer test
+was performed. Engine/runtime bytes remain unchanged.
+
+The final self-contained Release passed **10,794 detached checks / 212 renders /
+zero binding errors**: `artifacts/tooltip-owners-20261020/ui-final/results.json`.
+Its executable stayed hash-stable during verification. The Controls render was
+inspected; the correction preserves its layout and uses the existing tooltip
+template. Graph, preferences, commands, history and focus checks pass.
+
+## 20 October — Menu tooltip handoff in both directions
+
+The maintainer reported Settings help switching upward but failing downward. Source
+review found that the shared controller started help on movement only, did not
+schedule it on row entry, dismissed the previous row on leave without reconciling
+the current geometric hit, and abandoned a pending request when its hit changed.
+These are confirmed recovery gaps; a deterministic native downward-only rule
+was not established without physical input. The earlier shown-menu regression
+covered keyboard ownership and pointer dismissal, rather than adjacent pointer
+handoff in either direction.
+
+Enter and leave now reconcile the actual hit-tested row. An old leave cannot
+erase a new owner, and a pending tick hands off to the current row without
+requiring more movement. A stale callback cannot rearm after dismissal. Reused
+menus refresh their current rows without retaining removed rows or adding
+duplicate handlers. Native asynchronous tooltip teardown remains unchanged.
+
+The audit extended this shared handling to Add, node, cable, canvas, Activity and
+EQ context menus. Settings and Help's sample menu already used it. Add's search
+field now uses its host row's shared help, with accessible purpose text and no
+competing child tooltip. ComboBox item tooltips and the WinForms tray menu use
+different paths; no equivalent custom handoff defect was found in those paths.
+
+Platform research on **2026-10-20** used pinned .NET 10 primary source:
+[MouseDevice](https://github.com/dotnet/wpf/blob/v10.0.0/src/Microsoft.DotNet.Wpf/src/PresentationCore/System/Windows/Input/MouseDevice.cs),
+[ReverseInheritProperty](https://github.com/dotnet/wpf/blob/v10.0.0/src/Microsoft.DotNet.Wpf/src/PresentationCore/System/Windows/ReverseInheritProperty.cs),
+[ToolTip](https://github.com/dotnet/wpf/blob/v10.0.0/src/Microsoft.DotNet.Wpf/src/PresentationFramework/System/Windows/Controls/ToolTip.cs)
+and [PopupControlService](https://github.com/dotnet/wpf/blob/v10.0.0/src/Microsoft.DotNet.Wpf/src/PresentationFramework/System/Windows/Controls/PopupControlService.cs).
+The source does not support attributing the report to an ordinary opaque tooltip
+intercepting the mouse or to a normal sibling leave occurring after that move's
+preview event; the correction addresses the application-owned recovery gaps.
+
+The final self-contained Release passed **10,481 detached checks / 212 renders /
+zero binding errors**: `artifacts/tooltip-handoff-20261020/ui-final/results.json`.
+Real arranged menu and submenu geometry feeds controlled pointer samples through
+the installed callbacks and shared timer logic. Removing the enter hookup and,
+separately, restoring the pending-owner drop each fail the intended regression.
+These are behavioral variants with the recording boundary retained, not runs of
+the previously installed binary. Graph, preferences, commands, history, save
+state and focus remain unchanged. No Computer Use, native popup/focus automation
+or physical-pointer validation was performed. Engine/runtime bytes are unchanged.
+
+## 20 October — Simplified Controls and Settings search
+
+Help now has six topics. Voice Color, Nodes & cables and Canvas navigation
+practice menus are removed. Quick Reference is renamed Controls and uses flat,
+divided action/key rows with one expanded section at a time. Each selected row
+reveals its explanation, reducing the amount of text visible at once. Existing
+fonts, palette, narrow-window navigation and silent examples are retained.
+
+Settings starts with Search settings and help. Native settings filter by their
+labels, purpose and aliases; a shared reference catalogue supplies inline control
+instructions. Zoom shows wheel zoom, reset-to-100% and related framing help.
+Enter or double-click opens the selected Controls entry. Tab reaches matching
+settings and Shift+Tab returns to search. Escape clears a query first. Search
+does not run commands or change mixer preferences, graph or history, including
+when offline.
+
+The final self-contained Release package passed **10,347 detached checks / 212
+renders / zero binding errors**:
+`artifacts/controls-search-20261020/ui-final/results.json`.
+Normal, minimum-size and high-contrast Controls, Settings and search layouts
+were inspected. A stale detached menu measurement initially hid the no-match
+hint; query renders now wait for layout and remeasure their height. The regression
+checks actual text bounds through ancestor clipping. No Computer Use or
+shown-window automation was performed. Native input/focus remain separate from
+these checks; the audio engine and runtime are unchanged.
+
+## 20 October — Flat utility menus
+
+Help now follows the existing mixer rather than a repeated card layout: open
+sections, 13-DIP body text, small headings, a compact topic list and the existing
+flat toolbar actions. The slogan, duplicate lesson titles and panel enclosures
+are removed. EQ and Voice Color lead with the actual controls; the sample canvas
+uses one Enter/Exit bar and a transparent inactive shield. Help is bounded to
+960×680 DIPs and retains the compact selector at the minimum window size.
+
+Find node uses a flat results list, secondary device/type text and a visible
+selection edge, including high contrast. Settings groups navigation,
+preferences and audio recovery with simple separators. Add, Activity and context
+menus share compact rows and aligned checks, icons, shortcuts and submenu arrows.
+The canvas node controls and audio processing are unchanged. Practice state
+buttons retain their state fill on hover and a visible keyboard-focus edge.
+
+Design guidance was sourced on **2026-10-20** from Anthropic's
+[Frontend Design skill](https://github.com/anthropics/skills/blob/main/skills/frontend-design/SKILL.md).
+Its guidance to follow the product's own visual language and remove generic
+card-based structure was applied to the existing IBM Plex fonts, console palette
+and mixer controls. No external UI package or runtime dependency was added.
+
+The final self-contained Release package passed **10,399 detached checks / 220
+renders / zero binding errors**. Normal, minimum-size and high-contrast Help
+renders and the menu/search captures were inspected. Evidence:
+`artifacts/menu-style-20261020/ui-final-2/results.json`.
+This revision used no Computer Use or shown-window automation. Native input,
+focus and popup placement remain separate from these detached checks.
+
+## 20 October — Interactive Help & shortcuts
+
+Help now has a separated quick reference and eight practice topics covering
+dials/exact values, buttons/menus/selectors, search, EQ, Voice Color, nodes and
+cables, canvas navigation, and meters/status. Each distinct reference action has
+its own divided row. The topic sidebar becomes a dropdown at narrow sizes;
+Close and Reset example remain outside the scrolling content.
+
+Real shared controls use temporary values. The practice graph has a dedicated
+preview model, private node clipboard and independent history; it has no engine
+connection or settings persistence. Enter/Exit explicitly gates the whole graph
+subtree. Cancellation and cleanup cover popups, drafts, renames, gestures and
+capture on reset, topic change, close and visibility changes. Ordinary text
+fields retain their usual Windows clipboard behavior.
+
+The self-contained Release package passed **10,399 detached checks / 220 renders
+/ zero binding errors**. Normal, 900×580, high-contrast and 144/192-DPI help
+renders were inspected. Evidence:
+`artifacts/help-menu-20261020/ui-final-2/results.json`.
+The final tests run without desktop input or shown-window automation; native
+input/focus and screen-reader behavior are not certified by detached checks.
+The native engine and runtime are unchanged.
+
+## 20 October — Tooltips describe purpose and state
+
+Dial faces and numeric entries now describe their parameter's audio role, with
+context for Compressor, Ducking, Gate/Expander, filters and other effects.
+Workspace buttons, sockets, node headers, EQ/band hover and Voice Color omit
+gesture recipes. Meter readings and real device diagnostics remain informative.
+Help & shortcuts and accessible keyboard instructions remain available.
+
+The published interface passed **9,945 detached checks / 189 renders / zero
+binding errors**. The actual tooltip template renders were visually inspected,
+including long diagnostic wrapping. Evidence:
+`artifacts/tooltip-purpose-20261020/ui-final-2/results.json` and `tooltips.png`.
+No native processing changed.
+The verified interface reopened as PID 64700 while engine PID 26784 and its
+runtime stayed unchanged. Audio frames advanced; configuration, running paths,
+saved audio settings and UI preferences were preserved. Evidence:
+`artifacts/tooltip-purpose-20261020/activation.json`.
+
+## 20 October — Separate Gate and Expander; Static/Dynamic Ducking
+
+Expander and Gate are separate Add/search entries with five and six controls.
+Existing expander-kind gate records display Gate controls without conversion.
+Ducking has Static and Dynamic modes: a fixed Amount or ratio-based reduction
+above Threshold. Both keep detector-only trigger routing and saved mode values;
+mode changes retain the gain envelope and node/socket geometry. Compressor has
+no detector selector or sidechain socket and always follows its own main audio.
+The maintainer confirmed no existing compressor detector routes need preservation.
+
+All **17 native offline suites** passed, alongside **9,945 detached desktop
+checks / 189 renders / zero binding errors**. Gate parity, Static compatibility,
+Dynamic curves/thresholds/transitions, trigger isolation, own-signal compression,
+allocation guards, persistence, copying, reset and Undo/Redo are covered.
+The separate nodes, both Ducking modes and main-only Compressor were visually
+inspected. Evidence:
+`artifacts/dynamics-organization-20261020/native-final/results.json` and
+`artifacts/dynamics-organization-20261020/ui-final-2/results.json`.
+The matched engine/interface update was activated at 13:29 UTC+10. The engine
+became ready in 0.39 seconds after restart; all ten previously running paths
+resumed and audio frames advanced. Configuration matched with only the new
+omitted Ducking defaults normalized, and saved settings bytes were unchanged.
+The new interface opened and responded. Evidence:
+`artifacts/dynamics-organization-20261020/activation/result.json`.
+Hardware listening and long-duration qualification remain separate.
+
+## 20 October — EQ reset correction
+
+Following the maintainer's reset report, both **Reset node to defaults** and **Reset EQ
+to flat** now clear all EQ bands, matching new-node defaults. Resetting an empty
+curve is a no-op. Resetting after the eight-band limit warning also restores
+the ordinary empty-EQ caption/help. Existing saved EQs are retained until the
+user explicitly resets them; individual band-position resets are unchanged.
+
+The candidate passed **9,701 detached checks / 182 renders / zero binding errors**:
+`artifacts/eq-reset-empty-20261020/ui-final/results.json`.
+Checks exercise the real plot menu and node reset actions, disabled empty-state
+controls, exact Undo/Redo of a custom bell/notch curve, no-op behavior, persistence
+and unchanged other-node/routing state. No native audio processing changed.
+The correction is running as UI PID 62160. Engine PID 31632, its start time,
+configuration, running paths, settings and preferences were preserved while
+audio frames advanced. Evidence:
+`artifacts/eq-reset-empty-20261020/activation.json`.
+
+## 20 October — Empty new EQs and centred plot text
+
+New workspace EQ nodes start with no bands and a flat response. Existing saved
+bands, older omitted-band settings, Tone and dedicated filter defaults are
+preserved. Reset EQ to flat and Reset node retain their established five-band
+behavior. The hint and top band information are centred within the plot width,
+clear of both decibel gutters. Long captions shorten to one line while complete
+band details remain accessible; the hint sits above the flat response line.
+
+The candidate passed **9,692 detached checks / 182 renders / zero binding errors**:
+`artifacts/eq-empty-centred-20261020/ui-final/results.json`.
+Verification checks actual text ink at 96/144/192 DPI, narrow/normal widths,
+selection, high contrast, first-band editing, persistence, copying and history.
+Empty and first-band node renders and narrow captions were visually inspected.
+No native processing changed. The verified interface is now running as PID 41604;
+engine PID 31632 and its start time were preserved, audio frames advanced, and
+previously running paths, configuration, settings and preferences were unchanged.
+The maintainer requested no further Saved/idle prompts; this preference is recorded in
+AGENTS.md, and activation evidence records the actual instruction without claiming
+independent verification of pending edits. Evidence:
+`artifacts/eq-empty-centred-20261020/activation.json`.
+Native pointer behavior remains for user review.
+
+## 20 October — Output availability warnings
+
+Unavailable listening and virtual outputs now share the input warning treatment:
+red device-name pulse, faint outer glow, and a steady warning triangle above the
+meter. Render/playback status determines availability, including saved missing
+devices, mute, recovery and absent VAC Lite. Output access help avoids the older
+engine's microphone-specific privacy wording. Reduced animation and high contrast
+follow the input behavior. Output meter columns reserve warning space, so controls,
+node dimensions and sockets remain fixed as warnings appear and clear.
+
+The candidate passed **9,507 detached checks / 174 renders / zero binding errors**:
+`artifacts/output-availability-20261020/ui-final-3/results.json`.
+Output warning, recovery and high-contrast renders were inspected beside input
+renders. No new native processing or real-device/audio qualification was performed.
+
+After the maintainer confirmed Saved/idle, UI PID 22872 loaded the verified binary.
+Engine PID 31632 and its start time were retained; audio frames advanced and all
+previously running paths remained running. Configuration, audio settings and UI
+preferences were unchanged. Activation/backup evidence:
+`artifacts/output-availability-20261020/activation.json`.
+Real unplug/replug and audible recovery still need manual verification.
+
 ## 19 October — Minimal cable hover
 
 At the user's request, routine cable hover now shows only **source → destination**.
@@ -977,3 +1274,203 @@ advancing. Software recovery to Running took 0.307 seconds; audible interruption
 was not measured. Full configuration, revision 3807 and exact settings bytes
 were unchanged. Both installed binaries match the verified candidates. Physical
 latency, hands-on device recovery and the deferred soak remain later qualification.
+
+
+## Vine Mix identity - 20 October 2026
+
+Implemented the approved split VM mark without a wordmark, bundled IBM Plex
+Sans/Mono and restrained forest-green actions across the existing native UI.
+Green audio cables (`#78BE98`) and lavender Ducking sidechains (`#B8A0D8`) remain
+separate. Category colours, Mute/Bypass labels, meter zones and Windows high
+contrast remain meaningful. [Branding inventory/assets](docs/BRANDING.md).
+
+The Release package built with zero desktop warnings/errors. All 17 native
+offline suites passed. Detached WPF passed **10,012 checks**, produced **189
+images**, and recorded **zero binding errors**. The shown-window harness passed
+**43 checks**, also with zero binding errors. Final evidence is linked in the
+[implementation record](docs/BRANDING_IMPLEMENTATION_PLAN.md).
+
+Reviewed actual workspace, Settings, EQ, Voice Color, Ducking, effect-node, help
+and high-contrast renders. Checks resolve embedded font faces/weights, numeric
+readouts, popup typography, independent vector pieces, nine icon frames, contrast,
+caption hit testing, 96/144/192 DPI and existing zoom/window layouts. A faint
+unchecked-checkbox outline was fixed and covered by a real template assertion.
+Sparse text validation now checks contrasting ink when a correctly rendered
+Plex label has fewer than sixteen antialiasing colours. The empty-canvas plus
+uses a glyph covered by Plex rather than requiring a font fallback.
+
+Computer Use exercised the actual preview's Fit, Settings, search/filtering,
+Escape, F1 help and maximise/restore/close. The installed workspace was inspected
+for Saved revision 5981, node/control access, green audio and lavender sidechain
+cables and the real Settings popup. Native desktop evidence supplements detached
+layout; screen-reader speech and physical monitor transitions were not measured.
+
+The verified UI was activated with the engine PID/binary preserved. Frame count
+advanced during replacement; full committed configuration, revision, settings
+bytes and path states were unchanged. The candidate engine matches the running
+engine exactly. Initial installer failure restored the prior UI because of an
+external Content-file path; the corrected prechecks and licence path passed.
+Both attempt records/backups remain in artifacts. Final identity and activation
+results are recorded in the implementation plan. No real audio test signals,
+device/default changes or system font installation were used. Audible quality
+and hardware endurance remain separate qualifications.
+
+
+## Transparent Windows icons - 20 October 2026, 14:29
+
+Removed the rounded graphite plate from all nine app/tray icon frames and the
+PNG preview at the maintainer's request. Letter geometry, scale and white/green colours
+are unchanged. Caption vector and SVG were already transparent. No separate
+installer artwork or named desktop/Start Menu shortcut was found.
+
+The clean Release publish and detached suite passed: 10,030 checks, 189 renders,
+zero binding errors. New packaged-resource assertions check transparent outer
+margins and the letter gap at all nine sizes; alpha/colour checks also passed.
+Evidence: `artifacts/transparent-icons-20261020/ui/results.json` and
+`artifacts/transparent-icons-20261020/asset-checks.json`.
+
+Activation passed (`artifacts/transparent-icons-20261020-activation/result.json`),
+with responsive UI62504 and unchanged engine26784/binary. Frames advanced and
+configuration, revision5981 and exact settings bytes were preserved. Current UI
+SHA-256: `C962AE418D7D899A0AEA47B689FF6195A5D50525E8FAB9C9AB9BDEE54D9AD2B9`.
+
+## Caption spacing, menu ticks and help handoff - 20 October 2026, 15:06
+
+Reduced the existing caption mark from 24 x 25 to 20 x 20 DIPs and inset it in a
+focusable website button. The mark retains its current corner. Clicking opens
+`https://vinemix.app` through the existing external-link opener. Caption dragging
+and native resize edges remain available around the button. Replaced the shared
+menu's Plex tick glyph with a clearly shaped, rounded-stroke check path.
+
+Reproduced the Settings defect in the running native app: Reduce meter animation
+was highlighted while the preceding Right-click drag to pan help remained open.
+Research on 20 October used the pinned .NET 10 WPF
+[PopupControlService source](https://github.com/dotnet/wpf/blob/v10.0.0/src/Microsoft.DotNet.Wpf/src/PresentationFramework/System/Windows/Controls/PopupControlService.cs)
+and [ToolTip source](https://github.com/dotnet/wpf/blob/v10.0.0/src/Microsoft.DotNet.Wpf/src/PresentationFramework/System/Windows/Controls/ToolTip.cs).
+The native service retains an owner/tooltip safe area and does not reset its
+current owner merely because application code closes that popup. Settings now
+owns one scoped tooltip, resolving the actual hovered row across its popup
+surfaces and replacing content/placement together. It cancels stale delays and
+releases content on row changes, disabled/no-help rows, submenu closure and menu
+closure. Other tooltips retain the native service. Accessible help text stays
+available, and Ctrl+Shift+F10 still toggles help for the focused Settings row.
+
+Final Release publish passed without warnings/errors. Detached WPF passed
+**10,051 checks**, **189 images**, **zero binding errors**; the shown-window
+suite passed **77 checks**, zero binding errors. Evidence:
+`artifacts/caption-menu-20261020/ui-final-2/results.json` and
+`artifacts/caption-menu-20261020/native-ui-final/results.json`.
+These include exact website destination, logo/caption hit targets, DPI/zoom,
+fonts/icons/high contrast, all existing editing/control coverage, and a new real
+popup/focus lifecycle regression with pending-timer cancellation and unchanged
+preview state. Peer review caught and corrected SystemKey normalization and
+standalone modifier handling before the final passing build.
+
+Native preview pointer checks exercised A-to-B-to-A handoff, device-visibility
+children, returning to the main menu and disabled-row dismissal. Final installed
+UI inspection confirmed the inset mark, clear tick, correct adjacent-row help,
+keyboard navigation and actual Ctrl+Shift+F10 close/reopen. Escape cleared the
+menu and its help. The automated website test intercepts the shell opener;
+website availability was not assessed.
+
+Activation passed in `artifacts/caption-menu-20261020-activation/result.json`.
+Responsive UI **23032** has SHA-256
+`3E961A35D3A45A9E810EA3C9A253AD11FEC7A077E5B3C6DA0E38DE8CBAA9545C`.
+Engine **26784** and its binary were preserved; frames advanced
+**279190320 -> 279239040**. Full committed configuration, revision **5983** and
+exact settings bytes were unchanged. Rollback UI/settings copies are retained
+beside that activation record. No engine source or binary was changed.
+
+## Separator tooltip flash and logo underline - 20 October 2026, 15:16
+
+The maintainer reported a tiny box when leaving Settings help for a separator and asked
+for a fix without Computer Use. The previous dismissal immediately cleared
+content and placement after setting IsOpen false. The pinned .NET 10
+[Popup closing implementation](https://github.com/dotnet/wpf/blob/v10.0.0/src/Microsoft.DotNet.Wpf/src/PresentationFramework/System/Windows/Controls/Primitives/Popup.cs)
+defers native window destruction; the
+[ToolTip implementation](https://github.com/dotnet/wpf/blob/v10.0.0/src/Microsoft.DotNet.Wpf/src/PresentationFramework/System/Windows/Controls/ToolTip.cs)
+forwards its eventual Closed event. Source research on 20 October identified
+premature content removal as the likely cause of the small bordered frame.
+
+Dismissal now stops the timer and clears logical ownership immediately, retaining
+the visual content/target until real closure. An IsOpen guard prevents old close
+cleanup from clearing a quickly reopened tooltip. Immediate release is allowed
+when no presentation source exists. The focused regression fails against the old
+order and passes after this change, observing actual property changes and Closed
+ordering rather than relying on IsOpen alone. It also checks the separator's
+rendered hit region, rapid reopening and delayed-request cancellation.
+
+The website logo now has its own plain hover/pressed template without the shared
+toolbar's persistent focus underline. Keyboard navigation retains a separate
+inset outline. Geometry, caption hit testing, accessible identity and link action
+remain unchanged. Peer source reviews found no additional actionable issues.
+
+Clean Release publish passed. Final detached checks: **10,051**, **189 images**;
+shown-window checks: **90**; zero binding errors in both. Reports and the expected
+before-fix failure are in `artifacts/tooltip-separator-20261020/`. Tests use inert
+in-memory models and application-owned WPF focus/popup lifecycles; no desktop
+input injection, Computer Use tools or visual hover inspection was used.
+
+Activation passed in `artifacts/tooltip-separator-20261020-activation/result.json`.
+Responsive UI **71480** has SHA-256
+`48AECAF54FF2A48C5CA567C283A892EDE178DEF68C59DD188177FE1D4A443915`.
+Engine **26784** and its binary remain unchanged; frames advanced
+**308150880 -> 308205120**. Full committed configuration, revision **5986** and
+exact settings bytes were preserved. Backups remain beside the activation record.
+
+## Centred header mark and left connection indicator - 20 October 2026, 15:31
+
+Explained the dot's existing connection/readiness meaning before editing. Moved
+the 20 DIP website mark to the centre of the complete visible header, and the
+connection dot to the far left at 8 DIPs. Folded the former 4 DIP outer top inset
+into the header's 36 DIP height so centering includes the full visible space;
+the divider, toolbar and canvas retain their positions. The logo has 8 DIPs above
+and below, and the dot has 14. Separate equal-width side regions constrain
+warnings and saved status without moving or overlapping the mark. The website
+action, connection bindings, accessible status and keyboard navigation remain.
+The keyboard-only outline sits outside the smaller button, clear of its artwork.
+
+Release passed 10,105 detached checks, 189 renders and 90 shown-window checks,
+with zero binding errors. The size/DPI/warning matrix verifies centering,
+separation, caption client/drag targets and resize geometry. The actual detached
+workspace render was inspected. No Computer Use or native input injection was
+used. Evidence: `artifacts/header-alignment-20261020/ui-final/results.json` and
+`artifacts/header-alignment-20261020/native-ui-final/results.json`.
+
+Activation passed in `artifacts/header-alignment-20261020-activation/result.json`.
+Responsive UI **54380** has SHA-256
+`1841AB354E1CFC4CAE4BA83699CE935A810B87CA3CDBB5AFD38762ACD8EF8FA0`.
+Engine **26784** and its binary were preserved; frames advanced
+**350923440 -> 350973840**. Configuration, revision **5986** and exact settings
+bytes were unchanged. Backups remain with the activation record.
+
+## Logo hover highlight - 20 October 2026, 15:48
+
+Removed only the website logo template's mouse-over background trigger. The
+background stays transparent on hover; website activation, transient pressed
+feedback and the keyboard-only focus outline remain. The override prevents the
+base toolbar template's hover treatment from applying. Peer source review passed.
+
+Release publish and 10,105 detached checks passed, with 189 renders and zero
+binding errors: `artifacts/logo-hover-20261020/ui-final/results.json`. No new
+tests or desktop input were added; the unchanged menu lifecycle suite was not
+rerun. Activation passed in `artifacts/logo-hover-20261020-activation/result.json`.
+Responsive UI **2536** has SHA-256
+`299763AEABC59C467580959E098CD51F3CA8724476E16722FF8FC0D291B00ECD`.
+Engine **26784** and its binary were preserved; frames advanced
+400188960 -> 400239120. Configuration, revision **5986** and exact settings bytes
+were unchanged.
+
+## Logo pressed highlight - 20 October 2026, 15:54
+
+Removed the remaining logo-specific IsPressed background trigger after the maintainer
+reported the box during a click. Hover and press now keep the transparent
+background; the separate keyboard-only focus cue and website activation remain.
+Peer source review confirmed no inherited mouse-state template triggers apply.
+
+Release and 10,105 detached checks passed, 189 renders, zero binding errors:
+`artifacts/logo-press-20261020/ui-final/results.json`. Activation passed in
+`artifacts/logo-press-20261020-activation/result.json`. Responsive UI **20492** has
+SHA-256 `8B92BD7D088B098AECDFFEFC893C966591AE2B43CDC515AB29F942D7A9FDD04A`.
+Engine **26784**, configuration, revision **5986** and exact settings bytes were
+preserved; frames advanced 418256640 -> 418304880. No desktop input was injected.

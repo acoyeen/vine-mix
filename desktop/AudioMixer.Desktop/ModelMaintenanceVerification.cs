@@ -151,8 +151,8 @@ internal static class ModelMaintenanceVerification
             var legacy = new GraphNode { Id = "saved-dynamics", Kind = "compressor", Name = "My original dynamics", X = 92, Y = 143,
                 GainDb = 7.25, Bypass = true, Compressor = new() { Mode = setting.Item1, Detector = setting.Item2,
                     CeilingDb = -3.5, ThresholdDb = -23.75, Ratio = 5.125, AttackMs = .125, ReleaseMs = 231.125, MakeupDb = 4.25 } };
-            var graph = new GraphConfiguration { Nodes = [legacy, new() { Id = "trigger", Kind = "microphone" }, new() { Id = "linked", Kind = "control", GainDb = -4.5 }],
-                Edges = [new() { Id = "detector", From = "trigger", To = legacy.Id, Kind = "sidechain", GainDb = -3.5, Muted = true },
+            var graph = new GraphConfiguration { Nodes = [legacy, new() { Id = "trigger", Kind = "microphone" }, new() { Id = "linked", Kind = "control", GainDb = -4.5 }, new() { Id = "duck", Kind = "ducking" }],
+                Edges = [new() { Id = "detector", From = "trigger", To = "duck", Kind = "sidechain", GainDb = -3.5, Muted = true },
                     new() { Id = "control", From = "linked", To = legacy.Id, Kind = "control" }] };
             var oldJson = JsonNode.Parse(JsonSerializer.Serialize(graph, Protocol.Json))!;
             static void RemoveNewFields(JsonNode root)
@@ -171,7 +171,7 @@ internal static class ModelMaintenanceVerification
             require(GraphClipboard.TryCreatePaste(group, new(), new Point(0, 0), out var copied, out _)
                 && copied.Nodes.Single(node => node.Kind == "compressor").DynamicsUiVersion == 0
                 && copied.Edges.Count == 2 && copied.Edges.Single(edge => edge.Kind == "sidechain").Muted,
-                "Legacy compressor copy/paste preserves mode availability and separate detector and linked-control cables.");
+                "Legacy compressor settings and independent Ducking detector wiring survive copying alongside linked controls.");
             GraphDefaults.ResetNodeSettings(loaded.Nodes[0]);
             require(loaded.Nodes[0].DynamicsUiVersion == 0, "Explicit reset preserves a saved compressor's legacy presentation choice.");
         }
@@ -183,6 +183,8 @@ internal static class ModelMaintenanceVerification
             n => n.Ducking.AmountDb = -.1, n => n.Ducking.AmountDb = 60.1,
             n => n.Ducking.AttackMs = .09, n => n.Ducking.AttackMs = 201,
             n => n.Ducking.ReleaseMs = 4.9, n => n.Ducking.ReleaseMs = 2001,
+            n => n.Ducking.Mode = "unknown", n => n.Ducking.Ratio = .99, n => n.Ducking.Ratio = 20.01,
+            n => n.Ducking.Ratio = double.NaN,
             n => n.Ducking = null!, n => n.DynamicsUiVersion = 2
         })
         {
