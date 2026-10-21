@@ -1,15 +1,15 @@
-VINE MIX INSTALLATION TERMS AND LICENCE
+VINEMIX INSTALLATION TERMS AND LICENCE
 
-Vine Mix is experimental Windows audio software. Please read these terms
+VineMix is experimental Windows audio software. Please read these terms
 before continuing. Selecting "I accept" acknowledges these terms. Acceptance
-does not reduce rights granted by the open-source licences included with Vine Mix.
+does not reduce rights granted by the open-source licences included with VineMix.
 
 YOUR FILES AND SETTINGS
 
 Application files are installed in the folder shown by Setup. By default this is
-%LOCALAPPDATA%\Programs\Vine Mix. Your saved workspace, preferences, backups and
-logs remain in %LOCALAPPDATA%\AudioMixer, separately from application files.
-Existing saved settings are retained. Uninstalling Vine Mix retains these files.
+%LOCALAPPDATA%\Programs\VineMix. Your saved workspace, preferences, backups and
+logs remain in %LOCALAPPDATA%\VineMix, separately from application files.
+Existing saved settings are retained. Uninstalling VineMix retains these files.
 
 A copy already running from another folder shares the same settings and audio
 engine identity. Setup does not stop that copy or launch another one alongside
@@ -18,11 +18,11 @@ it. Quit the existing copy from its tray menu before using the installed copy.
 OPTIONAL THIRD-PARTY DRIVERS
 
 VB-CABLE and Virtual Audio Cable (VAC) are independent proprietary products.
-Vine Mix's MIT licence does not cover them. Including them does not imply their
-vendors endorse Vine Mix. Their original packages and notices are preserved. Installing either
+VineMix's MIT licence does not cover them. Including them does not imply their
+vendors endorse VineMix. Their original packages and notices are preserved. Installing either
 driver requires your agreement to its vendor terms and Windows administrator
 approval. A restart may be needed. Existing installations are not replaced by
-this setup. Drivers remain installed when Vine Mix is uninstalled.
+this setup. Drivers remain installed when VineMix is uninstalled.
 
 VB-CABLE is made by VB-Audio. It is donationware; all contributions are welcome.
 You can identify the product and donate or obtain a licence from its vendor:
@@ -33,7 +33,7 @@ Professional deployment has additional licensing conditions.
 VAC Lite is made by Eugene Muzychenko. Its licence permits use only in a private
 home environment unrelated to income generation. It is unsuitable for monetised
 streaming, paid audio work or business use under that licence. Do not select its
-installation if those conditions do not fit your use. Vine Mix can be installed
+installation if those conditions do not fit your use. VineMix can be installed
 without either optional driver. VAC terms and product information:
 https://vac.muzychenko.net/en/license.txt
 https://vac.muzychenko.net/en/download.htm
@@ -46,13 +46,13 @@ in THIRD_PARTY_NOTICES.md and the licences folder.
 
 PRIVACY AND AUDIO
 
-Setup checks installed audio drivers and running Vine Mix processes locally.
+Setup checks installed audio drivers and running VineMix processes locally.
 The included driver packages are available offline. Opening a vendor website
 uses your browser. Setup does not upload your audio, settings or saved workspaces.
-Vine Mix's routing and audio settings remain under your control. Review the user
+VineMix's routing and audio settings remain under your control. Review the user
 guide and test routing and levels before relying on it for important work.
 
-VINE MIX OPEN-SOURCE LICENCE
+VINEMIX OPEN-SOURCE LICENCE
 
 MIT License
 

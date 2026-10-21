@@ -1,29 +1,29 @@
-VINE MIX INSTALLATION HELP
+VINEMIX INSTALLATION HELP
 
 Application folder
-  Default: %LOCALAPPDATA%\Programs\Vine Mix
-  Run AudioMixer.exe, or use the Vine Mix Start menu shortcut.
+  Default: %LOCALAPPDATA%\Programs\VineMix
+  Run VineMix.exe, or use the VineMix Start menu shortcut.
 
 Saved workspaces, preferences, backups and logs
-  %LOCALAPPDATA%\AudioMixer
+  %LOCALAPPDATA%\VineMix
   These files are separate from the application and are retained on upgrade,
-  repair and uninstall. The existing AudioMixer name preserves compatibility.
+  repair and uninstall. Legacy AudioMixer data is retained during copy-only migration.
   Save an extra copy of important workspaces through the application's controls.
 
 Existing portable copies
   All copies share one user account's settings and audio engine identity.
-  Setup leaves a running copy in another folder alone. Choose Quit Vine Mix in
+  Setup leaves a running copy in another folder alone. Choose Quit VineMix in
   its tray menu before opening the installed copy. Closing its window only
   hides it to the tray. Do not manually run two engines against the same files.
 
 Virtual audio drivers
-  VB-CABLE receives other applications' playback into Vine Mix.
-  VAC supplies Vine Mix's outgoing audio to recording/microphone applications.
+  VB-CABLE receives other applications' playback into VineMix.
+  VAC supplies VineMix's outgoing audio to recording/microphone applications.
   Setup checks installed device and driver-package identity, including disabled
   devices. Existing packages are kept; their names/settings are not reset.
   Missing drivers are optional and require separate consent and administrator
   approval in their original vendor installation windows. Restart Windows after
-  installing drivers before using them. Vine Mix can run without virtual paths.
+  installing drivers before using them. VineMix can run without virtual paths.
 
   VB-CABLE by VB-Audio is donationware; all contributions are welcome.
   https://vb-audio.com/Cable/
@@ -48,19 +48,19 @@ Upgrade and repair
   implement online update checking or automatic downloads of application updates.
 
 Uninstall
-  Use Windows Settings > Apps > Installed apps > Vine Mix > Uninstall, or the
+  Use Windows Settings > Apps > Installed apps > VineMix > Uninstall, or the
   Start menu uninstall shortcut. Quit the installed copy first. Uninstall removes
   installed application files and shortcuts, retaining saved workspaces and all
   shared audio drivers. If this installed copy owns its start-at-login entry,
   that entry is removed. Other copies' startup entries are retained.
 
 Security and notices
-  The current development installer and Vine Mix executables are unsigned.
+  The current development installer and VineMix executables are unsigned.
   Driver vendor signatures are verified during package preparation. They do not
-  sign Vine Mix or imply vendor endorsement. Read TERMS.txt, THIRD_PARTY_NOTICES.md
+  sign VineMix or imply vendor endorsement. Read TERMS.txt, THIRD_PARTY_NOTICES.md
   and the licences directory for the separate component terms.
 
 Unattended application-only deployment
   Setup requires explicit /ACCEPTTERMS=1 for /SILENT or /VERYSILENT runs.
   Specify /DRIVERS=none. Driver installs are interactive only. /NORESTART prevents
-  an automatic restart. Silent setup does not launch Vine Mix.
+  an automatic restart. Silent setup does not launch VineMix.

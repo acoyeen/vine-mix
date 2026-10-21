@@ -4,6 +4,12 @@
 #ifndef AppVersion
   #error AppVersion is required.
 #endif
+#ifndef NumericVersion
+  #error NumericVersion is required.
+#endif
+#ifndef DisplayVersion
+  #error DisplayVersion is required.
+#endif
 #ifndef DriverArchiveDir
   #error DriverArchiveDir is required.
 #endif
@@ -16,12 +22,13 @@
 
 [Setup]
 AppId={code:ApplicationId}
-AppName=Vine Mix
-AppVersion={#AppVersion}
+AppName=VineMix
+AppVersion={#DisplayVersion}
 AppPublisher=acoyeen
 AppComments=Local Windows audio mixing with a node workspace
-DefaultDirName={localappdata}\Programs\Vine Mix
-DefaultGroupName=Vine Mix
+DefaultDirName={localappdata}\Programs\VineMix
+UsePreviousAppDir=yes
+DefaultGroupName=VineMix
 DisableProgramGroupPage=yes
 DisableDirPage=no
 AllowNoIcons=yes
@@ -32,8 +39,8 @@ SetupArchitecture=x64
 MinVersion=10.0.22000
 WizardStyle=modern dynamic
 WizardSizePercent=120,140
-SetupIconFile=..\desktop\AudioMixer.Desktop\Assets\Branding\app.ico
-UninstallDisplayIcon={app}\AudioMixer.exe
+SetupIconFile=..\desktop\VineMix.Desktop\Assets\Branding\app.ico
+UninstallDisplayIcon={app}\VineMix.exe
 LicenseFile=TERMS.txt
 OutputDir={#OutputDir}
 OutputBaseFilename=VineMix-{#AppVersion}-Setup-x64
@@ -44,10 +51,11 @@ CloseApplications=no
 RestartApplications=no
 SetupMutex=Local\VineMix.Setup
 UsePreviousLanguage=no
-UninstallDisplayName=Vine Mix
-VersionInfoProductName=Vine Mix
-VersionInfoProductVersion={#AppVersion}
-VersionInfoVersion={#AppVersion}
+UninstallDisplayName=VineMix
+VersionInfoProductName=VineMix
+VersionInfoProductVersion={#NumericVersion}
+VersionInfoProductTextVersion={#AppVersion}
+VersionInfoVersion={#NumericVersion}
 VersionInfoCopyright=Copyright (c) 2026 acoyeen
 
 [Tasks]
@@ -61,21 +69,26 @@ Source: "{#DriverArchiveDir}\vac471lite.zip"; Flags: dontcopy
 Source: "{#PayloadDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{group}\Vine Mix"; Filename: "{app}\AudioMixer.exe"; WorkingDir: "{app}"; AppUserModelID: "acoyeen.VineMix"; Check: NotTestMode
+Name: "{group}\VineMix"; Filename: "{app}\VineMix.exe"; WorkingDir: "{app}"; AppUserModelID: "acoyeen.VineMix"; Check: NotTestMode
 Name: "{group}\Installation help"; Filename: "{app}\SetupSupport\INSTALLATION.txt"; Check: NotTestMode
-Name: "{group}\Uninstall Vine Mix"; Filename: "{uninstallexe}"; Check: NotTestMode
-Name: "{autodesktop}\Vine Mix"; Filename: "{app}\AudioMixer.exe"; WorkingDir: "{app}"; Tasks: desktopicon; Check: NotTestMode
+Name: "{group}\Uninstall VineMix"; Filename: "{uninstallexe}"; Check: NotTestMode
+Name: "{autodesktop}\VineMix"; Filename: "{app}\VineMix.exe"; WorkingDir: "{app}"; Tasks: desktopicon; Check: NotTestMode
 
 [INI]
-Filename: "{app}\installation.ini"; Section: "Installation"; Key: "Version"; String: "{#AppVersion}"; Flags: uninsdeleteentry uninsdeletesectionifempty
+Filename: "{app}\installation.ini"; Section: "Installation"; Key: "Version"; String: "{#NumericVersion}"; Flags: uninsdeleteentry uninsdeletesectionifempty
 Filename: "{app}\installation.ini"; Section: "Installation"; Key: "ApplicationId"; String: "{code:ApplicationId}"; Flags: uninsdeleteentry uninsdeletesectionifempty
+
+[InstallDelete]
+; Retire only binaries owned by the previous AppId after the process guard passed.
+Type: files; Name: "{app}\AudioMixer.exe"
+Type: files; Name: "{app}\AudioMixer.Engine.exe"
 
 [UninstallDelete]
 Type: files; Name: "{app}\installation.ini"
 Type: files; Name: "{app}\SetupSupport\driver-install-result.txt"
 
 [Run]
-Filename: "{app}\AudioMixer.exe"; WorkingDir: "{app}"; Description: "Open Vine Mix"; Flags: nowait postinstall skipifsilent; Check: CanLaunch
+Filename: "{app}\VineMix.exe"; WorkingDir: "{app}"; Description: "Open VineMix"; Flags: nowait postinstall skipifsilent; Check: CanLaunch
 
 [Code]
 var
@@ -252,12 +265,12 @@ begin
   VbCheck := TNewCheckBox.Create(DriversPage);
   VbCheck.Parent := DriversPage.Surface;
   VbCheck.SetBounds(0, ScaleY(101), DriversPage.SurfaceWidth, ScaleY(22));
-  VbCheck.Caption := 'Install VB-CABLE - brings other applications into Vine Mix';
+  VbCheck.Caption := 'Install VB-CABLE - brings other applications into VineMix';
   VbCheck.OnClick := @DriverSelectionChanged;
   VacCheck := TNewCheckBox.Create(DriversPage);
   VacCheck.Parent := DriversPage.Surface;
   VacCheck.SetBounds(0, ScaleY(128), DriversPage.SurfaceWidth, ScaleY(22));
-  VacCheck.Caption := 'Install VAC Lite - sends Vine Mix to microphone/recording apps';
+  VacCheck.Caption := 'Install VAC Lite - sends VineMix to microphone/recording apps';
   VacCheck.OnClick := @DriverSelectionChanged;
   DriverNotice := TNewStaticText.Create(DriversPage);
   DriverNotice.Parent := DriversPage.Surface;
@@ -267,7 +280,7 @@ begin
   DriverNotice.Caption := 'VB-CABLE by VB-Audio is donationware; contributions are welcome. ' +
     'VAC Lite is for private home use with no income generation. ' +
     'Selected drivers open their original setup windows and require administrator approval. ' +
-    'You can install Vine Mix without them.';
+    'You can install VineMix without them.';
   VbTermsButton := TNewButton.Create(DriversPage);
   VbTermsButton.Parent := DriversPage.Surface;
   VbTermsButton.SetBounds(0, ScaleY(248), ScaleX(155), ScaleY(25));
@@ -291,13 +304,15 @@ begin
 end;
 
 function SafeDestination: Boolean;
-var Folder, DataFolder, Root: String;
+var Folder, DataFolder, LegacyDataFolder, Root: String;
 begin
   Folder := AddBackslash(ExpandFileName(ExpandConstant('{app}')));
-  DataFolder := AddBackslash(ExpandFileName(ExpandConstant('{localappdata}\AudioMixer')));
+  DataFolder := AddBackslash(ExpandFileName(ExpandConstant('{localappdata}\VineMix')));
+  LegacyDataFolder := AddBackslash(ExpandFileName(ExpandConstant('{localappdata}\AudioMixer')));
   Root := AddBackslash(ExtractFileDrive(Folder));
   Result := (CompareText(Folder, Root) <> 0) and
     (Pos(Lowercase(DataFolder), Lowercase(Folder)) <> 1) and
+    (Pos(Lowercase(LegacyDataFolder), Lowercase(Folder)) <> 1) and
     (CompareText(Folder, AddBackslash(GetEnv('USERPROFILE'))) <> 0) and
     (CompareText(Folder, AddBackslash(ExpandConstant('{localappdata}'))) <> 0) and
     (CompareText(Folder, AddBackslash(ExpandConstant('{userdocs}'))) <> 0) and
@@ -338,22 +353,22 @@ begin
   Result := '';
   if not SafeDestination then begin Result := 'Choose a dedicated application folder.'; Exit; end;
   if not RefreshDetection then begin
-    Result := 'Setup could not safely check running Vine Mix processes. Close other setup windows and try again.'; Exit;
+    Result := 'Setup could not safely check running VineMix processes. Close other setup windows and try again.'; Exit;
   end;
   if not DestinationSafe then begin
     Result := 'Choose a dedicated application folder outside your saved-data folder and system roots.'; Exit;
   end;
   if TargetRunning then begin
     Log('TARGET_RUNNING: refusing to replace files used by the running target.');
-    Result := 'Vine Mix is running from the selected installation folder. Save your work and choose Quit Vine Mix from its tray menu, then retry.'; Exit;
+    Result := 'VineMix is running from the selected installation folder. Save your work and choose Quit VineMix from its tray menu, then retry.'; Exit;
   end;
   if AppRunning and (VbCheck.Checked or VacCheck.Checked) then begin
-    Result := 'Quit the running Vine Mix from its tray menu before installing audio drivers. You can also go back and deselect driver installation.'; Exit;
+    Result := 'Quit the running VineMix from its tray menu before installing audio drivers. You can also go back and deselect driver installation.'; Exit;
   end;
   ExistingVersion := GetIniString('Installation', 'Version', '', ExpandConstant('{app}\installation.ini'));
-  if (ExistingVersion <> '') and (CompareVersion(ExistingVersion, '{#AppVersion}') > 0) then begin
+  if (ExistingVersion <> '') and (CompareVersion(ExistingVersion, '{#NumericVersion}') > 0) then begin
     Log('DOWNGRADE_BLOCKED: installed version is newer than this package.');
-    Result := 'A newer version of Vine Mix is installed here. Use its installer rather than downgrading.';
+    Result := 'A newer version of VineMix is installed here. Use its installer rather than downgrading.';
   end;
 end;
 
@@ -361,13 +376,13 @@ function UpdateReadyMemo(Space, NewLine, MemoUserInfoInfo, MemoDirInfo, MemoType
   MemoComponentsInfo, MemoGroupInfo, MemoTasksInfo: String): String;
 begin
   Result := MemoDirInfo + NewLine + NewLine + 'Saved workspaces and preferences:' + NewLine +
-    Space + ExpandConstant('{localappdata}\AudioMixer') + NewLine +
+    Space + ExpandConstant('{localappdata}\VineMix') + NewLine +
     Space + 'Existing files are retained, including on uninstall.' + NewLine + NewLine + 'Virtual audio drivers:';
   if VbCheck.Checked then Result := Result + NewLine + Space + 'Install original VB-CABLE package'
   else Result := Result + NewLine + Space + 'VB-CABLE: keep current installation / skip';
   if VacCheck.Checked then Result := Result + NewLine + Space + 'Install original VAC Lite package'
   else Result := Result + NewLine + Space + 'VAC: keep current installation / skip';
-  if AppRunning then Result := Result + NewLine + NewLine + 'A copy of Vine Mix is already running. Setup will leave it running and will not open another copy.';
+  if AppRunning then Result := Result + NewLine + NewLine + 'A copy of VineMix is already running. Setup will leave it running and will not open another copy.';
   if MemoTasksInfo <> '' then Result := Result + NewLine + NewLine + MemoTasksInfo;
 end;
 
@@ -400,15 +415,65 @@ begin
   end;
 end;
 
+procedure MigrateOwnedStartup;
+var
+  RunKey, ApprovalKey, OldCommand, NewCommand, Existing, Confirm: String;
+  Approval, CurrentApproval: AnsiString;
+  HadApproval, NewEntryExists: Boolean;
+begin
+  if IsTest then Exit;
+  RunKey := 'Software\Microsoft\Windows\CurrentVersion\Run';
+  ApprovalKey := 'Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run';
+  OldCommand := Quote(ExpandConstant('{app}\AudioMixer.exe')) + ' --background';
+  NewCommand := Quote(ExpandConstant('{app}\VineMix.exe')) + ' --background';
+  if not RegQueryStringValue(HKCU, RunKey, 'AudioMixer', Existing) or
+      (CompareText(Existing, OldCommand) <> 0) then Exit;
+  NewEntryExists := RegValueExists(HKCU, RunKey, 'VineMix');
+  if NewEntryExists then begin
+    if not RegQueryStringValue(HKCU, RunKey, 'VineMix', Existing) or
+        (CompareText(Existing, NewCommand) <> 0) then begin
+      Log('STARTUP_MIGRATION_SKIPPED: another VineMix startup entry is already owned elsewhere.'); Exit;
+    end;
+    { The current entry already expresses the user's current choice. }
+  end else begin
+    HadApproval := RegValueExists(HKCU, ApprovalKey, 'AudioMixer');
+    if HadApproval and not RegQueryBinaryValue(HKCU, ApprovalKey, 'AudioMixer', Approval) then begin
+      Log('STARTUP_MIGRATION_SKIPPED: legacy startup approval state could not be preserved.'); Exit;
+    end;
+    if RegValueExists(HKCU, ApprovalKey, 'VineMix') then begin
+      Log('STARTUP_MIGRATION_SKIPPED: an existing VineMix startup approval choice is retained.'); Exit;
+    end;
+    { Copy Windows' state verbatim; do not decode or reset disabled choices. }
+    if HadApproval then begin
+      if not RegWriteBinaryValue(HKCU, ApprovalKey, 'VineMix', Approval) or
+          not RegQueryBinaryValue(HKCU, ApprovalKey, 'VineMix', CurrentApproval) or
+          (CurrentApproval <> Approval) then begin
+        Log('STARTUP_MIGRATION_SKIPPED: startup approval state could not be copied safely.'); Exit;
+      end;
+    end;
+    if not RegWriteStringValue(HKCU, RunKey, 'VineMix', NewCommand) then begin
+      Log('STARTUP_MIGRATION_SKIPPED: the current startup entry could not be written.'); Exit;
+    end;
+  end;
+  if RegQueryStringValue(HKCU, RunKey, 'VineMix', Confirm) and
+      (CompareText(Confirm, NewCommand) = 0) and
+      RegQueryStringValue(HKCU, RunKey, 'AudioMixer', Existing) and
+      (CompareText(Existing, OldCommand) = 0) then begin
+    RegDeleteValue(HKCU, RunKey, 'AudioMixer');
+    Log('STARTUP_MIGRATED: only the legacy startup command owned by this upgraded folder was moved.');
+  end;
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
   if CurStep = ssPostInstall then begin
+    MigrateOwnedStartup;
     DriverResults := '';
     if not VbCheck.Checked and not VacCheck.Checked then Log('DRIVER_INSTALLATION_SKIPPED');
     if VbCheck.Checked then InstallDriver('VBCable', 'VB-CABLE', 'VBCABLE_Driver_Pack45.zip', '{#VbArchiveHash}', 'vb-cable', 'VBCABLE_Setup_x64.exe');
     if VacCheck.Checked then InstallDriver('VAC', 'VAC Lite', 'vac471lite.zip', '{#VacArchiveHash}', 'vac-lite', 'setup64.exe');
     SaveStringToFile(ExpandConstant('{app}\SetupSupport\driver-install-result.txt'),
-      'Vine Mix Setup '#13#10 + DriverResults + #13#10 + 'Use Setup to check or install missing drivers. Existing drivers are never uninstalled with Vine Mix.', False);
+      'VineMix Setup '#13#10 + DriverResults + #13#10 + 'Use Setup to check or install missing drivers. Existing drivers are never uninstalled with VineMix.', False);
   end;
 end;
 
@@ -429,7 +494,7 @@ begin
   if CurPageID = DriversPage.ID then begin RefreshDetection; UpdateDriverPage; end;
   if CurPageID = wpFinished then begin
     if AppRunning then WizardForm.FinishedLabel.Caption :=
-      'Vine Mix is installed. Your existing copy is still running. Quit it from the tray before opening the installed copy. Your saved workspaces and preferences are shared and retained.';
+      'VineMix is installed. Your existing copy is still running. Quit it from the tray before opening the installed copy. Your saved workspaces and preferences are shared and retained.';
     if DriverResults <> '' then WizardForm.FinishedLabel.Caption := WizardForm.FinishedLabel.Caption + #13#10 + DriverResults;
   end;
 end;
@@ -442,7 +507,7 @@ begin
   StatusFile := ExpandConstant('{tmp}\vinemix-uninstall-status.ini');
   if FileExists(StatusFile) and not DeleteFile(StatusFile) then Exit;
   if not FileExists(UninstallHelper) then begin
-    SuppressibleMsgBox('Setup support is missing. Reinstall Vine Mix in this folder to repair it before uninstalling.', mbError, MB_OK, IDOK); Exit;
+    SuppressibleMsgBox('Setup support is missing. Reinstall VineMix in this folder to repair it before uninstalling.', mbError, MB_OK, IDOK); Exit;
   end;
   if not Exec(UninstallHelper, 'detect --output ' + Quote(StatusFile) + ' --install-dir ' + Quote(ExpandConstant('{app}')),
       '', SW_HIDE, ewWaitUntilTerminated, Code) then Exit;
@@ -452,7 +517,7 @@ begin
   if not ValidBoolIni('Application', 'RunningInstalled', StatusFile) then Exit;
   if GetIniString('Application', 'RunningInstalled', '1', StatusFile) = '1' then begin
     Log('UNINSTALL_TARGET_RUNNING: refusing to remove files used by the running target.');
-    SuppressibleMsgBox('Save your work and choose Quit Vine Mix from its tray menu before uninstalling this copy.', mbInformation, MB_OK, IDOK); Exit;
+    SuppressibleMsgBox('Save your work and choose Quit VineMix from its tray menu before uninstalling this copy.', mbInformation, MB_OK, IDOK); Exit;
   end;
   Result := True;
 end;
@@ -461,6 +526,9 @@ procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 var StartupValue: String;
 begin
   if (CurUninstallStep = usUninstall) and not TestMode then begin
+    if RegQueryStringValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Run', 'VineMix', StartupValue) and
+      (CompareText(StartupValue, Quote(ExpandConstant('{app}\VineMix.exe')) + ' --background') = 0) then
+      RegDeleteValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Run', 'VineMix');
     if RegQueryStringValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Run', 'AudioMixer', StartupValue) and
       (CompareText(StartupValue, Quote(ExpandConstant('{app}\AudioMixer.exe')) + ' --background') = 0) then
       RegDeleteValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Run', 'AudioMixer');

@@ -6,5 +6,5 @@
 # Preserve upstream notices verbatim, including their original whitespace.
 licenses/** -text -whitespace
 # Preserve the embedded upstream notice and approved artwork bytes as published.
-desktop/AudioMixer.Desktop/Assets/Fonts/IBM-Plex-LICENSE.txt -text -whitespace
-desktop/AudioMixer.Desktop/Assets/Branding/wordmark.svg -text -whitespace
+desktop/VineMix.Desktop/Assets/Fonts/IBM-Plex-LICENSE.txt -text -whitespace
+desktop/VineMix.Desktop/Assets/Branding/wordmark.svg -text -whitespace

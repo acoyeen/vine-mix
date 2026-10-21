@@ -245,7 +245,7 @@ int observe(const Options& options) {
     if (endpoint.id.empty() || endpoint.direction != "capture" || endpoint.state != "Active" || !endpoint.isVirtual ||
         (endpoint.transport != "vacLite" && endpoint.transport != "vbCable"))
         throw std::runtime_error("Capture ID must identify an active VAC or VB-CABLE capture endpoint; physical and unknown transports are refused");
-    Json report{{"tool", "AudioMixer.CaptureIsolationProbe"}, {"pid", options.pid}, {"executablePath", utf8(path)},
+    Json report{{"tool", "VineMix.CaptureIsolationProbe"}, {"pid", options.pid}, {"executablePath", utf8(path)},
         {"captureEndpoint", {{"id", endpoint.id}, {"name", endpoint.name}, {"transport", endpoint.transport}}},
         {"seconds", options.seconds}, {"audioFilesWritten", false}, {"outputStreamsOpened", false},
         {"settingsChanged", false}, {"isolationProven", false}};
@@ -311,7 +311,7 @@ int observe(const Options& options) {
 int wmain(int argc, wchar_t** argv) {
     try { return observe(parse(argc, argv)); }
     catch (const std::exception& error) {
-        std::cout << Json{{"tool", "AudioMixer.CaptureIsolationProbe"}, {"outcome", "error"}, {"detail", error.what()}}.dump() << '\n';
+        std::cout << Json{{"tool", "VineMix.CaptureIsolationProbe"}, {"outcome", "error"}, {"detail", error.what()}}.dump() << '\n';
         return 1;
     }
 }

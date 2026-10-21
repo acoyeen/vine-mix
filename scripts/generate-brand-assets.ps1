@@ -2,7 +2,7 @@
 param()
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName PresentationCore, WindowsBase
-$directory = Join-Path $PSScriptRoot '..\desktop\AudioMixer.Desktop\Assets\Branding'
+$directory = Join-Path $PSScriptRoot '..\desktop\VineMix.Desktop\Assets\Branding'
 $null = New-Item -ItemType Directory -Path $directory -Force
 # Keep these two paths in sync with Controls/BrandMark.cs. Their long diagonals
 # share a 45-degree angle; the two filled pieces remain separated at every size.

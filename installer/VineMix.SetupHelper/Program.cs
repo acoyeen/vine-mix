@@ -30,7 +30,7 @@ internal static class Program
             var vb = DetectionPolicy.Evaluate(DriverFamily.VBCable, devices, packages);
             var vac = DetectionPolicy.Evaluate(DriverFamily.VAC, devices, packages);
             var application = WindowsDetection.ReadApplication(installDirectory);
-            var text = new StringBuilder("; Vine Mix read-only setup detection. No devices or processes were changed.\r\n");
+            var text = new StringBuilder("; VineMix read-only setup detection. No devices or processes were changed.\r\n");
             WriteDriver(text, "VBCable", vb);
             WriteDriver(text, "VAC", vac);
             text.AppendLine("[Application]");
@@ -126,8 +126,8 @@ internal static class DetectionPolicy
             if (installDirectory is not null && IsWithin(process.Path, installDirectory)) installed = true;
         }
         if (!succeeded)
-            return new(false, true, true, "A possible Vine Mix process could not be checked safely. Close Vine Mix before continuing.");
-        return new(true, running, installed, running ? "Vine Mix or its audio engine is already running. The current session will be left untouched." : "No Vine Mix session is running for this Windows user.");
+            return new(false, true, true, "A possible VineMix process could not be checked safely. Close VineMix before continuing.");
+        return new(true, running, installed, running ? "VineMix or its audio engine is already running. The current session will be left untouched." : "No VineMix session is running for this Windows user.");
     }
 
     private static bool IsWithin(string path, string directory)
@@ -344,7 +344,7 @@ internal static class WindowsDetection
         if (installDirectory is not null && resolvedDirectory is null) succeeded = false;
         bool installPathSafe = installDirectory is null || IsSafeDestination(resolvedDirectory);
         string ownUser = WindowsIdentity.GetCurrent().User?.Value ?? throw new InvalidOperationException("Current user cannot be identified.");
-        foreach (string name in new[] { "AudioMixer", "AudioMixer.Engine" })
+        foreach (string name in new[] { "VineMix", "VineMix.Engine", "AudioMixer", "AudioMixer.Engine" })
         {
             Process[] processes;
             try { processes = Process.GetProcessesByName(name); }
@@ -378,8 +378,11 @@ internal static class WindowsDetection
     private static bool IsSafeDestination(string? directory)
     {
         if (directory is null) return false;
-        string? data = ResolveDestination(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AudioMixer"));
-        if (data is null || IsSameOrWithin(directory, data)) return false;
+        foreach (string name in new[] { "AudioMixer", "VineMix" })
+        {
+            string? data = ResolveDestination(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), name));
+            if (data is null || IsSameOrWithin(directory, data)) return false;
+        }
         foreach (var special in new[] { Environment.SpecialFolder.UserProfile, Environment.SpecialFolder.LocalApplicationData,
             Environment.SpecialFolder.MyDocuments, Environment.SpecialFolder.Windows, Environment.SpecialFolder.System })
         {
@@ -533,7 +536,9 @@ internal static class SelfTests
         var questionable = new Evidence<PackageEvidence>(new[] { new PackageEvidence(DriverFamily.VAC, "", false) }, true);
         Require(DetectionPolicy.Evaluate(DriverFamily.VAC, noDevices, questionable) is { Installed: true, Succeeded: false }, "broken package requires attention rather than reinstall");
         Require(!DetectionPolicy.Evaluate(DriverFamily.VAC, new Evidence<DeviceEvidence>(Array.Empty<DeviceEvidence>(), false), noPackages).Succeeded, "partial Windows enumeration never means absent");
-        var target = @"C:\Users\Example\AppData\Local\Programs\Vine Mix";
+        var target = @"C:\Users\Example\AppData\Local\Programs\VineMix";
+        Require(DetectionPolicy.EvaluateProcesses(new[] { new ProcessEvidence(true, target + @"\VineMix.exe", true) }, true, target) is { Running: true, RunningInstalled: true }, "current desktop target blocks overwrite");
+        Require(DetectionPolicy.EvaluateProcesses(new[] { new ProcessEvidence(true, @"E:\Other\VineMix.Engine.exe", true) }, true, target) is { Running: true, RunningInstalled: false }, "current engine in another folder blocks a second launch");
         Require(DetectionPolicy.EvaluateProcesses(new[] { new ProcessEvidence(true, target + @"\AudioMixer.exe", true) }, true, target) is { Running: true, RunningInstalled: true }, "running target blocks overwrite");
         Require(DetectionPolicy.EvaluateProcesses(new[] { new ProcessEvidence(true, @"E:\Other\AudioMixer.Engine.exe", true) }, true, target) is { Running: true, RunningInstalled: false }, "other folder session blocks second launch only");
         Require(DetectionPolicy.EvaluateProcesses(new[] { new ProcessEvidence(false, target + @"\AudioMixer.exe", true) }, true, target).Running == false, "other user is not current user session");
@@ -541,8 +546,8 @@ internal static class SelfTests
         Require(!DetectionPolicy.EvaluateProcesses(new[] { new ProcessEvidence(true, target + @"2\AudioMixer.exe", true) }, true, target).RunningInstalled, "directory boundary avoids sibling prefix collision");
         Require(!DetectionPolicy.EvaluateProcesses(new[] { new ProcessEvidence(true, null, false) }, true, target).Running, "exited processes ignored");
         Require(!Program.Sanitize("value\r\nInjected=1\u00e9").Contains('\n'), "INI injection prevented");
-        Require(WindowsDetection.NormalizeFinalPath(@"\\?\C:\Programs\Vine Mix") == @"C:\Programs\Vine Mix", "DOS final path normalization");
-        Require(WindowsDetection.NormalizeFinalPath(@"\\?\UNC\server\share\Vine Mix") == @"\\server\share\Vine Mix", "UNC final path normalization");
+        Require(WindowsDetection.NormalizeFinalPath(@"\\?\C:\Programs\VineMix") == @"C:\Programs\VineMix", "DOS final path normalization");
+        Require(WindowsDetection.NormalizeFinalPath(@"\\?\UNC\server\share\VineMix") == @"\\server\share\VineMix", "UNC final path normalization");
         Require(WindowsDetection.IsSameOrWithin(@"C:\Data\AudioMixer\Nested", @"C:\Data\AudioMixer"), "protected data descendant blocked after final-path resolution");
         Require(WindowsDetection.IsSameOrWithin(@"C:\Data\AudioMixer", @"C:\Data\AudioMixer"), "protected data directory blocked after final-path resolution");
         Require(!WindowsDetection.IsSameOrWithin(@"C:\Data\AudioMixer2", @"C:\Data\AudioMixer"), "protected data sibling prefix remains distinct");

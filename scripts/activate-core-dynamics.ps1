@@ -1,15 +1,18 @@
 $ErrorActionPreference = 'Stop'
 $project = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
-$package = Join-Path $project 'artifacts\AudioMixer'
-$candidate = Join-Path $project 'artifacts\AudioMixer-CoreDynamics'
+$package = Join-Path $project 'artifacts\VineMix'
+$candidate = Join-Path $project 'artifacts\VineMix-CoreDynamics'
 $evidence = Join-Path $project ('artifacts\core-dynamics-update-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
-$uiPath = Join-Path $package 'AudioMixer.exe'
-$enginePath = Join-Path $package 'AudioMixer.Engine.exe'
-$settings = Join-Path $env:LOCALAPPDATA 'AudioMixer\settings.json'
-$oldUi = @(Get-Process AudioMixer -ErrorAction SilentlyContinue | Where-Object Path -eq $uiPath)
-$oldEngine = @(Get-Process AudioMixer.Engine -ErrorAction SilentlyContinue | Where-Object Path -eq $enginePath)
+$uiPath = Join-Path $package 'VineMix.exe'
+$enginePath = Join-Path $package 'VineMix.Engine.exe'
+$settings = Join-Path $env:LOCALAPPDATA 'VineMix\settings.json'
+. (Join-Path $PSScriptRoot 'assert-desktop-data-context.ps1')
+Assert-DesktopDataContext $settings
+if (Get-Process AudioMixer,AudioMixer.Engine -ErrorAction SilentlyContinue) { throw 'A legacy audio session is running. No process was changed.' }
+$oldUi = @(Get-Process VineMix -ErrorAction SilentlyContinue | Where-Object Path -eq $uiPath)
+$oldEngine = @(Get-Process VineMix.Engine -ErrorAction SilentlyContinue | Where-Object Path -eq $enginePath)
 if ($oldUi.Count -ne 1 -or $oldEngine.Count -ne 1) { throw 'Expected exactly the current personal controller and engine.' }
-foreach ($file in @('AudioMixer.exe','AudioMixer.Engine.exe')) {
+foreach ($file in @('VineMix.exe','VineMix.Engine.exe')) {
     if (-not (Test-Path -LiteralPath (Join-Path $candidate $file))) { throw "Candidate missing $file" }
 }
 $manifestPath = Join-Path $candidate 'BUILD_IDENTITY.json'
@@ -28,14 +31,14 @@ foreach ($file in @('licenses\SpeexDSP-COPYING.txt','THIRD_PARTY_NOTICES.md','do
 New-Item -ItemType Directory -Path $evidence | Out-Null
 # Complete working package backup, including all bundled guides and runtimes.
 Copy-Item -LiteralPath $package -Destination (Join-Path $evidence 'package-before') -Recurse
-foreach ($file in @('AudioMixer.exe','AudioMixer.Engine.exe')) {
+foreach ($file in @('VineMix.exe','VineMix.Engine.exe')) {
     Copy-Item -LiteralPath (Join-Path $package $file) -Destination (Join-Path $evidence $file)
 }
 $result = [ordered]@{started=(Get-Date).ToString('o'); oldUiId=$oldUi[0].Id; oldEngineId=$oldEngine[0].Id; backupDirectory=$evidence; passed=$false; rolledBack=$false}
 $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
 try { $sid = $identity.User.Value } finally { $identity.Dispose() }
 function Request([string]$command) {
-    $pipe = [IO.Pipes.NamedPipeClientStream]::new('.',('AudioMixer.Control.' + $sid),[IO.Pipes.PipeDirection]::InOut,[IO.Pipes.PipeOptions]::Asynchronous)
+    $pipe = [IO.Pipes.NamedPipeClientStream]::new('.',('VineMix.Control.' + $sid),[IO.Pipes.PipeDirection]::InOut,[IO.Pipes.PipeOptions]::Asynchronous)
     $reader = $null; $writer = $null
     try {
         $pipe.Connect(3000)
@@ -102,7 +105,7 @@ try {
     $stoppedEngine=$true; $null=Request 'shutdown'
     if (-not $oldEngine[0].WaitForExit(5000)) { throw 'Engine did not exit gracefully.' }
     $replaced=$true
-    foreach ($file in @('AudioMixer.exe','AudioMixer.Engine.exe')) {
+    foreach ($file in @('VineMix.exe','VineMix.Engine.exe')) {
         Copy-Item -LiteralPath (Join-Path $candidate $file) -Destination (Join-Path $package $file) -Force
     }
     foreach ($folder in @('licenses','docs')) {
@@ -159,18 +162,15 @@ try {
     $result.previouslyRunningPathsRestored=($missing.Count -eq 0)
     $result.paths=@($after.status.nodes | ForEach-Object {[ordered]@{id=$_.id;state=$_.path.state}})
     $result.newEngineId=$newEngine.Id
-    # Opening the requested application is the only visible desktop action.
-    $newUi=Start-Process -FilePath $uiPath -WorkingDirectory $package -PassThru
-    $result.inputIdle=$newUi.WaitForInputIdle(15000)
-    Start-Sleep -Milliseconds 400
-    $newUi.Refresh()
-    if ($newUi.HasExited -or $newUi.MainWindowHandle -eq 0 -or -not $newUi.Responding) { throw 'Updated application did not open a responsive window.' }
+    # Track the final responsive controller after its standalone self-relaunch.
+    $newUi=Start-DesktopController -ExecutablePath $uiPath -WorkingDirectory $package
+    $result.inputIdle=$true
     $result.newUiId=$newUi.Id
     $result.windowTitle=$newUi.MainWindowTitle
     $result.windowHandle=$newUi.MainWindowHandle.ToInt64()
-    $result.uiMatchesCandidate=((Get-FileHash -LiteralPath $uiPath).Hash -eq (Get-FileHash -LiteralPath (Join-Path $candidate 'AudioMixer.exe')).Hash)
+    $result.uiMatchesCandidate=((Get-FileHash -LiteralPath $uiPath).Hash -eq (Get-FileHash -LiteralPath (Join-Path $candidate 'VineMix.exe')).Hash)
         $result.settingsUnchangedAfterOpen=((Get-FileHash -LiteralPath $settings).Hash -eq $settingsHash)
-    $result.engineMatchesCandidate=((Get-FileHash -LiteralPath $enginePath).Hash -eq (Get-FileHash -LiteralPath (Join-Path $candidate 'AudioMixer.Engine.exe')).Hash)
+    $result.engineMatchesCandidate=((Get-FileHash -LiteralPath $enginePath).Hash -eq (Get-FileHash -LiteralPath (Join-Path $candidate 'VineMix.Engine.exe')).Hash)
     if (-not $result.uiMatchesCandidate -or -not $result.engineMatchesCandidate) { throw 'The installed application differs from the verified candidate.' }
     if (-not $result.settingsUnchangedAfterOpen) { throw 'Saved settings changed when opening the updated controller.' }
     # Publish guides and build identity only after the verified binaries recover.
@@ -190,7 +190,7 @@ try {
             # Stop supervision before checking all exact-path engines; the UI
             # may have replaced the initially launched candidate process.
             foreach ($processPath in @($uiPath,$enginePath)) {
-              foreach ($process in @(Get-Process AudioMixer,AudioMixer.Engine -ErrorAction SilentlyContinue | Where-Object Path -eq $processPath)) {
+              foreach ($process in @(Get-Process VineMix,VineMix.Engine -ErrorAction SilentlyContinue | Where-Object Path -eq $processPath)) {
                 try {
                     if (-not $process.HasExited) {
                         $process.Kill()
@@ -201,7 +201,7 @@ try {
               }
             }
             $restored=0
-            foreach ($file in @('AudioMixer.exe','AudioMixer.Engine.exe')) {
+            foreach ($file in @('VineMix.exe','VineMix.Engine.exe')) {
                 try {
                     Copy-Item -LiteralPath (Join-Path $evidence $file) -Destination (Join-Path $package $file) -Force
                     $restored++
@@ -221,19 +221,19 @@ try {
                     elseif (Test-Path -LiteralPath $target) { Remove-Item -LiteralPath $target -Force }
                 } catch { $rollbackErrors.Add('Restore metadata '+$relative+': '+$_.Exception.Message) }
             }
-            foreach ($file in @('AudioMixer.exe','AudioMixer.Engine.exe')) {
+            foreach ($file in @('VineMix.exe','VineMix.Engine.exe')) {
                 if ((Get-FileHash -LiteralPath (Join-Path $package $file)).Hash -cne (Get-FileHash -LiteralPath (Join-Path $backupPackage $file)).Hash) { $rollbackErrors.Add('Rollback binary hash mismatch: '+$file); $result.rolledBack=$false }
             }
         }
     } finally {
         # Recovery still runs when one stop/copy operation fails. Preserve the
         # user's current settings; never overwrite an intervening edit.
-        if ($stoppedEngine -and -not @(Get-Process AudioMixer.Engine -ErrorAction SilentlyContinue | Where-Object Path -eq $enginePath).Count) {
+        if ($stoppedEngine -and -not @(Get-Process VineMix.Engine -ErrorAction SilentlyContinue | Where-Object Path -eq $enginePath).Count) {
             try { $null=Start-Process -FilePath $enginePath -WorkingDirectory $package -WindowStyle Hidden -PassThru }
             catch { $rollbackErrors.Add('Restart engine: '+$_.Exception.Message) }
         }
-        if (-not @(Get-Process AudioMixer -ErrorAction SilentlyContinue | Where-Object Path -eq $uiPath).Count) {
-            try { $null=Start-Process -FilePath $uiPath -WorkingDirectory $package -PassThru }
+        if (-not @(Get-Process VineMix -ErrorAction SilentlyContinue | Where-Object Path -eq $uiPath).Count) {
+            try { $null=Start-DesktopController -ExecutablePath $uiPath -WorkingDirectory $package }
             catch { $rollbackErrors.Add('Restart controller: '+$_.Exception.Message) }
         }
         $result.rollbackErrors=@($rollbackErrors)

@@ -4,7 +4,7 @@ param(
     [Parameter(Mandatory)][string]$InstallerPath,
     [Parameter(Mandatory)][string]$PackageDirectory,
     [string]$ResultDirectory = '',
-    [switch]$SkipDetachedUi
+    [Alias('SkipDetachedUi')][switch]$SkipReleaseSmoke
 )
 
 $ErrorActionPreference = 'Stop'
@@ -16,13 +16,33 @@ if (-not $ResultDirectory) {
 }
 $evidence = [IO.Path]::GetFullPath($ResultDirectory)
 $target = [IO.Path]::GetFullPath((Join-Path $evidence 'installed-app'))
-$personalData = Join-Path $env:LOCALAPPDATA 'AudioMixer'
+$personalRoots = [ordered]@{VineMix=(Join-Path $env:LOCALAPPDATA 'VineMix');AudioMixer=(Join-Path $env:LOCALAPPDATA 'AudioMixer')}
 $checks = [Collections.Generic.List[object]]::new()
 $operations = [Collections.Generic.List[object]]::new()
 $failure = $null
 $before = $null
 $after = $null
 $started = [DateTimeOffset]::Now.ToString('o')
+if (-not ('VineMix.VerificationPhysicalPath' -as [type])) {
+    Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+using System.Text;
+using Microsoft.Win32.SafeHandles;
+namespace VineMix {
+    public static class VerificationPhysicalPath {
+        [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)]
+        private static extern uint GetFinalPathNameByHandleW(SafeFileHandle file, StringBuilder path, uint capacity, uint flags);
+        public static string Read(SafeFileHandle file) {
+            var path = new StringBuilder(32768);
+            uint count = GetFinalPathNameByHandleW(file, path, (uint)path.Capacity, 0);
+            if (count == 0 || count >= path.Capacity) throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+            return path.ToString();
+        }
+    }
+}
+'@
+}
 
 function Write-Evidence([string]$Name, $Value) {
     $Value | ConvertTo-Json -Depth 32 | Set-Content -LiteralPath (Join-Path $evidence $Name) -Encoding utf8
@@ -41,10 +61,16 @@ function Is-Within([string]$Path, [string]$Root) {
 }
 function Get-PersonalFiles {
     $files = [ordered]@{}
-    if (Test-Path -LiteralPath $personalData -PathType Container) {
+    foreach ($brand in $personalRoots.Keys) {
+        $personalData = $personalRoots[$brand]
+        if (-not (Test-Path -LiteralPath $personalData -PathType Container)) { continue }
         # Logs change naturally while audio runs. Hash saved state, not telemetry.
         foreach ($file in @(Get-ChildItem -LiteralPath $personalData -File | Where-Object { $_.Name -match '\.json(?:\..+)?$' } | Sort-Object Name)) {
-            $files[$file.Name] = [ordered]@{ hash = File-Hash $file.FullName; length = $file.Length }
+            $stream = [IO.File]::Open($file.FullName, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete)
+            try {
+                $physicalPath = [VineMix.VerificationPhysicalPath]::Read($stream.SafeFileHandle)
+                $files[$brand + '/' + $file.Name] = [ordered]@{hash=[Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($stream));length=$stream.Length;physicalPath=$physicalPath;logicalPath=$file.FullName}
+            } finally { $stream.Dispose() }
         }
     }
     $files
@@ -75,7 +101,7 @@ function Get-ShortcutFiles {
     $files
 }
 function Get-LiveProcesses {
-    @(Get-CimInstance Win32_Process -Filter "Name='AudioMixer.exe' OR Name='AudioMixer.Engine.exe'" |
+    @(Get-CimInstance Win32_Process -Filter "Name='VineMix.exe' OR Name='VineMix.Engine.exe' OR Name='AudioMixer.exe' OR Name='AudioMixer.Engine.exe'" |
         Sort-Object ProcessId | ForEach-Object {
             [ordered]@{
                 id = $_.ProcessId
@@ -155,8 +181,8 @@ function Invoke-Uninstall([string]$Name, [string]$UninstallerPath) {
 }
 
 if (-not (Test-Path -LiteralPath $installer -PathType Leaf)) { throw "Installer not found: $installer" }
-if (-not (Test-Path -LiteralPath (Join-Path $package 'AudioMixer.exe') -PathType Leaf)) { throw "Staged desktop not found in: $package" }
-if (-not (Test-Path -LiteralPath (Join-Path $package 'AudioMixer.Engine.exe') -PathType Leaf)) { throw "Staged engine not found in: $package" }
+if (-not (Test-Path -LiteralPath (Join-Path $package 'VineMix.exe') -PathType Leaf)) { throw "Staged desktop not found in: $package" }
+if (-not (Test-Path -LiteralPath (Join-Path $package 'VineMix.Engine.exe') -PathType Leaf)) { throw "Staged engine not found in: $package" }
 if (Test-Path -LiteralPath $evidence) { throw 'ResultDirectory must be new; prior evidence and installations are never overwritten.' }
 if (-not (Is-Within $target $evidence)) { throw 'The test installation must remain inside the new evidence directory.' }
 if ((Is-Within $package $evidence) -or (Is-Within $installer $evidence)) { throw 'Evidence cannot contain either input package.' }
@@ -180,7 +206,8 @@ try {
     $null = New-Item -ItemType Directory -Path $backupDirectory
     foreach ($name in $before.personalFiles.Keys) {
         $backup = Join-Path $backupDirectory $name
-        Copy-Item -LiteralPath (Join-Path $personalData $name) -Destination $backup
+        $null = New-Item -ItemType Directory -Force -Path (Split-Path $backup -Parent)
+        Copy-Item -LiteralPath $before.personalFiles[$name].logicalPath -Destination $backup
         Require ((File-Hash $backup) -ceq $before.personalFiles[$name].hash) "Verified read-only backup: $name."
     }
 
@@ -204,7 +231,7 @@ try {
         Require ($LASTEXITCODE -eq 0) 'The no-audio process fixture compiled successfully.'
     } finally { $env:PATH = $previousPath }
     $null = New-Item -ItemType Directory -Path $target
-    $fixtureTarget = Join-Path $target 'AudioMixer.exe'
+    $fixtureTarget = Join-Path $target 'VineMix.exe'
     Copy-Item -LiteralPath $fixtureBuild -Destination $fixtureTarget
     $fixtureHash = File-Hash $fixtureTarget
     $eventName = 'Local\VineMix.InstallerVerification.' + [Guid]::NewGuid().ToString('N')
@@ -218,7 +245,7 @@ try {
         Require ($inUseCode -ne 0) 'Setup refuses to replace files beneath a running application.'
         Require-LogMarker 'destination-in-use' 'TARGET_RUNNING:' 'The rejection specifically identifies a process inside the destination.'
         Require ((File-Hash $fixtureTarget) -ceq $fixtureHash) 'Setup did not alter the running fixture executable.'
-        Require (-not (Test-Path -LiteralPath (Join-Path $target 'AudioMixer.Engine.exe'))) 'A blocked replacement did not copy an engine.'
+        Require (-not (Test-Path -LiteralPath (Join-Path $target 'VineMix.Engine.exe'))) 'A blocked replacement did not copy an engine.'
         Require ((To-CanonicalJson (Get-UserUninstallEntries)) -ceq (To-CanonicalJson $registryBefore)) 'A blocked replacement did not register an installation.'
     } finally {
         $null = $fixtureEvent.Set()
@@ -236,7 +263,7 @@ try {
     $installCode = Invoke-Setup 'first-install' $true
     Require ($installCode -eq 0) 'Isolated first installation completed without requesting a reboot.'
     Require-LogMarker 'first-install' 'DRIVER_INSTALLATION_SKIPPED' 'First installation explicitly skipped both vendor installers.'
-    $desktopMatches = @(Get-ChildItem -LiteralPath $target -Filter 'AudioMixer.exe' -File -Recurse)
+    $desktopMatches = @(Get-ChildItem -LiteralPath $target -Filter 'VineMix.exe' -File -Recurse)
     Require ($desktopMatches.Count -eq 1) 'The installation contains exactly one desktop payload.'
     $payloadDirectory = $desktopMatches[0].Directory.FullName
     Require ($payloadDirectory.TrimEnd('\', '/') -ieq $target.TrimEnd('\', '/')) 'The desktop and engine use the documented stable installation folder.'
@@ -293,28 +320,28 @@ try {
         Require ($downgradeCode -ne 0) 'Setup refuses to overwrite a newer installed version.'
         Require-LogMarker 'downgrade-refused' 'DOWNGRADE_BLOCKED:' 'The rejection specifically identifies a newer installed version.'
         Require ((File-Hash $sentinel) -ceq $sentinelHash) 'A blocked downgrade preserved the user file.'
-        Require ((File-Hash (Join-Path $payloadDirectory 'AudioMixer.exe')) -ceq (File-Hash (Join-Path $package 'AudioMixer.exe'))) 'A blocked downgrade preserved desktop bytes.'
-        Require ((File-Hash (Join-Path $payloadDirectory 'AudioMixer.Engine.exe')) -ceq (File-Hash (Join-Path $package 'AudioMixer.Engine.exe'))) 'A blocked downgrade preserved engine bytes.'
+        Require ((File-Hash (Join-Path $payloadDirectory 'VineMix.exe')) -ceq (File-Hash (Join-Path $package 'VineMix.exe'))) 'A blocked downgrade preserved desktop bytes.'
+        Require ((File-Hash (Join-Path $payloadDirectory 'VineMix.Engine.exe')) -ceq (File-Hash (Join-Path $package 'VineMix.Engine.exe'))) 'A blocked downgrade preserved engine bytes.'
     } finally { [IO.File]::WriteAllBytes($installationRecord, $installationBytes) }
 
-    if (-not $SkipDetachedUi) {
+    if (-not $SkipReleaseSmoke) {
         # This specific app mode returns before the singleton, show event, tray,
         # engine connection and personal settings. Ordinary startup is forbidden.
-        $uiEvidence = Join-Path $evidence 'detached-ui'
-        $ui = Start-Process -FilePath $desktopMatches[0].FullName -ArgumentList ('--render-design --verification-dir ' + (Quote-Argument $uiEvidence)) -WindowStyle Hidden -PassThru
+        $uiEvidence = Join-Path $evidence 'installed-release-smoke'
+        $ui = Start-Process -FilePath $desktopMatches[0].FullName -ArgumentList ('--release-smoke ' + (Quote-Argument $uiEvidence)) -WindowStyle Hidden -PassThru
         try {
             if (-not $ui.WaitForExit(180000)) { throw "Detached UI verification exceeded its deadline (PID $($ui.Id))." }
-            Require ($ui.ExitCode -eq 0) 'Installed desktop passed its detached verification mode.'
+            Require ($ui.ExitCode -eq 0) 'Installed release passed its inert smoke check.'
         } finally { $ui.Dispose() }
         $uiReport = Get-Content -LiteralPath (Join-Path $uiEvidence 'results.json') -Raw | ConvertFrom-Json -Depth 32
-        Require ([bool]$uiReport.passed) 'Installed desktop reported successful detached checks.'
+        Require ([bool]$uiReport.passed) 'Installed release reported successful smoke checks.'
     }
 
     $uninstaller = $uninstallers[0].FullName
     $uninstallGuardDirectory = [IO.Path]::GetFullPath((Join-Path $target 'guard-fixture'))
     Require (Is-Within $uninstallGuardDirectory $evidence) 'The uninstall process fixture remains inside this test destination.'
     $null = New-Item -ItemType Directory -Path $uninstallGuardDirectory
-    $uninstallFixture = Join-Path $uninstallGuardDirectory 'AudioMixer.exe'
+    $uninstallFixture = Join-Path $uninstallGuardDirectory 'VineMix.exe'
     Copy-Item -LiteralPath $fixtureBuild -Destination $uninstallFixture
     $uninstallFixtureHash = File-Hash $uninstallFixture
     $uninstallEventName = 'Local\VineMix.InstallerVerification.' + [Guid]::NewGuid().ToString('N')
@@ -327,8 +354,8 @@ try {
         $blockedUninstallCode = Invoke-Uninstall 'uninstall-destination-in-use' $uninstaller
         Require ($blockedUninstallCode -ne 0) 'Uninstall refuses to remove an application with a process inside its folder.'
         Require-LogMarker 'uninstall-destination-in-use' 'UNINSTALL_TARGET_RUNNING:' 'Uninstall specifically identifies the running destination as its reason for refusal.'
-        Require ((File-Hash (Join-Path $target 'AudioMixer.exe')) -ceq (File-Hash (Join-Path $package 'AudioMixer.exe'))) 'A blocked uninstall preserved the desktop bytes.'
-        Require ((File-Hash (Join-Path $target 'AudioMixer.Engine.exe')) -ceq (File-Hash (Join-Path $package 'AudioMixer.Engine.exe'))) 'A blocked uninstall preserved the engine bytes.'
+        Require ((File-Hash (Join-Path $target 'VineMix.exe')) -ceq (File-Hash (Join-Path $package 'VineMix.exe'))) 'A blocked uninstall preserved the desktop bytes.'
+        Require ((File-Hash (Join-Path $target 'VineMix.Engine.exe')) -ceq (File-Hash (Join-Path $package 'VineMix.Engine.exe'))) 'A blocked uninstall preserved the engine bytes.'
         Require ((Get-UserUninstallEntries).Contains($testRegistryKey)) 'A blocked uninstall preserved its installation registration.'
     } finally {
         $null = $uninstallEvent.Set()
@@ -346,13 +373,13 @@ try {
     # Inno can finish the final removal from a temporary child. Give only this
     # known test destination time to settle; never change another installation.
     $uninstallTimer = [Diagnostics.Stopwatch]::StartNew()
-    while ((Test-Path -LiteralPath (Join-Path $payloadDirectory 'AudioMixer.exe')) -and $uninstallTimer.ElapsedMilliseconds -lt 10000) {
+    while ((Test-Path -LiteralPath (Join-Path $payloadDirectory 'VineMix.exe')) -and $uninstallTimer.ElapsedMilliseconds -lt 10000) {
         Start-Sleep -Milliseconds 100
     }
     Require (Test-Path -LiteralPath $sentinel -PathType Leaf) 'Uninstall preserved an unknown user file.'
     Require ((File-Hash $sentinel) -ceq $sentinelHash) 'Uninstall did not change the preserved user file.'
-    Require (-not (Test-Path -LiteralPath (Join-Path $payloadDirectory 'AudioMixer.exe'))) 'Uninstall removed the installed desktop payload.'
-    Require (-not (Test-Path -LiteralPath (Join-Path $payloadDirectory 'AudioMixer.Engine.exe'))) 'Uninstall removed the installed engine payload.'
+    Require (-not (Test-Path -LiteralPath (Join-Path $payloadDirectory 'VineMix.exe'))) 'Uninstall removed the installed desktop payload.'
+    Require (-not (Test-Path -LiteralPath (Join-Path $payloadDirectory 'VineMix.Engine.exe'))) 'Uninstall removed the installed engine payload.'
     Require ((To-CanonicalJson (Get-UserUninstallEntries)) -ceq (To-CanonicalJson $registryBefore)) 'Uninstall removed only its isolated registration.'
 } catch {
     $failure = $_.Exception.Message
@@ -380,7 +407,7 @@ try {
         installerHash = File-Hash $installer
         stagedPackage = $package
         testDestination = $target
-        scope = 'An isolated per-user test installation, harmless waiting processes that exercise replacement and uninstall guards, same-version reinstall, downgrade refusal, uninstall, and optional detached UI. Driver installation and normal app launch are disabled. The existing mixer is never stopped or relaunched. Personal saved files are read and backed up; any detected concurrent changes are reported without restoration.'
+        scope = 'An isolated per-user test installation, harmless waiting processes that exercise replacement and uninstall guards, same-version reinstall, downgrade refusal, uninstall, and optional inert installed-release smoke. Driver installation and normal app launch are disabled. The existing mixer is never stopped or relaunched. Personal saved files are read and backed up; any detected concurrent changes are reported without restoration.'
         checks = $checks
         operations = $operations
         resultDirectory = $evidence

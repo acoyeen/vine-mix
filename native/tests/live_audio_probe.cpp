@@ -136,7 +136,7 @@ Json analyze(const Capture& capture,double injectionTime,double startClockSecond
         {"queueDroppedFrames",capture.queue->droppedFrames()},{"path",pathJson(capture.status())}};
 }
 int main(int argc,char** argv) {
-    Json result={{"tool","AudioMixer.LiveAudioProbe"},{"version",1},{"processId",GetCurrentProcessId()},
+    Json result={{"tool","VineMix.LiveAudioProbe"},{"version",1},{"processId",GetCurrentProcessId()},
         {"stimulusPeakDbFS",-48},{"latencyNote","Approximate application-queue submission to capture-drain arrival; includes diagnostic and transport buffering, not a calibrated acoustic measurement."}};
     std::string output;
     try {

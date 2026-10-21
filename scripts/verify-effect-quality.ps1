@@ -11,7 +11,7 @@ if (-not $ResultDirectory) {
 $ResultDirectory = [IO.Path]::GetFullPath($ResultDirectory)
 if (Test-Path -LiteralPath $ResultDirectory) { throw 'Choose a new results directory; existing evidence is never overwritten.' }
 $null = New-Item -ItemType Directory -Path $ResultDirectory
-$targets = @('AudioMixer.DeEsserQualityTests','AudioMixer.EffectsQualityTests')
+$targets = @('VineMix.DeEsserQualityTests','VineMix.EffectsQualityTests')
 $previousPath = $env:PATH
 $results = [Collections.Generic.List[object]]::new()
 try {

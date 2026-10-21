@@ -64,6 +64,10 @@ Json ControlServer::handle(const Json& request) {
             engine_.configure(request.at("configuration").get<Configuration>(), request.at("expectedRevision").get<std::uint64_t>());
             response["snapshot"] = engine_.snapshot();
         } else if (command == "retry") { engine_.retry(); response["snapshot"] = engine_.snapshot(); }
+        else if (command == "recoveryRetry" || command == "restoreBackup" || command == "startFresh") {
+            engine_.recover(command == "recoveryRetry" ? "retry" : command);
+            response["snapshot"] = engine_.snapshot();
+        }
         else if (command == "shutdown") { response["message"] = "Audio engine stopped."; }
         else throw std::runtime_error("Unknown control command.");
     } catch (const std::exception& error) { response["ok"] = false; response["error"] = error.what(); }

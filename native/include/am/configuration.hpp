@@ -47,7 +47,7 @@ inline void from_json(const Json& value, VoiceColorSettings& settings) {
     if (!value.is_object()) throw std::runtime_error("Voice Color settings must be an object.");
     settings.tone = value.value("tone", 0.); settings.ambience = value.value("ambience", 0.);
 }
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(GraphNode, id, kind, name, x, y, gainDb, muted, mono, device, app, eqBands, compressor, ducking, dynamicsUiVersion, expander, alignmentDelay, denoiser, deEsser, plosive, reverb, voiceColor, balance, bypass, collapsed)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(GraphNode, id, kind, name, x, y, gainDb, muted, mono, device, app, eqBands, compressor, ducking, dynamicsUiVersion, expander, alignmentDelay, denoiser, deEsser, plosive, reverb, voiceColor, balance, bypass, collapsed, autoAssignDevice)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(GraphEdge, id, from, to, kind, gainDb, muted)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(AudioGraph, nodes, edges, panX, panY, zoom)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_ONLY_SERIALIZE(Configuration, version, revision, microphones,
@@ -74,12 +74,19 @@ class ConfigurationStore {
 public:
     explicit ConfigurationStore(std::filesystem::path path = {});
     Configuration load();
+    Configuration recover(const std::string& action);
+    void pauseForRecovery(const std::string& message);
     void save(const Configuration&);
+    const std::string& loadState() const noexcept { return loadState_; }
+    bool writable() const noexcept { return loadState_ == "new" || loadState_ == "loaded"; }
     const std::filesystem::path& path() const noexcept { return path_; }
+    std::filesystem::path physicalPath() const;
     const std::string& warning() const noexcept { return warning_; }
 private:
     std::filesystem::path path_;
     std::string warning_;
+    std::string loadState_ = "new";
+    bool inspected_ = false;
     bool primaryValid_ = true;
     std::filesystem::path legacySource_;
 };

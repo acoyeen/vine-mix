@@ -1,11 +1,6 @@
-# Vine Mix Windows installer
+# VineMix Windows installer
 
-Installing the supplied **VineMix 0.3.0-beta.1**? Use the
-[beta installation steps](../docs/BETA_TESTER_GUIDE.md#install-with-setup).
-This development guide describes the older committed installer source; beta
-source integration is separate. See [source status](../README.md#source-status).
-
-One Windows 11 x64 setup contains the self-contained Vine Mix app, its read-only
+One Windows 11 x64 setup contains the self-contained VineMix app, its read-only
 setup helper and both complete original driver packages. It requires acceptance
 of [TERMS.txt](TERMS.txt); optional driver installation also requires consent to
 the vendor terms. This is the current free, non-commercial distribution. Future
@@ -28,7 +23,7 @@ fail preparation. No build step installs or runs the audio drivers.
 
 Outputs under `artifacts/installers/`:
 
-- `VineMix-0.2.0-Setup-x64.exe` — the installer.
+- `VineMix-0.3.0-beta.1-Setup-x64.exe` — the installer.
 - The `.exe.sha256` file — checksum.
 - The `.exe.json` file — source payload location, version, hash and driver pins.
 
@@ -41,8 +36,8 @@ development settings, research artifacts and build tools are excluded.
 
 ## Install and remove
 
-Default application directory: `%LOCALAPPDATA%\Programs\Vine Mix`.
-Existing saved data: `%LOCALAPPDATA%\AudioMixer`.
+Default application directory: `%LOCALAPPDATA%\Programs\VineMix`.
+Existing saved data: `%LOCALAPPDATA%\VineMix`.
 
 Setup is per-user. It requests administrator rights only when the user chooses
 a missing driver, using that vendor's original installer. Existing driver names,
@@ -66,7 +61,7 @@ owned startup value. It preserves saved data, unknown files and both drivers.
 Application-only unattended setup requires explicit terms acknowledgement:
 
 ```powershell
-.\VineMix-0.2.0-Setup-x64.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /ACCEPTTERMS=1 /DRIVERS=none
+.\VineMix-0.3.0-beta.1-Setup-x64.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /ACCEPTTERMS=1 /DRIVERS=none
 ```
 
 Driver installation is interactive only. Vendor windows and Windows elevation
@@ -85,7 +80,7 @@ a new isolated target and a distinct test AppId, with `/TESTMODE=1`, no icons,
 no driver execution, no startup changes and no normal app launch. It checks:
 
 - Silent setup rejects missing explicit terms acceptance.
-- A harmless waiting fixture called AudioMixer.exe inside the target prevents
+- A harmless waiting fixture called VineMix.exe inside the target prevents
   replacement; it exits cooperatively without audio, shared settings or engine IPC.
 - Install and same-version repair preserve exact packaged bytes and user files.
 - A newer marked version prevents downgrade.

@@ -32,7 +32,7 @@ int main(int argc,char** argv){
         const auto resultPath=std::filesystem::path(widen(output));std::filesystem::create_directories(resultPath.parent_path());
         const auto settings=resultPath.parent_path()/("muted-hardware-"+std::to_string(GetCurrentProcessId())+"-"+std::to_string(GetTickCount64())+".json");
         require(!std::filesystem::exists(settings),"Temporary test settings already exist");
-        Configuration config=defaultConfiguration();for(auto& n:config.graph.nodes){n.muted=true;n.device={};n.app={};}
+        Configuration config;migrateLegacyGraph(config);for(auto& n:config.graph.nodes){n.muted=true;n.device={};n.app={};}
         node(config,"app-input").device.id=vb;node(config,"main-output-1").device.id=a1;node(config,"main-output-2").device.id=a2;node(config,"virtual-output").device.id=vac;
         muted(config);ConfigurationStore(settings).save(config);Engine engine(settings);engine.start();
         auto waitFor=[&](auto predicate,const char* reason){const auto start=Clock::now();Json s;do{

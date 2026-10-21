@@ -1,0 +1,50 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <VineMixReleaseJson>$([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)..\..\release.json'))</VineMixReleaseJson>
+    <Version>$([System.Text.RegularExpressions.Regex]::Replace('$(VineMixReleaseJson)', '(?s).*?&quot;version&quot;\s*:\s*&quot;([^&quot;]+)&quot;.*', '$1'))</Version>
+    <FileVersion>$([System.Text.RegularExpressions.Regex]::Replace('$(VineMixReleaseJson)', '(?s).*?&quot;numericVersion&quot;\s*:\s*&quot;([^&quot;]+)&quot;.*', '$1'))</FileVersion>
+    <AssemblyVersion>$(FileVersion)</AssemblyVersion>
+    <InformationalVersion>$(Version)</InformationalVersion>
+    <VineMixBuildMode Condition="'$(VineMixBuildMode)' == ''">Installed</VineMixBuildMode>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>VineMix</AssemblyName>
+    <AssemblyName Condition="'$(VineMixVerification)' == 'true'">VineMix.Verification</AssemblyName>
+    <RootNamespace>VineMix.Desktop</RootNamespace>
+    <Product>VineMix</Product>
+    <Title>VineMix</Title>
+    <AssemblyTitle>VineMix</AssemblyTitle>
+    <Description>Windows audio mixer with a node workspace and local audio processing.</Description>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets/Branding/app.ico</ApplicationIcon>
+    <Platforms>x64</Platforms>
+    <PlatformTarget>x64</PlatformTarget>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <DefineConstants Condition="'$(VineMixVerification)' == 'true'">$(DefineConstants);VINEMIX_VERIFICATION</DefineConstants>
+    <DefineConstants Condition="'$(VineMixBuildMode)' == 'Standalone'">$(DefineConstants);VINEMIX_STANDALONE</DefineConstants>
+    <DefineConstants Condition="'$(VineMixBuildMode)' == 'Installed'">$(DefineConstants);VINEMIX_INSTALLED</DefineConstants>
+  </PropertyGroup>
+  <Import Project="$(VineMixReleaseProps)" Condition="'$(VineMixReleaseProps)' != ''"/>
+  <ItemGroup>
+    <Resource Include="Assets/Fonts/*.ttf"/>
+    <Resource Include="Assets/Branding/*.ico"/>
+    <Resource Include="Assets/Branding/*.svg"/>
+    <Content Include="Assets/Fonts/IBM-Plex-LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest"/>
+    <Content Update="Assets/Fonts/IBM-Plex-LICENSE.txt" CopyToPublishDirectory="Never" Condition="'$(VineMixBuildMode)' == 'Standalone'"/>
+    <EmbeddedResource Include="../../release.json" LogicalName="VineMix.Release.json"/>
+    <AssemblyMetadata Include="SourceSnapshotHash" Value="$(VineMixSourceSnapshotHash)" Condition="'$(VineMixSourceSnapshotHash)' != ''"/>
+    <AssemblyMetadata Include="BuildTimestamp" Value="$(VineMixBuildTimestamp)" Condition="'$(VineMixBuildTimestamp)' != ''"/>
+    <EmbeddedResource Include="$(VineMixRuntimeArchive)" LogicalName="VineMix.Runtime.zip" Condition="'$(VineMixBuildMode)' == 'Standalone'"/>
+    <EmbeddedResource Include="$(VineMixRuntimeManifest)" LogicalName="VineMix.Runtime.manifest.json" Condition="'$(VineMixBuildMode)' == 'Standalone'"/>
+    <Compile Remove="*Verification.cs;UiPreview.cs;OffscreenDesignRenderer.cs" Condition="'$(VineMixVerification)' != 'true'"/>
+  </ItemGroup>
+  <Target Name="ValidateVineMixBuild" BeforeTargets="PrepareForBuild">
+    <Error Condition="'$(VineMixBuildMode)' != 'Installed' and '$(VineMixBuildMode)' != 'Standalone'" Text="Select VineMixBuildMode Installed or Standalone."/>
+    <Error Condition="'$(VineMixBuildMode)' == 'Standalone' and (!Exists('$(VineMixRuntimeArchive)') or !Exists('$(VineMixRuntimeManifest)'))" Text="Standalone requires a verified runtime payload; use scripts/build.ps1."/>
+  </Target>
+</Project>

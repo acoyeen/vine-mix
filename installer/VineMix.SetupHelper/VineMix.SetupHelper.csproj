@@ -7,7 +7,10 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>VineMix.SetupHelper</AssemblyName>
-    <Version>0.2.0</Version>
+    <VineMixReleaseJson>$([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)..\..\release.json'))</VineMixReleaseJson>
+    <Version>$([System.Text.RegularExpressions.Regex]::Replace('$(VineMixReleaseJson)', '(?s).*?&quot;version&quot;\s*:\s*&quot;([^&quot;]+)&quot;.*', '$1'))</Version>
+    <FileVersion>$([System.Text.RegularExpressions.Regex]::Replace('$(VineMixReleaseJson)', '(?s).*?&quot;numericVersion&quot;\s*:\s*&quot;([^&quot;]+)&quot;.*', '$1'))</FileVersion>
+    <AssemblyVersion>$(FileVersion)</AssemblyVersion>
     <SelfContained>true</SelfContained>
     <PublishSingleFile>true</PublishSingleFile>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>

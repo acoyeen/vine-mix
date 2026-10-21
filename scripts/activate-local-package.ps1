@@ -8,16 +8,18 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $project = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
-$package = Join-Path $project 'artifacts\AudioMixer'
+$package = Join-Path $project 'artifacts\VineMix'
 $candidate = [IO.Path]::GetFullPath($CandidateDirectory)
 $evidence = [IO.Path]::GetFullPath($EvidenceDirectory)
-$uiPath = Join-Path $package 'AudioMixer.exe'
-$enginePath = Join-Path $package 'AudioMixer.Engine.exe'
-$candidateEngine = Join-Path $candidate 'AudioMixer.Engine.exe'
-$candidateUi = Join-Path $candidate 'AudioMixer.exe'
-$settingsPath = Join-Path $env:LOCALAPPDATA 'AudioMixer\settings.json'
-$backupEngine = Join-Path $evidence 'AudioMixer.Engine.before.exe'
-$backupUi = Join-Path $evidence 'AudioMixer.before.exe'
+$uiPath = Join-Path $package 'VineMix.exe'
+$enginePath = Join-Path $package 'VineMix.Engine.exe'
+$candidateEngine = Join-Path $candidate 'VineMix.Engine.exe'
+$candidateUi = Join-Path $candidate 'VineMix.exe'
+$settingsPath = Join-Path $env:LOCALAPPDATA 'VineMix\settings.json'
+. (Join-Path $PSScriptRoot 'assert-desktop-data-context.ps1')
+Assert-DesktopDataContext $settingsPath
+$backupEngine = Join-Path $evidence 'VineMix.Engine.before.exe'
+$backupUi = Join-Path $evidence 'VineMix.before.exe'
 $expectedHash = $ExpectedEngineHash.ToUpperInvariant()
 $expectedUiHash = $ExpectedUiHash.ToUpperInvariant()
 if (Test-Path -LiteralPath $evidence) { throw 'EvidenceDirectory must be a new directory.' }
@@ -66,7 +68,7 @@ function Request([ValidateSet('snapshot', 'shutdown')][string]$Command, [int]$Ti
     if ($TimeoutMilliseconds -lt 1) { throw 'The engine request deadline has expired.' }
     $deadline = [Threading.CancellationTokenSource]::new()
     $deadline.CancelAfter($TimeoutMilliseconds)
-    $pipe = [IO.Pipes.NamedPipeClientStream]::new('.', ('AudioMixer.Control.' + $sid),
+    $pipe = [IO.Pipes.NamedPipeClientStream]::new('.', ('VineMix.Control.' + $sid),
         [IO.Pipes.PipeDirection]::InOut, [IO.Pipes.PipeOptions]::Asynchronous)
     $reader = $null
     try {
@@ -109,17 +111,7 @@ function Start-PackagedEngine([string]$LogPrefix) {
         -RedirectStandardError (Join-Path $evidence ($LogPrefix + '-stderr.log'))
 }
 function Start-PackagedUi {
-    # The user requested reopening the interactive application.
-    $process = Start-Process -FilePath $uiPath -WorkingDirectory $package -PassThru
-    if (-not $process.WaitForInputIdle(15000)) { throw 'The controller did not become idle within 15 seconds.' }
-    $timer = [Diagnostics.Stopwatch]::StartNew()
-    do {
-        $process.Refresh()
-        if ($process.HasExited) { throw 'The controller exited before opening its window.' }
-        if ($process.MainWindowHandle -ne 0 -and $process.Responding) { return $process }
-        Start-Sleep -Milliseconds 100
-    } while ($timer.ElapsedMilliseconds -lt 5000)
-    throw 'The controller did not open a responsive window.'
+    Start-DesktopController -ExecutablePath $uiPath -WorkingDirectory $package
 }
 
 $controllerStopped = $false
@@ -134,12 +126,12 @@ try {
     foreach ($path in @($uiPath, $enginePath, $settingsPath)) {
         if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Required file is missing: $path" }
     }
-    $allProcesses = @(Get-Process -Name AudioMixer, AudioMixer.Engine -ErrorAction SilentlyContinue)
+    $allProcesses = @(Get-Process -Name VineMix, VineMix.Engine, AudioMixer, AudioMixer.Engine -ErrorAction SilentlyContinue)
     if (@($allProcesses | Where-Object { $_.Path -ine $uiPath -and $_.Path -ine $enginePath }).Count) {
-        throw 'An Vine Mix process is running from another package. No process was stopped.'
+        throw 'A VineMix process is running from another package. No process was stopped.'
     }
-    $oldUi = @(Get-ExactProcess 'AudioMixer' $uiPath)
-    $oldEngine = @(Get-ExactProcess 'AudioMixer.Engine' $enginePath)
+    $oldUi = @(Get-ExactProcess 'VineMix' $uiPath)
+    $oldEngine = @(Get-ExactProcess 'VineMix.Engine' $enginePath)
     if ($oldUi.Count -ne 1 -or $oldEngine.Count -ne 1) { throw 'Expected exactly one installed controller and one installed engine.' }
     $overridePath = $env:AUDIOMIXER_ENGINE_PATH
     if ($overridePath -and (Test-Path -LiteralPath $overridePath) -and [IO.Path]::GetFullPath($overridePath) -ine $enginePath) {
@@ -188,7 +180,7 @@ try {
         $result.shutdownReplyWarning = $_.Exception.Message
     }
     if (-not $oldEngine[0].WaitForExit(5000)) { throw 'The exact engine process did not exit gracefully.' }
-    if (@(Get-ExactProcess 'AudioMixer' $uiPath).Count -or @(Get-ExactProcess 'AudioMixer.Engine' $enginePath).Count) {
+    if (@(Get-ExactProcess 'VineMix' $uiPath).Count -or @(Get-ExactProcess 'VineMix.Engine' $enginePath).Count) {
         throw 'The installed controller or engine restarted before replacement.'
     }
     $replacementAttempted = $true
@@ -229,7 +221,7 @@ try {
     # The UI owns the pipe now; verify persistence without competing for it.
     Start-Sleep -Milliseconds 300
     if ((FileHash $settingsPath) -cne $settingsHash) { throw 'Saved settings changed when reopening the controller.' }
-    $liveEngines = @(Get-ExactProcess 'AudioMixer.Engine' $enginePath)
+    $liveEngines = @(Get-ExactProcess 'VineMix.Engine' $enginePath)
     if ($liveEngines.Count -ne 1 -or $liveEngines[0].Id -ne $newEngine.Id -or $newEngine.HasExited) {
         throw 'The candidate engine changed or exited after reopening the controller.'
     }
@@ -262,11 +254,11 @@ try {
         if ($replacementAttempted) {
             $safeToRestore = $true
             try {
-                foreach ($process in @(Get-ExactProcess 'AudioMixer' $uiPath)) {
+                foreach ($process in @(Get-ExactProcess 'VineMix' $uiPath)) {
                     $process.Kill()
                     if (-not $process.WaitForExit(5000)) { throw 'The replacement controller did not stop for rollback.' }
                 }
-                $engines = @(Get-ExactProcess 'AudioMixer.Engine' $enginePath)
+                $engines = @(Get-ExactProcess 'VineMix.Engine' $enginePath)
                 if ($engines.Count) { try { $null = Request 'shutdown' } catch { } }
                 foreach ($process in $engines) {
                     if (-not $process.WaitForExit(5000)) {
@@ -274,7 +266,7 @@ try {
                         if (-not $process.WaitForExit(5000)) { throw 'The replacement engine did not stop for rollback.' }
                     }
                 }
-                if (@(Get-ExactProcess 'AudioMixer' $uiPath).Count -or @(Get-ExactProcess 'AudioMixer.Engine' $enginePath).Count) {
+                if (@(Get-ExactProcess 'VineMix' $uiPath).Count -or @(Get-ExactProcess 'VineMix.Engine' $enginePath).Count) {
                     throw 'A packaged process remains active; rollback will not overwrite a running executable.'
                 }
             } catch { $safeToRestore = $false; $recoveryErrors.Add($_.Exception.Message) }
@@ -293,13 +285,13 @@ try {
         $canRestart = -not $replacementAttempted -or $result.rolledBack
         if ($canRestart) {
             try {
-                if ($shutdownRequested -and -not @(Get-ExactProcess 'AudioMixer.Engine' $enginePath).Count) {
+                if ($shutdownRequested -and -not @(Get-ExactProcess 'VineMix.Engine' $enginePath).Count) {
                     $recoveredEngine = Start-PackagedEngine 'recovered-engine'
                     $result.recoveredEngineId = $recoveredEngine.Id
                 }
             } catch { $recoveryErrors.Add('Restart original engine: ' + $_.Exception.Message) }
             try {
-                if (-not @(Get-ExactProcess 'AudioMixer' $uiPath).Count) {
+                if (-not @(Get-ExactProcess 'VineMix' $uiPath).Count) {
                     $recoveredUi = Start-PackagedUi
                     $result.recoveredUiId = $recoveredUi.Id
                     $result.recoveredUiResponsive = $true

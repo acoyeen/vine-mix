@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "reviewedDate": "2026-10-20",
+  "reviewedDate": "2026-10-21",
   "distributionChannel": "free-noncommercial",
   "targetArchitecture": "x64",
   "notes": [
-    "These proprietary drivers retain their original vendor terms, separate from Vine Mix MIT licence.",
+    "These proprietary drivers retain their original vendor terms, separate from VineMix MIT licence.",
     "Complete vendor packages are preserved, including other architectures and documentation. No paid, Trial, A+B or C+D package is substituted.",
     "Installer executables must be launched interactively only after the user opts in. The build preparation never executes them.",
     "This channel is not cleared for paid, sponsored or donation-supported redistribution. Review vendor conditions before changing distribution."

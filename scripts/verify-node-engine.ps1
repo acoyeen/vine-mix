@@ -2,13 +2,13 @@
 param([string]$EnginePath = '', [string]$ResultDirectory = '')
 $ErrorActionPreference = 'Stop'
 $projectRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
-if (-not $EnginePath) { $EnginePath = Join-Path $projectRoot 'build\native\AudioMixer.Engine.exe' }
+if (-not $EnginePath) { $EnginePath = Join-Path $projectRoot 'build\native\VineMix.Engine.exe' }
 if (-not $ResultDirectory) { $ResultDirectory = Join-Path $projectRoot ('artifacts\graph-engine-verification\' + (Get-Date -Format 'yyyyMMdd-HHmmss')) }
 $EnginePath = [IO.Path]::GetFullPath($EnginePath)
 $ResultDirectory = [IO.Path]::GetFullPath($ResultDirectory)
 # Never configure a live personal engine. The test refuses to run alongside one
 # and checks the connected engine's explicit temporary settings path before edits.
-if (Get-Process -Name 'AudioMixer.Engine' -ErrorAction SilentlyContinue) { throw 'Close the personal engine before running this isolated, silent check.' }
+if (Get-Process -Name VineMix.Engine,AudioMixer.Engine -ErrorAction SilentlyContinue) { throw 'Close the personal engine before running this isolated, silent check.' }
 New-Item -ItemType Directory -Path $ResultDirectory -Force | Out-Null
 $settingsPath = Join-Path $ResultDirectory ('unassigned-' + [Guid]::NewGuid().ToString('N') + '.json')
 $checks = [Collections.Generic.List[string]]::new()
@@ -35,7 +35,7 @@ function Require([bool]$condition, [string]$description) {
 try {
     $testEngine = Start-Process -FilePath $EnginePath -ArgumentList @('--settings', ('"' + $settingsPath + '"')) -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $ResultDirectory 'stdout.log') -RedirectStandardError (Join-Path $ResultDirectory 'stderr.log')
     $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
-    $pipe = [IO.Pipes.NamedPipeClientStream]::new('.', ('AudioMixer.Control.' + $sid), [IO.Pipes.PipeDirection]::InOut, [IO.Pipes.PipeOptions]::Asynchronous)
+    $pipe = [IO.Pipes.NamedPipeClientStream]::new('.', ('VineMix.Control.' + $sid), [IO.Pipes.PipeDirection]::InOut, [IO.Pipes.PipeOptions]::Asynchronous)
     $pipe.Connect(10000)
     $reader = [IO.StreamReader]::new($pipe, [Text.UTF8Encoding]::new($false), $false, 4096, $true)
     $writer = [IO.StreamWriter]::new($pipe, [Text.UTF8Encoding]::new($false), 4096, $true)
@@ -72,7 +72,7 @@ try {
     Require ($unchanged.snapshot.configuration.graph.edges.Count -eq $savedEdgeCount -and $unchanged.snapshot.configuration.revision -eq $savedRevision) 'Rejected graph leaves the committed graph intact'
     Require ([ulong]$unchanged.snapshot.status.audioFrames -gt [ulong]$saved.snapshot.status.audioFrames) 'Processing continues across valid and rejected edits'
     $reader.Dispose(); $writer.Dispose(); $pipe.Dispose(); $reader=$null; $writer=$null; $pipe=$null
-    $pipe = [IO.Pipes.NamedPipeClientStream]::new('.', ('AudioMixer.Control.' + $sid), [IO.Pipes.PipeDirection]::InOut, [IO.Pipes.PipeOptions]::Asynchronous)
+    $pipe = [IO.Pipes.NamedPipeClientStream]::new('.', ('VineMix.Control.' + $sid), [IO.Pipes.PipeDirection]::InOut, [IO.Pipes.PipeOptions]::Asynchronous)
     $pipe.Connect(5000)
     $reader = [IO.StreamReader]::new($pipe, [Text.UTF8Encoding]::new($false), $false, 4096, $true)
     $writer = [IO.StreamWriter]::new($pipe, [Text.UTF8Encoding]::new($false), 4096, $true); $writer.AutoFlush=$true

@@ -10,11 +10,21 @@
 #include <vector>
 
 namespace am {
-namespace { constexpr std::size_t maximumSettingsBytes = 262144; }
+namespace {
+constexpr std::size_t maximumSettingsBytes = 262144;
+struct UnsupportedSettings : std::runtime_error { using std::runtime_error::runtime_error; };
+}
 void from_json(const Json& value, Configuration& config) {
     if (!value.is_object()) throw std::runtime_error("Settings must be a JSON object.");
-    const auto version = value.at("version").get<int>();
-    if (version != 1 && version != 2) throw std::runtime_error("This configuration version is not supported.");
+    const auto& schema = value.at("version");
+    if (!schema.is_number_integer()) throw std::runtime_error("The configuration version must be a whole number.");
+    // Compare before narrowing: a future 64-bit schema must never wrap around
+    // to a supported int and become writable by an older engine.
+    const bool futureSchema = schema.is_number_unsigned()
+        ? schema.get<std::uint64_t>() > 2 : schema.get<std::int64_t>() > 2;
+    if (futureSchema) throw UnsupportedSettings("This workspace requires a newer version of VineMix.");
+    if (schema != 1 && schema != 2) throw std::runtime_error("This configuration version is not supported.");
+    const auto version = schema.get<int>();
     if (!value.at("microphones").is_array() || value.at("microphones").size() != 2
         || !value.at("mainOutputs").is_array() || value.at("mainOutputs").size() != 2
         || !value.at("sources").is_array() || value.at("sources").size() != 3)
@@ -60,10 +70,16 @@ void migrateLegacyGraph(Configuration& config) {
 }
 Configuration defaultConfiguration() {
     Configuration config;
-    // New microphones capture stereo when supported. Loaded legacy settings
-    // still pass through migrateLegacyGraph with their exact saved channel.
-    for (auto& microphone : config.microphones) microphone.channel = -1;
-    migrateLegacyGraph(config); return config;
+    GraphNode input; input.id = "starter-input"; input.kind = "microphone";
+    input.name = "Physical input"; input.x = 48; input.y = 200; input.autoAssignDevice = false;
+    GraphNode virtualOutput; virtualOutput.id = "starter-virtual-output"; virtualOutput.kind = "virtualOutput";
+    virtualOutput.name = "Virtual output"; virtualOutput.x = 480; virtualOutput.y = 48; virtualOutput.muted = true;
+    GraphNode output; output.id = "starter-listening-output"; output.kind = "output";
+    output.name = "Listening output"; output.x = 480; output.y = 420; output.gainDb = -24;
+    output.muted = true; output.autoAssignDevice = false;
+    config.graph.nodes = {input, virtualOutput, output};
+    config.graph.edges = {{"starter-virtual-route", input.id, virtualOutput.id}, {"starter-listening-route", input.id, output.id}};
+    return config;
 }
 
 std::wstring widen(const std::string& text) {
@@ -105,14 +121,14 @@ std::string currentUserSid() {
     LocalFree(sid);
     return result;
 }
-std::wstring pipeName() { return L"\\\\.\\pipe\\AudioMixer.Control." + widen(currentUserSid()); }
+std::wstring pipeName() { return L"\\\\.\\pipe\\VineMix.Control." + widen(currentUserSid()); }
 std::filesystem::path applicationDataDirectory() {
     const DWORD required = GetEnvironmentVariableW(L"LOCALAPPDATA", nullptr, 0);
     if (!required) throw std::runtime_error("LOCALAPPDATA is unavailable.");
     std::wstring value(required, L'\0');
     GetEnvironmentVariableW(L"LOCALAPPDATA", value.data(), required);
     value.resize(required - 1);
-    return std::filesystem::path(value) / L"AudioMixer";
+    return std::filesystem::path(value) / L"VineMix";
 }
 void validateConfiguration(const Configuration& config) {
     if (config.version != 2) throw std::runtime_error("This configuration version is not supported.");
@@ -160,10 +176,40 @@ void validateConfiguration(const Configuration& config) {
 }
 ConfigurationStore::ConfigurationStore(std::filesystem::path path)
     : path_(path.empty() ? applicationDataDirectory() / L"settings.json" : std::move(path)) {}
+std::filesystem::path ConfigurationStore::physicalPath() const {
+    // Resolve the opened object: the process's printed LOCALAPPDATA string can
+    // name a different physical file under Windows filesystem redirection.
+    auto candidate = std::filesystem::absolute(path_);
+    std::vector<std::filesystem::path> missing;
+    HANDLE file = INVALID_HANDLE_VALUE;
+    for (;;) {
+        file = CreateFileW(candidate.c_str(), FILE_READ_ATTRIBUTES,
+            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
+        if (file != INVALID_HANDLE_VALUE) break;
+        const auto error = GetLastError();
+        if (error != ERROR_FILE_NOT_FOUND && error != ERROR_PATH_NOT_FOUND)
+            throw std::runtime_error("Cannot verify the physical settings location.");
+        const auto parent = candidate.parent_path();
+        if (parent.empty() || parent == candidate) throw std::runtime_error("Cannot resolve the settings volume.");
+        missing.push_back(candidate.filename()); candidate = parent;
+    }
+    std::wstring physical(32768, L'\0');
+    const auto length = GetFinalPathNameByHandleW(file, physical.data(), static_cast<DWORD>(physical.size()), FILE_NAME_NORMALIZED);
+    CloseHandle(file);
+    if (!length || length >= physical.size()) throw std::runtime_error("Cannot resolve the physical settings location.");
+    physical.resize(length);
+    if (physical.starts_with(L"\\\\?\\UNC\\")) physical = L"\\\\" + physical.substr(8);
+    else if (physical.starts_with(L"\\\\?\\")) physical.erase(0, 4);
+    std::filesystem::path resolved(physical);
+    for (auto component = missing.rbegin(); component != missing.rend(); ++component) resolved /= *component;
+    return resolved;
+}
 Configuration ConfigurationStore::load() {
+    inspected_ = true;
     // A store can be reloaded after external repair. Do not carry an old
     // recovery warning or invalid-primary flag into the next successful load.
     warning_.clear();
+    loadState_ = "loaded";
     primaryValid_ = true;
     legacySource_.clear();
     const auto read = [this](const std::filesystem::path& path) {
@@ -180,23 +226,71 @@ Configuration ConfigurationStore::load() {
     try {
         // A missing primary is recoverable too (for example after an
         // interrupted replacement). Only a genuinely new store gets defaults.
-        if (!std::filesystem::exists(path_) && !std::filesystem::exists(backup))
+        auto established = path_; established += L".established";
+        auto pending = path_; pending += L".new";
+        auto legacyBackup = path_; legacyBackup += L".v1.bak";
+        if (!std::filesystem::exists(path_) && !std::filesystem::exists(backup) && !std::filesystem::exists(established)
+            && !std::filesystem::exists(pending) && !std::filesystem::exists(legacyBackup)) {
+            loadState_ = "new";
             return defaultConfiguration();
+        }
         return read(path_);
+    }
+    catch (const UnsupportedSettings& error) {
+        loadState_ = "unsupported"; primaryValid_ = false; warning_ = error.what();
+        return defaultConfiguration();
     }
     catch (const std::exception&) {
         primaryValid_ = false;
         try {
             auto configuration = read(backup);
-            warning_ = "Settings were missing or damaged. The last good configuration was restored.";
+            loadState_ = "backupAvailable";
+            warning_ = "Settings could not be loaded. A backup is available for review; audio is paused until you choose recovery.";
             return configuration;
+        } catch (const UnsupportedSettings& error) {
+            loadState_ = "unsupported"; warning_ = error.what();
+            return defaultConfiguration();
         } catch (const std::exception&) {
-            warning_ = "Settings could not be read. Safe unassigned defaults are active; the original file was preserved.";
+            loadState_ = "recoveryRequired";
+            warning_ = "Your workspace could not be loaded. Audio and saving are paused. Retry or start fresh after preserving the originals.";
             return defaultConfiguration();
         }
     }
 }
+Configuration ConfigurationStore::recover(const std::string& action) {
+    if (writable()) throw std::runtime_error("The workspace does not need recovery.");
+    if (action == "retry") return load();
+    if (loadState_ == "unsupported") throw std::runtime_error("Open this workspace with a compatible newer version of VineMix.");
+    if (action != "restoreBackup" && action != "startFresh") throw std::runtime_error("Unknown recovery action.");
+    Configuration candidate = defaultConfiguration();
+    if (action == "restoreBackup") {
+        // Re-read and validate the actual backup; never commit a stale preview.
+        auto backup = path_; backup += L".bak";
+        if (std::filesystem::file_size(backup) > maximumSettingsBytes) throw std::runtime_error("Backup is too large.");
+        std::ifstream stream(backup, std::ios::binary);
+        candidate = Json::parse(stream).get<Configuration>();
+        validateConfiguration(candidate);
+    }
+    auto preserved = path_; preserved += L".recovery-" + std::to_wstring(GetTickCount64());
+    if (!std::filesystem::create_directory(preserved)) throw std::runtime_error("Cannot create a unique recovery folder.");
+    for (const auto* suffix : {L"", L".bak", L".established", L".new", L".v1.bak"}) {
+        auto source = path_; source += suffix;
+        if (std::filesystem::exists(source)) std::filesystem::copy_file(source, preserved / source.filename());
+    }
+    const auto previous = loadState_;
+    loadState_ = "loaded";
+    try { save(candidate); }
+    catch (...) { loadState_ = previous; throw; }
+    warning_.clear();
+    return candidate;
+}
+void ConfigurationStore::pauseForRecovery(const std::string& message) {
+    loadState_ = "recoveryRequired";
+    warning_ = message;
+}
 void ConfigurationStore::save(const Configuration& configuration) {
+    if (!inspected_) (void)load();
+    if (!writable()) throw std::runtime_error("Choose workspace recovery before saving any changes.");
     validateConfiguration(configuration);
     // A successful commit must also be readable on the next launch. Individual
     // string limits alone do not bound the size of a complete graph document.
@@ -207,6 +301,18 @@ void ConfigurationStore::save(const Configuration& configuration) {
     // parent path is not a directory that create_directories can create.
     if (const auto parent = path_.parent_path(); !parent.empty())
         std::filesystem::create_directories(parent);
+    // Establish the store before committing. An interrupted first commit must
+    // not be mistaken for a new workspace on the next launch.
+    auto established = path_; established += L".established";
+    if (!std::filesystem::exists(established)) {
+        HANDLE marker = CreateFileW(established.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
+        if (marker == INVALID_HANDLE_VALUE) throw std::runtime_error("Cannot record the workspace identity.");
+        const char identity[] = "VineMix workspace\n"; DWORD count{};
+        const bool marked = WriteFile(marker, identity, sizeof(identity) - 1, &count, nullptr)
+            && count == sizeof(identity) - 1 && FlushFileBuffers(marker);
+        CloseHandle(marker);
+        if (!marked) throw std::runtime_error("Cannot commit the workspace identity.");
+    }
     if (!legacySource_.empty()) {
         auto preserved = path_; preserved += L".v1.bak";
         if (!std::filesystem::exists(preserved) && !CopyFileW(legacySource_.c_str(), preserved.c_str(), TRUE))
@@ -234,6 +340,7 @@ void ConfigurationStore::save(const Configuration& configuration) {
         throw std::runtime_error("Cannot commit the settings file.");
     }
     primaryValid_ = true;
+    loadState_ = "loaded";
     legacySource_.clear();
 }
 }

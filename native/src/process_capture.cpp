@@ -104,7 +104,8 @@ std::wstring basename(std::wstring_view path) {
 }
 bool isMixer(const std::wstring& path) {
     const auto name = basename(path);
-    return samePath(name, L"AudioMixer.Engine.exe") || samePath(name, L"AudioMixer.exe") || samePath(name, L"AudioMixer.Desktop.exe");
+    return samePath(name, L"VineMix.Engine.exe") || samePath(name, L"VineMix.exe") || samePath(name, L"VineMix.Desktop.exe")
+        || samePath(name, L"AudioMixer.Engine.exe") || samePath(name, L"AudioMixer.exe") || samePath(name, L"AudioMixer.Desktop.exe");
 }
 
 struct ProcessEntry { DWORD parent{}; std::wstring filename; };

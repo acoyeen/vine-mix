@@ -86,7 +86,7 @@ void save(const Options& options, const Json& report) {
     if (!okay || written != text.size()) throw std::runtime_error("Could not write complete observation report");
 }
 int observe(const Options& options) {
-    Json report{{"tool", "AudioMixer.ApplicationObserve"}, {"startedUtc", utcNow()},
+    Json report{{"tool", "VineMix.ApplicationObserve"}, {"startedUtc", utcNow()},
         {"requestedApplicationName", options.applicationName}, {"requestedSeconds", options.seconds},
         {"mode", "process-loopback statistics only"}, {"audioFilesWritten", false},
         {"outputStreamsOpened", false}, {"microphoneStreamsOpened", false}, {"settingsChanged", false},

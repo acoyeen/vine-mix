@@ -1,75 +1,72 @@
 #requires -Version 7.3
 [CmdletBinding()]
-param(
-    [string]$ApplicationPackageDirectory = '',
-    [string]$OutputDirectory = '',
-    [switch]$Offline
-)
+param([string]$ApplicationPackageDirectory = '', [string]$OutputDirectory = '', [switch]$Offline)
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $project = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
+$release = & (Join-Path $PSScriptRoot 'write-release-metadata.ps1')
 $stage = Join-Path $project ('artifacts\installer-build-' + (Get-Date -Format 'yyyyMMdd-HHmmss-fff'))
 $payload = Join-Path $stage 'payload'
 if (-not $OutputDirectory) { $OutputDirectory = Join-Path $project 'artifacts\installers' }
 $OutputDirectory = [IO.Path]::GetFullPath($OutputDirectory)
-New-Item -ItemType Directory -Force -Path $stage,$payload,$OutputDirectory | Out-Null
-
-[xml]$desktopProject = Get-Content -LiteralPath (Join-Path $project 'desktop\AudioMixer.Desktop\AudioMixer.Desktop.csproj') -Raw
-$version = [string]$desktopProject.Project.PropertyGroup.Version
-$nativeProject = Get-Content -LiteralPath (Join-Path $project 'CMakeLists.txt') -Raw
-if ($version -notmatch '^\d+\.\d+\.\d+$' -or $nativeProject -notmatch ('project\(AudioMixer VERSION ' + [regex]::Escape($version) + ' LANGUAGES')) {
-    throw 'Desktop and native project versions must match before packaging.'
-}
+$null = New-Item -ItemType Directory -Force -Path $stage,$payload,$OutputDirectory
+$version = $release.version
 $compiler = & (Join-Path $PSScriptRoot 'bootstrap-installer-tools.ps1') -Offline:$Offline
 if (-not $ApplicationPackageDirectory) {
     $ApplicationPackageDirectory = Join-Path $stage 'application-build'
-    & (Join-Path $PSScriptRoot 'build.ps1') -NoBootstrap -PackageDirectory $ApplicationPackageDirectory
+    & (Join-Path $PSScriptRoot 'build.ps1') -NoBootstrap -BuildMode Installed -PackageDirectory $ApplicationPackageDirectory
     if (-not $?) { throw 'Application build failed.' }
 }
 $source = [IO.Path]::GetFullPath($ApplicationPackageDirectory)
-foreach ($name in @('AudioMixer.exe','AudioMixer.Engine.exe','libc++.dll','libunwind.dll','libwinpthread-1.dll',
-        'LICENSE','THIRD_PARTY_NOTICES.md')) {
+$receiptPath = $source + '.build.json'
+if (-not (Test-Path -LiteralPath $receiptPath -PathType Leaf)) { throw 'The application build receipt is required; rebuild the installed package with scripts/build.ps1.' }
+$receipt = Get-Content -LiteralPath $receiptPath -Raw | ConvertFrom-Json -Depth 12
+$sourceIdentity = & (Join-Path $PSScriptRoot 'get-source-identity.ps1')
+if ($receipt.buildMode -ne 'Installed' -or $receipt.version -ne $release.version -or $receipt.sourceIdentity.sourceSnapshotSha256 -ne $sourceIdentity.sourceSnapshotSha256) { throw 'The installed package source receipt does not match the current release source.' }
+# Deliberate release allowlist. Checkout guides, fixtures, images and research
+# notes do not enter the package, even if present in a caller-supplied folder.
+$required = @('VineMix.exe','VineMix.Engine.exe','libc++.dll','libunwind.dll','libwinpthread-1.dll','LICENSE','THIRD_PARTY_NOTICES.md')
+$licenseNames = @('IBM-Plex-OFL.txt','libsamplerate-LICENSE','libsamplerate-source-notices.txt',
+    'SpeexDSP-COPYING.txt','SpeexDSP-source-notices.txt','RNNoise-COPYING.txt','RNNoise-source-notices.txt',
+    'nlohmann-json-LICENSE','nlohmann-json-third-party-notices.txt','LLVM-runtime-LICENSE.txt','MinGW-w64-COPYING.txt',
+    'MinGW-runtime-COPYING.txt','winpthreads-COPYING.txt','dotnet-runtime-LICENSE.txt','dotnet-runtime-ThirdPartyNotices.txt',
+    'dotnet-windowsdesktop-LICENSE.txt','dotnet-wpf-ThirdPartyNotices.txt','dotnet-winforms-ThirdPartyNotices.txt',
+    'W3C-Audio-EQ-Cookbook-NOTICE.txt','Microsoft-Windows-classic-samples-LICENSE.txt')
+$required += @($licenseNames | ForEach-Object { 'licenses\' + $_ })
+foreach ($name in $required) {
     $file = Join-Path $source $name
-    if (-not (Test-Path -LiteralPath $file -PathType Leaf)) { throw "Required staged application file missing: $name" }
-    Copy-Item -LiteralPath $file -Destination $payload
+    if (-not (Test-Path -LiteralPath $file -PathType Leaf) -or (Get-Item -LiteralPath $file).Length -eq 0) { throw "Required staged file missing or empty: $name" }
+    $entry = @($receipt.files | Where-Object path -CEQ $name.Replace('\','/'))
+    if ($entry.Count -ne 1 -or (Get-Item -LiteralPath $file).Length -ne $entry[0].size -or
+        (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash -ne $entry[0].sha256) { throw "Staged file no longer matches its build receipt: $name" }
+    $destination = Join-Path $payload $name
+    $null = New-Item -ItemType Directory -Force -Path (Split-Path $destination -Parent)
+    Copy-Item -LiteralPath $file -Destination $destination
+    if ((Get-FileHash -LiteralPath $destination -Algorithm SHA256).Hash -ne $entry[0].sha256) { throw "Staged copy integrity failed: $name" }
 }
-$sourceVersion = [Diagnostics.FileVersionInfo]::GetVersionInfo((Join-Path $source 'AudioMixer.exe')).ProductVersion.Split('+')[0]
-if ($sourceVersion -ne $version) { throw "Staged desktop version $sourceVersion does not match source $version." }
-foreach ($directory in @('licenses','Assets\Fonts')) {
-    $from = Join-Path $source $directory
-    if (-not (Test-Path -LiteralPath $from -PathType Container)) { throw "Required licence folder missing: $directory" }
-    $to = Join-Path $payload $directory
-    New-Item -ItemType Directory -Force -Path $to | Out-Null
-    Get-ChildItem -LiteralPath $from -File | ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination $to }
+foreach ($name in @('Assets\Fonts\IBM-Plex-LICENSE.txt')) {
+    if (Test-Path -LiteralPath (Join-Path $source $name) -PathType Leaf) {
+        $destination = Join-Path $payload $name
+        $null = New-Item -ItemType Directory -Force -Path (Split-Path $destination -Parent)
+        Copy-Item -LiteralPath (Join-Path $source $name) -Destination $destination
+    }
 }
-# Only deliberately selected user documentation ships; research logs and machine paths stay in the checkout.
-$guides = @('USER_GUIDE.md','NODE_WORKSPACE.md','APP_AUDIO.md','DEVICE_VISIBILITY.md','VIRTUAL_DEVICE_UI.md',
-    'INPUT_AVAILABILITY.md','AUDIO_LATENCY.md','EFFECTS_RESEARCH.md','DISTRIBUTION.md','IBM_PLEX_FONTS.md',
-    'BLENDER_NODE_STYLE.md','CONTROL_PROTOCOL.md','CORE_DYNAMICS.md','DEESSER_QUALITY_AUDIT.md',
-    'EFFECTS_QUALITY_AUDIT.md','EQ_SPECTRUM_ANALYZER.md','MAINTENANCE_REVIEW.md','NODE_VERIFICATION.md',
-    'SHURE_DENOISER.md','VOICE_COLOR.md')
-$docs = Join-Path $payload 'docs'
-New-Item -ItemType Directory -Force -Path $docs | Out-Null
-foreach ($name in $guides) { Copy-Item -LiteralPath (Join-Path $project ('docs\' + $name)) -Destination $docs }
-Copy-Item -LiteralPath (Join-Path $project 'docs\images') -Destination $docs -Recurse
-foreach ($name in @('CHANGELOG.md','TESTING.md','design-qa.md')) { Copy-Item -LiteralPath (Join-Path $project $name) -Destination $payload }
-Copy-Item -LiteralPath (Join-Path $project 'installer\PACKAGE_README.md') -Destination (Join-Path $payload 'README.md')
+$sourceInfo = [Diagnostics.FileVersionInfo]::GetVersionInfo((Join-Path $source 'VineMix.exe'))
+if ($sourceInfo.ProductVersion.Split('+')[0] -ne $version -or $sourceInfo.FileVersion -ne $release.numericVersion) { throw 'Staged desktop release metadata does not match release.json.' }
+$nativeVersion = (& (Join-Path $source 'VineMix.Engine.exe') --version | Out-String).Trim()
+if ($LASTEXITCODE -ne 0 -or -not $nativeVersion.Contains($version)) { throw 'Staged engine release metadata does not match release.json.' }
 $support = Join-Path $payload 'SetupSupport'
-New-Item -ItemType Directory -Force -Path $support | Out-Null
-foreach ($name in @('TERMS.txt','INSTALLATION.txt')) {
-    Copy-Item -LiteralPath (Join-Path $project ('installer\' + $name)) -Destination $support
-}
+$null = New-Item -ItemType Directory -Path $support
+foreach ($name in @('TERMS.txt','INSTALLATION.txt')) { Copy-Item -LiteralPath (Join-Path $project ('installer\' + $name)) -Destination $support }
 Copy-Item -LiteralPath (Join-Path $project 'installer\notices\DRIVER-NOTICES.txt') -Destination $support
+Copy-Item -LiteralPath (Join-Path $project 'installer\PACKAGE_README.md') -Destination (Join-Path $payload 'README.md')
 $dotnet = Join-Path $project '.tools\dotnet\dotnet.exe'
 $helperPublish = Join-Path $stage 'helper'
-& $dotnet publish (Join-Path $project 'installer\VineMix.SetupHelper\VineMix.SetupHelper.csproj') -c Release -r win-x64 `
-    --self-contained true '-p:PublishSingleFile=true' '-p:IncludeNativeLibrariesForSelfExtract=true' '-p:DebugType=None' `
-    '-p:UseSharedCompilation=false' -o $helperPublish --nologo
+& $dotnet publish (Join-Path $project 'installer\VineMix.SetupHelper\VineMix.SetupHelper.csproj') -c Release -r win-x64 --self-contained true '-p:PublishSingleFile=true' '-p:IncludeNativeLibrariesForSelfExtract=true' '-p:DebugType=None' '-p:UseSharedCompilation=false' ('-p:Version=' + $version) ('-p:FileVersion=' + $release.numericVersion) ('-p:AssemblyVersion=' + $release.numericVersion) -o $helperPublish --nologo
 if ($LASTEXITCODE -ne 0) { throw 'Installer helper publish failed.' }
 Copy-Item -LiteralPath (Join-Path $helperPublish 'VineMix.SetupHelper.exe') -Destination $support
 & (Join-Path $support 'VineMix.SetupHelper.exe') --self-test
 if ($LASTEXITCODE -ne 0) { throw 'Installer helper policy tests failed.' }
-
 $dependencies = Join-Path $stage 'dependencies'
 $cache = Join-Path $project '.tools\downloads'
 & (Join-Path $PSScriptRoot 'prepare-installer-drivers.ps1') -DestinationDirectory $dependencies -CacheDirectory $cache -Offline:$Offline
@@ -78,32 +75,23 @@ $drivers = Get-Content -LiteralPath (Join-Path $project 'installer\drivers.json'
 Copy-Item -LiteralPath (Join-Path $project 'installer\drivers.json') -Destination $support
 Copy-Item -LiteralPath (Join-Path $project '.tools\innosetup-7.1.0\license.txt') -Destination (Join-Path $support 'Inno-Setup-LICENSE.txt')
 $inventory = @(Get-ChildItem -LiteralPath $payload -File -Recurse | Sort-Object FullName | ForEach-Object {
-    [ordered]@{ path = [IO.Path]::GetRelativePath($payload, $_.FullName).Replace('\','/');
-        size = $_.Length; sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash }
+    [ordered]@{path=[IO.Path]::GetRelativePath($payload,$_.FullName).Replace('\','/');size=$_.Length;sha256=(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash}
 })
-[ordered]@{version=$version;files=$inventory} | ConvertTo-Json -Depth 5 |
-    Set-Content -LiteralPath (Join-Path $support 'package-manifest.json') -Encoding utf8
+[ordered]@{version=$version;numericVersion=$release.numericVersion;sourceSnapshotSha256=$sourceIdentity.sourceSnapshotSha256;gitHead=$sourceIdentity.gitHead;gitDirty=$sourceIdentity.gitDirty;files=$inventory} | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $support 'package-manifest.json') -Encoding utf8
 $installer = Join-Path $OutputDirectory ('VineMix-' + $version + '-Setup-x64.exe')
-if (@(Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $installer }).Count) {
-    throw 'The output installer is running; choose a new output directory.'
-}
+if (Test-Path -LiteralPath $installer) { throw 'The output installer already exists. Choose a new output directory; prior candidates are retained.' }
 $vb = $drivers.drivers | Where-Object id -eq 'vb-cable'
 $vac = $drivers.drivers | Where-Object id -eq 'vac-lite'
-$arguments = @('/Qp',('/DPayloadDir=' + $payload),('/DAppVersion=' + $version),('/DDriverArchiveDir=' + $cache),
-    ('/DOutputDir=' + $OutputDirectory),('/DVbArchiveHash=' + $vb.archiveSha256),('/DVacArchiveHash=' + $vac.archiveSha256),
-    (Join-Path $project 'installer\VineMix.iss'))
+$arguments = @('/Qp',('/DPayloadDir=' + $payload),('/DAppVersion=' + $version),('/DNumericVersion=' + $release.numericVersion),('/DDisplayVersion=' + $release.displayVersion),('/DDriverArchiveDir=' + $cache),('/DOutputDir=' + $OutputDirectory),('/DVbArchiveHash=' + $vb.archiveSha256),('/DVacArchiveHash=' + $vac.archiveSha256),(Join-Path $project 'installer\VineMix.iss'))
 & $compiler @arguments 2>&1 | Tee-Object -LiteralPath (Join-Path $stage 'compiler.log')
-if ($LASTEXITCODE -ne 0) { throw 'Installer compilation failed. See compiler.log in the staging folder.' }
+if ($LASTEXITCODE -ne 0) { throw 'Installer compilation failed. See staging compiler.log.' }
 if (-not (Test-Path -LiteralPath $installer)) { throw 'The compiler did not produce the expected installer.' }
-$manifest = [ordered]@{
-    product='Vine Mix'; version=$version; architecture='x64'; minimumWindows='Windows 11 build 22000';
-    distributionChannel='free-noncommercial'; signed=$false; stageDirectory=$stage; payloadDirectory=$payload;
-    installer=$installer; size=(Get-Item -LiteralPath $installer).Length;
-    sha256=(Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash;
-    applicationDirectory='%LOCALAPPDATA%\Programs\Vine Mix'; dataDirectory='%LOCALAPPDATA%\AudioMixer';
-    drivers=@($drivers.drivers | Select-Object id,version,downloadUrl,archiveSha256)
-}
-$manifest | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath ($installer + '.json') -Encoding utf8
+$afterIdentity = & (Join-Path $PSScriptRoot 'get-source-identity.ps1')
+if ($sourceIdentity.sourceSnapshotSha256 -ne $afterIdentity.sourceSnapshotSha256) { throw 'Release source changed while packaging. Retain this unpublished candidate and repeat from stable source.' }
+$manifest = [ordered]@{product='VineMix';version=$version;numericVersion=$release.numericVersion;displayVersion=$release.displayVersion;sourceIdentity=$sourceIdentity;architecture='x64';minimumWindows='Windows 11 build 22000';distributionChannel='closed-beta-free-noncommercial';published=$false;signed=$false;stageDirectory=$stage;payloadDirectory=$payload;installer=$installer;size=(Get-Item -LiteralPath $installer).Length;sha256=(Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash;applicationDirectory='%LOCALAPPDATA%\Programs\VineMix';dataDirectory='%LOCALAPPDATA%\VineMix';legacyDataDirectory='%LOCALAPPDATA%\AudioMixer';drivers=@($drivers.drivers | Select-Object id,version,downloadUrl,archiveSha256)}
+$manifest | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath ($installer + '.json') -Encoding utf8
 ($manifest.sha256 + '  ' + [IO.Path]::GetFileName($installer)) | Set-Content -LiteralPath ($installer + '.sha256') -Encoding ascii
-$manifest | ConvertTo-Json -Depth 6
-Write-Host 'Installer built. No application or driver was installed or launched.'
+[ordered]@{researchDate='2026-10-21';vbAudioPermission='Maintainer attested in this session on 2026-10-21 that VB-Audio integration permission was already obtained; agreement document not independently reviewed.';vendorReview=Join-Path $project 'installer\notices\DISTRIBUTION-REVIEW.md';driversExecuted=$false;published=$false} | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $stage 'private-qualification-notes.json') -Encoding utf8
+Write-Host ("Installer SHA-256: " + $manifest.sha256)
+Write-Host ("Source snapshot SHA-256: " + $sourceIdentity.sourceSnapshotSha256)
+Write-Host 'Unpublished installer candidate built. No application session or driver was installed or launched.'

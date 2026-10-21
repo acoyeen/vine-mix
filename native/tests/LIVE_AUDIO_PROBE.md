@@ -16,14 +16,14 @@ Run from the repository root in PowerShell (the normal build must already have f
   native/tests/live_audio_probe.cpp native/src/windows_audio.cpp native/src/process_capture.cpp native/src/dsp.cpp `
   build/native/_deps/samplerate-build/src/libsamplerate.a `
   -lole32 -luuid -lavrt -lpropsys -ladvapi32 -lwinmm -luser32 -static-libgcc -static-libstdc++ `
-  -o build/native/AudioMixer.LiveAudioProbe.exe
+  -o build/native/VineMix.LiveAudioProbe.exe
 $env:PATH = "$PWD\.tools\llvm-mingw-20261006-ucrt-x86_64\bin;$env:PATH"
 ```
 
 ## Read-only inventory
 
 ```powershell
-& .\build\native\AudioMixer.LiveAudioProbe.exe --list
+& .\build\native\VineMix.LiveAudioProbe.exe --list
 ```
 
 This enumerates endpoints without opening streams. All streaming requires `--run`. Both render and capture endpoint IDs are required and validated as active, correctly directed VB-CABLE or VAC Lite endpoints. Physical endpoint IDs are rejected.
@@ -31,7 +31,7 @@ This enumerates endpoints without opening streams. All streaming requires `--run
 ## Cable round trip
 
 ```powershell
-& .\build\native\AudioMixer.LiveAudioProbe.exe --run `
+& .\build\native\VineMix.LiveAudioProbe.exe --run `
   --render '<explicit virtual playback ID>' --capture '<explicit virtual recording ID>' `
   --consumers 2 --seconds 6 --output '<absolute result.json>'
 ```
@@ -41,7 +41,7 @@ Two consumers use two independent production WASAPI capture clients on the selec
 ## Passive shared-consumer compatibility
 
 ```powershell
-& .\build\native\AudioMixer.LiveAudioProbe.exe --run --capture-only --observe-only `
+& .\build\native\VineMix.LiveAudioProbe.exe --run --capture-only --observe-only `
   --capture '<explicit VAC virtual recording ID>' --consumers 2 --seconds 6 --output '<absolute result.json>'
 ```
 

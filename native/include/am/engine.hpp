@@ -24,6 +24,7 @@ public:
     Json snapshot();
     void configure(Configuration configuration, std::uint64_t expectedRevision);
     void retry();
+    void recover(const std::string& action);
     std::vector<Endpoint> endpoints();
 private:
     struct Port;

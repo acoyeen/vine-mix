@@ -93,7 +93,7 @@ __declspec(noinline) void migration() {
         expectNear(virtualOut.back().left, b.back().left, 1e-6, "B route migration " + std::to_string(mask));
         expectNear(virtualOut.back().right, b.back().right, 1e-6, "B stereo migration");
     }
-    auto config = defaultConfiguration(); config.busA = {true, -24}; config.revision = 3;
+    Configuration config; migrateLegacyGraph(config); config.busA = {true, -24}; config.revision = 3;
     config.microphones[0] = {"saved-mic", "stable-mic", "Saved microphone", 1};
     config.mainOutputs[0] = {"missing-headphones", "stable-headphones", "Missing headphones", 0};
     config.sources[0].b.enabled = true;
@@ -578,6 +578,7 @@ __declspec(noinline) void standaloneFiltersAndNotch() {
         auto plan = compileGraph(graph); auto current = std::make_unique<GraphProcessor>();
         const auto sourceIndex = index(plan, "source"), effectIndex = index(plan, "effect"), outIndex = index(plan, "out");
         GraphChannels channels{}; channels[sourceIndex] = 2;
+        graph.nodes[0].device.channel = 0; plan = compileGraph(graph);
         expect(graphSignalChannels(plan, channels)[outIndex] == 1, "Legacy selected-channel source remains mono through dedicated filters");
         graph.nodes[0].device.channel = -1; plan = compileGraph(graph);
         expect(graphSignalChannels(plan, channels)[outIndex] == 2, "Dedicated filters preserve a stereo signal layout");
@@ -686,8 +687,33 @@ __declspec(noinline) void finiteAndTransitions() {
 std::string contents(const std::filesystem::path& path) { std::ifstream input(path, std::ios::binary); std::ostringstream text; text << input.rdbuf(); return text.str(); }
 __declspec(noinline) void stereoMetersAndMicrophoneMono() {
     const auto defaults = defaultConfiguration();
-    expect(defaults.graph.nodes[0].device.channel == -1 && defaults.graph.nodes[1].device.channel == -1
-        && !defaults.graph.nodes[0].mono && !defaults.graph.nodes[1].mono, "Fresh microphone slots start with stereo capture and Mono off");
+    expect(defaults.graph.nodes.size() == 3 && defaults.graph.edges.size() == 2,
+        "Fresh workspace has exactly one physical input and two output routes");
+    expect(defaults.graph.nodes[0].id == "starter-input" && defaults.graph.nodes[0].kind == "microphone"
+        && defaults.graph.nodes[1].id == "starter-virtual-output" && defaults.graph.nodes[1].kind == "virtualOutput"
+        && defaults.graph.nodes[2].id == "starter-listening-output" && defaults.graph.nodes[2].kind == "output",
+        "Fresh workspace identities and node kinds are stable");
+    expect(defaults.graph.nodes[0].x == 48 && defaults.graph.nodes[0].y == 200
+        && defaults.graph.nodes[1].x == 480 && defaults.graph.nodes[1].y == 48
+        && defaults.graph.nodes[2].x == 480 && defaults.graph.nodes[2].y == 420
+        && defaults.graph.panX == 20 && defaults.graph.panY == 20 && defaults.graph.zoom == 1,
+        "Fresh workspace matches the desktop starter layout and camera");
+    expect(!defaults.graph.nodes[0].muted && defaults.graph.nodes[1].muted && defaults.graph.nodes[2].muted
+        && defaults.graph.nodes[2].gainDb == -24 && !defaults.graph.nodes[0].autoAssignDevice
+        && defaults.graph.nodes[1].autoAssignDevice && !defaults.graph.nodes[2].autoAssignDevice,
+        "Starter outputs stay muted and physical hardware requires explicit assignment");
+    for (const auto& fresh : defaults.graph.nodes)
+        expect(fresh.device.id.empty() && fresh.device.stableId.empty() && fresh.device.channel == -1 && !fresh.mono,
+            "Every fresh endpoint is unassigned, stereo and Mono off");
+    expect(defaults.graph.edges[0].from == "starter-input" && defaults.graph.edges[0].to == "starter-virtual-output"
+        && defaults.graph.edges[1].from == "starter-input" && defaults.graph.edges[1].to == "starter-listening-output",
+        "Starter input fans out directly to both output nodes");
+    validateConfiguration(defaults);
+    auto older = Json(defaults); for (auto& item : older["graph"]["nodes"]) item.erase("autoAssignDevice");
+    const auto compatibleDefaults = older.get<Configuration>();
+    expect(std::all_of(compatibleDefaults.graph.nodes.begin(), compatibleDefaults.graph.nodes.end(),
+        [](const auto& item) { return item.autoAssignDevice; }), "Older graphs retain historical automatic-assignment eligibility");
+    expect(Json(Json(defaults).get<Configuration>()) == Json(defaults), "Fresh assignment intent survives serialization");
     auto graph = chain(); graph.nodes[0].device.channel = -1; graph.nodes[0].gainDb = -6;
     auto plan = compileGraph(graph); auto dsp = std::make_unique<GraphProcessor>();
     constant(*dsp, plan, {.8f, -.2f});
@@ -816,7 +842,8 @@ __declspec(noinline) void persistence() {
     const auto root = std::filesystem::temp_directory_path() / (L"AudioMixer-OfflineGraph-" + std::to_wstring(GetCurrentProcessId()));
     expect(!std::filesystem::exists(root), "Isolated test directory does not preexist"); std::filesystem::create_directories(root);
     const auto path = root / "settings.json";
-    auto legacy = Json(defaultConfiguration()); legacy["version"] = 1; legacy.erase("graph"); legacy["revision"] = 3; legacy["busA"] = {{"muted", true}, {"gainDb", -24}};
+    Configuration legacyFixture; migrateLegacyGraph(legacyFixture);
+    auto legacy = Json(legacyFixture); legacy["version"] = 1; legacy.erase("graph"); legacy["revision"] = 3; legacy["busA"] = {{"muted", true}, {"gainDb", -24}};
     const auto original = legacy.dump(3) + "\n"; { std::ofstream stream(path, std::ios::binary); stream << original; }
     ConfigurationStore store(path); auto config = store.load();
     expect(contents(path) == original, "Read-only migration does not rewrite settings");
@@ -838,7 +865,7 @@ __declspec(noinline) void persistence() {
     const auto compatible = old.get<Configuration>();
     expect(!compatible.graph.nodes[0].mono && compatible.graph.nodes[0].device.channel == -1 && compatible.graph.nodes[1].device.channel == 1,
         "Older graphs default Mono off without rewriting channel selections");
-    for (const auto& suffix : {"", ".bak", ".v1.bak", ".new"}) std::filesystem::remove(path.string() + suffix);
+    for (const auto& suffix : {"", ".bak", ".v1.bak", ".new", ".established"}) std::filesystem::remove(path.string() + suffix);
     std::filesystem::remove(root); // exact newly-created directory, only when empty
 }
 __declspec(noinline) void fanoutQueues() {

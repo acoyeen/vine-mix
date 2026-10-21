@@ -1,4 +1,4 @@
-# Vine Mix setup detection helper
+# VineMix setup detection helper
 
 This Windows x64 helper inspects the system. It never installs/removes drivers,
 changes devices, terminates processes, or changes application settings. Only the
@@ -36,7 +36,7 @@ does not certify edition or permitted use. Unknown hardware identities from futu
 driver releases need explicit review before adding support.
 
 `[Application]` contains `DetectSucceeded`, `Running`, `RunningInstalled`,
-`InstallPathSafe`, `State`, and `Detail`. `Running=1` means the current Windows user's `AudioMixer.exe` or
+`InstallPathSafe`, `State`, and `Detail`. `Running=1` means the current Windows user's `VineMix.exe`, `VineMix.Engine.exe`, `AudioMixer.exe` or
 `AudioMixer.Engine.exe` is running anywhere. `RunningInstalled=1` additionally
 means a process is using a file beneath `--install-dir`. Another folder's running
 session prevents a second launch but does not prevent copying files into an unused

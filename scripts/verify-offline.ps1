@@ -6,14 +6,14 @@ $build = Join-Path $project 'build\native'
 $compiler = Join-Path $project '.tools\llvm-mingw-20261006-ucrt-x86_64\bin'
 $cmake = Join-Path $project '.tools\cmake-4.4.4-windows-x86_64\bin\cmake.exe'
 $dotnet = Join-Path $project '.tools\dotnet\dotnet.exe'
-$previewPackage = Join-Path $project 'artifacts\AudioMixer-Verification'
+$previewPackage = Join-Path $project 'artifacts\VineMix-Verification'
 if (-not $ResultDirectory) { $ResultDirectory = Join-Path $project ('artifacts\offline-verification-' + (Get-Date -Format 'yyyyMMdd-HHmmss')) }
 $ResultDirectory = [IO.Path]::GetFullPath($ResultDirectory)
 if (Test-Path -LiteralPath $ResultDirectory) { throw 'Choose a new results directory; prior evidence is retained.' }
 $null = New-Item -ItemType Directory -Path $ResultDirectory
-$targets = @('AudioMixer.GraphTests','AudioMixer.EngineLifecycleTests','AudioMixer.QualificationTests',
-    'AudioMixer.DriftQueueTests','AudioMixer.AdvancedEffectsTests','AudioMixer.DenoiserTests','AudioMixer.SpectrumTests',
-    'AudioMixer.DeEsserQualityTests','AudioMixer.EffectsQualityTests','AudioMixer.GraphPerformanceTests','AudioMixer.WindowsCatalogTests','AudioMixer.ExclusiveRenderTests','AudioMixer.SharedAudioTests','AudioMixer.AudioTimingTests','AudioMixer.MixClockTests','AudioMixer.VoiceColorTests','AudioMixer.CoreDynamicsTests')
+$targets = @('VineMix.GraphTests','VineMix.EngineLifecycleTests','VineMix.QualificationTests',
+    'VineMix.DriftQueueTests','VineMix.AdvancedEffectsTests','VineMix.DenoiserTests','VineMix.SpectrumTests',
+    'VineMix.DeEsserQualityTests','VineMix.EffectsQualityTests','VineMix.GraphPerformanceTests','VineMix.WindowsCatalogTests','VineMix.ExclusiveRenderTests','VineMix.SharedAudioTests','VineMix.AudioTimingTests','VineMix.MixClockTests','VineMix.VoiceColorTests','VineMix.CoreDynamicsTests')
 $oldPath=$env:PATH; $oldDotnet=$env:DOTNET_ROOT
 $results=[Collections.Generic.List[object]]::new()
 $failure=$null
@@ -31,7 +31,7 @@ try {
         $path=Join-Path $build ($target+'.exe')
         if (-not (Test-Path -LiteralPath $path)) { throw "Missing verifier: $target" }
         $arguments=@()
-        if ($target -eq 'AudioMixer.QualificationTests') { $arguments=@((Join-Path $ResultDirectory 'configuration-fixtures')) }
+        if ($target -eq 'VineMix.QualificationTests') { $arguments=@((Join-Path $ResultDirectory 'configuration-fixtures')) }
         $timer=[Diagnostics.Stopwatch]::StartNew()
         $output=& $path @arguments 2>&1
         $code=$LASTEXITCODE
@@ -40,11 +40,11 @@ try {
     }
     if (-not $NativeOnly) {
         if (-not $SkipBuild) {
-            & $dotnet publish (Join-Path $project 'desktop\AudioMixer.Desktop\AudioMixer.Desktop.csproj') -c Release -r win-x64 --self-contained true '-p:PublishSingleFile=true' '-p:IncludeNativeLibrariesForSelfExtract=true' '-p:DebugType=None' '-p:UseSharedCompilation=false' -o $previewPackage --nologo
+            & $dotnet publish (Join-Path $project 'desktop\VineMix.Desktop\VineMix.Desktop.csproj') -c Release -r win-x64 --self-contained true '-p:PublishSingleFile=true' '-p:IncludeNativeLibrariesForSelfExtract=true' '-p:DebugType=None' '-p:UseSharedCompilation=false' '-p:VineMixVerification=true' '-p:VineMixBuildMode=Installed' -o $previewPackage --nologo
             if ($LASTEXITCODE -ne 0) { throw 'Detached UI verification build failed.' }
         }
         $uiResult=Join-Path $ResultDirectory 'ui'
-        $process=Start-Process -FilePath (Join-Path $previewPackage 'AudioMixer.exe') -ArgumentList @('--render-design','--verification-dir',('"'+$uiResult+'"')) -WindowStyle Hidden -PassThru
+        $process=Start-Process -FilePath (Join-Path $previewPackage 'VineMix.Verification.exe') -ArgumentList @('--render-design','--verification-dir',('"'+$uiResult+'"')) -WindowStyle Hidden -PassThru
         if (-not $process.WaitForExit(120000)) { $process.Kill(); throw 'Detached UI verification exceeded its deadline.' }
         $report=Get-Content -LiteralPath (Join-Path $uiResult 'results.json') -Raw | ConvertFrom-Json
         $results.Add([ordered]@{test='Detached WPF';passed=($process.ExitCode -eq 0 -and $report.passed);checks=$report.checks.Count;renders=$report.images.Count;bindingErrors=$report.bindingErrors.Count})

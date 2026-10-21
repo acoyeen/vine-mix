@@ -32,7 +32,7 @@ New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
 $compiler = Join-Path $project '.tools/llvm-mingw-20261006-ucrt-x86_64/bin/clang++.exe'
 $sourceDirectory = if ($UseBaseline) { Join-Path $fixture 'baseline-source' } else { Join-Path $project 'native/src' }
 $includeDirectory = if ($UseBaseline) { Join-Path $fixture 'baseline-source' } else { Join-Path $project 'native/include' }
-$speex = if ($UseBaseline) { Join-Path $fixture 'baseline-source/libAudioMixer.Speex.a' } else { Join-Path $project 'build/native/libAudioMixer.Speex.a' }
+$speex = if ($UseBaseline) { Join-Path $fixture 'baseline-source/libAudioMixer.Speex.a' } else { Join-Path $project 'build/native/libVineMix.Speex.a' }
 $executable = Join-Path $OutputDirectory 'VoiceColorSpeech.exe'
 & $compiler -std=c++20 -O3 -DNOMINMAX -static-libgcc -static-libstdc++ "-I$includeDirectory" "-I$(Join-Path $project 'build/native/_deps/json-src/include')" "-I$(Join-Path $project 'build/native/_deps/speexdsp-src/include')" (Join-Path $PSScriptRoot 'voice_color_speech.cpp') (Join-Path $sourceDirectory 'graph.cpp') (Join-Path $sourceDirectory 'advanced_effects.cpp') $speex -o $executable
 if ($LASTEXITCODE -ne 0) { throw "Offline speech harness compilation failed: $LASTEXITCODE" }

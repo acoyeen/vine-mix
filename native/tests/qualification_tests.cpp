@@ -8,6 +8,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <memory>
 #include <numbers>
 #include <random>
@@ -59,7 +60,7 @@ void write(const std::filesystem::path& path, const std::string& text) {
 }
 void settings(const std::filesystem::path& root) {
     const auto path = root / "settings.json";
-    Configuration initial = defaultConfiguration(); initial.revision = 41;
+    Configuration initial; migrateLegacyGraph(initial); initial.revision = 41;
     Configuration current = initial; current.revision = 42; current.graph.nodes[0].name = "Preserved microphone";
     ConfigurationStore store(path); store.save(initial); store.save(current);
     const auto primary = read(path), backup = read(path.string() + ".bak");
@@ -71,14 +72,24 @@ void settings(const std::filesystem::path& root) {
     require(restoredMissing.revision == 41 && !missingPrimary.warning().empty(), "Missing primary restores a surviving last-good backup with a warning");
     require(!std::filesystem::exists(path) && read(path.string() + ".bak") == backup, "Missing-file recovery is read-only and preserves the backup");
     auto committedMissing = restoredMissing; committedMissing.revision = 43;
+    rejects([&] { missingPrimary.save(committedMissing); }, "Backup preview cannot be saved without a recovery choice");
+    missingPrimary.recover("restoreBackup");
     missingPrimary.save(committedMissing);
     require(ConfigurationStore(path).load().revision == 43 && read(path.string() + ".bak") == backup, "Saving recovered missing-primary settings retains the original good backup");
     write(path, primary);
-    auto unsupported = Json(current); unsupported["version"] = 999;
-    const std::array<std::string, 5> damaged{"{", primary.substr(0, primary.size() / 2), std::string(262145, ' '), unsupported.dump(), "null"};
+    for (const auto version : {std::uint64_t{999}, std::numeric_limits<std::uint64_t>::max()}) {
+        auto unsupported = Json(current); unsupported["version"] = version;
+        write(path, unsupported.dump());
+        ConfigurationStore future(path); future.load();
+        require(future.loadState() == "unsupported", "Future schema cannot narrow to a supported version or fall back to an older backup");
+        rejects([&] { future.recover("startFresh"); }, "Future schema cannot be overwritten by recovery");
+        rejects([&] { future.save(current); }, "Future schema blocks configuration writes");
+        require(read(path) == unsupported.dump(), "Future schema bytes remain intact");
+    }
+    const std::array<std::string, 4> damaged{"{", primary.substr(0, primary.size() / 2), std::string(262145, ' '), "null"};
     for (const auto& text : damaged) {
         write(path, text); ConfigurationStore recovery(path); const auto restored = recovery.load();
-        require(restored.revision == 41, "Damaged, truncated, oversized or unknown-version file restores last good");
+        require(restored.revision == 41 && recovery.loadState() == "backupAvailable" && !recovery.writable(), "Damaged files expose a read-only backup preview");
         require(!recovery.warning().empty(), "Recovery is visible to user");
         require(read(path) == text && read(path.string() + ".bak") == backup, "Read-only recovery preserves original and backup exactly");
     }
@@ -92,11 +103,12 @@ void settings(const std::filesystem::path& root) {
     write(path, primary); write(path.string() + ".bak", backup);
     write(path, "broken original"); write(path.string() + ".bak", "broken backup");
     ConfigurationStore defaults(path); const auto safe = defaults.load();
+    rejects([&] { defaults.save(safe); }, "Two damaged files cannot silently commit defaults");
     require(safe.revision == 0 && !defaults.warning().empty(), "Two damaged files yield safe defaults and warning");
     require(std::all_of(safe.graph.nodes.begin(), safe.graph.nodes.end(), [](const auto& n) { return n.device.id.empty() && n.device.stableId.empty() && !n.app.processId; }), "Recovery never assigns hardware or applications");
     require(read(path) == "broken original" && read(path.string() + ".bak") == "broken backup", "Fallback preserves both corrupt originals");
     write(path.string() + ".bak", backup);
-    ConfigurationStore recovered(path); auto restored = recovered.load(); restored.revision = 43; recovered.save(restored);
+    ConfigurationStore recovered(path); recovered.load(); auto restored = recovered.recover("restoreBackup"); restored.revision = 43; recovered.save(restored);
     require(ConfigurationStore(path).load().revision == 43 && read(path.string() + ".bak") == backup, "Commit after fallback preserves usable backup");
     bool archived = false;
     for (const auto& entry : std::filesystem::directory_iterator(root))

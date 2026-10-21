@@ -1,0 +1,5 @@
+#pragma once
+namespace am {
+inline constexpr char releaseVersion[] = "@VINEMIX_VERSION@";
+inline constexpr char releaseDisplayVersion[] = "@VINEMIX_DISPLAY_VERSION@";
+}

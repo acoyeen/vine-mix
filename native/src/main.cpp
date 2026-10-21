@@ -1,6 +1,8 @@
 #include "am/configuration.hpp"
 #include "am/control_server.hpp"
 #include "am/engine.hpp"
+#include "am/engine_instance.hpp"
+#include "am/version.hpp"
 #include <windows.h>
 #include <chrono>
 #include <atomic>
@@ -38,15 +40,29 @@ int wmain(int argc, wchar_t** argv) {
     SetConsoleOutputCP(CP_UTF8);
     try {
         std::filesystem::path settings;
+        std::filesystem::path validation;
         bool listDevices = false;
+        bool version = false;
         for (int i = 1; i < argc; ++i) {
             const std::wstring option = argv[i];
             if (option == L"--list-devices") listDevices = true;
             else if (option == L"--settings" && i + 1 < argc) settings = argv[++i];
+            else if (option == L"--validate-settings" && i + 1 < argc) validation = argv[++i];
+            else if (option == L"--version") version = true;
             else if (option == L"--help") {
                 std::cout << "Vine Mix Engine\n  --list-devices   Enumerate endpoints without opening audio streams\n"
-                    "  --settings FILE Use a separate configuration file\n"; return 0;
+                    "  --settings FILE Use a separate configuration file\n"
+                    "  --validate-settings FILE Validate settings without starting audio or writing files\n"
+                    "  --version       Print the release version without loading settings\n"; return 0;
             } else throw std::runtime_error("Unknown argument. Use --help.");
+        }
+        if (version) { std::cout << "VineMix " << am::releaseVersion << '\n'; return 0; }
+        if (!validation.empty()) {
+            am::ConfigurationStore store(validation);
+            const auto configuration = store.load();
+            std::cout << am::Json{{"valid", store.loadState() == "loaded"}, {"settingsState", store.loadState()},
+                {"warning", store.warning()}, {"version", am::releaseVersion}, {"revision", configuration.revision}}.dump() << '\n';
+            return store.loadState() == "loaded" ? 0 : 2;
         }
         if (listDevices) {
             am::DeviceCatalog catalog;
@@ -55,11 +71,7 @@ int wmain(int argc, wchar_t** argv) {
             std::this_thread::sleep_for(std::chrono::milliseconds(750));
             std::cout << am::Json(catalog.enumerate()).dump(2) << '\n'; return 0;
         }
-        const auto mutexName = L"Local\\AudioMixer.Engine." + am::widen(am::currentUserSid());
-        HANDLE instance = CreateMutexW(nullptr, TRUE, mutexName.c_str());
-        if (!instance) throw std::runtime_error("Cannot create the engine instance lock.");
-        if (GetLastError() == ERROR_ALREADY_EXISTS) { CloseHandle(instance); return 0; }
-        struct CloseInstance { HANDLE value; ~CloseInstance() { ReleaseMutex(value); CloseHandle(value); } } cleanup{instance};
+        am::EngineInstance instance(am::widen(am::currentUserSid()));
         am::Engine engine(settings);
         ConsoleRegistration registration(engine);
         engine.start();

@@ -18,7 +18,7 @@ struct DeviceBinding {
     std::string id;
     std::string stableId;
     std::string name;
-    int channel = 0;
+    int channel = -1;
 };
 inline constexpr std::size_t maximumGraphNodes = 32;
 inline constexpr std::size_t maximumGraphEdges = 96;
@@ -88,6 +88,7 @@ struct GraphNode {
     double balance{};
     bool bypass{};
     bool collapsed{};
+    bool autoAssignDevice = true;
 };
 struct GraphEdge {
     std::string id;

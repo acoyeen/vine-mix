@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)][string]$RenderEndpoint,
-    [string]$ProbePath = (Join-Path $PSScriptRoot '..\build\native\AudioMixer.LiveAudioProbe.exe'),
+    [string]$ProbePath = (Join-Path $PSScriptRoot '..\build\native\VineMix.LiveAudioProbe.exe'),
     [string]$ResultDirectory = (Join-Path $PSScriptRoot ('..\artifacts\qualification\process-capture-' + [Guid]::NewGuid().ToString('N')))
 )
 

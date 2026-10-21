@@ -1,6 +1,6 @@
 # Third-party notices
 
-Vine Mix's original source is released under the MIT licence in the root
+VineMix's original source is released under the MIT licence in the root
 [LICENSE](LICENSE), copyright (c) 2026 acoyeen.
 Third-party components retain the licences and copyright notices below; the
 root licence does not replace them. Preserve this file and the complete
@@ -16,7 +16,6 @@ packaging and update guidance is in [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md)
 | [RNNoise v0.2](https://github.com/xiph/rnnoise/tree/v0.2) and matching default model `0b50c45` | Neural noise suppression | BSD-3-Clause and source-file BSD notices; `licenses/RNNoise-COPYING.txt` and `RNNoise-source-notices.txt` |
 | [nlohmann/json 3.12.0](https://github.com/nlohmann/json/tree/v3.12.0) | Configuration and control messages | MIT; `licenses/nlohmann-json-LICENSE` and `nlohmann-json-third-party-notices.txt`, including Florian Loitsch's Grisu2 and Evan Nemerson's Hedley credits |
 | [IBM Plex](https://github.com/IBM/plex/tree/71f558992315a12ca1f06a2215d57962a1992162): Sans 3.005 Regular, Medium and SemiBold; Mono 2.005 Regular | Embedded interface typography and numeric readouts | SIL Open Font License 1.1; `licenses/IBM-Plex-OFL.txt` and `Assets/Fonts/IBM-Plex-LICENSE.txt`; [asset provenance](docs/IBM_PLEX_FONTS.md) |
-| [Inter 4.1](https://github.com/rsms/inter/releases/tag/v4.1) Regular and SemiBold | Retained embedded legacy font assets; the current interface uses IBM Plex | SIL Open Font License 1.1; `licenses/Inter-OFL.txt` and `Assets/Fonts/LICENSE.txt` |
 | .NET 10.0.13, WPF and Windows Forms | Self-contained desktop runtime | MIT and component terms; `licenses/dotnet-runtime-LICENSE.txt`, `dotnet-windowsdesktop-LICENSE.txt`, and the `dotnet-*-ThirdPartyNotices.txt` files |
 | [LLVM-MinGW 20261006 UCRT x86_64](https://github.com/mstorsjo/llvm-mingw/releases/tag/20261006) | Native C++/unwind runtime, compiler support and Windows runtime support | Apache-2.0 with LLVM exceptions, legacy LLVM terms, MinGW-w64 and component terms; `licenses/LLVM-runtime-LICENSE.txt`, `MinGW-w64-COPYING.txt`, `MinGW-runtime-COPYING.txt`, and `winpthreads-COPYING.txt` |
 
@@ -34,7 +33,7 @@ interface text and Mono for numerical values and shortcuts. Inter is also
 unmodified. Copyright (c) 2016 The Inter Project Authors. Both families are
 embedded in the desktop application; they are not installed system-wide. Their
 OFL terms remain attached to the fonts and do not change the licence of the
-application source. The forest-green split VM symbol is Vine Mix's application
+application source. The forest-green split VM symbol is VineMix's application
 branding; the use of IBM Plex does not imply IBM's endorsement.
 
 ### Pinned denoiser provenance
@@ -71,7 +70,7 @@ Copyright (c) Microsoft Corporation. The sample repository's complete MIT notice
 is preserved in `licenses/Microsoft-Windows-classic-samples-LICENSE.txt` as an
 acknowledgement of this implementation reference.
 
-Vine Mix's `native/src/process_capture.cpp` implements its own discovery,
+VineMix's `native/src/process_capture.cpp` implements its own discovery,
 callback lifetime, interruptible capture worker, queues and recovery. The local
 `ProcessActivationParams` declaration represents the documented Windows ABI's
 values and layout because the build's MinGW headers lack that declaration. The
@@ -119,13 +118,15 @@ separately, retain this attribution:
 > Unchanged. [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/),
 > subject to the [manual's stated exceptions](https://docs.blender.org/manual/en/latest/copyright.html).
 
-Blender implementation code and branding are not embedded in Vine Mix.
+Blender implementation code and branding are not embedded in VineMix.
 
-## Separately obtained virtual audio drivers
+## Optional virtual audio drivers
 
-Vine Mix does not redistribute or install VB-CABLE, VB-CABLE A+B/C+D, or
-Virtual Audio Cable (VAC). Obtain any driver separately from its publisher and
-follow that publisher's licence for the intended use.
+The standalone VineMix EXE contains no driver packages. The full Setup includes
+the unchanged official VB-CABLE Pack45 and VAC Lite archives and can offer their
+original installers with separate vendor terms and consent. These proprietary
+components are not covered by VineMix's MIT licence. Follow each publisher's
+licence for the intended use. VB-CABLE A+B and C+D are not included.
 
 - [VB-Audio licensing](https://vb-audio.com/Services/licensing.htm): VB-CABLE is
   donationware; professional use and bundling have additional conditions.
@@ -133,7 +134,7 @@ follow that publisher's licence for the intended use.
   publisher's published terms.
 - [VAC licence](https://vac.muzychenko.net/en/license.txt): the Lite/freeware
   version is restricted to private home use without income generation. Other
-  versions have their own terms. Vine Mix's licence does not expand those
+  versions have their own terms. VineMix's licence does not expand those
   permissions.
 
 The names of upstream projects and publishers identify components and sources;

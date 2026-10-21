@@ -2,6 +2,7 @@
 // against synthetic workers. windows_audio.cpp/process_capture.cpp are NEVER
 // linked into this executable, so it cannot open real audio endpoints.
 #include "am/engine.hpp"
+#include "am/engine_instance.hpp"
 #include "am/process_capture.hpp"
 #include <windows.h>
 #include <algorithm>
@@ -9,6 +10,7 @@
 #include <atomic>
 #include <chrono>
 #include <cmath>
+#include <fstream>
 #include <iostream>
 #include <map>
 #include <stdexcept>
@@ -150,6 +152,105 @@ std::vector<ApplicationInfo> enumerateAudioApplications() { return {}; }
 }
 
 namespace test {
+void defaultSettings(const std::filesystem::path& directory) {
+    using namespace am;
+    check(live == 0, "Default-settings fixture must start without another engine's workers");
+    const auto fixture = directory / L"default local app data";
+    const auto application = fixture / L"VineMix";
+    const auto working = directory / L"unrelated working directory";
+    const auto path = application / L"settings.json";
+    std::filesystem::create_directories(application);
+    std::filesystem::create_directory(working);
+    auto config = defaultConfiguration();
+    config.revision = 6371;
+    config.graph.nodes.clear(); config.graph.edges.clear();
+    GraphNode microphone; microphone.id = "saved-source"; microphone.kind = "microphone";
+    microphone.name = "Saved custom microphone"; microphone.x = -137.25; microphone.y = 283.75;
+    microphone.device = {"synthetic-microphone", "synthetic-stable-id", "Saved device", -1};
+    microphone.mono = true;
+    GraphNode gain; gain.id = "saved-gain"; gain.kind = "gain"; gain.name = "Saved gain";
+    gain.gainDb = -7.5f; gain.x = 421.25; gain.y = 283.75;
+    GraphNode output; output.id = "saved-output"; output.kind = "output"; output.name = "Saved output";
+    output.muted = true; output.x = 987.5; output.y = 283.75;
+    config.graph.nodes = {microphone, gain, output};
+    config.graph.edges = {{"saved-input-route", microphone.id, gain.id}, {"saved-output-route", gain.id, output.id}};
+    config.graph.panX = -125.5; config.graph.panY = 91.25; config.graph.zoom = .65;
+    ConfigurationStore(path).save(config);
+    auto decoy = defaultConfiguration(); decoy.revision = 9000;
+    ConfigurationStore(working / L"settings.json").save(decoy);
+    {
+        // Only this synthetic executable's environment and current directory
+        // change. Restore both even when an assertion or engine startup fails.
+        struct RestoreLaunchContext {
+            std::filesystem::path previousDirectory = std::filesystem::current_path();
+            std::wstring previousLocalAppData;
+            bool hadLocalAppData{};
+            RestoreLaunchContext() {
+                const DWORD required = GetEnvironmentVariableW(L"LOCALAPPDATA", nullptr, 0);
+                hadLocalAppData = required != 0;
+                if (!required) {
+                    check(GetLastError() == ERROR_ENVVAR_NOT_FOUND, "Read the previous test-process LOCALAPPDATA state");
+                    return;
+                }
+                previousLocalAppData.resize(required);
+                check(GetEnvironmentVariableW(L"LOCALAPPDATA", previousLocalAppData.data(), required) == required - 1,
+                    "Read the previous test-process LOCALAPPDATA value");
+                previousLocalAppData.resize(required - 1);
+            }
+            ~RestoreLaunchContext() {
+                SetEnvironmentVariableW(L"LOCALAPPDATA", hadLocalAppData ? previousLocalAppData.c_str() : nullptr);
+                std::error_code ignored;
+                std::filesystem::current_path(previousDirectory, ignored);
+            }
+        } restore;
+        check(SetEnvironmentVariableW(L"LOCALAPPDATA", fixture.c_str()) != FALSE,
+            "Redirect default settings into a new test-only application-data directory");
+        std::filesystem::current_path(working);
+        check(applicationDataDirectory() == application, "Default application data must resolve to the test-only absolute directory");
+        const auto verify = [&](Engine& engine) {
+            const auto snapshot = engine.snapshot();
+            check(snapshot.at("configuration") == Json(config),
+                "A default engine must restore the exact custom v2 graph, revision, controls, device and camera");
+            check(snapshot.at("warning") == "", "Valid default-path settings must load without a recovery warning");
+            check(snapshot.at("settingsPath") == narrow(path.wstring())
+                && snapshot.at("logPath") == narrow((application / L"engine.log").wstring()),
+                "Default settings and logging must use the application-data folder independently of the working directory");
+        };
+        {
+            Engine implicit;
+            Engine explicitPath(path);
+            verify(implicit); verify(explicitPath);
+            check(live == 0, "Reading either startup configuration must not create audio workers");
+            implicit.start(); verify(implicit);
+            config.graph.nodes[1].gainDb = -11.25f;
+            config.graph.nodes[0].x = -211.75;
+            implicit.configure(config, config.revision); ++config.revision;
+            verify(implicit);
+            implicit.stop();
+            check(live == 0, "Quitting the default-path engine must release all synthetic workers");
+        }
+        // A full engine reconstruction, from a second launch directory, must
+        // load the last committed custom workspace rather than fresh defaults.
+        std::filesystem::current_path(directory);
+        {
+            Engine reopened;
+            verify(reopened);
+            reopened.start(); verify(reopened);
+            reopened.stop();
+            check(live == 0, "Reopening the default-path engine must not leak synthetic workers");
+        }
+        check(Json(ConfigurationStore(path).load()) == Json(config), "Full quit and reopen must retain the last custom settings on disk");
+        check(ConfigurationStore(working / L"settings.json").load().revision == decoy.revision,
+            "Default-path startup must not read or overwrite the working-directory settings decoy");
+        check(!std::filesystem::exists(directory / L"VineMix") && !std::filesystem::exists(working / L"VineMix"),
+            "Default-path startup must not create a settings folder relative to either launch directory");
+    }
+    for (const auto& name : {L"settings.json", L"settings.json.bak", L"settings.json.new", L"settings.json.established", L"engine.log", L"engine.log.previous"})
+        std::filesystem::remove(application / name);
+    std::filesystem::remove(working / L"settings.json");
+    std::filesystem::remove(working / L"settings.json.established");
+    std::filesystem::remove(working); std::filesystem::remove(application); std::filesystem::remove(fixture);
+}
 void relativeSettings(const std::filesystem::path& directory) {
     using namespace am;
     const auto fixture = directory / "relative-settings";
@@ -175,7 +276,7 @@ void relativeSettings(const std::filesystem::path& directory) {
             "The actual engine must retain diagnostic logging beside relative settings");
         check(live == 0, "Relative settings fixture leaked synthetic workers");
     }
-    for (const auto& name : {"settings.json", "settings.json.bak", "settings.json.new", "engine.log", "engine.log.previous"})
+    for (const auto& name : {"settings.json", "settings.json.bak", "settings.json.new", "settings.json.established", "engine.log", "engine.log.previous"})
         std::filesystem::remove(fixture / name);
     std::filesystem::remove(fixture);
 }
@@ -274,6 +375,141 @@ void duplicateSources(const std::filesystem::path& path) {
         reopened.stop(); check(live == 0, "Restarted shared-source fixture leaked workers");
     }
 }
+void ownershipLocks() {
+    using namespace am;
+    const auto identity = L"OfflineVerification-" + std::to_wstring(GetCurrentProcessId());
+    const auto rejectsInstance = [&] {
+        bool rejected = false;
+        try { EngineInstance competing(identity); } catch (const std::exception&) { rejected = true; }
+        check(rejected, "Either existing product lock must reject another engine before settings are opened");
+    };
+    for (const auto* product : {L"AudioMixer", L"VineMix"}) {
+        const auto name = L"Local\\" + std::wstring(product) + L".Engine." + identity;
+        HANDLE legacy = CreateMutexW(nullptr, TRUE, name.c_str());
+        check(legacy != nullptr, "Create private synthetic product lock");
+        rejectsInstance(); ReleaseMutex(legacy); CloseHandle(legacy);
+        EngineInstance available(identity); rejectsInstance();
+    }
+    EngineInstance available(identity); // Rejected acquisition must not leak a lock.
+}
+void recovery(const std::filesystem::path& directory) {
+    using namespace am;
+    check(live == 0, "Recovery fixture must start without workers");
+    const auto root = directory / "recovery";
+    std::filesystem::create_directory(root);
+    const auto path = root / "settings.json";
+    const auto nested = root / "not-created" / "nested" / "settings.json";
+    check(ConfigurationStore(nested).physicalPath() == nested && !std::filesystem::exists(nested.parent_path()),
+        "A new nested settings path resolves through its nearest existing ancestor without creating directories");
+    const auto write = [&](const auto& file, const auto& text) {
+        std::ofstream stream(file, std::ios::binary); stream << text;
+        check(static_cast<bool>(stream), "Write isolated recovery fixture");
+    };
+    const auto read = [](const auto& file) {
+        std::ifstream stream(file, std::ios::binary);
+        return std::string(std::istreambuf_iterator<char>(stream), std::istreambuf_iterator<char>());
+    };
+    const auto rejects = [](auto action) {
+        bool rejected = false; try { action(); } catch (const std::exception&) { rejected = true; }
+        check(rejected, "Unsafe recovery/configuration operation must be rejected");
+    };
+    Configuration saved; migrateLegacyGraph(saved); saved.revision = 11;
+    saved.graph.nodes[0].device.id = "recovery-mic";
+    ConfigurationStore store(path); store.save(saved); ++saved.revision; store.save(saved);
+    const auto backup = read(path.string() + ".bak");
+    write(path, "broken original");
+    {
+        const int before = created;
+        Engine blocked(path); blocked.start();
+        check(blocked.snapshot()["settingsState"] == "backupAvailable" && created == before && live == 0
+            && blocked.snapshot()["status"]["nodes"].empty(), "Backup preview starts zero synthetic audio ports");
+        rejects([&] { blocked.configure(saved, 11); });
+        blocked.retry(); blocked.recover("retry");
+        check(created == before && read(path) == "broken original" && read(path.string() + ".bak") == backup,
+            "Recovery retry and rejected configuration leave audio closed and preserve originals");
+        failNextConfiguration = true;
+        rejects([&] { blocked.recover("restoreBackup"); });
+        check(live == 0 && blocked.snapshot()["settingsState"] == "recoveryRequired"
+            && blocked.snapshot()["status"]["nodes"].empty(), "Recovery worker failure closes every partial port and keeps saving paused");
+        const int afterFailure = created;
+        rejects([&] { blocked.configure(saved, 11); });
+        check(created == afterFailure, "Configuration remains blocked after a recovered workspace fails audio startup");
+        blocked.recover("retry");
+        const auto snapshot = blocked.snapshot();
+        check(snapshot["settingsState"] == "loaded" && snapshot["warning"] == "" && live > 0
+            && snapshot["configuration"]["revision"] == 11, "Retry after failed recovery can load the committed backup and start audio safely");
+        check(snapshot["enginePid"] == GetCurrentProcessId() && snapshot["engineProtocolVersion"] == 1
+            && !snapshot["executablePath"].get<std::string>().empty()
+            && std::filesystem::equivalent(std::filesystem::path(widen(snapshot["physicalSettingsPath"].get<std::string>())), path),
+            "Snapshot identifies its process and actual opened settings file");
+        blocked.stop(); check(live == 0, "Recovered engine shutdown closes every synthetic worker");
+    }
+    write(path, "broken fresh original"); write(path.string() + ".bak", "broken fresh backup");
+    write(path.string() + ".new", "orphaned newer staging bytes");
+    {
+        const int before = created;
+        Engine blocked(path); blocked.start();
+        check(blocked.snapshot()["settingsState"] == "recoveryRequired" && created == before && live == 0,
+            "Two corrupt copies do not start ports or adopt defaults");
+        rejects([&] { blocked.configure(defaultConfiguration(), 0); });
+        blocked.recover("startFresh");
+        check(blocked.snapshot()["settingsState"] == "loaded"
+            && Json(ConfigurationStore(path).load().graph) == Json(defaultConfiguration().graph),
+            "Explicit start-fresh persists the exact conservative starter graph");
+        blocked.stop();
+    }
+    auto future = Json(saved); future["version"] = 999; write(path, future.dump());
+    {
+        const int before = created;
+        Engine blocked(path); blocked.start();
+        rejects([&] { blocked.recover("startFresh"); });
+        rejects([&] { blocked.recover("restoreBackup"); });
+        rejects([&] { blocked.configure(saved, 0); });
+        check(blocked.snapshot()["settingsState"] == "unsupported" && created == before && live == 0
+            && read(path) == future.dump(), "Newer schema blocks writes, destructive recovery and every audio port");
+        blocked.stop();
+    }
+    std::filesystem::remove(path); std::filesystem::remove(path.string() + ".bak");
+    {
+        const int before = created;
+        Engine missing(path); missing.start();
+        check(missing.snapshot()["settingsState"] == "recoveryRequired" && created == before,
+            "Established workspace with both files missing cannot silently become a new workspace");
+        missing.stop();
+    }
+    std::filesystem::remove(path.string() + ".established");
+    write(path.string() + ".new", "interrupted first commit");
+    {
+        const int before = created;
+        Engine orphaned(path); orphaned.start();
+        rejects([&] { orphaned.configure(defaultConfiguration(), 0); });
+        check(orphaned.snapshot()["settingsState"] == "recoveryRequired" && created == before
+            && read(path.string() + ".new") == "interrupted first commit",
+            "Orphaned first-commit staging files cannot be mistaken for a new workspace or overwritten");
+        orphaned.stop();
+    }
+    // Remove only this fixture's known files and explicitly inspected recovery
+    // artifacts. Directory removal fails if any unexpected content remains.
+    bool preservedBackup = false, preservedFresh = false;
+    for (const auto& entry : std::filesystem::directory_iterator(root)) {
+        const auto name = entry.path().filename().string();
+        if (entry.is_directory() && name.starts_with("settings.json.recovery-")) {
+            const auto original = read(entry.path() / "settings.json");
+            const auto originalBackup = read(entry.path() / "settings.json.bak");
+            preservedBackup |= original == "broken original" && originalBackup == backup;
+            preservedFresh |= original == "broken fresh original" && originalBackup == "broken fresh backup"
+                && read(entry.path() / "settings.json.new") == "orphaned newer staging bytes";
+            for (const auto* file : {"settings.json", "settings.json.bak", "settings.json.established", "settings.json.new", "settings.json.v1.bak"})
+                std::filesystem::remove(entry.path() / file);
+            std::filesystem::remove(entry.path());
+        } else if (name.starts_with("settings.json.corrupt-")) std::filesystem::remove(entry.path());
+    }
+    check(preservedBackup && preservedFresh, "Both explicit recovery choices preserve the exact original and backup bytes together");
+    for (const auto* file : {"settings.json", "settings.json.bak", "settings.json.new", "settings.json.established", "engine.log", "engine.log.previous"})
+        std::filesystem::remove(root / file);
+    std::filesystem::remove(root);
+    std::cout << "PASS recovery: backup preview, corrupt/missing established workspace and future schema open no ports; configuration is blocked; preserved recovery, worker-failure cleanup and retry; dual legacy/current engine locks use private test names\n";
+}
 }
 int main() {
     using namespace am;
@@ -282,7 +518,7 @@ int main() {
         test::check(!std::filesystem::exists(directory), "Test directory already exists");
         std::filesystem::create_directories(directory);
         const auto path = directory / "settings.json";
-        Configuration config = defaultConfiguration();
+        Configuration config; migrateLegacyGraph(config);
         config.graph.nodes[0].device.id = "mic-a";
         config.graph.nodes[2].device.id = "virtual-in";
         config.graph.nodes[5].device.id = "out1";
@@ -322,10 +558,16 @@ int main() {
         ConfigurationStore(path).save(config);
         std::uint64_t previousEngineSpectrumRevision{};
         {
-            Engine engine(path); engine.start(); test::wait(150);
+            Engine engine(path); engine.start();
+            // A loaded machine can delay new synthetic worker threads beyond
+            // one fixed Sleep. Wait for actual fanout, retaining a hard bound.
+            const bool fanoutReady = test::eventually([&] {
+                // Enough consumed quanta also primes the 4096-frame analyzer.
+                return test::render1 > 20 && test::render2 > 20 && test::renderB > 20;
+            });
             const auto initial = engine.snapshot();
             test::check(initial["status"]["audioFrames"].get<std::uint64_t>() > 0, "Audio clock stalled");
-            test::check(test::render1 > 10 && test::render2 > 10 && test::renderB > 10, "Initial synthetic fanout failed");
+            test::check(fanoutReady, "Initial synthetic fanout failed");
             const auto& mic = initial["status"]["nodes"][0];
             test::check(mic["channels"] == 2 && mic["peakLeft"].get<float>() > .29f
                 && mic["peakRight"].get<float>() > .09f && mic["peakRight"].get<float>() < .11f,
@@ -566,12 +808,15 @@ int main() {
         }
         const auto sharedPath = directory / "shared-settings.json";
         test::duplicateSources(sharedPath);
+        test::defaultSettings(directory);
         test::relativeSettings(directory);
+        test::ownershipLocks();
+        test::recovery(directory);
         for (const auto& fixture : {path, sharedPath})
-            for (const auto& suffix : {"", ".bak", ".new"}) std::filesystem::remove(fixture.string() + suffix);
+            for (const auto& suffix : {"", ".bak", ".new", ".established"}) std::filesystem::remove(fixture.string() + suffix);
         std::filesystem::remove(directory / "engine.log"); std::filesystem::remove(directory / "engine.log.previous");
         std::filesystem::remove(directory);
-        std::cout << "PASS: actual engine survived 301 graph commits, Core Dynamics and measured Voice Color output changes/live persistence without worker restart, canvas-only saves without DSP rebuilds, concurrent snapshots, measured EQ spectrum lifecycle, topology fades, rapid device rebinding, isolated output loss/rejoin, retirement, restart and failed-start cleanup; fresh and saved duplicate microphone/virtual/app sources share capture with independent controls/routes while output uniqueness remains enforced. Synthetic worker stubs only.\n";
+        std::cout << "PASS: actual engine survived 301 graph commits, Core Dynamics and measured Voice Color output changes/live persistence without worker restart, canvas-only saves without DSP rebuilds, concurrent snapshots, measured EQ spectrum lifecycle, topology fades, rapid device rebinding, isolated output loss/rejoin, retirement, restart and failed-start cleanup; fresh and saved duplicate microphone/virtual/app sources share capture with independent controls/routes while output uniqueness remains enforced; implicit default-path startup and full quit/reopen preserve a custom v2 workspace independently of launch directory. Synthetic worker stubs only.\n";
         return 0;
     } catch (const std::exception& error) { std::cerr << "FAIL: " << error.what() << '\n'; return 1; }
 }

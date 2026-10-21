@@ -358,10 +358,11 @@ void persistenceAndValidation() {
     check(Json(loaded) == json, "Both axes, bypass and node layout round-trip through version-2 configuration");
     auto copy = loaded.graph.nodes[1]; copy.voiceColor = {}; check(loaded.graph.nodes[1].voiceColor.tone == .37 && loaded.graph.nodes[1].voiceColor.ambience == .62,
         "Node copy settings are independent; defaults are neutral");
-    auto legacy = Json(defaultConfiguration()); for (auto& node : legacy["graph"]["nodes"]) node.erase("voiceColor");
+    Configuration legacyFixture; migrateLegacyGraph(legacyFixture);
+    auto legacy = Json(legacyFixture); for (auto& node : legacy["graph"]["nodes"]) node.erase("voiceColor");
     const auto old = legacy.get<Configuration>(); auto upgraded = Json(old); for (auto& node : upgraded["graph"]["nodes"]) node.erase("voiceColor");
     check(upgraded == legacy, "Existing saved graphs retain every old field, route, sound control and position");
-    check(compileGraph(old.graph) == compileGraph(defaultConfiguration().graph), "Missing Voice Color fields preserve the exact old DSP plan");
+    check(compileGraph(old.graph) == compileGraph(legacyFixture.graph), "Missing Voice Color fields preserve the exact old DSP plan");
     for (double invalid : {-1.001, 1.001, std::numeric_limits<double>::infinity(), std::numeric_limits<double>::quiet_NaN()}) {
         auto graph = chain(); graph.nodes[1].voiceColor.tone = invalid; rejects([&] { compileGraph(graph); }, "Invalid or nonfinite tone rejected");
     }

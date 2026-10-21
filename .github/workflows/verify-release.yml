@@ -1,0 +1,97 @@
+name: Verify published release assets
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to verify
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: refs/tags/${{ github.event.release.tag_name || inputs.tag }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Download and verify versioned packages
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tag = $env:RELEASE_TAG
+          if ($tag -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?$') {
+            throw 'Choose a canonical release tag.'
+          }
+          $version = $tag.Substring(1)
+          $source = git rev-parse --verify ('refs/tags/' + $tag + '^{commit}')
+          if ($LASTEXITCODE) { throw 'The source tag could not be resolved.' }
+          $checkout = git rev-parse HEAD
+          if ($LASTEXITCODE -or $checkout -ne $source) {
+            throw 'The checkout does not match the release tag.'
+          }
+          $record = git show ($source + ':release.json') | ConvertFrom-Json
+          if ($LASTEXITCODE -or $record.version -ne $version) {
+            throw 'The tagged source does not identify this release version.'
+          }
+          $directory = Join-Path $env:RUNNER_TEMP 'release-assets'
+          New-Item -ItemType Directory -Path $directory | Out-Null
+          gh release download $tag --repo $env:GITHUB_REPOSITORY --dir $directory
+          if ($LASTEXITCODE) { throw 'Release downloads failed.' }
+          $checksums = Join-Path $directory 'SHA256SUMS.txt'
+          $seen = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+          foreach ($line in [IO.File]::ReadAllLines($checksums)) {
+            if ($line -notmatch '^([0-9a-f]{64})  ([A-Za-z0-9._-]+)$') {
+              throw 'The published checksum file has an invalid entry.'
+            }
+            $digest = $Matches[1]
+            $name = $Matches[2]
+            if (-not $seen.Add($name)) { throw 'Duplicate release checksum entry.' }
+            $path = Join-Path $directory $name
+            if ((Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant() -ne $digest) {
+              throw 'A published checksum does not match its downloaded asset.'
+            }
+          }
+          $expected = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+          $null = $expected.Add('VineMix-' + $version + '-Setup-x64.exe')
+          $null = $expected.Add('VineMix-' + $version + '-Standalone-x64.exe')
+          if ($version -ne '0.3.0-beta.1') {
+            $null = $expected.Add('VineMix-' + $version + '-Updates.json')
+          }
+          $sourceName = 'VineMix-' + $version + '-Source.zip'
+          if (Test-Path -LiteralPath (Join-Path $directory $sourceName)) {
+            $null = $expected.Add($sourceName)
+          }
+          if (-not $expected.SetEquals($seen)) {
+            throw 'Published checksums must cover exactly the canonical release assets.'
+          }
+          $downloaded = @(Get-ChildItem -LiteralPath $directory -File | Where-Object Name -cne 'SHA256SUMS.txt' | ForEach-Object Name)
+          if (-not $expected.SetEquals([string[]]$downloaded)) {
+            throw 'The release contains missing or unexpected assets.'
+          }
+          $notes = Join-Path $env:RUNNER_TEMP 'release-notes.md'
+          gh release view $tag --repo $env:GITHUB_REPOSITORY --json body --jq .body |
+            Set-Content -LiteralPath $notes -Encoding utf8
+          if ($LASTEXITCODE) { throw 'Release notes could not be read.' }
+          $parameters = @{
+            AssetDirectory = $directory
+            NotesPath = $notes
+            Version = $version
+            ValidateOnly = $true
+          }
+          if ($version -eq '0.3.0-beta.1') { $parameters.LegacyWithoutUpdater = $true }
+          $archive = Join-Path $directory ('VineMix-' + $version + '-Source.zip')
+          if (Test-Path -LiteralPath $archive) { $parameters.SourceArchivePath = $archive }
+          & ./.github/release/Publish-Release.ps1 @parameters
+          if (-not $?) { throw 'Release asset verification failed.' }

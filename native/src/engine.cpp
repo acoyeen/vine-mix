@@ -3,6 +3,7 @@
 #include "am/mix_clock.hpp"
 #include "am/process_capture.hpp"
 #include "am/spectrum.hpp"
+#include "am/version.hpp"
 #include <windows.h>
 #include <avrt.h>
 #include <algorithm>
@@ -86,7 +87,8 @@ void Engine::start() {
     if (started_.exchange(true)) return;
     try {
         stopping_.store(false); ResetEvent(stopEvent_);
-        { std::lock_guard lock(configurationMutex_); runtimes_.reserve(1); publish(prepare(configuration_, compileGraph(configuration_.graph))); }
+        { std::lock_guard lock(configurationMutex_); runtimes_.reserve(1);
+          if (store_.writable()) publish(prepare(configuration_, compileGraph(configuration_.graph))); }
         mixThread_ = std::thread(&Engine::mixLoop, this);
         maintenanceThread_ = std::thread(&Engine::maintenanceLoop, this);
         writeLog("Canvas engine started. Device assignments are explicit; Windows defaults are unchanged.");
@@ -179,6 +181,7 @@ void Engine::retire() {
 }
 void Engine::configure(Configuration config, std::uint64_t expectedRevision) {
     std::lock_guard lock(configurationMutex_);
+    if (!store_.writable()) throw std::runtime_error("Choose workspace recovery before changing the configuration.");
     if (expectedRevision != configuration_.revision) throw std::runtime_error("Configuration revision conflict. Refresh and retry your change.");
     if (configuration_.revision == std::numeric_limits<std::uint64_t>::max()) throw std::runtime_error("The configuration revision cannot be advanced.");
     retire();
@@ -208,6 +211,22 @@ void Engine::retry() {
     std::unordered_set<Port*> visited;
     for (const auto& runtime : runtimes_) for (const auto& port : runtime->ports)
         if (port && visited.insert(port.get()).second) port->retry();
+}
+void Engine::recover(const std::string& action) {
+    std::lock_guard lock(configurationMutex_);
+    // Reserve before committing recovery so publication cannot allocate after
+    // opening ports or persisting the user's explicit choice.
+    runtimes_.reserve(runtimes_.size() + 1);
+    auto recovered = store_.recover(action);
+    configuration_ = std::move(recovered);
+    warning_ = store_.warning();
+    if (!store_.writable() || !started_.load()) return;
+    try { publish(prepare(configuration_, compileGraph(configuration_.graph))); }
+    catch (...) {
+        store_.pauseForRecovery("The workspace was recovered, but audio could not start. Audio and saving remain paused. Retry to reconnect safely.");
+        warning_ = store_.warning();
+        throw;
+    }
 }
 Json Engine::snapshot() {
     std::lock_guard lock(configurationMutex_);
@@ -255,9 +274,15 @@ Json Engine::snapshot() {
         for (std::size_t i = 0; i < status.nodes.size(); ++i) status.nodes[i].channels = channels[i];
     }
     std::lock_guard endpointLock(endpointsMutex_);
+    std::wstring executable(32768, L'\0');
+    executable.resize(GetModuleFileNameW(nullptr, executable.data(), static_cast<DWORD>(executable.size())));
     return Json{{"configuration", configuration_}, {"endpoints", endpoints_}, {"applications", applications_},
+        {"enginePid", GetCurrentProcessId()}, {"executablePath", narrow(executable)}, {"engineProtocolVersion", 1},
+        {"engineVersion", releaseVersion}, {"displayVersion", releaseDisplayVersion},
+        {"physicalSettingsPath", narrow(store_.physicalPath().wstring())},
         {"appCaptureAvailable", processCaptureAvailable()}, {"status", status}, {"settingsPath", narrow(store_.path().wstring())},
-        {"logPath", narrow(logPath_.wstring())}, {"warning", warning_}};
+        {"logPath", narrow(logPath_.wstring())}, {"warning", warning_}, {"settingsState", store_.loadState()},
+        {"backupPath", narrow(store_.path().wstring()) + ".bak"}};
 }
 
 void Engine::mixLoop() {

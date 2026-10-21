@@ -5,10 +5,10 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $project = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
-$package = Join-Path $project 'artifacts\AudioMixer'
-$uiPath = Join-Path $package 'AudioMixer.exe'
-$enginePath = Join-Path $package 'AudioMixer.Engine.exe'
-$settingsPath = Join-Path $env:LOCALAPPDATA 'AudioMixer\settings.json'
+$package = Join-Path $project 'artifacts\VineMix'
+$uiPath = Join-Path $package 'VineMix.exe'
+$enginePath = Join-Path $package 'VineMix.Engine.exe'
+$settingsPath = Join-Path $env:LOCALAPPDATA 'VineMix\settings.json'
 $session = [IO.Path]::GetFullPath($SessionDirectory)
 $artifactRoot = [IO.Path]::GetFullPath((Join-Path $project 'artifacts')) + [IO.Path]::DirectorySeparatorChar
 if (-not $session.StartsWith($artifactRoot, [StringComparison]::OrdinalIgnoreCase)) { throw 'Session evidence must stay inside project artifacts.' }
@@ -17,7 +17,7 @@ $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
 try { $sid = $identity.User.Value } finally { $identity.Dispose() }
 
 function Request([string]$command, $configuration = $null, $revision = $null) {
-    $pipe = [IO.Pipes.NamedPipeClientStream]::new('.', ('AudioMixer.Control.' + $sid), [IO.Pipes.PipeDirection]::InOut, [IO.Pipes.PipeOptions]::Asynchronous)
+    $pipe = [IO.Pipes.NamedPipeClientStream]::new('.', ('VineMix.Control.' + $sid), [IO.Pipes.PipeDirection]::InOut, [IO.Pipes.PipeOptions]::Asynchronous)
     $reader = $null; $writer = $null
     try {
         $pipe.Connect(3000)
@@ -61,14 +61,14 @@ function AssertOriginalPreserved($original, $current) {
     }
 }
 
-$engine = @(Get-Process AudioMixer.Engine -ErrorAction SilentlyContinue | Where-Object Path -eq $enginePath)
+$engine = @(Get-Process VineMix.Engine -ErrorAction SilentlyContinue | Where-Object Path -eq $enginePath)
 if ($engine.Count -ne 1) { throw 'Expected one updated personal engine.' }
 $engineId = $engine[0].Id
 if ($Action -ne 'Prepare') {
     $sessionState = Get-Content -LiteralPath (Join-Path $session 'session.json') -Raw | ConvertFrom-Json
     if ($sessionState.engineId -ne $engineId) { throw 'The engine restarted since this live test session began; investigate before continuing.' }
 }
-$ui = @(Get-Process AudioMixer -ErrorAction SilentlyContinue | Where-Object Path -eq $uiPath)
+$ui = @(Get-Process VineMix -ErrorAction SilentlyContinue | Where-Object Path -eq $uiPath)
 if ($ui.Count -gt 1) { throw 'Unexpected controller count.' }
 $changed = $false; $original = $null
 try {
@@ -159,10 +159,10 @@ try {
     }
     throw
 } finally {
-    if (-not @(Get-Process AudioMixer -ErrorAction SilentlyContinue | Where-Object Path -eq $uiPath).Count) {
+    if (-not @(Get-Process VineMix -ErrorAction SilentlyContinue | Where-Object Path -eq $uiPath).Count) {
         $opened = Start-Process -FilePath $uiPath -WorkingDirectory $package -PassThru
         $null=$opened.WaitForInputIdle(10000)
     }
-    $currentEngine = @(Get-Process AudioMixer.Engine -ErrorAction SilentlyContinue | Where-Object Path -eq $enginePath)
+    $currentEngine = @(Get-Process VineMix.Engine -ErrorAction SilentlyContinue | Where-Object Path -eq $enginePath)
     if ($currentEngine.Count -ne 1 -or $currentEngine[0].Id -ne $engineId) { throw 'Engine process changed during the test session.' }
 }
