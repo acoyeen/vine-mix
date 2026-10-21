@@ -1,13 +1,13 @@
 # Bundled IBM Plex fonts
 
-Researched and verified on **20 October 2026**. Vine Mix bundles unmodified static
+Researched and verified on **20 October 2026**. VineMix bundles unmodified static
 TrueType files from the official [IBM/plex repository](https://github.com/IBM/plex),
 pinned to commit
 [`71f558992315a12ca1f06a2215d57962a1992162`](https://github.com/IBM/plex/tree/71f558992315a12ca1f06a2215d57962a1992162).
 Only the local filenames differ from upstream; the font binaries are unchanged.
 No system font installation is required.
 
-| Local asset in `desktop/AudioMixer.Desktop/Assets/Fonts/` | Upstream source at the pinned commit | WPF family / face | Weight | Font version |
+| Local asset in `desktop/VineMix.Desktop/Assets/Fonts/` | Upstream source at the pinned commit | WPF family / face | Weight | Font version |
 | --- | --- | --- | --- | --- |
 | `IBM-Plex-Sans-Regular.ttf` | [IBMPlexSans-Regular.ttf](https://github.com/IBM/plex/blob/71f558992315a12ca1f06a2215d57962a1992162/packages/plex-sans/fonts/complete/ttf/IBMPlexSans-Regular.ttf) | IBM Plex Sans / Regular | 400 | 3.005 |
 | `IBM-Plex-Sans-Medium.ttf` | [IBMPlexSans-Medium.ttf](https://github.com/IBM/plex/blob/71f558992315a12ca1f06a2215d57962a1992162/packages/plex-sans/fonts/complete/ttf/IBMPlexSans-Medium.ttf) | IBM Plex Sans / Medium | 500 | 3.005 |
@@ -51,7 +51,7 @@ the **SIL Open Font License 1.1**. The exact upstream
 [LICENSE.txt](https://github.com/IBM/plex/blob/71f558992315a12ca1f06a2215d57962a1992162/LICENSE.txt)
 is retained as both `Assets/Fonts/IBM-Plex-LICENSE.txt` and
 `licenses/IBM-Plex-OFL.txt`. Include this license with redistributed font files.
-The fonts are bundled as part of Vine Mix; IBM's identity and endorsement are
+The fonts are bundled as part of VineMix; IBM's identity and endorsement are
 not implied.
 
 ## SHA-256

@@ -200,6 +200,22 @@ public sealed class EngineSupervisor : IDisposable
             catch (System.ComponentModel.Win32Exception) { }
         }
     }
+    internal async Task WaitForUpdateExitAsync(int expectedPid, CancellationToken token)
+    {
+        if (_verifiedIdentity is not { } identity || identity.Pid != expectedPid)
+            throw new IOException("The audio engine owner was not verified for this update.");
+        Process process;
+        try { process = Process.GetProcessById(expectedPid); }
+        catch (ArgumentException) { return; } // The verified process already exited cooperatively.
+        using (process)
+        {
+            if (process.HasExited) return;
+            if (!MatchesIdentity(process, identity)
+                || !string.Equals(process.MainModule?.FileName, _enginePath, StringComparison.OrdinalIgnoreCase))
+                throw new IOException("The audio engine identity changed before update shutdown completed.");
+            await process.WaitForExitAsync(token);
+        }
+    }
     // Disposing a controller releases its process handle only. The engine outlives the UI.
     public void Dispose() => _process?.Dispose();
 }

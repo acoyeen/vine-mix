@@ -1,4 +1,4 @@
-# Vine Mix visual identity
+# VineMix visual identity
 
 Implemented 20 October 2026. The approved direction is a minimal native audio
 workspace using the split VM mark, IBM Plex typography and forest-green actions.
@@ -11,13 +11,13 @@ The symbol consists of a separate V above an M. Their long diagonals share a
 the shape. The application caption pairs the symbol with the approved outlined
 **VineMix** wordmark: green **Vine**, light **Mix**, with full-width square i dots
 aligned to the capital letters and shorter i stems.
-Retain **Vine Mix** in Windows titles, accessible identity and tray commands.
+Use **VineMix** consistently in Windows titles, accessible identity and tray commands.
 
 The caption centres the 106 × 20 DIP wide artwork across the full visible header,
 with equal space above and below. Its transparent 122 × 20 DIP button leaves the
 surrounding caption available for dragging and the native resize border clear.
 The button supports keyboard focus and opens
-[vinemix.app](https://vinemix.app), with the accessible name **Open Vine Mix
+[vinemix.app](https://vinemix.app), with the accessible name **Open VineMix
 website**. The lettering comes from the packaged vector, so it needs no font
 fallback and retains the approved custom letter shapes.
 
@@ -26,17 +26,17 @@ underline or mouse highlight. Its accessible name remains available. A separate
 outline appears for keyboard navigation and follows the live theme.
 
 An 8 × 8 DIP connection dot sits at the far left, vertically centred in the same
-header. Green means the interface is connected to the audio engine and ready to
+header, with the compact **0.3.0 · Beta 1** version beside it. Green means the interface is connected to the audio engine and ready to
 accept edits; it dims during disconnection or restart. Its hover text and
 accessible name expose the current connection status. Warnings occupy the left
 half; saved status, Settings and window actions occupy the right without shifting
 the central mark.
 
-- [Scalable transparent mark](../desktop/AudioMixer.Desktop/Assets/Branding/mark.svg)
-- [Scalable transparent wide logo](../desktop/AudioMixer.Desktop/Assets/Branding/wordmark.svg)
-- [Application icon](../desktop/AudioMixer.Desktop/Assets/Branding/app.ico)
-- [Tray icon](../desktop/AudioMixer.Desktop/Assets/Branding/tray.ico)
-- [256px icon preview](../desktop/AudioMixer.Desktop/Assets/Branding/app.png)
+- [Scalable transparent mark](../desktop/VineMix.Desktop/Assets/Branding/mark.svg)
+- [Scalable transparent wide logo](../desktop/VineMix.Desktop/Assets/Branding/wordmark.svg)
+- [Application icon](../desktop/VineMix.Desktop/Assets/Branding/app.ico)
+- [Tray icon](../desktop/VineMix.Desktop/Assets/Branding/tray.ico)
+- [256px icon preview](../desktop/VineMix.Desktop/Assets/Branding/app.png)
 
 Icons contain 16, 20, 24, 32, 40, 48, 64, 128 and 256px frames. Their backgrounds
 are transparent; only the green V and white M are painted, including in the
@@ -87,7 +87,7 @@ use the same application-wide ownership rules.
 | Surface | Implementation point |
 | --- | --- |
 | Caption wide logo, website button and Windows title/icon | `MainWindow.xaml`, `MainWindow.cs`, `Controls/BrandWordmark.cs`, `Controls/BrandMark.cs` |
-| Executable/taskbar icon and product metadata | `AudioMixer.Desktop.csproj`, `Assets/Branding/` |
+| Executable/taskbar icon and product metadata | `VineMix.Desktop.csproj`, `Assets/Branding/` |
 | Tray icon, menu font, tooltip and commands | `App.xaml.cs`, `TrayBranding.cs` |
 | Interface, detached menus and tooltips | `App.xaml` shared font/control styles |
 | Live palette and Windows high contrast | `Controls/ConsoleTheme.cs`, `Theme.xaml` |
@@ -100,13 +100,14 @@ use the same application-wide ownership rules.
 | User-facing project copy and screenshots | README, user/node guides, issue template, `docs/images/` |
 | Credits and redistributable notices | `THIRD_PARTY_NOTICES.md`, `licenses/`, `scripts/build.ps1` |
 
-Executable/assembly/namespace names, storage paths, startup identity, named pipes
-and clipboard format retain `AudioMixer` compatibility identifiers. Historical
-design reports retain their original typography and product context.
+Beta 1 uses VineMix for executable, assembly, namespace, startup and process
+identity. Personal data is copied from the legacy AudioMixer location to
+`%LOCALAPPDATA%\VineMix`, preserving originals. Historical reports and intentional
+compatibility readers retain their original context.
 
 ## Verification
 
-`--render-design` checks actual embedded fonts and weights, glyph coverage,
+The separate verification build's `--render-design` checks actual embedded fonts and weights, glyph coverage,
 numeric alignment, menu/tooltip inheritance, drawn labels, two separate logo
 pieces, all icon frames, contrast and high-contrast restoration. Existing suites
 continue to cover every creatable node, routing/editing, numeric entry, meters,

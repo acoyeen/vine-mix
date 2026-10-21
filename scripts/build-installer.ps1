@@ -1,11 +1,13 @@
 #requires -Version 7.3
 [CmdletBinding()]
-param([string]$ApplicationPackageDirectory = '', [string]$OutputDirectory = '', [switch]$Offline)
+param([string]$ApplicationPackageDirectory = '', [string]$OutputDirectory = '', [switch]$Offline, [string]$StageDirectory = '')
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $project = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
-$release = & (Join-Path $PSScriptRoot 'write-release-metadata.ps1')
-$stage = Join-Path $project ('artifacts\installer-build-' + (Get-Date -Format 'yyyyMMdd-HHmmss-fff'))
+if (-not $StageDirectory) { $StageDirectory = Join-Path $env:LOCALAPPDATA ('VineMix.BuildCache\installer-' + (Get-Date -Format 'yyyyMMdd-HHmmss-fff')) }
+$stage = [IO.Path]::GetFullPath($StageDirectory)
+if (Test-Path -LiteralPath $stage) { throw 'Choose a new StageDirectory; private build evidence is retained.' }
+$release = & (Join-Path $PSScriptRoot 'write-release-metadata.ps1') -OutputDirectory (Join-Path $stage 'metadata')
 $payload = Join-Path $stage 'payload'
 if (-not $OutputDirectory) { $OutputDirectory = Join-Path $project 'artifacts\installers' }
 $OutputDirectory = [IO.Path]::GetFullPath($OutputDirectory)

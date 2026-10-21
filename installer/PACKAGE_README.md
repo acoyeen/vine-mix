@@ -18,7 +18,20 @@ share that data and one audio engine per Windows user. Existing AudioMixer
 workspaces are copied during migration when needed, and the originals are kept.
 Quit an older running copy before opening this one.
 
-The installer can offer original VB-CABLE and VAC Lite packages if missing.
+For a first setup, install VineMix with both optional driver boxes clear. Choose
+your Windows microphone on **Physical input** and headphones on **Listening
+output**. New outputs start muted; check the device and level before unmuting.
+For a **Virtual Desktop microphone**, connect the headset, enable **Microphone
+passthrough**, confirm it appears in **Windows Settings > System > Sound >
+Input**, then select that device on **Physical input**. Its starter name does not
+limit the picker to physical microphones.
+
+The installer can offer original VB-CABLE and VAC Lite packages if missing;
+neither is required for an existing microphone or Virtual Desktop input.
+**VB-CABLE** brings other apps' audio into VineMix's **Virtual input**.
+**VAC Lite** sends **Virtual output** to another app as its microphone.
+Both start unchecked and require separate consent. You can run Setup later
+when you need either feature.
 Their vendor terms are separate from VineMix's MIT licence. VAC Lite is limited
 to private home use unrelated to income generation. Details and vendor links
 are retained in [the driver notices](SetupSupport/DRIVER-NOTICES.txt).

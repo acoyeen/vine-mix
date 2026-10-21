@@ -38,7 +38,8 @@ struct Engine::Port {
     Port(const GraphNode& node, GraphKind kind, DeviceCatalog& catalog) : identity(node) {
         if (kind == GraphKind::appInput) app = std::make_unique<ProcessCaptureWorker>(queue);
         else device = std::make_unique<AudioWorker>(isSource(kind), kind == GraphKind::microphone, queue, catalog,
-            kind == GraphKind::virtualInput ? "vbCable" : kind == GraphKind::virtualOutput ? "vacLite" : "physical");
+            kind == GraphKind::virtualInput ? "vbCable" : kind == GraphKind::virtualOutput ? "vacLite"
+                : kind == GraphKind::microphone ? "" : "physical");
     }
     bool matches(const GraphNode& node) const noexcept {
         return identity.kind == node.kind
@@ -118,14 +119,34 @@ void Engine::validateEndpoints(const Configuration& config) {
         const bool capture = node.kind == "microphone" || node.kind == "virtualInput";
         const bool render = node.kind == "output" || node.kind == "virtualOutput";
         if (!capture && !render) continue;
-        const auto match = std::find_if(devices.begin(), devices.end(), [&](const Endpoint& endpoint) {
-            return (!node.device.stableId.empty() && endpoint.stableId == node.device.stableId)
-                || (!node.device.id.empty() && endpoint.id == node.device.id);
+        const std::string_view direction = capture ? "capture" : "render";
+        const auto exact = std::find_if(devices.begin(), devices.end(), [&](const Endpoint& endpoint) {
+            return !node.device.id.empty() && endpoint.id == node.device.id && endpoint.direction == direction;
         });
-        if (match == devices.end()) continue;
-        if (match->direction != (capture ? "capture" : "render")) throw std::runtime_error("The device has the wrong audio direction for this node.");
-        if ((node.kind == "microphone" || node.kind == "output") && match->isVirtual)
-            throw std::runtime_error("Choose physical hardware for a microphone or listening output node.");
+        auto match = exact != devices.end() && exact->state == "Active" ? exact : devices.end();
+        // Match AudioWorker::resolve: an exact active ID wins even when a
+        // stable ID has aliases; otherwise accept one active stable match.
+        // Ambiguous stable identities remain saved and unresolved, rather than
+        // validating or rejecting whichever alias happened to enumerate first.
+        bool ambiguous{};
+        if (match == devices.end() && !node.device.stableId.empty()) {
+            for (auto candidate = devices.begin(); candidate != devices.end(); ++candidate) {
+                if (candidate->direction != direction || candidate->state != "Active"
+                    || candidate->stableId != node.device.stableId) continue;
+                if (match != devices.end()) { ambiguous = true; break; }
+                match = candidate;
+            }
+        }
+        if (ambiguous) continue;
+        if (match == devices.end()) match = exact;
+        if (match == devices.end()) {
+            if (!node.device.id.empty() && std::any_of(devices.begin(), devices.end(), [&](const Endpoint& endpoint) {
+                return endpoint.id == node.device.id && endpoint.direction != direction;
+            })) throw std::runtime_error("The device has the wrong audio direction for this node.");
+            continue;
+        }
+        if (node.kind == "output" && match->isVirtual)
+            throw std::runtime_error("Choose physical hardware for a listening output node.");
         if (node.kind == "virtualInput" && match->transport != "vbCable")
             throw std::runtime_error("Choose the base VB-CABLE receive endpoint for a virtual input.");
         if (node.kind == "virtualOutput" && match->transport != "vacLite")

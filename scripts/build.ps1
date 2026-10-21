@@ -4,7 +4,8 @@ param(
     [ValidateSet('Installed','Standalone')][string]$BuildMode = 'Installed',
     [switch]$NativeOnly,
     [switch]$NoBootstrap,
-    [string]$PackageDirectory = ''
+    [string]$PackageDirectory = '',
+    [string]$BuildDirectory = ''
 )
 $ErrorActionPreference = 'Stop'
 $projectRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
@@ -13,8 +14,10 @@ if (-not $NoBootstrap) { & (Join-Path $PSScriptRoot 'bootstrap-tools.ps1') }
 $cmake = Join-Path $toolsRoot 'cmake-4.4.4-windows-x86_64\bin\cmake.exe'
 $compilerRoot = Join-Path $toolsRoot 'llvm-mingw-20261006-ucrt-x86_64\bin'
 $dotnet = Join-Path $toolsRoot 'dotnet\dotnet.exe'
-$buildRoot = Join-Path $projectRoot 'build\native'
-$metadataRoot = Join-Path $projectRoot 'build\release'
+if (-not $BuildDirectory) { $BuildDirectory = Join-Path $env:LOCALAPPDATA 'VineMix.BuildCache\release' }
+$buildDirectoryRoot = [IO.Path]::GetFullPath($BuildDirectory)
+$buildRoot = Join-Path $buildDirectoryRoot 'native'
+$metadataRoot = Join-Path $buildDirectoryRoot 'metadata'
 $release = & (Join-Path $PSScriptRoot 'write-release-metadata.ps1') -OutputDirectory $metadataRoot
 $sourceIdentity = & (Join-Path $PSScriptRoot 'get-source-identity.ps1')
 $buildTimestamp = [DateTimeOffset]::UtcNow.ToString('o')

@@ -174,7 +174,7 @@ internal static class GraphUiVerification
             mixer.ReducedAnimation = previousReducedAnimation;
 
             mixer.ApplyPreviewSnapshot(UiPreview.CreateSnapshot(["--waiting"])); await Layout(window); workspace.FitAll(); await Layout(window);
-            Require(mixer.GraphConfig.Nodes.Single(n => n.Id == "mic1").Device.Name.Contains("USB microphone") && mixer.GraphStatus.Single(n => n.Id == "mic1").Path.State == "Waiting", "Disconnected source keeps its saved identity and waiting status");
+            Require(mixer.GraphConfig.Nodes.Single(n => n.Id == "mic1").Device.Name == "Example USB Microphone" && mixer.GraphStatus.Single(n => n.Id == "mic1").Path.State == "Waiting", "Disconnected source keeps its saved identity and waiting status");
             Render(window, Path.Combine(directory, "waiting.png"));
             await CanvasNavigationVerification.VerifySettingsAsync(mixer, () => Layout(window), Require);
             Require(Descendants<Button>(window).Any(b => AutomationProperties.GetName(b).Contains("Minimise")) && Descendants<Button>(window).Any(b => AutomationProperties.GetName(b).Contains("Close")), "Window actions remain accessible inside the application header");

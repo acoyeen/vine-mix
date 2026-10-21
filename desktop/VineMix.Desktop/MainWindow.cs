@@ -50,7 +50,8 @@ public partial class MainWindow : Window
             caption: mixer.IsPreview ? "Close UI preview" : "Close to tray — audio keeps running"));
         foreach (Button button in WindowActions.Children) { button.SetResourceReference(StyleProperty, "WorkspaceToolbarButton"); button.Margin = new Thickness(0); }
         Workspace = new GraphWorkspace(mixer);
-        _settingsMenu = CreateSettingsMenu(mixer, Workspace.SetMessage, OpenHelp, OpenNodeSearch, OpenHelpEntry, OpenAbout);
+        _settingsMenu = CreateSettingsMenu(mixer, Workspace.SetMessage, OpenHelp, OpenNodeSearch, OpenHelpEntry, OpenAbout, OpenUpdates);
+        SettingsButton.PreviewMouseDown += (_, args) => { if (!TryPrepareUpdateEditors()) args.Handled = true; };
         ConsoleGrid.Children.Add(Workspace);
         HelpView = new WorkspaceHelpView(CloseHelp) { MaxWidth = 960, MaxHeight = 680,
             HorizontalAlignment = HorizontalAlignment.Stretch, VerticalAlignment = VerticalAlignment.Stretch };
@@ -103,10 +104,10 @@ public partial class MainWindow : Window
             FontFamily = FontFamily, FontSize = 13, ShowInTaskbar = false };
         dialog.SetResourceReference(BackgroundProperty, "ConsoleWindowBrush");
         dialog.SetResourceReference(ForegroundProperty, "ConsoleTextBrush");
-        dialog.Content = CreateAboutContent(dialog.Close);
+        dialog.Content = CreateAboutContent(dialog.Close, showUpdates: () => { dialog.Close(); OpenUpdates(); });
         dialog.ShowDialog();
     }
-    internal static FrameworkElement CreateAboutContent(Action closeAbout, Action<string>? copyVersion = null)
+    internal static FrameworkElement CreateAboutContent(Action closeAbout, Action<string>? copyVersion = null, Action? showUpdates = null)
     {
         var content = new StackPanel { Margin = new Thickness(24) };
         content.Children.Add(new TextBlock { Text = "VineMix", FontSize = 24, FontWeight = FontWeights.SemiBold });
@@ -131,6 +132,11 @@ public partial class MainWindow : Window
         };
         var close = new Button { Content = "Close", IsCancel = true, Padding = new Thickness(12, 6, 12, 6) };
         close.Click += (_, _) => closeAbout();
+        if (showUpdates is not null)
+        {
+            var updates = new Button { Content = "Check for updates", Padding = new Thickness(12, 6, 12, 6), Margin = new Thickness(0, 0, 8, 0) };
+            updates.Click += (_, _) => showUpdates(); actions.Children.Add(updates);
+        }
         actions.Children.Add(copy); actions.Children.Add(close); content.Children.Add(actions);
         return content;
     }
@@ -224,7 +230,7 @@ public partial class MainWindow : Window
         OpenNodeSearch(); return IsNodeSearchOpen;
     }
     internal static ContextMenu CreateSettingsMenu(MixerViewModel mixer, Action<string, bool>? feedback = null,
-        Action? showHelp = null, Action? findNode = null, Action<string>? showHelpEntry = null, Action? showAbout = null)
+        Action? showHelp = null, Action? findNode = null, Action<string>? showHelpEntry = null, Action? showAbout = null, Action? showUpdates = null)
     {
         var menu = new ContextMenu { Width = 380, MaxHeight = 560 };
         AutomationProperties.SetName(menu, "VineMix settings");
@@ -260,7 +266,7 @@ public partial class MainWindow : Window
         Preference("Show disconnected or missing devices", nameof(MixerViewModel.ShowDisconnectedAudioDevices),
             "Show unplugged or missing devices. This does not reconnect devices or change audio routing.", visibility.Items);
         Preference("Show advanced inputs and outputs", nameof(MixerViewModel.ShowAdvancedAudioDevices),
-            "Show line-level inputs, network or telephone endpoints, and S/PDIF or digital passthrough devices. Ordinary microphones, speakers, headphones and HDMI outputs remain visible; unclassified active devices also remain visible. Availability controls still apply.", visibility.Items);
+            "Show line-level inputs, network outputs, telephone endpoints, and S/PDIF or digital passthrough devices. Ordinary and streamed microphones, speakers, headphones and HDMI outputs remain visible; unclassified active devices also remain visible. Availability controls still apply.", visibility.Items);
         menu.Items.Add(visibility);
         var startup = Preference("Start VineMix when I sign in", nameof(MixerViewModel.StartAtLogin),
             "Automatically start the mixer when you sign in to Windows.");
@@ -285,6 +291,11 @@ public partial class MainWindow : Window
         };
         menu.Items.Add(restart);
         menu.Items.Add(new Separator());
+        var updates = new MenuItem { Header = "Check for updates", ToolTip = "Check GitHub for a newer verified VineMix release." };
+        AutomationProperties.SetHelpText(updates, "Check for a newer version. Installation only starts after you choose Install and restart; audio briefly stops then.");
+        updates.Click += (_, _) => showUpdates?.Invoke(); menu.Items.Add(updates);
+        Preference("Automatically check for updates", nameof(MixerViewModel.AutomaticallyCheckForUpdates),
+            "Check at most once a day after startup. Downloads and installation require your choice.");
         var about = new MenuItem { Header = "About VineMix", ToolTip = "Version and build information to include in a bug report." };
         about.Click += (_, _) => showAbout?.Invoke();
         menu.Items.Add(about);

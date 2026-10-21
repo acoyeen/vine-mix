@@ -1,11 +1,19 @@
 <Project>
-  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'AudioMixer.Desktop' or '$(MSBuildProjectName)' == 'VineMix.Desktop' or $(MSBuildProjectName.Contains('_wpftmp'))">
+  <PropertyGroup>
+    <!-- Build caches can contain local account paths. Keep generated diagnostics
+         outside the checkout and make source paths in symbols portable. -->
+    <VineMixBuildCacheRoot Condition="'$(VineMixBuildCacheRoot)' == '' and '$(LOCALAPPDATA)' != ''">$(LOCALAPPDATA)\VineMix.BuildCache</VineMixBuildCacheRoot>
+    <VineMixBuildCacheRoot Condition="'$(VineMixBuildCacheRoot)' == ''">$([System.IO.Path]::GetTempPath())VineMix.BuildCache</VineMixBuildCacheRoot>
     <VineMixBuildMode Condition="'$(VineMixBuildMode)' == ''">Installed</VineMixBuildMode>
     <VineMixFlavor>$(VineMixBuildMode)</VineMixFlavor>
     <VineMixFlavor Condition="'$(VineMixVerification)' == 'true'">Verification</VineMixFlavor>
-    <BaseIntermediateOutputPath>obj\$(VineMixFlavor)\</BaseIntermediateOutputPath>
+    <!-- WPF's temporary markup project must share its parent's restored assets. -->
+    <VineMixCacheProjectName>$([System.Text.RegularExpressions.Regex]::Replace('$(MSBuildProjectName)', '_[A-Za-z0-9]+_wpftmp$', ''))</VineMixCacheProjectName>
+    <BaseIntermediateOutputPath>$(VineMixBuildCacheRoot)\$(VineMixCacheProjectName)\$(VineMixFlavor)\obj\</BaseIntermediateOutputPath>
     <MSBuildProjectExtensionsPath>$(BaseIntermediateOutputPath)</MSBuildProjectExtensionsPath>
-    <BaseOutputPath>bin\$(VineMixFlavor)\</BaseOutputPath>
+    <BaseOutputPath>$(VineMixBuildCacheRoot)\$(VineMixCacheProjectName)\$(VineMixFlavor)\bin\</BaseOutputPath>
     <DefaultItemExcludes>$(DefaultItemExcludes);**/obj/**;**/bin/**</DefaultItemExcludes>
+    <PathMap>$(MSBuildThisFileDirectory)=/_/VineMix/</PathMap>
+    <Deterministic>true</Deterministic>
   </PropertyGroup>
 </Project>

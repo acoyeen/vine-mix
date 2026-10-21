@@ -1,31 +1,39 @@
-# Beta 1 release source provenance
+# Release source and provenance
 
-This tag contains the preserved **0.3.0-beta.1** production source, recovered from
-its sanitized development snapshot. It contains all **247** source inputs listed
-in the original build receipt: native engine, desktop, installer, scripts,
-third-party notices, release metadata and build configuration. No Beta 2 runtime
-changes have been backported into this historical source release.
+Every published version has its own source tag and retained executable downloads.
+The [release history](RELEASES.md) links each version's notes and assets.
 
-The original Beta 1 package receipts identify the consumed source inventory as:
+## 0.3.0-beta.2
 
-```text
-cbc3c540cc03c58d3ec4209afb84706de94c200d09d74036a9764e945b4aeb7a
-```
+The release source was captured from the same frozen 276-file build input set as
+the Setup, standalone EXE and signed update manifest. Its recorded source
+snapshot SHA-256 is
+`d25f6868862875847085b8106f6aaf2b65678dd0a8ee61e21c0632fc6e0ad12f`.
 
-That is the **historical build-receipt identity**, not a Git commit or a claim
-that the reconstructed checkout has the same aggregate byte hash. Repository
-line endings and a privacy-only verification assertion differ from the original
-working-tree bytes. The latter uses generic example-device wording; it does not
-change the shipped audio engine or desktop behavior. Source inventory hashes
-also include notices and development scripts.
+The release's `VineMix-0.3.0-beta.2-Source.zip` preserves those build-input bytes,
+including original line endings, and includes updated documentation and release
+tooling. `SOURCE-MANIFEST.json` inside it lists the input scope, per-file sizes
+and hashes, and corresponding release commit. GitHub's automatic source archive
+uses the committed text normalization; it represents the same source revision
+but need not have the same raw-byte inventory hash.
 
-The downloaded Setup and standalone EXEs are the original verified Beta 1 bytes;
-they have not been rebuilt or replaced during release-history publication.
-[Release notes](releases/0.3.0-beta.1.md) record their SHA-256 hashes and the checks
-performed against those exact files. Source metadata, build timestamps and normal
-packaging details mean this record does not promise byte-for-byte reproducible
-executables.
+The original binaries were built from a frozen working snapshot before the
+release-history commits were made. Their embedded build revision therefore names
+the earlier base revision; the source snapshot hash and exact executable hashes
+identify the consumed input and delivered bytes. A later rebuild can have
+different build metadata and executable hashes. Do not describe this as a claim
+of independently established bit-for-bit reproducible binaries.
 
-Required third-party attribution is retained. Raw diagnostics, private build
-receipts, recovery backups and signing material are not part of this source tag.
-The product release direction is recorded in [AGENTS.md](../AGENTS.md).
+## 0.3.0-beta.1
+
+The historical version tag retains the sanitized Beta 1 production source.
+Its original build receipts recorded
+`cbc3c540cc03c58d3ec4209afb84706de94c200d09d74036a9764e945b4aeb7a`.
+Newline normalization and a privacy-only verification wording correction mean
+that hash is a historical build-receipt identity, not a claim that the restored
+source ZIP has an identical aggregate byte hash. Runtime source corresponds to
+Beta 1; Beta 2 implementation changes are kept in the newer version.
+
+Source archives contain source, documentation and required licences, with neutral
+archive metadata. Signing keys, personal diagnostics, settings, recovery backups,
+downloaded tools and compiled application payloads are excluded.

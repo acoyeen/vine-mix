@@ -1,0 +1,10 @@
+{
+  "formatVersion": 1,
+  "keys": [
+    {
+      "keyId": "vinemix-updates-2026-01",
+      "algorithm": "RSA-PSS-SHA256",
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEAoKS924qToSjDQeli4MXv\ncfA5+Lwz8unv5eIWvh2TjT7fbG3MLnYhIooMBVRAGQD7csq+HSjCH3CmGgYWA3Tr\nkRk0FF1ydAMotr2oNKMbe0W4aZMV4pkThDIfnU+i8Oumw59G2jIJwL35EJtJgYRw\nWudArwau2Az/z22fCdZ6n1EeKW847diHGeKK+tvHbupxQgBhAmN8K9GHrnPmPpJm\nUH/x/lLeRzLN+jbvXQo9w6EjNJJ42WfQ6DdiEMjsybljYmLCN/m8HhpgrIcAOGdl\np6gmyvkIOYuNa5LOKh1hLRHZCQN3ucbgFRXtNTkvnXl1wkZA9CWNQGT4ZHZUOB34\nEub92W63M8rV2PSywsHM9h3mSJHJchhBJrBePCF4MqMVIjGTddvkt9aqu1GmJKT7\nCLJPAIuN2eJ7ABvqsI38ru35ntmBgHfhwpVuhs23FtIl4FPz/LFNGuZ9q9c1mg7R\nmToABClKdubTAwCqx6aHD7lo6wWmUhSMrudpAPGNczI9AgMBAAE=\n-----END PUBLIC KEY-----"
+    }
+  ]
+}

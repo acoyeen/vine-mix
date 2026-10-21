@@ -24,6 +24,10 @@ std::atomic<bool> failNextConfiguration{};
 std::atomic<int> workerWakeMilliseconds{5};
 std::mutex portsMutex;
 std::map<std::string, int> openPorts;
+// Set only before constructing a fixture engine, and cleared after destruction.
+// The catalog remains immutable while its maintenance thread can read it.
+std::vector<am::Endpoint> catalogEndpoints;
+std::map<std::string, std::string> configuredTransports;
 void check(bool condition, const char* reason) { if (!condition) throw std::runtime_error(reason); }
 void wait(int milliseconds) { std::this_thread::sleep_for(std::chrono::milliseconds(milliseconds)); }
 void refillCapture(am::FrameQueue& queue, std::span<const am::Frame> frames) {
@@ -43,13 +47,14 @@ namespace am {
 struct DeviceCatalog::Impl {};
 DeviceCatalog::DeviceCatalog() : impl_(std::make_unique<Impl>()) {}
 DeviceCatalog::~DeviceCatalog() = default;
-std::vector<Endpoint> DeviceCatalog::enumerate() const { return {}; }
+std::vector<Endpoint> DeviceCatalog::enumerate() const { return test::catalogEndpoints; }
 std::uint64_t DeviceCatalog::generation() const noexcept { return 0; }
 void DeviceCatalog::refresh() noexcept {}
 struct AudioWorker::Impl {
     bool capture;
     std::shared_ptr<FrameQueue> queue;
     std::string id;
+    std::string requiredTransport;
     std::mutex mutex;
     std::atomic<bool> stopped{};
     std::thread thread;
@@ -88,8 +93,8 @@ struct AudioWorker::Impl {
         std::lock_guard lock(test::portsMutex); if (!id.empty()) --test::openPorts[id]; --test::live;
     }
 };
-AudioWorker::AudioWorker(bool capture, bool, std::shared_ptr<FrameQueue> queue, DeviceCatalog&, std::string)
-    : impl_(std::make_unique<Impl>(capture, std::move(queue))) {}
+AudioWorker::AudioWorker(bool capture, bool, std::shared_ptr<FrameQueue> queue, DeviceCatalog&, std::string transport)
+    : impl_(std::make_unique<Impl>(capture, std::move(queue))) { impl_->requiredTransport = std::move(transport); }
 AudioWorker::~AudioWorker() = default;
 void AudioWorker::configure(DeviceBinding binding) {
     if (test::failNextConfiguration.exchange(false)) throw std::runtime_error("Synthetic worker initialization failure");
@@ -97,6 +102,7 @@ void AudioWorker::configure(DeviceBinding binding) {
     if (impl_->id == binding.id) return;
     if (!impl_->id.empty()) --test::openPorts[impl_->id];
     impl_->id = binding.id;
+    if (!impl_->id.empty()) test::configuredTransports[impl_->id] = impl_->requiredTransport;
     if (!impl_->id.empty() && ++test::openPorts[impl_->id] > 1) ++test::duplicates;
 }
 void AudioWorker::retry() noexcept { impl_->queue->requestClear(); }
@@ -152,6 +158,85 @@ std::vector<ApplicationInfo> enumerateAudioApplications() { return {}; }
 }
 
 namespace test {
+void streamedMicrophones(const std::filesystem::path& directory) {
+    using namespace am;
+    check(live == 0 && catalogEndpoints.empty(), "Streamed-input fixture must start without another catalog or worker");
+    const auto path = directory / "streamed-input-settings.json";
+    auto endpoint = [](std::string id, std::string direction, std::string transport, int formFactor) {
+        Endpoint value;
+        value.id = std::move(id); value.stableId = "stable-" + value.id; value.name = "Example streamed microphone";
+        value.direction = std::move(direction); value.state = "Active"; value.transport = std::move(transport);
+        value.isVirtual = value.transport != "physical"; value.formFactor = formFactor;
+        value.channels = 2; value.rate = 48000;
+        return value;
+    };
+    catalogEndpoints = {endpoint("example-streamed", "capture", "otherVirtual", 0),
+        endpoint("example-unknown-driver", "capture", "physical", -1),
+        endpoint("example-cable", "capture", "vbCable", 2),
+        endpoint("example-streamed-playback", "render", "otherVirtual", 0),
+        endpoint("example-vac-output", "render", "vacLite", 1)};
+    auto alias = endpoint("example-stable-alias", "capture", "otherVirtual", 0);
+    alias.stableId = "stable-example-streamed"; alias.channels = 1;
+    catalogEndpoints.insert(catalogEndpoints.begin(), alias);
+    auto old = endpoint("example-disabled-old", "capture", "otherVirtual", 0);
+    old.state = "Disabled"; old.channels = 1; old.stableId = "stable-example-returned";
+    catalogEndpoints.push_back(old);
+    catalogEndpoints.push_back(endpoint("example-returned", "capture", "otherVirtual", 0));
+    {
+        Engine engine(path); engine.start();
+        auto config = defaultConfiguration(); config.graph.nodes.clear(); config.graph.edges.clear();
+        GraphNode microphone; microphone.id = "example-input"; microphone.kind = "microphone";
+        config.graph.nodes = {microphone};
+        for (const auto* id : {"example-streamed", "example-unknown-driver", "example-cable"}) {
+            config.graph.nodes[0].device = {id, std::string("stable-") + id, "Example chosen microphone", -1};
+            engine.configure(config, config.revision); ++config.revision;
+            const auto persisted = engine.snapshot()["configuration"]["graph"]["nodes"][0]["device"];
+            check(persisted["id"] == id && persisted["stableId"] == std::string("stable-") + id,
+                "Actual engine validation accepts Windows capture from any vendor and persists the explicit exact/stable identities");
+            std::lock_guard lock(portsMutex);
+            check(configuredTransports.at(id).empty(),
+                "Generic microphone workers must not retain a physical-driver transport restriction after validation");
+        }
+        config.graph.nodes[0].device = {"example-streamed", "stable-example-streamed", "Saved exact input", 1};
+        engine.configure(config, config.revision); ++config.revision;
+        check(engine.snapshot()["configuration"]["graph"]["nodes"][0]["device"]["id"] == "example-streamed",
+            "Exact active capture identity wins over an earlier stable alias with an incompatible channel count");
+        config.graph.nodes[0].device = {"example-disabled-old", "stable-example-returned", "Saved returning input", 1};
+        engine.configure(config, config.revision); ++config.revision;
+        check(engine.snapshot()["configuration"]["graph"]["nodes"][0]["device"]["id"] == "example-disabled-old",
+            "A unique active stable replacement supplies validation metadata without overwriting the inactive saved exact ID");
+        config.graph.nodes[0].device = {"", "stable-example-streamed", "Saved ambiguous input", 7};
+        engine.configure(config, config.revision); ++config.revision;
+        check(engine.snapshot()["configuration"]["graph"]["nodes"][0]["device"]["stableId"] == "stable-example-streamed",
+            "Ambiguous stable-only capture retains the saved choice unresolved instead of validating an arbitrary alias");
+        auto rejects = [&](std::string kind, std::string id, int channel = -1) {
+            auto invalid = config; invalid.graph.nodes[0].kind = std::move(kind);
+            invalid.graph.nodes[0].device = {std::move(id), "", "Example incompatible device", channel};
+            bool rejected = false;
+            try { engine.configure(invalid, config.revision); } catch (const std::exception&) { rejected = true; }
+            check(rejected && engine.snapshot()["configuration"]["revision"] == config.revision,
+                "Generic input support preserves direction, channel and dedicated cable validation without committing failed edits");
+        };
+        rejects("microphone", "example-streamed-playback");
+        rejects("microphone", "example-streamed", 2);
+        rejects("virtualInput", "example-streamed");
+        rejects("virtualOutput", "example-streamed-playback");
+        rejects("output", "example-streamed-playback");
+        config.graph.nodes[0].kind = "virtualOutput";
+        config.graph.nodes[0].device = {"example-vac-output", "", "Example virtual output", -1};
+        engine.configure(config, config.revision); ++config.revision;
+        {
+            std::lock_guard lock(portsMutex);
+            check(configuredTransports.at("example-vac-output") == "vacLite",
+                "Dedicated virtual microphone output retains its VAC transport and direct-render policy");
+        }
+        engine.stop(); check(live == 0, "Streamed-input fixture releases every synthetic worker");
+    }
+    catalogEndpoints.clear();
+    for (const auto* suffix : {"", ".bak", ".new", ".established"}) std::filesystem::remove(path.string() + suffix);
+    std::cout << "PASS streamed inputs: actual engine accepts generic Windows capture across vendor families, preserves exact/stable assignments and keeps direction/channel/cable restrictions; synthetic workers only\n";
+}
+
 void defaultSettings(const std::filesystem::path& directory) {
     using namespace am;
     check(live == 0, "Default-settings fixture must start without another engine's workers");
@@ -812,6 +897,7 @@ int main() {
         test::relativeSettings(directory);
         test::ownershipLocks();
         test::recovery(directory);
+        test::streamedMicrophones(directory);
         for (const auto& fixture : {path, sharedPath})
             for (const auto& suffix : {"", ".bak", ".new", ".established"}) std::filesystem::remove(fixture.string() + suffix);
         std::filesystem::remove(directory / "engine.log"); std::filesystem::remove(directory / "engine.log.previous");

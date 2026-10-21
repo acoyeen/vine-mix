@@ -1,8 +1,8 @@
 # Local control protocol — wire version 1, configuration version 2
 
-The native engine is `AudioMixer.Engine.exe`; the WPF controller is
-`AudioMixer.exe`. They communicate using
-`\\.\pipe\AudioMixer.Control.<current-user-SID>`. The engine restricts the pipe
+The native engine is `VineMix.Engine.exe`; the WPF controller is
+`VineMix.exe`. They communicate using
+`\\.\pipe\VineMix.Control.<current-user-SID>`. The engine restricts the pipe
 to the current user and SYSTEM and rejects remote clients. No audio crosses this
 connection.
 
@@ -23,10 +23,27 @@ Commands:
 - `configure`: full `configuration` plus `expectedRevision`. Validate, save,
   publish the compiled plan, then acknowledge with a new snapshot.
 - `retry`: retry assigned workers.
+- `recoveryRetry`: reload settings after an external repair. A successful reply
+  can still require recovery; inspect `snapshot.settingsState`.
+- `restoreBackup`: preserve the original files, commit the validated backup,
+  then activate its routing. The backup can predate recent edits.
+- `startFresh`: preserve originals, then commit the unassigned three-node starter.
 - `shutdown`: explicit engine shutdown, after the response is sent.
 
 A stale revision is rejected. The controller rebases pending id-based edits on a
 fresh snapshot rather than overwriting concurrent changes.
+
+Snapshots include `settingsState` (`new`, `loaded`, `backupAvailable`,
+`recoveryRequired`, `unsupported`), `backupPath`, `physicalSettingsPath`,
+`enginePid`, `executablePath`, `engineVersion` and `engineProtocolVersion`.
+Only `new` and `loaded` permit configuration writes and audio activation. A valid
+backup is a read-only preview until restoration is chosen. Unsupported settings
+require a compatible newer app; they cannot be replaced by the recovery commands.
+
+The desktop verifies the named-pipe server PID/path and performs a read-only
+snapshot handshake before its first mutating request. It compares release,
+protocol and the physical settings location resolved from an open Windows handle.
+Matching printed AppData paths alone does not establish workspace identity.
 
 ## Graph configuration
 

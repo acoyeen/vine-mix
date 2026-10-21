@@ -248,6 +248,16 @@ internal class RotaryValueControl : StackPanel
         StopAdjustment(); Commit(value); return true;
     }
 
+    internal bool TryCommitPendingEntry()
+    {
+        if (!_entry.IsKeyboardFocusWithin && !_entryInvalid) return true;
+        if (TryCommitText(_entry.Text)) { RenderEntry(); return true; }
+        _entryInvalid = true; RefreshEntryBorder(); RefreshEntryAccessibility();
+        _entry.ToolTip = NodeToolTip.Create("Invalid value", EntryRequirement());
+        _entry.Focus();
+        return false;
+    }
+
     internal bool HandleEntryKey(Key key, ModifierKeys modifiers)
     {
         if (!IsEnabled || !_entry.IsEnabled || (modifiers & ~ModifierKeys.Shift) != ModifierKeys.None) return false;

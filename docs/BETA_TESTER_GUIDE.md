@@ -1,212 +1,182 @@
-# VineMix beta test guide
+# VineMix installation and beta guide
 
-For **0.3.0-beta.1**, displayed as **0.3.0 · Beta 1**. Updated 21 October 2026.
-This is a private test build for **Windows 11 x64**, supplied directly by the maintainer.
-Release qualification remains in progress. Do not treat a generated package as a
-qualified release until the [beta qualification record](BETA_IMPLEMENTATION.md)
-records its checks.
-
-This guide describes the supplied Beta 1 files. Their application changes are
-still being integrated into the source on GitHub; the current checkout does not
-yet reproduce this beta. See [source status](../README.md#source-status).
+For **0.3.0-beta.2**, displayed as **0.3.0 · Beta 2**, on Windows 11 x64.
+Updated 22 October 2026. Read the [release notes](https://github.com/acoyeen/vine-mix/releases/tag/v0.3.0-beta.2)
+for changes and download the format you prefer.
 
 ## Choose a package
 
-| File supplied by the maintainer | How to use it |
+| Download | How it works |
 | --- | --- |
-| `VineMix-0.3.0-beta.1-Setup-x64.exe` | Installs the app and shortcuts for your account; can offer missing optional drivers. |
-| `VineMix-0.3.0-beta.1-Standalone-x64.exe` | Open the supplied EXE in File Explorer. Its bundled app files are prepared automatically; drivers are installed separately. |
+| [VineMix-0.3.0-beta.2-Setup-x64.exe](https://github.com/acoyeen/vine-mix/releases/download/v0.3.0-beta.2/VineMix-0.3.0-beta.2-Setup-x64.exe) | Installs the app and shortcuts for your account; optional virtual audio drivers are separate choices. |
+| [VineMix-0.3.0-beta.2-Standalone-x64.exe](https://github.com/acoyeen/vine-mix/releases/download/v0.3.0-beta.2/VineMix-0.3.0-beta.2-Standalone-x64.exe) | Launches from one EXE without registering an app installation; virtual audio drivers are installed separately. |
 
-You do not need to install .NET. The standalone EXE includes the app and runtime;
-it does not register an app installation. Setup installs under
-`%LOCALAPPDATA%\Programs\VineMix`.
+Both include .NET. Setup installs under `%LOCALAPPDATA%\Programs\VineMix`.
+Standalone prepares its verified bundled runtime under
+`%LOCALAPPDATA%\VineMix\runtime\<payload-SHA-256>` and reuses it on later launches.
+Keep the downloaded EXE as your standalone launcher.
 
-The standalone EXE keeps its bundled engine, supporting files and notices in
-`%LOCALAPPDATA%\VineMix\runtime\<payload-SHA-256>`. First launch validates and
-prepares that version's files; later launches validate and reuse them. A damaged
-cache is preserved in an `.invalid-…` folder while a replacement is prepared.
-Quit every VineMix copy before repairing or removing its cache.
-
-The current app, helper and Setup are unsigned. Windows may show an unknown
-publisher warning. Verify the exact file came from the maintainer and compare its SHA-256
-with the checksum supplied with that build before deciding to run it. If the file
-or warning differs from what you were sent, stop and report it. A vendor's signed
-driver installer does not establish the publisher of VineMix.
+The app, helper and Setup are currently unsigned. Windows may show an
+unknown-publisher warning. Verify the release filename and checksum before
+running it. The signed update metadata and vendor driver signatures do not
+provide a Windows Authenticode signature for VineMix.
 
 ### Install with Setup
 
-1. If the files arrived in a ZIP, use **Extract all** in File Explorer first.
-   Compare `VineMix-0.3.0-beta.1-Setup-x64.exe` with the supplied checksum.
-2. Open that Setup file in File Explorer and follow its installation steps.
-   Review the app terms and any separate optional driver terms before accepting.
-3. Install only the optional drivers you need. Follow any vendor restart request,
-   then open **VineMix** from its Start menu shortcut.
-4. Continue with [First session](#first-session) below.
+1. Download Setup from the release page. If using a ZIP bundle, choose
+   **Extract all** in File Explorer before launching its contents.
+2. Open `VineMix-0.3.0-beta.2-Setup-x64.exe` and follow the installation steps.
+3. Use the app-only installation unless you need a virtual cable route. Both
+   optional driver boxes start unchecked. Selected drivers have separate terms,
+   administrator prompts and possible restart requests.
+4. Open **VineMix** from the Start menu and continue with
+   [First session](#first-session).
 
 ### Use the standalone EXE
 
-1. If the files arrived in a ZIP, use **Extract all** first. Keep
-   `VineMix-0.3.0-beta.1-Standalone-x64.exe` in a folder where you intend to keep
-   launching it, and compare it with the supplied checksum.
-2. Install optional virtual audio drivers separately only if you need virtual
-   routes; see [Optional drivers](#optional-drivers).
-3. Open the standalone EXE in File Explorer. The first launch prepares its bundled
-   runtime automatically; keep the EXE as your launcher for future sessions.
-4. Continue with [First session](#first-session) below.
+1. Download `VineMix-0.3.0-beta.2-Standalone-x64.exe` and keep it in the folder
+   where you intend to launch it. Extract any ZIP bundle first.
+2. Install optional virtual audio drivers separately if your routes need them.
+3. Open the EXE in File Explorer. First launch prepares the bundled runtime
+   automatically; continue with [First session](#first-session).
 
 ## Optional drivers
 
-A physical microphone and listening output work without either driver. Use the
-official vendors' information and packages:
+Physical microphone and headphone routes work without virtual cable drivers.
+An existing streamed microphone, such as Virtual Desktop's microphone, should be
+selected in **Physical input** and does not need either bundled cable.
 
 | You want to… | Driver and endpoint names |
 | --- | --- |
-| Receive audio sent to a virtual playback device | [VB-CABLE](https://vb-audio.com/Cable/): send from the other app to **CABLE Input (VB-Audio Virtual Cable)**; VineMix captures **CABLE Output**. |
-| Give another app the mixed audio as a microphone | [Virtual Audio Cable](https://vac.muzychenko.net/en/download.htm): VineMix sends to **Line 1 (Virtual Audio Cable)** playback; select **Line 1** recording in the other app. |
+| Receive another app's virtual playback | [VB-CABLE](https://vb-audio.com/Cable/): the app plays to **CABLE Input (VB-Audio Virtual Cable)**; VineMix captures **CABLE Output**. |
+| Give another app the mix as a microphone | [Virtual Audio Cable](https://vac.muzychenko.net/en/download.htm): VineMix sends to **Line 1 (Virtual Audio Cable)** playback; the other app records from **Line 1**. |
 
 | Driver | Official Windows ZIP | Vendor information |
 | --- | --- | --- |
-| VB-CABLE | [VBCABLE Driver Pack 45](https://download.vb-audio.com/Download_CABLE/VBCABLE_Driver_Pack45.zip) | [VB-CABLE installation and information](https://vb-audio.com/Cable/) |
+| VB-CABLE | [Driver Pack 45](https://download.vb-audio.com/Download_CABLE/VBCABLE_Driver_Pack45.zip) | [VB-CABLE installation and information](https://vb-audio.com/Cable/) |
 | VAC Lite | [VAC 4.71 Lite](https://software.muzychenko.net/freeware/vac471lite.zip) | [VAC editions and downloads](https://vac.muzychenko.net/en/download.htm) |
 
-Extract a downloaded driver ZIP into its own folder before running its vendor
-setup. Follow the included vendor instructions and keep the package files together.
+Extract each driver ZIP into its own folder, keep its files together and follow
+the vendor setup instructions. A disabled or unplugged endpoint is not a reason
+to install a duplicate driver.
 
-Setup offers original driver installers only when it detects the corresponding
-package is missing. A disabled or unplugged endpoint is not a reason to install a
-duplicate driver. Driver installation requires separate acceptance and may need
-administrator permission and a restart. Follow the vendor instructions.
-
-VAC **Lite** is allowed only in a private home environment without income
-generation. A work, commercial or income-generating setup needs an appropriate
-licence; do not assume the free Lite package permits it. Review
-[VAC's licence](https://vac.muzychenko.net/en/license.txt) and
-[VB-Audio's licensing terms](https://vb-audio.com/Services/licensing.htm).
-The trial VAC package is different from Lite and adds a voice reminder after
-30 minutes. Vendor information was checked on **21 October 2026**.
+**VAC Lite permits private home use without income generation.** Other uses
+need an appropriate licence. Review [VAC's licence](https://vac.muzychenko.net/en/license.txt)
+and [VB-Audio's licensing terms](https://vb-audio.com/Services/licensing.htm).
+The VAC trial is different from Lite and adds a voice reminder after 30 minutes.
+Vendor links and terms were checked on 21 October 2026.
 
 ## First session
 
 ![Fresh starter with physical devices unassigned and no available VAC output](images/first-run.png)
 
-This fresh-workspace example has no assigned microphone or headphones and no
-available VAC output. The red **Line 1** warning clears when an eligible virtual
-output is available; physical microphone and headphone routes can still be used
-without it. Both outputs are muted.
+The fresh workspace has **Physical input** connected separately to **Virtual
+output** and **Listening output**. Physical devices are unassigned and both
+outputs are muted. This example has no available VAC output, so **Line 1** shows
+a warning; physical listening can still be configured.
 
-1. Open VineMix from its installed shortcut or through File Explorer. Do not use
-   a developer render or verification executable as your personal mixer.
-2. The fresh workspace has exactly three nodes: **Physical input**, **Virtual
-   output**, and **Listening output**. Two cables connect the input to the outputs.
-   Your physical devices are unassigned. Both outputs are muted, with Listening
-   output at −24 dB.
-3. Choose the microphone and headphones explicitly. Use headphones at a low
-   volume, then unmute Listening output and increase it gradually. Mute again
-   before changing a route you are unsure about.
-4. If you need a virtual microphone, confirm Virtual output shows the intended
-   Line 1 device, select Line 1 recording in the receiving app, then unmute that
-   output. Use the receiving app's test or recording function to check it.
-5. Make one harmless change, wait for **Saved**, quit from the tray and reopen
-   from the same shortcut. Confirm the assignment, level, mute and layout return.
+1. Choose your microphone in Physical input and headphones in Listening output.
+2. Begin at low headphone volume. Unmute Listening output, which starts at
+   **−24 dB**, and raise it gradually. Headphones help avoid microphone feedback.
+3. For a virtual microphone, confirm Virtual output shows the intended Line 1
+   device. Select Line 1 recording in the receiving app, then unmute Virtual
+   output and use that app's recording test.
+4. Make a small edit, wait for **Saved**, use **Quit VineMix** from the tray and
+   reopen. Confirm the assignments, levels, mutes and layout return.
 
-![A configured example starter, with both outputs still muted](images/workspace.png)
+![Configured starter with example devices and both outputs muted](images/workspace.png)
 
-The configured example uses **Example USB Microphone** and **Example Headphones**;
-your device names will differ. Both images are detached renders of actual app
-controls with synthetic devices. They do not access audio hardware or load a
-personal workspace.
+The images use real app controls with synthetic devices. “Example USB Microphone”
+and “Example Headphones” are placeholders; no personal workspace or hardware is
+loaded to produce them.
 
-Closing the main window hides it in the tray and leaves audio running.
-**Quit VineMix** in the tray menu stops the desktop and engine. Standalone and
-installed copies share one workspace and session; opening another copy should
-bring the current app forward instead of starting a competing engine.
+Closing the window hides it in the tray and leaves audio running. **Quit
+VineMix** stops the desktop and engine. Installed and standalone copies share a
+workspace and coordinate one session; opening another copy brings the active app
+forward.
 
-## Updating and uninstalling
+## Updates
 
-There is no automatic update service for this beta. Wait for a replacement file
-from the maintainer. Before updating, wait for Saved and use **Quit VineMix** from the
-tray; closing the window alone leaves it running.
+1. Open **Settings → Check for updates**, or use the button in About.
+2. Review the release notes and choose **Download update**. VineMix verifies
+   signed release metadata and the package size and SHA-256 hash.
+3. Choose **Install and restart** when you can briefly interrupt audio. The app
+   saves pending edits, updates its files and reopens the saved workspace.
 
-For Setup, run the newer supplied installer. For standalone, open the newer
-supplied EXE after quitting the old copy. Do not mix extracted app files from
-different builds. Keep the old EXE until the new one restores your workspace
-correctly. An older build may not understand
-newer saved data; ask the maintainer before attempting a downgrade.
+Daily checks can be turned on or off with **Automatically check for updates**
+in Settings. A check never downloads or installs silently. You can keep using
+audio while downloading; installation is a separate action.
 
-Setup's uninstall entry removes application files and shortcuts while retaining
-personal settings, backups and logs. Standalone removal consists of quitting and
-deleting its downloaded EXE. Its extracted runtime cache can be removed separately
-by deleting `%LOCALAPPDATA%\VineMix\runtime` after all copies have quit; there is
-no automatic cache uninstaller. Keep the rest of the VineMix data folder if you
-want to retain the workspace. Both packages leave shared audio drivers in place. Remove a
-driver only with its vendor's uninstall instructions after
-checking that other apps do not need it. Retained personal data remains in
-`%LOCALAPPDATA%\VineMix`.
+**Beta 1 users:** make the first upgrade manually from
+[GitHub Releases](https://github.com/acoyeen/vine-mix/releases). Wait for Saved,
+quit from the tray, then run the newer Setup or open the newer standalone EXE.
+Do not combine files from different builds or replace an app while it is running.
+
+If an update needs manual repair, keep its journal and backups and report the
+message shown. The updater does not replace newer settings with an older backup.
+See [update behavior and recovery limits](INSTALLATION_AND_UPDATES.md).
 
 ## Recovery
 
-VineMix stores the workspace in `%LOCALAPPDATA%\VineMix\settings.json`, its
-last-good backup in `settings.json.bak`, and interface preferences in `ui.json`.
-Logs in that folder can help explain a failure. Back up the whole data folder
-before manual recovery, with the app quit.
+Workspace settings live in `%LOCALAPPDATA%\VineMix\settings.json`, the last-good
+backup in `settings.json.bak`, and interface preferences in `ui.json`. Back up
+the whole data folder with the app quit before attempting manual recovery.
 
-On first use of this renamed build, existing `AudioMixer` data is copied into
-`VineMix`; the original files are retained. If different legacy copies exist,
-the app asks which workspace to keep using. A workspace already established in
-VineMix takes precedence. Interrupted migration resumes using its saved journal;
-do not delete migration files while investigating a problem.
+Legacy AudioMixer data is copied while retaining its originals. If different
+legacy stores exist, choose the workspace you intend to keep. An established
+VineMix workspace takes precedence.
 
 An unreadable, damaged or missing established workspace opens **Workspace
 recovery** before normal editing or audio starts:
 
-- **Retry** checks the existing files again after a temporary problem is resolved.
-- **Restore backup** uses the available backup and preserves the current files.
-- **Start fresh · preserve originals** archives existing files, then creates the
-  muted three-node starter. It does not silently replace a failed workspace.
+- **Retry** checks the existing files again after a temporary issue is resolved.
+- **Restore backup** preserves current files before using the available backup.
+- **Start fresh · preserve originals** archives existing data and creates a muted
+  starter.
 
-Recovery preserves originals in a timestamped `settings.json.recovery-…` folder
-inside the data folder. If the buttons cannot complete recovery, keep those files
-and contact the maintainer. Do not delete settings or overwrite a newer workspace with
-an older copy to get past the banner.
+Preserved originals are kept in a timestamped `settings.json.recovery-…` folder.
+Keep these files if recovery cannot complete. Do not overwrite a newer workspace
+with an older copy to bypass the banner.
 
-For a missing audio device, reconnect it, check that Windows sees it, then use
-**Settings → Retry assigned devices**. Use **Restart audio engine** only when a
-brief interruption is acceptable. Settings and graph changes should survive it.
+For a missing device, reconnect it, check Windows sound settings and use
+**Settings → Retry assigned devices**. **Restart audio engine** causes a brief
+interruption while reconnecting saved routes.
+
+## Uninstalling
+
+Setup's uninstall entry removes app files and shortcuts while retaining settings,
+backups, logs and shared drivers. For standalone, quit and delete the launcher
+EXE. Its runtime cache can be removed separately from
+`%LOCALAPPDATA%\VineMix\runtime` once every copy is closed. Keep the rest of the
+data folder to retain your workspace.
+
+Remove shared drivers only through their vendor instructions after checking that
+other apps do not need them.
 
 ## Useful beta checks
 
-Test only when an interruption will not disrupt a call, recording or other work.
-Start quietly. Record what you actually tried; leave unavailable scenarios as
-**Not run**.
+Test first-run mutes, workspace retention after Quit/reopen, independent outputs,
+device reconnect and sleep/resume. For Virtual Desktop, check microphone
+enumeration, recording and saved assignment on the actual headset setup.
+Observe resizing and Add Node help at your normal display scale.
 
-- Confirm first-run output mutes, explicit physical assignments and saved state
-  after quitting and reopening from the shortcut.
-- Listen through each intended output separately, then together; check that
-  muting headphones leaves the virtual microphone independent, and vice versa.
-- Disconnect and reconnect an assigned device; confirm its warning clears and
-  the intended route returns without a different device being chosen.
-- Check a normal Windows sleep and resume, and an ordinary restart when practical.
-- Use your normal mix for a sustained session; note duration, clicks, missing
-  sound, drift, unexpected closure, and CPU/memory changes. The eight-hour gate
-  is still pending until recorded with evidence.
-
-Full procedure and known qualification limits: [TESTING.md](../TESTING.md).
-Offline tests do not replace these listening and hardware checks.
+Record duration, glitches, unexpected exits and CPU/memory changes during longer
+sessions. Full hardware and end-to-end update checks are documented in
+[TESTING.md](../TESTING.md). Mark scenarios you could not perform **Not run**.
 
 ## Report a problem
 
-Send the report through the private channel the maintainer used to supply the build, or
-use the repository issue form if you have access. Include:
+Use the [bug report form](https://github.com/acoyeen/vine-mix/issues/new/choose).
+Include:
 
-- **Settings → About VineMix → Copy version information**, plus your Windows
-  version and whether this is Setup or standalone.
-- What you were doing, numbered reproduction steps, expected result and actual
-  result; whether sound stopped and which output was affected.
-- Whether the problem followed an update, device reconnect, sleep or restart;
-  the approximate time and timezone; frequency and any reliable workaround.
-- A cropped screenshot and only the relevant log lines, after reviewing them.
+- **Settings → About VineMix → Copy version information**, Windows version and
+  whether you use Setup or standalone.
+- Numbered reproduction steps, expected and actual results, and whether audio
+  stopped or only one output was affected.
+- Frequency, recent update/reconnect/sleep, approximate failure time and any
+  reliable workaround.
+- A cropped screenshot and relevant log lines after reviewing them.
 
-Device names and identifiers, app names, executable paths, account paths and
-workspace files may be private. Remove those before sharing. A complete settings
-file is not required for the first report. Keep original logs locally if the maintainer
-needs a private follow-up. Do not describe a workaround as a verified fix.
+Remove personal device identifiers, app names, executable/account paths and
+workspace data before sharing diagnostics. A complete settings file is not
+required for the first report. Keep original evidence locally for follow-up.

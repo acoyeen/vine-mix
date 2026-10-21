@@ -167,7 +167,14 @@ internal sealed class MenuHoverHelp
 
     internal MenuItem? RowAt(Visual surface, Point position)
     {
-        var hit = VisualTreeHelper.HitTest(surface, position)?.VisualHit;
+        DependencyObject? hit = null;
+        // Filtering keeps old arranged visuals alive after their menu rows
+        // collapse. They must not mask the visible result at the same point.
+        // Disabled rows still participate so their explanation remains usable.
+        VisualTreeHelper.HitTest(surface, candidate =>
+            candidate is UIElement element && (!element.IsHitTestVisible || element.Visibility != Visibility.Visible)
+                ? HitTestFilterBehavior.ContinueSkipSelfAndChildren : HitTestFilterBehavior.Continue,
+            result => { hit = result.VisualHit; return HitTestResultBehavior.Stop; }, new PointHitTestParameters(position));
         for (DependencyObject? current = hit; current is not null; current = VisualTreeHelper.GetParent(current))
         {
             if (current is not MenuItem row) continue;

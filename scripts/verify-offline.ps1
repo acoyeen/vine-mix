@@ -1,16 +1,17 @@
 [CmdletBinding()]
-param([switch]$SkipBuild, [switch]$NativeOnly, [string]$ResultDirectory = '')
+param([switch]$SkipBuild, [switch]$NativeOnly, [string]$ResultDirectory = '', [string]$BuildDirectory = '')
 $ErrorActionPreference = 'Stop'
 $project = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
-$build = Join-Path $project 'build\native'
+if (-not $BuildDirectory) { $BuildDirectory = Join-Path $env:LOCALAPPDATA 'VineMix.BuildCache\release\native' }
+$build = [IO.Path]::GetFullPath($BuildDirectory)
 $compiler = Join-Path $project '.tools\llvm-mingw-20261006-ucrt-x86_64\bin'
 $cmake = Join-Path $project '.tools\cmake-4.4.4-windows-x86_64\bin\cmake.exe'
 $dotnet = Join-Path $project '.tools\dotnet\dotnet.exe'
-$previewPackage = Join-Path $project 'artifacts\VineMix-Verification'
-if (-not $ResultDirectory) { $ResultDirectory = Join-Path $project ('artifacts\offline-verification-' + (Get-Date -Format 'yyyyMMdd-HHmmss')) }
+if (-not $ResultDirectory) { $ResultDirectory = Join-Path $env:LOCALAPPDATA ('VineMix.BuildCache\offline-verification-' + (Get-Date -Format 'yyyyMMdd-HHmmss')) }
 $ResultDirectory = [IO.Path]::GetFullPath($ResultDirectory)
 if (Test-Path -LiteralPath $ResultDirectory) { throw 'Choose a new results directory; prior evidence is retained.' }
 $null = New-Item -ItemType Directory -Path $ResultDirectory
+$previewPackage = Join-Path $ResultDirectory 'verification-build'
 $targets = @('VineMix.GraphTests','VineMix.EngineLifecycleTests','VineMix.QualificationTests',
     'VineMix.DriftQueueTests','VineMix.AdvancedEffectsTests','VineMix.DenoiserTests','VineMix.SpectrumTests',
     'VineMix.DeEsserQualityTests','VineMix.EffectsQualityTests','VineMix.GraphPerformanceTests','VineMix.WindowsCatalogTests','VineMix.ExclusiveRenderTests','VineMix.SharedAudioTests','VineMix.AudioTimingTests','VineMix.MixClockTests','VineMix.VoiceColorTests','VineMix.CoreDynamicsTests')

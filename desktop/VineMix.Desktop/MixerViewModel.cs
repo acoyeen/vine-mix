@@ -37,7 +37,7 @@ internal sealed record EngineRestartOperations(
     internal TimeSpan RetryDelay { get; init; } = TimeSpan.FromMilliseconds(100);
 }
 
-public sealed class MixerViewModel : Observable, IDisposable
+public sealed partial class MixerViewModel : Observable, IDisposable
 {
     private readonly bool _preview;
     private EngineConnection? _connection;
@@ -100,9 +100,9 @@ public sealed class MixerViewModel : Observable, IDisposable
     internal ulong MeterAudioFrames => _snapshot?.Status.AudioFrames ?? 0;
     internal GraphNode? AcknowledgedGraphNode(string id) => _snapshot?.Configuration.Graph.Nodes.FirstOrDefault(node => node.Id == id);
     internal long ConfigurationPresentationCount { get; private set; }
-    public bool CanEdit { get => _connected && !IsRestartingEngine; private set { if (Set(ref _connected, value)) NotifyHistory(); } }
+    public bool CanEdit { get => _connected && !IsRestartingEngine && !IsPreparingUpdate && !IsUpdateHealthMode; private set { if (Set(ref _connected, value)) NotifyHistory(); } }
     public bool IsRestartingEngine => _restartingEngine;
-    public bool CanRestartEngine => _restartOperations is not null && !IsRestartingEngine && !_stop.IsCancellationRequested
+    public bool CanRestartEngine => _restartOperations is not null && !IsRestartingEngine && !IsPreparingUpdate && !IsUpdateHealthMode && !_stop.IsCancellationRequested
         && !HasSettingsRecovery && (_preview || _snapshot is not null && _supervisor?.CanRestart == true);
     public bool IsVisible { get => _visible; set => _visible = value; }
     public string ConnectionStatus { get => _connectionStatus; private set => Set(ref _connectionStatus, value); }
@@ -191,6 +191,7 @@ public sealed class MixerViewModel : Observable, IDisposable
     }
     private sealed class UiPreferences
     {
+        public bool? AutomaticallyCheckForUpdates { get; set; }
         public bool? ReducedAnimation { get; set; }
         public bool RightClickDragToPan { get; set; }
         public bool ShowDisabledAudioDevices { get; set; }
@@ -202,6 +203,7 @@ public sealed class MixerViewModel : Observable, IDisposable
     internal void LoadUiPreferencesJson(string json)
     {
         var preferences = JsonSerializer.Deserialize<UiPreferences>(json, Protocol.Json);
+        _automaticallyCheckForUpdates = preferences?.AutomaticallyCheckForUpdates ?? true;
         _reducedAnimation = preferences?.ReducedAnimation ?? _reducedAnimation;
         _rightClickDragToPan = preferences?.RightClickDragToPan ?? false;
         _showDisabledAudioDevices = preferences?.ShowDisabledAudioDevices ?? false;
@@ -210,6 +212,7 @@ public sealed class MixerViewModel : Observable, IDisposable
     }
     internal string SerializeUiPreferences() => JsonSerializer.Serialize(new UiPreferences
     {
+        AutomaticallyCheckForUpdates = _automaticallyCheckForUpdates,
         ReducedAnimation = _reducedAnimation,
         RightClickDragToPan = _rightClickDragToPan,
         ShowDisabledAudioDevices = _showDisabledAudioDevices,
@@ -422,6 +425,7 @@ public sealed class MixerViewModel : Observable, IDisposable
 
     internal PendingBatch PreparePendingConfiguration(MixerConfiguration basis)
     {
+        ReconcileUnconfirmedUpdate(basis);
         var configuration = ReplayPending(basis.Copy());
         if (_canvasView is { } view) { configuration.Graph.PanX = view.X; configuration.Graph.PanY = view.Y; configuration.Graph.Zoom = view.Zoom; }
         return new(configuration, _pending.ToArray());
@@ -481,6 +485,7 @@ public sealed class MixerViewModel : Observable, IDisposable
             snapshot.Configuration.Graph = GraphDefaults.FromLegacy(snapshot.Configuration);
             snapshot.Configuration.Version = 2;
         }
+        ReconcileUnconfirmedUpdate(snapshot.Configuration);
         bool initial = _snapshot is null;
         bool recovery = snapshot.SettingsState is not ("loaded" or "new");
         if (recovery && !HasSettingsRecovery && _pending.Count > 0) _recoveryPending = _desired.Copy();
@@ -515,7 +520,7 @@ public sealed class MixerViewModel : Observable, IDisposable
         ConnectionStatus = _preview ? "Preview · no audio engine" : "Audio engine connected";
         FrameLabel = $"{snapshot.Status.AudioFrames:N0} frames · 48 kHz";
         if (_pending.Count == 0) SaveStatus = _preview ? "Preview · no settings are saved" : _editError.Length == 0 ? $"Saved · revision {snapshot.Configuration.Revision}" : "Change was not saved";
-        if (!HasSettingsRecovery && (configurationChanged || inventoryChanged))
+        if (!HasSettingsRecovery && !IsPreparingUpdate && !IsUpdateHealthMode && (configurationChanged || inventoryChanged))
         {
             var assignments = AutomaticAssignments()
                 .Where(a => _preview || !_automaticAssignmentAttempts.Contains(a.AttemptKey)).ToArray();
@@ -586,6 +591,7 @@ public sealed class MixerViewModel : Observable, IDisposable
 
     private PendingBatch PrepareRestartConfiguration(MixerConfiguration basis)
     {
+        ReconcileUnconfirmedUpdate(basis);
         var configuration = basis.Copy();
         foreach (var edit in _pending)
         {
@@ -729,12 +735,18 @@ public sealed class MixerViewModel : Observable, IDisposable
     {
         while (!_stop.IsCancellationRequested)
         {
+            if (IsPreparingUpdate)
+            {
+                try { await Task.Delay(100, _stop.Token); }
+                catch (OperationCanceledException) { break; }
+                continue;
+            }
             double began = _clock.Elapsed.TotalSeconds;
             bool entered = false;
             try
             {
                 await _engineGate.WaitAsync(_stop.Token); entered = true;
-                if (IsRestartingEngine) continue;
+                if (IsRestartingEngine || IsPreparingUpdate) continue;
                 var response = await _connection!.RequestAsync("snapshot", null, null, _stop.Token);
                 if (!response.Ok || response.Snapshot is null) throw new InvalidOperationException(response.Error.Length > 0 ? response.Error : "The audio engine did not provide a snapshot.");
                 bool wasConnected = CanEdit;
@@ -743,7 +755,7 @@ public sealed class MixerViewModel : Observable, IDisposable
                 if (!wasConnected || now - _lastPoll > 8 || _lastFrames != response.Snapshot.Status.AudioFrames)
                 { _lastFrameAdvance = now; _lastFrames = response.Snapshot.Status.AudioFrames; }
                 _lastPoll = now;
-                if (!HasSettingsRecovery && now - _lastFrameAdvance >= 6)
+                if (!HasSettingsRecovery && !IsUpdateHealthMode && now - _lastFrameAdvance >= 6)
                 {
                     CanEdit = false;
                     InvalidatePresentation();
@@ -773,7 +785,7 @@ public sealed class MixerViewModel : Observable, IDisposable
             catch (OperationCanceledException) when (_stop.IsCancellationRequested) { break; }
             catch (Exception error) when (error is System.IO.IOException or TimeoutException or OperationCanceledException or InvalidOperationException or System.Text.Json.JsonException or UnauthorizedAccessException)
             {
-                CanEdit = false; ConnectionStatus = _supervisor!.EnsureStarted();
+                CanEdit = false; ConnectionStatus = IsUpdateHealthMode ? EnsureHealthEngineStarted() : _supervisor!.EnsureStarted();
                 FrameLabel = "Engine offline"; SaveStatus = _pending.Count > 0 ? "Changes queued until reconnection" : "Waiting for connection";
                 Warning = error is TimeoutException or OperationCanceledException ? "Waiting for the engine to respond…" : error.Message;
                 InvalidatePresentation();
@@ -792,7 +804,7 @@ public sealed class MixerViewModel : Observable, IDisposable
     public async Task RetryAsync()
     {
         if (_preview && _restartOperations is null) { Warning = "Preview only · no devices are retried."; return; }
-        if (IsRestartingEngine || _stop.IsCancellationRequested) return;
+        if (IsRestartingEngine || IsPreparingUpdate || _stop.IsCancellationRequested) return;
         bool entered = false;
         try
         {

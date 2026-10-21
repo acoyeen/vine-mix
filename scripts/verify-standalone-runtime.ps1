@@ -5,7 +5,7 @@ $project = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $package = [IO.Path]::GetFullPath($PackageDirectory)
 $receipt = Get-Content -LiteralPath ($package + '.build.json') -Raw | ConvertFrom-Json -Depth 12
 if ($receipt.buildMode -ne 'Standalone') { throw 'Select a standalone package with its build receipt.' }
-if (-not $ResultDirectory) { $ResultDirectory = Join-Path $project ('artifacts\runtime-verification-' + (Get-Date -Format 'yyyyMMdd-HHmmss-fff')) }
+if (-not $ResultDirectory) { $ResultDirectory = Join-Path $env:LOCALAPPDATA ('VineMix.BuildCache\runtime-verification-' + (Get-Date -Format 'yyyyMMdd-HHmmss-fff')) }
 $result = [IO.Path]::GetFullPath($ResultDirectory)
 if (Test-Path -LiteralPath $result) { throw 'Choose a fresh evidence directory.' }
 $null = New-Item -ItemType Directory -Path $result

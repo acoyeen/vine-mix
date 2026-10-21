@@ -12,7 +12,7 @@ $project = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $installer = [IO.Path]::GetFullPath($InstallerPath)
 $package = [IO.Path]::GetFullPath($PackageDirectory)
 if (-not $ResultDirectory) {
-    $ResultDirectory = Join-Path $project ('artifacts\installer-verification-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
+    $ResultDirectory = Join-Path $env:LOCALAPPDATA ('VineMix.BuildCache\installer-verification-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
 }
 $evidence = [IO.Path]::GetFullPath($ResultDirectory)
 $target = [IO.Path]::GetFullPath((Join-Path $evidence 'installed-app'))
@@ -167,6 +167,17 @@ function Require-LogMarker([string]$Name, [string]$Marker, [string]$Description)
     Require (Test-Path -LiteralPath $log -PathType Leaf) "Setup created its diagnostic log: $Name."
     Require ((Get-Content -LiteralPath $log -Raw).Contains($Marker)) $Description
 }
+function Require-DriverPagePolicy([string]$Name) {
+    $logText = Get-Content -LiteralPath (Join-Path $evidence ($Name + '.log')) -Raw
+    Require ($logText.Contains('DRIVER_CHOICES_OPT_IN: VB=0 VAC=0 terms=0;')) 'Both optional drivers and their consent begin unselected, including during repair.'
+    $layout = [regex]::Match($logText, 'DRIVER_PAGE_LAYOUT: surface=(\d+)x(\d+); options bottom=(\d+); status top=(\d+) height=(\d+); refresh top=(\d+) bottom=(\d+); terms surface=(\d+)x(\d+) bottom=(\d+)')
+    Require $layout.Success 'Setup reports its actual hidden wizard surface and measured text geometry.'
+    if (-not $layout.Success) { return }
+    $size = @(1..10 | ForEach-Object { [int]$layout.Groups[$_].Value })
+    Require ($size[0] -gt 0 -and $size[1] -gt 0 -and $size[2] -lt $size[3] -and $size[4] -gt 0 -and
+        $size[3] + $size[4] -lt $size[5] -and $size[5] -lt $size[6] -and $size[6] -le $size[1]) 'Measured optional-feature text, detection status and refresh action fit without overlapping on the hidden wizard surface.'
+    Require ($size[7] -gt 0 -and $size[8] -gt 0 -and $size[9] -le $size[8]) 'The separately measured driver notice, terms actions and acceptance control fit on their hidden wizard surface.'
+}
 function Invoke-Uninstall([string]$Name, [string]$UninstallerPath) {
     Require (Is-Within $UninstallerPath $target) 'The selected uninstaller resolves inside the verified test destination.'
     $log = Join-Path $evidence ($Name + '.log')
@@ -263,6 +274,7 @@ try {
     $installCode = Invoke-Setup 'first-install' $true
     Require ($installCode -eq 0) 'Isolated first installation completed without requesting a reboot.'
     Require-LogMarker 'first-install' 'DRIVER_INSTALLATION_SKIPPED' 'First installation explicitly skipped both vendor installers.'
+    Require-DriverPagePolicy 'first-install'
     $desktopMatches = @(Get-ChildItem -LiteralPath $target -Filter 'VineMix.exe' -File -Recurse)
     Require ($desktopMatches.Count -eq 1) 'The installation contains exactly one desktop payload.'
     $payloadDirectory = $desktopMatches[0].Directory.FullName
@@ -300,6 +312,7 @@ try {
     $reinstallCode = Invoke-Setup 'same-version-reinstall' $true
     Require ($reinstallCode -eq 0) 'Reinstall completed without requesting a reboot.'
     Require-LogMarker 'same-version-reinstall' 'DRIVER_INSTALLATION_SKIPPED' 'Reinstall explicitly skipped both vendor installers.'
+    Require-DriverPagePolicy 'same-version-reinstall'
     Require ((File-Hash $sentinel) -ceq $sentinelHash) 'Reinstall preserved an unknown user file.'
     foreach ($file in $payloadManifest) {
         Require ((File-Hash (Join-Path $payloadDirectory $file.path)) -ceq $file.hash) "Reinstall retained complete package bytes: $($file.path)."

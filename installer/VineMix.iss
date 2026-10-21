@@ -92,9 +92,9 @@ Filename: "{app}\VineMix.exe"; WorkingDir: "{app}"; Description: "Open VineMix";
 
 [Code]
 var
-  DriversPage: TWizardPage;
+  DriversPage, DriverTermsPage: TWizardPage;
   VbCheck, VacCheck, DriverTermsCheck: TNewCheckBox;
-  StatusText, DriverNotice: TNewStaticText;
+  AppOnlyText, InputNotice, DriverHelp, StatusText, DriverNotice: TNewStaticText;
   RefreshButton, VbTermsButton, VacTermsButton: TNewButton;
   DetectionFile, HelperFile, DriverResults: String;
   IsTest, DetectionReady, VbInstalled, VacInstalled, VbKnown, VacKnown: Boolean;
@@ -183,8 +183,9 @@ end;
 
 procedure UpdateDriverPage;
 begin
-  StatusText.Caption := 'VB-CABLE: ' + DriverStatus('VBCable', VbKnown, VbInstalled) + #13#10#13#10 +
-    'VAC: ' + DriverStatus('VAC', VacKnown, VacInstalled);
+  StatusText.Caption := 'VB-CABLE: ' + DriverStatus('VBCable', VbKnown, VbInstalled) + #13#10 +
+    'VAC Lite: ' + DriverStatus('VAC', VacKnown, VacInstalled);
+  StatusText.AdjustHeight;
   VbCheck.Enabled := VbKnown and not VbInstalled and not IsTest;
   VacCheck.Enabled := VacKnown and not VacInstalled and not IsTest;
   if not VbCheck.Enabled then VbCheck.Checked := False;
@@ -201,6 +202,8 @@ end;
 
 procedure DriverSelectionChanged(Sender: TObject);
 begin
+  { Consent belongs to the currently selected packages, not an earlier choice. }
+  DriverTermsCheck.Checked := False;
   UpdateDriverPage;
 end;
 
@@ -250,57 +253,94 @@ begin
   ExtractArchive(ExpandConstant('{tmp}\vac471lite.zip'), ExpandConstant('{tmp}\drivers\vac-lite'), '', True, nil);
   FileCopy(ExpandConstant('{tmp}\drivers\vac-lite\license.txt'), ExpandConstant('{tmp}\vac-license.txt'), False);
 
-  DriversPage := CreateCustomPage(wpSelectTasks, 'Virtual audio drivers',
-    'Keep installed drivers, or choose the missing components you need.');
+  DriversPage := CreateCustomPage(wpSelectTasks, 'Choose optional audio features',
+    'VineMix works with your existing microphones and listening devices.');
+  AppOnlyText := TNewStaticText.Create(DriversPage);
+  AppOnlyText.Parent := DriversPage.Surface;
+  AppOnlyText.SetBounds(0, 0, DriversPage.SurfaceWidth, ScaleY(36));
+  AppOnlyText.AutoSize := False;
+  AppOnlyText.WordWrap := True;
+  AppOnlyText.Font.Style := [fsBold];
+  AppOnlyText.Caption := 'Install VineMix only: leave both options clear and click Next.';
+  AppOnlyText.AdjustHeight;
+  InputNotice := TNewStaticText.Create(DriversPage);
+  InputNotice.Parent := DriversPage.Surface;
+  InputNotice.SetBounds(0, AppOnlyText.Top + AppOnlyText.Height + ScaleY(8), DriversPage.SurfaceWidth, ScaleY(44));
+  InputNotice.AutoSize := False;
+  InputNotice.WordWrap := True;
+  InputNotice.Caption := 'Using a headset or Virtual Desktop microphone? Connect it first, then choose its Windows input in VineMix. Neither optional driver below is required.';
+  InputNotice.AdjustHeight;
+  VbCheck := TNewCheckBox.Create(DriversPage);
+  VbCheck.Parent := DriversPage.Surface;
+  VbCheck.SetBounds(0, InputNotice.Top + InputNotice.Height + ScaleY(18), DriversPage.SurfaceWidth, ScaleY(22));
+  VbCheck.Caption := 'Optional: audio from other apps (VB-CABLE)';
+  VbCheck.Checked := False;
+  VbCheck.OnClick := @DriverSelectionChanged;
+  VacCheck := TNewCheckBox.Create(DriversPage);
+  VacCheck.Parent := DriversPage.Surface;
+  VacCheck.SetBounds(0, VbCheck.Top + VbCheck.Height + ScaleY(10), DriversPage.SurfaceWidth, ScaleY(22));
+  VacCheck.Caption := 'Optional: your mix as an app microphone (VAC Lite)';
+  VacCheck.Checked := False;
+  VacCheck.OnClick := @DriverSelectionChanged;
+  DriverHelp := TNewStaticText.Create(DriversPage);
+  DriverHelp.Parent := DriversPage.Surface;
+  DriverHelp.SetBounds(0, VacCheck.Top + VacCheck.Height + ScaleY(12), DriversPage.SurfaceWidth, ScaleY(42));
+  DriverHelp.AutoSize := False;
+  DriverHelp.WordWrap := True;
+  DriverHelp.Caption := 'Choose only what you need. Drivers require separate terms, administrator approval and a restart. You can add them later by running Setup again.';
+  DriverHelp.AdjustHeight;
   StatusText := TNewStaticText.Create(DriversPage);
   StatusText.Parent := DriversPage.Surface;
-  StatusText.SetBounds(0, 0, DriversPage.SurfaceWidth, ScaleY(58));
   StatusText.AutoSize := False;
   StatusText.WordWrap := True;
   RefreshButton := TNewButton.Create(DriversPage);
   RefreshButton.Parent := DriversPage.Surface;
-  RefreshButton.SetBounds(0, ScaleY(65), ScaleX(100), ScaleY(25));
+  RefreshButton.SetBounds(0, DriversPage.SurfaceHeight - ScaleY(33), ScaleX(100), ScaleY(25));
   RefreshButton.Caption := 'Check again';
   RefreshButton.OnClick := @RefreshClicked;
-  VbCheck := TNewCheckBox.Create(DriversPage);
-  VbCheck.Parent := DriversPage.Surface;
-  VbCheck.SetBounds(0, ScaleY(101), DriversPage.SurfaceWidth, ScaleY(22));
-  VbCheck.Caption := 'Install VB-CABLE - brings other applications into VineMix';
-  VbCheck.OnClick := @DriverSelectionChanged;
-  VacCheck := TNewCheckBox.Create(DriversPage);
-  VacCheck.Parent := DriversPage.Surface;
-  VacCheck.SetBounds(0, ScaleY(128), DriversPage.SurfaceWidth, ScaleY(22));
-  VacCheck.Caption := 'Install VAC Lite - sends VineMix to microphone/recording apps';
-  VacCheck.OnClick := @DriverSelectionChanged;
-  DriverNotice := TNewStaticText.Create(DriversPage);
-  DriverNotice.Parent := DriversPage.Surface;
-  DriverNotice.SetBounds(0, ScaleY(162), DriversPage.SurfaceWidth, ScaleY(79));
+  StatusText.SetBounds(0, DriverHelp.Top + DriverHelp.Height + ScaleY(10), DriversPage.SurfaceWidth,
+    RefreshButton.Top - (DriverHelp.Top + DriverHelp.Height) - ScaleY(18));
+
+  DriverTermsPage := CreateCustomPage(DriversPage.ID, 'Review selected driver terms',
+    'Only the optional features you checked will be installed.');
+  DriverNotice := TNewStaticText.Create(DriverTermsPage);
+  DriverNotice.Parent := DriverTermsPage.Surface;
+  DriverNotice.SetBounds(0, 0, DriverTermsPage.SurfaceWidth, ScaleY(122));
   DriverNotice.AutoSize := False;
   DriverNotice.WordWrap := True;
-  DriverNotice.Caption := 'VB-CABLE by VB-Audio is donationware; contributions are welcome. ' +
-    'VAC Lite is for private home use with no income generation. ' +
-    'Selected drivers open their original setup windows and require administrator approval. ' +
-    'You can install VineMix without them.';
-  VbTermsButton := TNewButton.Create(DriversPage);
-  VbTermsButton.Parent := DriversPage.Surface;
-  VbTermsButton.SetBounds(0, ScaleY(248), ScaleX(155), ScaleY(25));
+  DriverNotice.Caption := 'VB-CABLE by VB-Audio receives other apps into VineMix''s Virtual input. It is donationware; contributions are welcome.' + #13#10#13#10 +
+    'VAC Lite sends VineMix''s Virtual output to another app''s microphone input. Its licence permits private home use unrelated to earning income.' + #13#10#13#10 +
+    'Selected drivers open their original setup windows and require administrator approval. Restart Windows before using a newly installed driver.';
+  DriverNotice.AdjustHeight;
+  VbTermsButton := TNewButton.Create(DriverTermsPage);
+  VbTermsButton.Parent := DriverTermsPage.Surface;
+  VbTermsButton.SetBounds(0, DriverNotice.Top + DriverNotice.Height + ScaleY(14), ScaleX(155), ScaleY(25));
   VbTermsButton.Caption := 'VB-CABLE terms / donate';
   VbTermsButton.OnClick := @OpenVbTerms;
-  VacTermsButton := TNewButton.Create(DriversPage);
-  VacTermsButton.Parent := DriversPage.Surface;
-  VacTermsButton.SetBounds(ScaleX(165), ScaleY(248), ScaleX(135), ScaleY(25));
+  VacTermsButton := TNewButton.Create(DriverTermsPage);
+  VacTermsButton.Parent := DriverTermsPage.Surface;
+  VacTermsButton.SetBounds(ScaleX(165), VbTermsButton.Top, ScaleX(135), ScaleY(25));
   VacTermsButton.Caption := 'Read VAC licence';
   VacTermsButton.OnClick := @OpenVacTerms;
-  DriverTermsCheck := TNewCheckBox.Create(DriversPage);
-  DriverTermsCheck.Parent := DriversPage.Surface;
-  DriverTermsCheck.SetBounds(0, ScaleY(288), DriversPage.SurfaceWidth, ScaleY(38));
-  DriverTermsCheck.Caption := 'I accept the selected terms and VAC Lite''s home / non-income limits.';
+  DriverTermsCheck := TNewCheckBox.Create(DriverTermsPage);
+  DriverTermsCheck.Parent := DriverTermsPage.Surface;
+  DriverTermsCheck.SetBounds(0, VbTermsButton.Top + VbTermsButton.Height + ScaleY(18), DriverTermsPage.SurfaceWidth, ScaleY(24));
+  DriverTermsCheck.Caption := 'I accept these driver terms and their use limits.';
   RefreshDetection;
-  if not IsTest and not WizardSilent and (Lowercase(ExpandConstant('{param:DRIVERS|auto}')) <> 'none') then begin
-    VbCheck.Checked := VbKnown and not VbInstalled;
-    VacCheck.Checked := VacKnown and not VacInstalled;
-  end;
+  { Drivers are always an explicit interactive opt-in, including on upgrade.
+    Detection and command-line values never select missing packages for a user. }
   UpdateDriverPage;
+  Log(Format('DRIVER_CHOICES_OPT_IN: VB=%d VAC=%d terms=%d; application-only setup is the default.', [
+    Ord(VbCheck.Checked), Ord(VacCheck.Checked), Ord(DriverTermsCheck.Checked)]));
+  Log(Format('DRIVER_PAGE_LAYOUT: surface=%dx%d; options bottom=%d; status top=%d height=%d; refresh top=%d bottom=%d; terms surface=%dx%d bottom=%d', [
+    DriversPage.SurfaceWidth, DriversPage.SurfaceHeight, DriverHelp.Top + DriverHelp.Height,
+    StatusText.Top, StatusText.Height, RefreshButton.Top, RefreshButton.Top + RefreshButton.Height,
+    DriverTermsPage.SurfaceWidth, DriverTermsPage.SurfaceHeight, DriverTermsCheck.Top + DriverTermsCheck.Height]));
+end;
+
+function ShouldSkipPage(PageID: Integer): Boolean;
+begin
+  Result := (PageID = DriverTermsPage.ID) and not (VbCheck.Checked or VacCheck.Checked);
 end;
 
 function SafeDestination: Boolean;
@@ -327,8 +367,8 @@ begin
     SuppressibleMsgBox('Choose a dedicated application folder. Your saved-data folder and system roots cannot be used.', mbError, MB_OK, IDOK);
     Result := False;
   end;
-  if (CurPageID = DriversPage.ID) and (VbCheck.Checked or VacCheck.Checked) and not DriverTermsCheck.Checked then begin
-    SuppressibleMsgBox('Read and accept the selected drivers'' terms, or deselect their installation.', mbInformation, MB_OK, IDOK);
+  if (CurPageID = DriverTermsPage.ID) and (VbCheck.Checked or VacCheck.Checked) and not DriverTermsCheck.Checked then begin
+    SuppressibleMsgBox('Read and accept the selected drivers'' terms, or go Back and clear their checkboxes to install VineMix only.', mbInformation, MB_OK, IDOK);
     Result := False;
   end;
 end;
@@ -351,6 +391,9 @@ function PrepareToInstall(var NeedsRestart: Boolean): String;
 var ExistingVersion: String;
 begin
   Result := '';
+  if (VbCheck.Checked or VacCheck.Checked) and not DriverTermsCheck.Checked then begin
+    Result := 'Accept the selected driver terms, or go Back and clear the optional driver checkboxes.'; Exit;
+  end;
   if not SafeDestination then begin Result := 'Choose a dedicated application folder.'; Exit; end;
   if not RefreshDetection then begin
     Result := 'Setup could not safely check running VineMix processes. Close other setup windows and try again.'; Exit;
@@ -377,7 +420,9 @@ function UpdateReadyMemo(Space, NewLine, MemoUserInfoInfo, MemoDirInfo, MemoType
 begin
   Result := MemoDirInfo + NewLine + NewLine + 'Saved workspaces and preferences:' + NewLine +
     Space + ExpandConstant('{localappdata}\VineMix') + NewLine +
-    Space + 'Existing files are retained, including on uninstall.' + NewLine + NewLine + 'Virtual audio drivers:';
+    Space + 'Existing files are retained, including on uninstall.' + NewLine + NewLine + 'Optional virtual audio drivers:';
+  if not VbCheck.Checked and not VacCheck.Checked then
+    Result := Result + NewLine + Space + 'Install VineMix only. No additional audio drivers will be installed.';
   if VbCheck.Checked then Result := Result + NewLine + Space + 'Install original VB-CABLE package'
   else Result := Result + NewLine + Space + 'VB-CABLE: keep current installation / skip';
   if VacCheck.Checked then Result := Result + NewLine + Space + 'Install original VAC Lite package'

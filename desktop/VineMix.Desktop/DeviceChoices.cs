@@ -41,7 +41,17 @@ internal static class DeviceChoices
     };
 
     internal static bool Compatible(Endpoint endpoint, string direction)
-        => endpoint.Direction == direction && !endpoint.IsVirtual && endpoint.Transport == "physical";
+        // A Windows capture endpoint may come from a USB device, a network
+        // headset or another driver's microphone. Vendor hints select the
+        // dedicated cable defaults; they are not generic capture capabilities.
+        => endpoint.Direction == direction && (direction == "capture"
+            || !endpoint.IsVirtual && endpoint.Transport == "physical");
+
+    internal static bool IsAdvanced(Endpoint endpoint)
+        // RemoteNetworkDevice describes how a microphone is reached, not an
+        // advanced routing mode. Keep streamed microphones visible by default.
+        => !(endpoint.Direction == "capture" && endpoint.FormFactor == 0)
+            && AdvancedPurpose(endpoint).Length > 0;
 
     internal static IReadOnlyList<EndpointChoice> Build(IReadOnlyList<Endpoint> inventory, string direction,
         DeviceBinding binding, DeviceVisibility visibility)
@@ -63,7 +73,7 @@ internal static class DeviceChoices
             if (!Compatible(endpoint, direction)) return false;
             bool available = endpoint.State == "Active" || endpoint.State == "Disabled" && visibility.Disabled
                 || (endpoint.State is "Missing" or "Unplugged") && visibility.Disconnected;
-            return available && (visibility.Advanced || AdvancedPurpose(endpoint).Length == 0);
+            return available && (visibility.Advanced || !IsAdvanced(endpoint));
         }
         var endpoints = directional.Where(endpoint => ReferenceEquals(endpoint, current) || Visible(endpoint))
             .OrderBy(endpoint => endpoint.State != "Active")
@@ -98,6 +108,7 @@ internal static class DeviceChoices
             help += !compatible ? "\nThis device needs its compatible virtual node. Choose a physical device here."
                 : endpoint.State == "Disabled" ? "\nDisabled in Windows. Enable it in Windows sound settings before use."
                 : endpoint.State != "Active" ? "\nUnavailable. Reconnect or enable the device in Windows; saved assignments are retained."
+                : direction == "capture" ? "\nAvailable Windows input, including streamed and virtual microphones."
                 : "\nAvailable";
             choices.Add(new() { Id = endpoint.Id, StableId = endpoint.StableId, Name = endpoint.Name,
                 State = endpoint.State, Channels = endpoint.Channels, DisplayName = display + state + (!compatible ? " · incompatible" : ""),

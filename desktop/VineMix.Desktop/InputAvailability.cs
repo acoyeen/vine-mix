@@ -27,7 +27,7 @@ internal static class InputAvailability
         {
             if (app) return new(AvailabilityNoticeKind.Setup, "CHOOSE AN APP", "Select an application below");
             if (node.Kind == "virtualInput") return UnassignedVirtual(endpoints);
-            return new(AvailabilityNoticeKind.Setup, "CHOOSE MICROPHONE", "Connect a microphone, then select it");
+            return new(AvailabilityNoticeKind.Setup, "CHOOSE MICROPHONE", "Select a Windows or streamed microphone");
         }
 
         var path = status?.Path;

@@ -1395,22 +1395,34 @@ public sealed class GraphWorkspace : UserControl
         var searchBox = new Grid(); searchBox.Children.Add(search);
         var placeholder = Text("Search nodes…", 13); placeholder.Margin = new Thickness(11, 0, 0, 0); placeholder.VerticalAlignment = VerticalAlignment.Center; placeholder.IsHitTestVisible = false; placeholder.SetResourceReference(TextBlock.ForegroundProperty, "ConsoleMutedBrush"); searchBox.Children.Add(placeholder);
         var searchItem = new MenuItem { StaysOpenOnClick = true, Header = searchBox, ToolTip = searchHelp }; menu.Items.Add(searchItem); menu.Items.Add(new Separator());
+        AutomationProperties.SetName(searchItem, "Search nodes"); AutomationProperties.SetHelpText(searchItem, searchHelp);
         var items = new List<(string Kind, MenuItem Item)>();
         var groups = new List<MenuItem>();
         MenuItem NodeItem(string kind)
         {
             var item = new MenuItem { Header = NodeCatalog.Title(kind), Icon = new Rectangle { Width = 10, Height = 10, Fill = NodeCatalog.HeaderBrush(kind) }, IsEnabled = _mixer.CanEdit && Graph.Nodes.Count < 32 };
-            if (NodeCatalog.Description(kind).Length > 0) item.ToolTip = NodeToolTip.Create(NodeCatalog.Title(kind), NodeCatalog.Description(kind));
+            string purpose = NodeCatalog.Description(kind);
+            string unavailable = Graph.Nodes.Count >= 32 ? "The workspace has reached its limit of 32 nodes. Remove a node before adding another."
+                : !_mixer.CanEdit ? "Wait for the audio engine before adding a node." : "";
+            item.ToolTip = NodeToolTip.Create(NodeCatalog.Title(kind), purpose, unavailable);
+            ToolTipService.SetShowOnDisabled(item, true);
+            AutomationProperties.SetName(item, NodeCatalog.Title(kind));
+            AutomationProperties.SetHelpText(item, purpose + (unavailable.Length == 0 ? "" : " " + unavailable));
             item.Click += (_, _) => { Spawn(kind, position); menu.IsOpen = false; }; return item;
         }
         foreach (var category in NodeCatalog.Categories)
         {
             var group = new MenuItem { Header = category.Title, Icon = new Rectangle { Width = 10, Height = 10, Fill = category.HeaderBrush } };
+            group.ToolTip = NodeToolTip.Create(category.Title, category.Description);
+            AutomationProperties.SetName(group, category.Title); AutomationProperties.SetHelpText(group, category.Description);
             foreach (string kind in category.Kinds) group.Items.Add(NodeItem(kind));
             groups.Add(group); menu.Items.Add(group);
         }
         foreach (string kind in GraphDefaults.Kinds.Where(NodeCatalog.CanCreate)) { var item = NodeItem(kind); item.Visibility = Visibility.Collapsed; menu.Items.Add(item); items.Add((kind, item)); }
         var empty = new MenuItem { Header = "No matching nodes", IsEnabled = false, Visibility = Visibility.Collapsed }; menu.Items.Add(empty);
+        const string emptyHelp = "Try a node name, category or purpose, or clear the search to browse all nodes.";
+        empty.ToolTip = NodeToolTip.Create("No matching nodes", emptyHelp);
+        ToolTipService.SetShowOnDisabled(empty, true); AutomationProperties.SetHelpText(empty, emptyHelp);
         search.TextChanged += (_, _) =>
         {
             string query = search.Text.Trim(); bool searching = query.Length > 0;

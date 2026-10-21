@@ -1,14 +1,21 @@
-# Vine Mix user guide
-
-For the supplied **VineMix 0.3.0-beta.1** files, start with the
-[beta tester guide](BETA_TESTER_GUIDE.md). The reference below belongs to the
-earlier committed source and uses its original names. See
-[source status](../README.md#source-status) for the integration status.
+# VineMix user guide
 
 A Windows 11 audio mixer built around draggable nodes and visible audio cables.
 Create sources, processing chains and destinations on a resizable node canvas, with
 settings inside each node. The C++ engine handles audio in a separate process;
 the WPF desktop handles editing, telemetry and tray behavior.
+
+For installation, first-session setup, driver terms, updates and reporting,
+start with the
+[beta tester guide](BETA_TESTER_GUIDE.md). The version beside the connection dot
+identifies the beta; **Settings → About VineMix** provides copyable full release
+and build information.
+
+A fresh workspace contains exactly **Physical input**, **Virtual output** and
+**Listening output**, with two cables from the input. Choose your physical
+microphone and headphones explicitly. Both outputs start muted; Listening output
+starts at −24 dB. A recognized VAC virtual output can bind automatically while
+remaining muted. Existing saved workspaces retain their graph and assignments.
 
 ## Node library
 
@@ -318,9 +325,9 @@ capture and audible routing still require the deferred qualification session.
 
 ## Run and build
 
-After building, launch **`artifacts/AudioMixer/AudioMixer.exe`**. The native engine
+After building, launch **`artifacts/VineMix/VineMix.exe`**. The native engine
 is alongside it, and the package includes the .NET desktop runtime. Closing the
-window hides it to the tray; right-click its tray icon and choose **Quit Vine Mix** to stop audio. Start at
+window hides it to the tray; right-click its tray icon and choose **Quit VineMix** to stop audio. Start at
 login is optional and off by default.
 
 ```powershell
@@ -330,7 +337,7 @@ login is optional and off by default.
 While the personal mixer is running, build a separate candidate:
 
 ```powershell
-.\scripts\build.ps1 -NoBootstrap -PackageDirectory "$PWD\artifacts\AudioMixer-Candidate"
+.\scripts\build.ps1 -NoBootstrap -PackageDirectory "$PWD\artifacts\VineMix-Candidate"
 ```
 
 The build refuses to overwrite a running controller or engine. Packages include
@@ -342,14 +349,16 @@ RNNoise sources and the matching RNNoise model are fetched during native
 configuration. The build script compiles and packages; it
 does not run audio tests, install drivers or change Windows defaults.
 
-For a silent interactive preview, launch the desktop with **`--preview`**.
-The preview opens no audio devices, starts no engine and saves no settings.
+Developers can use **`--preview`** in the separate verification build for a silent
+interactive example. It opens no audio devices, starts no engine and saves no
+settings. Preview and render modes are excluded from the release executable.
 
 ## Driver setup
 
 The application reuses separately installed **base VB-CABLE** for incoming app
 audio and **Virtual Audio Cable Lite** for its virtual microphone output. Neither
-requires VoiceMeeter. Install these drivers separately if you need virtual input or output nodes.
+requires VoiceMeeter. Setup can offer missing drivers through the original vendor
+installers; standalone users install them separately for virtual input or output.
 
 | Node / application | Windows endpoint |
 |---|---|
@@ -364,16 +373,24 @@ audio should stay outside any route returned to the virtual microphone.
 
 Obtain drivers from [VB-Audio](https://vb-audio.com/Cable/) and
 [VAC's official downloads](https://vac.muzychenko.net/en/download.htm). VAC Lite's
-[private-home-use licence](https://vac.muzychenko.net/en/license.txt) remains a
-dependency assumption; the app does not redistribute these drivers.
+[private-home-use licence](https://vac.muzychenko.net/en/license.txt) permits only
+private home use without income generation. The integrated Setup flow preserves
+the original driver packages and separate terms; the standalone EXE contains no
+driver installers. See [distribution conditions](DISTRIBUTION.md).
 
 ## Persistence and implementation
 
-Configuration is stored at `%LOCALAPPDATA%\AudioMixer\settings.json`. Version 2
+Configuration is stored at `%LOCALAPPDATA%\VineMix\settings.json`. Version 2
 contains a graph; version 1 is migrated in memory. Reading old settings does not
 rewrite them. The first edit saves the graph with an original-version backup and
 an ordinary last-good backup. No microphone or listening device is substituted
 because its name resembles a missing selection.
+
+Beta 1 copies legacy AudioMixer data into this directory while retaining the
+source files. An interrupted copy resumes from its journal; conflicting old
+copies require a source choice. Damaged or missing established workspaces show
+visible recovery before ordinary editing and audio. Retry, Restore backup and
+Start fresh preserve originals. See [recovery](BETA_TESTER_GUIDE.md#recovery).
 
 The dynamics redesign retains version 2 and the existing backup conventions.
 Missing `dynamicsUiVersion` means legacy compressor presentation (`0`); newly

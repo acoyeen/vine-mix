@@ -29,8 +29,8 @@ Selecting a device preserves the node's levels, mute, cables and position.
 - Evidence: `docs/design/virtual-devices-20261018-194729/results.json`, including
   `virtualInput-fixed-device.png` and `virtualOutput-fixed-device.png`.
 - Updated the running interface only. The existing engine process and binary
-  remained unchanged, its frame counter advanced, and all 11 node paths reported
-  Running. Configuration revision 3831 and the settings file were unchanged.
+  remained unchanged, its frame counter advanced, and all expected node paths
+  reported Running. The configuration revision and settings file were unchanged.
 - Activation evidence: `artifacts/virtual-devices-update-20261018-194800/result.json`.
 
 Checks used synthetic inventory and detached controls. Production save/rejection

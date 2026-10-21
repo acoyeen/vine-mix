@@ -48,6 +48,12 @@ internal static class VirtualDeviceBindingVerification
         require(VirtualDeviceBindings.FindAutomaticAssignments(Graph("virtualInput"),
             [Device("impostor", "capture", "physical")]).Count == 0,
             "A physical endpoint cannot impersonate a virtual transport through its friendly name.");
+        var streamed = Device("streamed-mic", "capture", "otherVirtual"); streamed.FormFactor = 0;
+        var unclassifiedStream = Device("streamed-without-driver-metadata", "capture", "physical"); unclassifiedStream.FormFactor = 0;
+        require(VirtualDeviceBindings.FindAutomaticAssignments(Graph("microphone", "virtualInput", "virtualOutput"),
+            [streamed, unclassifiedStream]).Count == 0
+            && !VirtualDeviceBindings.Matches("virtualInput", streamed) && !VirtualDeviceBindings.Matches("virtualOutput", streamed),
+            "Streamed microphones with known or absent driver provenance stay manual generic inputs and never become cable defaults.");
 
         var saved = Graph("virtualInput", "virtualOutput");
         saved.Nodes[0].Device = new() { Id = "missing-old-id", Name = receive.Name, Channel = 0 };

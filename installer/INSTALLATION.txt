@@ -1,5 +1,23 @@
 VINEMIX INSTALLATION HELP
 
+First time here?
+  Install VineMix only: leave both optional driver checkboxes clear and click
+  Next. Your existing Windows microphone and headphones do not require either
+  bundled driver. You can run Setup again to add an optional driver later.
+  After installation, open VineMix, choose your microphone on Physical input,
+  then choose headphones on Listening output. New outputs start muted; turn up
+  and unmute only when you are ready to listen quietly.
+
+Virtual Desktop microphone
+  Connect your headset in Virtual Desktop and enable Microphone passthrough.
+  Check Windows Settings > System > Sound > Input first. If its microphone is
+  listed there, select that same recording device on VineMix's Physical input
+  node. A virtual microphone can be selected there even though the starter node
+  is named Physical input. VB-CABLE and VAC Lite are not prerequisites for it.
+  If Windows does not list it, check Virtual Desktop's connection, passthrough
+  option and microphone permissions first; installing the bundled cables does
+  not create Virtual Desktop's microphone endpoint.
+
 Application folder
   Default: %LOCALAPPDATA%\Programs\VineMix
   Run VineMix.exe, or use the VineMix Start menu shortcut.
@@ -17,13 +35,17 @@ Existing portable copies
   hides it to the tray. Do not manually run two engines against the same files.
 
 Virtual audio drivers
-  VB-CABLE receives other applications' playback into VineMix.
-  VAC supplies VineMix's outgoing audio to recording/microphone applications.
+  Both are optional and start unchecked. Choose one only for its use case:
+  - VB-CABLE: route other applications' playback into VineMix's Virtual input.
+    Running app capture is another way to receive one application's audio.
+  - VAC Lite: send VineMix's Virtual output to a recording/microphone app.
+    Select the corresponding VAC recording device as that app's microphone.
   Setup checks installed device and driver-package identity, including disabled
   devices. Existing packages are kept; their names/settings are not reset.
-  Missing drivers are optional and require separate consent and administrator
-  approval in their original vendor installation windows. Restart Windows after
-  installing drivers before using them. VineMix can run without virtual paths.
+  When you select a missing driver, the next page shows separate vendor terms.
+  Driver installation requires your consent and administrator approval in the
+  original vendor installation window. Restart Windows before using a new
+  driver. Cancelling that window leaves VineMix installed; run Setup to retry.
 
   VB-CABLE by VB-Audio is donationware; all contributions are welcome.
   https://vb-audio.com/Cable/
@@ -38,14 +60,15 @@ Virtual audio drivers
   An installed but unavailable driver may need enabling, a restart or repair.
   Setup does not reinstall it automatically. Review Windows sound settings,
   Device Manager and the vendor instructions. Check Windows microphone access
-  if recording endpoints are inaccessible. Other-driver support is future work.
+  if recording endpoints are inaccessible. Other Windows recording devices can
+  be selected on an input node; Setup only bundles the two named driver packages.
 
 Upgrade and repair
   Run a newer installer and use the existing installation folder. Save your work
   and quit a copy running from that folder first. Setup will not force it closed.
   Running the same version again repairs its application files. Downgrading an
-  installation marked as a newer version is blocked. This installer does not
-  implement online update checking or automatic downloads of application updates.
+  installation marked as a newer version is blocked. Application-only upgrades
+  leave shared audio drivers and your saved device selections in place.
 
 Uninstall
   Use Windows Settings > Apps > Installed apps > VineMix > Uninstall, or the

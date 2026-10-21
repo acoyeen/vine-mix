@@ -59,6 +59,8 @@ internal static class InputAvailabilityVerification
         Check(mic, Status("Waiting"), [Device(state: "Unknown")], [], true,
             AvailabilityNoticeKind.Problem, "INPUT UNAVAILABLE", "An unknown endpoint state does not become a fabricated disabled diagnosis.");
         Check(mic, Status("Waiting"), [Device()], [], true, AvailabilityNoticeKind.Pending, "RECONNECTING", "A detected active endpoint awaiting capture is not missing.");
+        Check(mic, Status("Waiting"), [Device(transport: "otherVirtual")], [], true, AvailabilityNoticeKind.Pending, "RECONNECTING",
+            "A streamed or software microphone awaiting capture is detected regardless of its driver family.");
 
         var aliases = new[] { Device(state: "Disabled"), Device(id: "replacement") };
         Check(mic, Status("Waiting"), aliases, [], true, AvailabilityNoticeKind.Pending, "RECONNECTING", "One active stable-ID replacement takes precedence over the disabled old ID.");
@@ -136,6 +138,8 @@ internal static class InputAvailabilityVerification
         Check(cable, Status("Unassigned"), [], [], true, AvailabilityNoticeKind.Problem, "VB-CABLE NOT DETECTED", "An unassigned virtual input identifies the undetected transport without claiming it is uninstalled.");
         Check(cable, Status("Unassigned"), [Device(transport: "vbCable", direction: "render"), Device()], [], true,
             AvailabilityNoticeKind.Problem, "VB-CABLE NOT DETECTED", "VB-CABLE playback and ordinary microphones are not virtual receive candidates.");
+        Check(cable, Status("Unassigned"), [Device(transport: "otherVirtual")], [], true,
+            AvailabilityNoticeKind.Problem, "VB-CABLE NOT DETECTED", "A streamed microphone cannot impersonate the dedicated VB-CABLE receive transport.");
         foreach (var state in new[] { ("Disabled", "VB-CABLE DISABLED"), ("Unplugged", "VB-CABLE UNPLUGGED"), ("Missing", "VB-CABLE NOT DETECTED") })
             Check(cable, Status("Unassigned"), [Device(state: state.Item1, transport: "vbCable")], [], true,
                 AvailabilityNoticeKind.Problem, state.Item2, "A sole known VB-CABLE endpoint retains its " + state.Item1 + " reason.");

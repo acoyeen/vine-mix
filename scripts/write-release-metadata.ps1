@@ -7,7 +7,7 @@ if ($release.version -notmatch '^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$' -or
     $release.numericVersion -notmatch '^\d+\.\d+\.\d+\.\d+$' -or
     [string]::IsNullOrWhiteSpace($release.displayVersion)) { throw 'Invalid authoritative release.json.' }
 foreach ($part in $release.numericVersion.Split('.')) { if ([int]$part -gt 65535) { throw 'Numeric version component exceeds Windows version limits.' } }
-if (-not $OutputDirectory) { $OutputDirectory = Join-Path $project 'build\release' }
+if (-not $OutputDirectory) { $OutputDirectory = Join-Path $env:LOCALAPPDATA 'VineMix.BuildCache\release\metadata' }
 $OutputDirectory = [IO.Path]::GetFullPath($OutputDirectory)
 $null = New-Item -ItemType Directory -Force -Path $OutputDirectory
 $version = [Security.SecurityElement]::Escape($release.version)

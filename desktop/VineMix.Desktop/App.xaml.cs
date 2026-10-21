@@ -36,7 +36,7 @@ public partial class App : Application
         if (sender is ComboBox { IsDropDownOpen: false }) args.Handled = true;
     }
 
-    protected override void OnStartup(StartupEventArgs e)
+    protected override async void OnStartup(StartupEventArgs e)
     {
         HoverHelp.Register();
         base.OnStartup(e);
@@ -62,7 +62,7 @@ public partial class App : Application
                 try { renderer.WriteFailure(error.Exception); } catch (Exception reportError) { Debug.WriteLine(reportError); }
                 error.Handled = true; Shutdown(1);
             };
-            Dispatcher.BeginInvoke(new Action(async () =>
+            _ = Dispatcher.BeginInvoke(new Action(async () =>
             {
                 try
                 {
@@ -88,7 +88,7 @@ public partial class App : Application
             if (e.Args.Contains("--verify-ui", StringComparer.OrdinalIgnoreCase))
             {
                 _window.Show();
-                Dispatcher.BeginInvoke(new Action(async () =>
+                _ = Dispatcher.BeginInvoke(new Action(async () =>
                 {
                     try { await GraphUiVerification.RunAsync(_window, _mixer, e.Args); Shutdown(0); }
                     catch (Exception error) { GraphUiVerification.WriteFailure(e.Args, error); Shutdown(1); }
@@ -115,6 +115,40 @@ public partial class App : Application
                     "VineMix · Could not start", MessageBoxButton.OK, MessageBoxImage.Information);
             Shutdown(standalone.State == StandaloneLaunchState.Failed ? 1 : 0);
             return;
+        }
+        int worker = Array.FindIndex(e.Args, arg => arg.Equals("--apply-update", StringComparison.OrdinalIgnoreCase));
+        if (worker >= 0)
+        {
+            if (worker + 1 >= e.Args.Length) { Shutdown(2); return; }
+            _ = Dispatcher.BeginInvoke(new Action(async () =>
+            {
+                try { Shutdown(await UpdateWorker.RunAsync(e.Args[worker + 1])); }
+                catch (Exception error) { Debug.WriteLine(error); Shutdown(1); }
+            }));
+            return;
+        }
+        int health = Array.FindIndex(e.Args, arg => arg.Equals("--update-health", StringComparison.OrdinalIgnoreCase));
+        if (health >= 0)
+        {
+            if (health + 1 >= e.Args.Length) { Shutdown(2); return; }
+            try
+            {
+                _updateHealthTransaction = Path.GetFullPath(e.Args[health + 1]);
+                var expected = await UpdateTransaction.WaitForCandidateRegistrationAsync(_updateHealthTransaction);
+                int selected = Array.FindIndex(e.Args, arg => arg.Equals("--settings", StringComparison.OrdinalIgnoreCase));
+                if (expected.Version != ReleaseInfo.Version || expected.SettingsPath is null
+                    || selected < 0 || selected + 1 >= e.Args.Length
+                    || !UpdateFiles.SamePath(Path.GetFullPath(e.Args[selected + 1]), expected.SettingsPath))
+                    throw new IOException("This update candidate does not match its approved workspace and version.");
+            }
+            catch (Exception error) { Debug.WriteLine(error); Shutdown(1); return; }
+        }
+        try { if (HandlePendingUpdates()) { Shutdown(); return; } }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or InvalidOperationException
+            or System.ComponentModel.Win32Exception or System.Security.SecurityException)
+        {
+            MessageBox.Show(error.Message, "VineMix update recovery", MessageBoxButton.OK, MessageBoxImage.Information);
+            Shutdown(1); return;
         }
         string identity = EngineConnection.UserSid;
         _instance = new SessionOwnership();
@@ -162,7 +196,9 @@ public partial class App : Application
         DispatcherUnhandledException += (_, error) => AppLifetimeLog.Write("Unhandled dispatcher exception: " + error.Exception);
         AppDomain.CurrentDomain.UnhandledException += (_, error) => AppLifetimeLog.Write("Unhandled process exception: " + error.ExceptionObject);
         _mixer = new MixerViewModel();
+        if (_updateHealthTransaction is not null) _mixer.SetUpdateHealthMode(true);
         _window = new MainWindow(_mixer);
+        if (_updateHealthTransaction is not null) _window.IsEnabled = false;
         MainWindow = _window;
         _trayBranding = new TrayBranding();
         var menu = _trayMenu = new Forms.ContextMenuStrip { Font = _trayBranding.MenuFont };
@@ -175,6 +211,9 @@ public partial class App : Application
         if (!e.Args.Contains("--background", StringComparer.OrdinalIgnoreCase)) _window.Show();
         else _mixer.IsVisible = false;
         _mixer.Start();
+        if (_updateHealthTransaction is not null) _ = ObserveUpdatedCandidateAsync(_updateHealthTransaction);
+        else if (ReadUpdateRollbackNotice(e.Args) is { } rollbackNotice) _window.Workspace.SetMessage(rollbackNotice, true);
+        else _ = _window.BeginAutomaticUpdateCheckAsync();
     }
 
     public void ShowMixer()
@@ -188,6 +227,7 @@ public partial class App : Application
     public async Task QuitAsync()
     {
         if (_quitting) return;
+        if (_updating) return;
         _quitting = true;
         if (_tray is not null) _tray.Visible = false;
         if (_window is not null) _window.IsEnabled = false;
@@ -222,6 +262,7 @@ public partial class App : Application
         _tray?.Dispose();
         _trayMenu?.Dispose();
         _trayBranding?.Dispose();
+        _window?.StopUpdateChecks();
         _mixer?.Dispose();
         _instance?.Dispose();
         base.OnExit(e);

@@ -1,4 +1,4 @@
-# Vine Mix — node workspace
+# VineMix — node workspace
 
 This development changes the mixer from a fixed console into an editable audio
 graph. The earlier two-microphone/two-output limit is superseded by spawnable
@@ -12,7 +12,7 @@ The application opens at 1280 × 800 DIPs, resizes down to 900 × 580, and inclu
 maximise/restore in its own caption controls. Black and near-black surfaces use
 restrained forest-green branding. The split VM symbol appears in the header
 without a repeated wordmark; the Windows title and accessible name retain
-**Vine Mix**. Audio cables stay light green (`#78BE98`), Ducking's detector-only
+**VineMix**. Audio cables stay light green (`#78BE98`), Ducking's detector-only
 sidechain cables stay lavender (`#B8A0D8`), and control links retain their own
 neutral colour. Coloured category
 headers, grouped rotary parameters and edge sockets follow Blender's node-editor
@@ -148,7 +148,7 @@ enabled, pressing waits for movement; crossing a small drag threshold starts
 panning, and release after a pan does not open a menu. Releasing without dragging
 opens the existing canvas menu, even after a long hold. Nodes and cables keep
 their context actions, and Ctrl+right-drag retains cable cutting. The setting is
-stored alongside Reduced animation in `%LOCALAPPDATA%\AudioMixer\ui.json`,
+stored alongside Reduced animation in `%LOCALAPPDATA%\VineMix\ui.json`,
 independently of audio configuration; preview windows keep it only in memory.
 
 All value fields remain 110 × 28 DIPs with 12-DIP type and the same quiet border
@@ -637,8 +637,9 @@ Spotify/protected-content capture, Bluetooth behavior, latency, reconnect timing
 or long-running stability. The later procedure in [TESTING.md](../TESTING.md)
 records those separately and preserves the user's quiet initial listening setup.
 
-The earlier uniform-zoom controller passed [583 detached checks](design/uniform-zoom-final/results.json)
-and 50 renders with zero binding errors. Those tests compared fixed node dimensions,
+The earlier uniform-zoom controller passed 583 detached checks
+and 50 renders with zero binding errors (local evidence:
+`docs/design/uniform-zoom-final/results.json`). Those tests compared fixed node dimensions,
 fonts, borders, controls and socket positions across 30–200% zoom, verified the
 then-available explicit collapse and repeatable Fit, and retained the resizable-window
 checks. Visual
@@ -651,7 +652,8 @@ bands, zero-band flat response, each tone dial's boost/cut, bypass, linked-contr
 continuity, validation and JSON round trips. The broader qualification suite
 passed 7,901 assertions over 4,527,360 synthetic frames, and the stub-worker
 engine lifecycle suite passed 210 concurrent commits. The earlier readable-UI
-candidate passed [226 offscreen checks](design/blender-readable-final/results.json)
+candidate passed 226 offscreen checks (local evidence:
+`docs/design/blender-readable-final/results.json`)
 with 20 actual WPF renders at 96/144/192 DPI, zero binding errors and a Release
 build with no warnings or errors. The visual review found no remaining scoped
 blocking issue. Consult [design-qa.md](../design-qa.md) for that review and the

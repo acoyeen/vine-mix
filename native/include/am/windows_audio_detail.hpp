@@ -2,6 +2,7 @@
 #include "am/types.hpp"
 #include <optional>
 #include <span>
+#include <string_view>
 
 struct IMMDeviceEnumerator;
 struct IMMDevice;
@@ -14,6 +15,12 @@ namespace am::detail {
 // offline verification exercise Windows error paths with fake COM objects.
 std::optional<std::vector<Endpoint>> collectEndpoints(IMMDeviceEnumerator* enumerator,
     std::span<const Endpoint> previous = {});
+
+// Pure stream-selection policy, shared by initial opening and catalog refresh.
+// Generic microphone capture accepts any Windows capture endpoint. Dedicated
+// cable nodes continue to require their explicit transport family.
+std::string_view streamEndpointRejection(const Endpoint& endpoint, bool capture,
+    bool microphone, std::string_view requiredTransport);
 
 // Owns no hardware policy outside this exact device. The returned client owns
 // one COM reference and the returned format must be freed with CoTaskMemFree.

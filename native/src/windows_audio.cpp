@@ -235,6 +235,21 @@ std::optional<std::vector<Endpoint>> detail::collectEndpoints(IMMDeviceEnumerato
     return result;
 }
 
+std::string_view detail::streamEndpointRejection(const Endpoint& endpoint, bool capture,
+        bool microphone, std::string_view requiredTransport) {
+    if (endpoint.direction != (capture ? "capture" : "render"))
+        return "The device has the wrong audio direction for this node";
+    if (!requiredTransport.empty() && endpoint.transport != requiredTransport) {
+        if (requiredTransport == "physical") return "Select a physical device in this slot";
+        if (requiredTransport == "vbCable") return "Select the VB-CABLE receive endpoint in setup";
+        if (requiredTransport == "vacLite") return "Select the VAC Lite send endpoint in setup";
+        return "Device does not match the required audio transport";
+    }
+    if (capture && !microphone && !endpoint.isVirtual)
+        return "Select the virtual cable receive endpoint in setup";
+    return {};
+}
+
 namespace {
 bool sameEndpoints(const std::vector<Endpoint>& a, const std::vector<Endpoint>& b) {
     if (a.size() != b.size()) return false;
@@ -778,7 +793,7 @@ struct AudioWorker::Impl {
         const auto selected = resolve(binding());
         return selected && selected->state == "Active" && selected->id == endpoint.id &&
             selected->channels == endpoint.channels && selected->rate == endpoint.rate &&
-            (requiredTransport.empty() || selected->transport == requiredTransport);
+            detail::streamEndpointRejection(*selected, capture, microphone, requiredTransport).empty();
     }
 
     HRESULT openAndRun(const Endpoint& endpoint, const DeviceBinding& selection, std::uint64_t serial) {
@@ -1061,16 +1076,8 @@ struct AudioWorker::Impl {
                     std::string message = "Waiting for device";
                     if (endpoint && endpoint->state == "Disabled") message = "Device disabled in Windows Sound settings";
                     state("Waiting", std::move(message), endpoint ? &*endpoint : nullptr);
-                } else if (!requiredTransport.empty() && endpoint->transport != requiredTransport) {
-                    std::string message = "Device does not match the required audio transport";
-                    if (requiredTransport == "physical") message = "Select a physical device in this slot";
-                    else if (requiredTransport == "vbCable") message = "Select the VB-CABLE receive endpoint in setup";
-                    else if (requiredTransport == "vacLite") message = "Select the VAC Lite send endpoint in setup";
-                    state("Error", std::move(message), &*endpoint);
-                } else if (capture && microphone && endpoint->isVirtual) {
-                    state("Error", "Select a physical microphone in this slot", &*endpoint);
-                } else if (capture && !microphone && !endpoint->isVirtual) {
-                    state("Error", "Select the virtual cable receive endpoint in setup", &*endpoint);
+                } else if (const auto rejection = detail::streamEndpointRejection(*endpoint, capture, microphone, requiredTransport); !rejection.empty()) {
+                    state("Error", std::string(rejection), &*endpoint);
                 } else {
                     state("Opening", exclusiveRender ? "Opening direct virtual microphone output" : "Opening shared-mode audio", &*endpoint);
                     HRESULT result;

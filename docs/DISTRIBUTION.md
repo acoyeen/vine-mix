@@ -1,21 +1,23 @@
 # Distribution and attribution
 
 Reviewed 19 October 2026 against the dependencies and assets in this repository.
-Font, branding and installer notices updated 20 October 2026.
-This records Vine Mix's distribution setup and its limits. The full upstream
+Font, branding and installer notices updated 20 October 2026; beta package naming
+and driver information reviewed 21 October 2026. Font packaging descriptions
+updated against the Beta 2 source inventory on 22 October 2026.
+This records VineMix's distribution setup and its limits. The full upstream
 licences, rather than this summary, govern each component.
 
 ## Source repository
 
 Keep the root `LICENSE`, `THIRD_PARTY_NOTICES.md`, the complete `licenses/`
-directory and both `LICENSE.txt` and `IBM-Plex-LICENSE.txt` under
-`desktop/AudioMixer.Desktop/Assets/Fonts/` in source copies. The root MIT licence
-covers Vine Mix's original material; it does not relicense the embedded fonts,
+directory and `IBM-Plex-LICENSE.txt` under
+`desktop/VineMix.Desktop/Assets/Fonts/` in source copies. The root MIT licence
+covers VineMix's original material; it does not relicense the embedded fonts,
 dependencies, runtime components or cited
 third-party material. Preserve upstream copyright and licence headers if
 vendoring dependency source in future.
 
-Vine Mix's original code and documentation are released under the MIT licence,
+VineMix's original code and documentation are released under the MIT licence,
 copyright (c) 2026 acoyeen. It permits reuse, modification and redistribution,
 including commercial distribution, subject to its terms. Keep its copyright
 and permission notice in copies or substantial portions of that material.
@@ -31,16 +33,16 @@ third-party notices for anyone later sharing that local reference.
 
 ## Application packages
 
-Build into a staged directory using `scripts/build.ps1`. Before publishing a ZIP
+Build into a staged directory using `scripts/build.ps1`. Before distributing a standalone EXE
 or installer, verify the final archive contains:
 
-- `AudioMixer.exe` and `AudioMixer.Engine.exe`, and the native runtime DLLs
+- `VineMix.exe` and `VineMix.Engine.exe`, and the native runtime DLLs
   required by that build;
 - the root `LICENSE` and `THIRD_PARTY_NOTICES.md`;
-- every checked-in file under `licenses/`, including vendor source-file
-  acknowledgements, Microsoft sample attribution, W3C EQ acknowledgement,
-  IBM Plex and Inter OFL and runtime notices;
-- `Assets/Fonts/LICENSE.txt` and `Assets/Fonts/IBM-Plex-LICENSE.txt` beside the
+- the applicable notices under `licenses/` enumerated by the build, including
+  vendor source-file acknowledgements, Microsoft sample attribution, W3C EQ
+  acknowledgement, IBM Plex OFL and runtime notices;
+- `Assets/Fonts/IBM-Plex-LICENSE.txt` beside the
   self-contained desktop publish output;
 - the user guides, including this document.
 
@@ -53,7 +55,7 @@ linked or embedded inside a single executable.
 
 The checked-in notices correspond to libsamplerate 0.2.2, SpeexDSP 1.2.1,
 RNNoise v0.2/default model `0b50c45`, nlohmann/json 3.12.0, IBM Plex Sans 3.005
-and Mono 2.005, the retained Inter 4.1 assets,
+and Mono 2.005, historical Inter 4.1 assets,
 LLVM-MinGW 20261006 and the .NET 10.0.13 runtime packages. The .NET runtime
 licences are taken from `Microsoft.NETCore.App.Runtime.win-x64` and
 `Microsoft.WindowsDesktop.App.Runtime.win-x64`; their licence is MIT. The .NET
@@ -63,22 +65,25 @@ notices are included as well.
 
 The compiler, CMake, .NET SDK, RNNoise training checkpoint and datasets are not
 part of the application distribution. The current compiled audio libraries use
-permissive licences; the IBM Plex and Inter fonts remain under OFL. The archived
+permissive licences; IBM Plex and historical Inter fonts retain their OFL terms. The archived
 Blender image has separate CC BY-SA terms and must keep those terms and attribution if
 later published. Do not apply the application licence to that image.
 
 The current interface uses IBM Plex Sans for labels and IBM Plex Mono for
-numerical values and shortcuts, with Vine Mix's forest-green split VM symbol
+numerical values and shortcuts, with VineMix's forest-green split VM symbol
 for application and tray identity. Font files are embedded, so users do not
 need to install a system font. Keep the font notices even though the files are
 inside the executable. The source/version/hash record is in
-[IBM_PLEX_FONTS.md](IBM_PLEX_FONTS.md). Inter assets remain embedded and retain
-their existing notices. Packaging names such as `AudioMixer.exe` remain stable;
-the visual rebrand does not rename settings paths or application protocols.
+[IBM_PLEX_FONTS.md](IBM_PLEX_FONTS.md). Inter is no longer embedded in the current
+app; its historical notice remains in the source. Beta 1 renames the executable and internal product
+identity to VineMix and copies legacy AudioMixer settings into
+`%LOCALAPPDATA%\VineMix` with a restartable migration. Original data is preserved.
+The standalone EXE embeds a complete application payload; the verification
+executable and test/render implementation are excluded from release packages.
 
 ## Drivers and commercial use
 
-The portable application package contains no driver installers. The Windows
+The standalone application package contains no driver installers. The Windows
 setup built by `scripts/build-installer.ps1` includes the complete original base
 VB-CABLE Pack45 and VAC Lite 4.71 packages, restricted to the current **free,
 non-commercial distribution**. `installer/drivers.json` pins official URLs,
@@ -95,11 +100,13 @@ packages are not published as source-code dependencies in this repository.
 
 [VB-Audio](https://vb-audio.com/Services/licensing.htm) publishes specific
 donationware, professional-use and distribution conditions. Its A+B/C+D driver
-packages cannot be bundled with another product under the published terms.
+packages have separate published bundling restrictions. The maintainer has obtained
+VB-Audio permission for this project's current integrated base-driver flow;
+preserve that permission record when distributing it.
 [VAC Lite](https://vac.muzychenko.net/en/license.txt) is restricted to private
 home use without income generation, and its
 [distribution policy](https://vac.muzychenko.net/en/manual/distrib.htm) permits
-unchanged non-commercial redistribution. A source release of Vine Mix does not
+unchanged non-commercial redistribution. A source release of VineMix does not
 require distributing either driver; a commercial user must choose a driver
 licence suitable for that user's activity. This installer is not cleared for
 paid, sponsored or donation-supported redistribution. Reassess the exact vendor
@@ -118,7 +125,9 @@ included with the application package.
 ## Dependency changes and release checks
 
 The current development executables are unsigned: Authenticode inspection of
-both `AudioMixer.exe` and `AudioMixer.Engine.exe` reports `NotSigned`. A publisher
+the development desktop and engine reports `NotSigned`. The beta app, helper,
+standalone launcher and Setup remain unsigned until exact-artifact inspection
+records otherwise. A publisher
 who wants a verified signing identity must sign and timestamp the final
 executables using their own certificate before making the distribution archive.
 [Microsoft's SignTool documentation](https://learn.microsoft.com/en-us/windows/win32/seccrypto/signtool)

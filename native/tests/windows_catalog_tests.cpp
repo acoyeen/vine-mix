@@ -221,6 +221,45 @@ int main() {
         metadata.hasFormFactor = false;
         const auto missingProperty = am::detail::collectEndpoints(&enumerator);
         require(missingProperty && (*missingProperty)[0].formFactor == -1, "An empty optional property remains unclassified");
+
+        // Vendor labels and the general Windows form factor are not stream
+        // capabilities. These are invented fixtures, not a real headset probe.
+        metadata = {};
+        metadata.available = true; metadata.name = L"Microphone (Virtual Desktop Audio)";
+        metadata.hasFormFactor = true; metadata.formFactor = RemoteNetworkDevice;
+        auto streamed = am::detail::collectEndpoints(&enumerator);
+        require(streamed && (*streamed)[0].direction == "capture" && (*streamed)[0].isVirtual
+            && (*streamed)[0].transport == "otherVirtual" && (*streamed)[0].formFactor == RemoteNetworkDevice,
+            "A named streamed microphone retains its Windows direction and network form factor without impersonating a bundled cable");
+        require(am::detail::streamEndpointRejection((*streamed)[0], true, true, {}).empty(),
+            "The production stream policy accepts a generic streamed microphone without requiring a cable vendor");
+        require(!am::detail::streamEndpointRejection((*streamed)[0], true, false, "vbCable").empty()
+            && !am::detail::streamEndpointRejection((*streamed)[0], false, false, "vacLite").empty(),
+            "A streamed microphone cannot satisfy either dedicated cable transport");
+        metadata.name = L"Example network headset microphone";
+        auto unknownProvenance = am::detail::collectEndpoints(&enumerator);
+        require(unknownProvenance && (*unknownProvenance)[0].description.empty() && (*unknownProvenance)[0].interfaceName.empty()
+            && (*unknownProvenance)[0].channels == 0 && (*unknownProvenance)[0].rate == 0
+            && !(*unknownProvenance)[0].isVirtual && (*unknownProvenance)[0].transport == "physical"
+            && am::detail::streamEndpointRejection((*unknownProvenance)[0], true, true, {}).empty(),
+            "Missing driver provenance and optional format probes cannot hide or reject a Windows capture endpoint");
+        metadata.name = L"CABLE Output";
+        auto friendlyCable = am::detail::collectEndpoints(&enumerator);
+        require(friendlyCable && (*friendlyCable)[0].transport == "otherVirtual"
+            && !am::detail::streamEndpointRejection((*friendlyCable)[0], true, false, "vbCable").empty(),
+            "A cable-like friendly name alone cannot establish the VB-CABLE driver family");
+        for (const auto* transport : {"physical", "otherVirtual", "vbCable", "vacLite"}) {
+            auto endpoint = (*streamed)[0]; endpoint.transport = transport; endpoint.isVirtual = endpoint.transport != "physical";
+            require(am::detail::streamEndpointRejection(endpoint, true, true, {}).empty(),
+                "Every Windows capture transport is eligible for a manually selected generic input");
+            require(am::detail::streamEndpointRejection(endpoint, true, false, "vbCable").empty() == (endpoint.transport == "vbCable"),
+                "Dedicated cable capture remains restricted to its explicit transport family");
+            endpoint.direction = "render";
+            require(!am::detail::streamEndpointRejection(endpoint, true, true, {}).empty(),
+                "Generic microphone capture still rejects render endpoints");
+            require(am::detail::streamEndpointRejection(endpoint, false, false, "vacLite").empty() == (endpoint.transport == "vacLite"),
+                "Direct virtual microphone output remains restricted to the VAC transport");
+        }
         require(liveObjects == 0, "Metadata reads release every temporary COM property store and device");
         metadata = {};
         enumerator.state = DEVICE_STATE_DISABLED;

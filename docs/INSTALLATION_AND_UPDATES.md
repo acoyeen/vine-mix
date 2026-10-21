@@ -1,82 +1,82 @@
 # VineMix installation and updates
 
-Current beta: **0.3.0-beta.1**. Updated 21 October 2026. The maintainer supplies private
-beta files directly; no public release channel or automatic updater is enabled.
-See the [beta test guide](BETA_TESTER_GUIDE.md) for installation instructions and
-[the qualification record](BETA_IMPLEMENTATION.md) for outstanding gates.
+For **0.3.0-beta.2**, Windows 11 x64. Updated 22 October 2026.
+Download packages and read release notes on [GitHub Releases](https://github.com/acoyeen/vine-mix/releases).
+For a first installation, follow the [installation steps](BETA_TESTER_GUIDE.md#choose-a-package).
 
-This page describes the supplied beta files. The source currently committed on
-GitHub is the earlier development snapshot; see [source status](../README.md#source-status).
+## Packages and saved data
 
-## Packages and files
+**Setup** installs the desktop, engine and runtime under
+`%LOCALAPPDATA%\Programs\VineMix`, creates shortcuts and registers an uninstall
+entry. **Standalone** launches from one EXE and prepares its bundled runtime under
+`%LOCALAPPDATA%\VineMix\runtime\<payload-SHA-256>`. Neither needs a separate .NET
+installation.
 
-The Windows 11 x64 Setup installs the matched desktop and engine together under
-`%LOCALAPPDATA%\Programs\VineMix`, creates shortcuts, and registers an uninstall
-entry. The single standalone EXE prepares its bundled runtime files automatically
-without registering an application installation. Both include .NET and preserve
-required third-party notices.
-
-Both launch the same app and use `%LOCALAPPDATA%\VineMix` for workspace,
-preferences, backups and logs. They coordinate one desktop and engine session for
-the Windows user. Opening another copy should activate the current desktop rather
-than run a competing mixer. The app normalizes startup through the Windows shell
-before loading settings or starting an engine, including a launch inherited from
-a packaged tool. This prevents redirected AppData from selecting a different
-personal workspace.
-
-At first launch, existing AudioMixer data is copied to the new data directory
-without deleting its sources. A journal makes interrupted copying restartable;
-conflicting legacy copies require a deliberate source choice. An existing VineMix
-workspace takes precedence. A malformed or missing established workspace requires
-visible recovery before normal editing and audio starts. Recovery archives the
-originals before restoring a backup or creating the muted starter.
+Both formats use `%LOCALAPPDATA%\VineMix` for the workspace, preferences, backups
+and logs. They coordinate one mixer session. An existing workspace is retained;
+legacy AudioMixer data is copied while keeping the originals. Conflicting legacy
+stores require a choice, and damaged or missing established data enters recovery.
 
 ## Optional drivers
 
-Setup detects VB-CABLE and VAC by their driver/package identities, including
-installed but disabled or nonpresent devices. It offers original vendor setup
-only for confirmed missing packages, with separate acceptance and usage terms.
-Driver installation can require elevation and a restart. Setup does not remove
-shared audio drivers during app uninstall. The standalone EXE requires separate
-driver installation for virtual routes. Physical microphone and listening routes
-do not require these virtual drivers.
+Physical microphone and listening routes, including an existing Virtual Desktop
+microphone, do not need either bundled cable driver. Setup makes the app-only
+route available and starts both optional driver choices unchecked. A selected
+driver has a separate consent step; vendor setup can need administrator
+permission and a restart. Installed but disabled devices do not require another
+driver copy.
 
-VB-Audio bundling permission has been obtained for the current integrated flow.
-VAC Lite still carries private-home/non-income usage restrictions. Preserve the
-complete original vendor packages and their notices; see
-[the beta driver guidance](BETA_TESTER_GUIDE.md#optional-drivers). The
-[installer development guide](../installer/README.md) describes the older
-committed implementation until beta source integration is complete.
+VB-CABLE supplies virtual input; VAC supplies virtual output. Standalone users
+install these separately. **VAC Lite is limited to private home use without
+income generation.** Keep vendor packages and notices intact; see
+[driver downloads and terms](BETA_TESTER_GUIDE.md#optional-drivers).
 
-## Manual updates and removal
+## Check, download and install
 
-Wait for **Saved**, then use **Quit VineMix** from the tray. Closing the main
-window only hides it and leaves audio running. Run the newer supplied Setup, or
-open the newer standalone EXE after the older copy quits. Do not combine payload
-files from separate versions or force replacement while a target is in use.
+1. Open **Settings → Check for updates**, or use the update button in About.
+   Review the available version and release notes.
+2. Choose **Download update**. VineMix verifies signed release information,
+   the intended package format, file size and SHA-256 hash. Audio can keep running
+   during the download.
+3. Choose **Install and restart** when a brief audio interruption is acceptable.
+   VineMix saves edits, stops its engine cooperatively, updates the app and
+   reopens the saved workspace.
 
-Setup repairs or upgrades its application files while retaining personal data.
-Uninstall removes its owned application files and shortcuts, retaining workspace,
-preferences, backups, logs and shared drivers. Unknown user files are not owned
-by the installer. Start-at-login is an app preference and should only be removed
-when its value belongs to the removed copy.
+**Automatically check for updates** in Settings controls at-most-daily checks
+after startup. Checking never downloads or installs an update without your choice.
+An unreachable feed is reported as unavailable, rather than as “up to date.”
 
-The current app, helper and Setup are unsigned development artifacts. Verified
-vendor driver signatures do not sign or certify VineMix. Signing, package
-checksums, clean-machine installation and audible reliability are separate
-qualification checks. Follow only checksums supplied for the exact beta file;
-historical installer hashes do not describe the current package.
+The update worker verifies the application identity, preserves owned application
+files for recovery and checks the reopened workspace and engine before completing
+the update. It does not restore an old settings file over newer user data.
+If a safe rollback succeeds, the previous version reopens with a failure notice.
+Interrupted installation or unfamiliar file changes can require manual repair;
+retain the update journal and backups rather than deleting them.
 
-## Future updater proposals
+**Upgrading from Beta 1:** download Beta 2 from
+[Releases](https://github.com/acoyeen/vine-mix/releases), wait for **Saved**, use
+**Quit VineMix** from the tray, then run Setup or open the newer standalone EXE.
+That first upgrade is manual. Older installed copies missing an owned-file
+inventory may also need a normal Setup repair before in-app installation works.
 
-An in-app checker, signed release manifest, downloaded upgrades, a stable
-version-selecting launcher, automatic rollback and post-update release highlights
-remain proposals. Their older design sketches are not current app behavior.
-Implementing them needs a configured release channel, exact-version signature and
-hash validation, an explicit save/stop handshake, crash-safe replacement, retained
-rollback data and separate qualification. There is no anonymous production
-release endpoint for this private beta, and no developer account token should be
-embedded in a client.
+VineMix and Setup are currently unsigned Windows applications. The signed update
+metadata authenticates release file hashes; it is separate from Windows
+Authenticode, SmartScreen reputation and vendor driver signatures.
 
-The [earlier architecture record](INSTALLATION_UPDATE_DESIGN_HISTORY.md) retains
-the detailed proposed updater design and pre-beta implementation notes.
+## Removal
+
+Quit VineMix before removing it; closing the window only hides it in the tray.
+Setup's uninstall entry removes its owned app files and shortcuts while keeping
+settings, backups, logs and shared audio drivers. Unknown user files are retained.
+
+For standalone, delete the launcher EXE after quitting. Its runtime cache can be
+removed separately from `%LOCALAPPDATA%\VineMix\runtime` after all copies have
+quit. Keep the rest of the data folder to retain your workspace. Remove shared
+drivers only through their vendor instructions after checking other apps' needs.
+
+## Developer references
+
+- [Signed release preparation](UPDATE_RELEASES.md)
+- [Update transaction and recovery limits](UPDATE_WORKER.md)
+- [Installer development](../installer/README.md)
+- [Earlier architecture proposals](INSTALLATION_UPDATE_DESIGN_HISTORY.md)

@@ -31,6 +31,7 @@
   </PropertyGroup>
   <Import Project="$(VineMixReleaseProps)" Condition="'$(VineMixReleaseProps)' != ''"/>
   <ItemGroup>
+    <ProjectReference Include="../VineMix.UpdateCore/VineMix.UpdateCore.csproj"/>
     <Resource Include="Assets/Fonts/*.ttf"/>
     <Resource Include="Assets/Branding/*.ico"/>
     <Resource Include="Assets/Branding/*.svg"/>
