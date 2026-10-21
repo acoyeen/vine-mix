@@ -33,6 +33,20 @@ jobs:
             .tools/llvm-mingw-20261006-ucrt-x86_64
             .tools/cmake-4.4.4-windows-x86_64
           key: windows-tools-${{ hashFiles('scripts/bootstrap-tools.ps1') }}
+      - name: Prepare pinned source inventory tool
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP 'ripgrep.zip'
+          Invoke-WebRequest -Uri 'https://github.com/BurntSushi/ripgrep/releases/download/15.2.0/ripgrep-15.2.0-x86_64-pc-windows-msvc.zip' -OutFile $archive
+          $expected = '71b2fef860abe467217a538ff31de02f5258807c0129f771846f87bd029aafc5'
+          if ((Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant() -ne $expected) {
+            throw 'The source inventory tool download failed integrity verification.'
+          }
+          $directory = Join-Path $env:RUNNER_TEMP 'ripgrep'
+          Expand-Archive -LiteralPath $archive -DestinationPath $directory
+          $tool = Join-Path $directory 'ripgrep-15.2.0-x86_64-pc-windows-msvc'
+          $tool | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          & (Join-Path $tool 'rg.exe') --version
+          if ($LASTEXITCODE) { throw 'The source inventory tool could not run.' }
       - name: Build application package
         run: ./scripts/build.ps1
       - name: Save pinned local tools

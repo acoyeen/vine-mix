@@ -99,7 +99,8 @@ testing is ongoing; beta status does not imply every hardware combination is qua
 
 ## Build from source
 
-Requires Windows 11 x64 and PowerShell 7.3 or later. The first build downloads
+Requires Windows 11 x64, PowerShell 7.3 or later and
+[ripgrep (`rg`)](https://github.com/BurntSushi/ripgrep) on PATH. The first build downloads
 pinned project-local tools and dependencies:
 
 ```powershell
