@@ -1,6 +1,36 @@
 # Changelog
 
-## Unreleased
+## 0.3.0-beta.1 — supplied closed beta candidate
+
+These changes describe the candidate supplied directly by the maintainer.
+They are not yet integrated into this repository's application source; see
+[source status](README.md#source-status). Qualification remains incomplete, the
+repository stays private and release material is unpublished.
+
+- Prepare **0.3.0-beta.1 (0.3.0 · Beta 1)** with the VineMix product name,
+  a compact beta version in the header, and copyable release/build information
+  in Settings → About VineMix.
+- Begin new workspaces with Physical input connected directly to Virtual output
+  and Listening output. Physical assignments are explicit; both outputs start
+  muted and Listening output starts at −24 dB. Existing graphs are preserved.
+- Add visible workspace recovery, preserved recovery originals, one-session
+  ownership, and restartable copy-only migration from legacy AudioMixer data to
+  `%LOCALAPPDATA%\VineMix`.
+- Prepare separate single-EXE standalone and Setup beta packages, with shared
+  release metadata and release builds separated from verification/render code.
+  Final hardware qualification remains pending;
+  see [the beta record](docs/BETA_IMPLEMENTATION.md).
+- Rewrite the beginner README, beta tester/install/recovery guidance and bug
+  report form, and use silent three-node documentation fixtures with generic
+  example devices. No public download or automatic update channel is enabled.
+
+- Start Vine Mix in the ordinary Windows desktop context before reading settings,
+  so launches from packaged tools and Explorer use the same saved workspace.
+  Preserve launch arguments and background mode, and add desktop exit diagnostics.
+  Activation scripts reject redirected settings and track the final controller
+  after its startup handoff. Engine starts also select the workspace file explicitly.
+
+## Earlier development history
 
 - Distinguish Controls section headers from their options with flat shaded bars,
   larger chevrons on the right, and indented child rows with a vertical guide.

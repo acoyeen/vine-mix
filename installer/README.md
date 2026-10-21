@@ -1,5 +1,10 @@
 # Vine Mix Windows installer
 
+Installing the supplied **VineMix 0.3.0-beta.1**? Use the
+[beta installation steps](../docs/BETA_TESTER_GUIDE.md#install-with-setup).
+This development guide describes the older committed installer source; beta
+source integration is separate. See [source status](../README.md#source-status).
+
 One Windows 11 x64 setup contains the self-contained Vine Mix app, its read-only
 setup helper and both complete original driver packages. It requires acceptance
 of [TERMS.txt](TERMS.txt); optional driver installation also requires consent to

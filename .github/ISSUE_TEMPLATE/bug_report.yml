@@ -1,22 +1,37 @@
 name: Bug report
-description: Report a reproducible problem with Vine Mix.
+description: Report a reproducible problem with a supplied VineMix beta or source build.
 body:
-  - type: input
+  - type: textarea
     id: version
     attributes:
-      label: App and Windows versions
-      placeholder: Vine Mix 0.2.0, Windows 11
+      label: VineMix version and build
+      description: >-
+        For the supplied beta, use Settings → About VineMix → Copy version information.
+        For a source build without About, include the version and commit you built.
+      placeholder: Paste version/build information and say whether this is a supplied beta or source build.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Windows version and package
+      placeholder: Windows 11 build…, Setup, standalone EXE or source build
     validations:
       required: true
   - type: textarea
     id: reproduce
     attributes:
-      label: What happened?
-      description: Include steps to reproduce, what you expected and what actually happened.
+      label: Steps and result
+      description: Include numbered steps, what you expected, what happened, and whether audio stopped. Say which output was affected.
     validations:
       required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Timing and context
+      description: Note frequency, approximate time/timezone, recent update, device reconnect, sleep/restart, and any workaround.
   - type: textarea
     id: diagnostics
     attributes:
       label: Relevant diagnostics or screenshots
-      description: Remove personal device identifiers, executable paths and private settings before sharing.
+      description: Review before sharing. Remove personal device identifiers, app names, executable/account paths and private workspace data. Only relevant log lines or a cropped screenshot are needed initially.

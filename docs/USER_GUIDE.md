@@ -1,5 +1,10 @@
 # Vine Mix user guide
 
+For the supplied **VineMix 0.3.0-beta.1** files, start with the
+[beta tester guide](BETA_TESTER_GUIDE.md). The reference below belongs to the
+earlier committed source and uses its original names. See
+[source status](../README.md#source-status) for the integration status.
+
 A Windows 11 audio mixer built around draggable nodes and visible audio cables.
 Create sources, processing chains and destinations on a resizable node canvas, with
 settings inside each node. The C++ engine handles audio in a separate process;
