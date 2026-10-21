@@ -76,3 +76,12 @@ private visibility itself as a blocker to release preparation or publication.
 This release direction supersedes older plans that kept release material
 unpublished solely because the repository was private. Do not publish signing
 keys, personal diagnostics, recovery backups or other private workspace data.
+
+## Beta 2 finalisation hold — 22 October 2026
+
+The current uploaded `v0.3.0-beta.2` is provisional. The maintainer has explicitly
+said it is not final and will give the word when it is finalised. Wait for that
+explicit go-ahead before replacing its uploaded files or treating a later build
+as the final Beta 2. Do not infer approval from completed tests or elapsed time.
+On approval, replace the Beta 2 downloads, signed update metadata, checksums and
+release notes as one verified release update. Preserve Beta 1's version history.
