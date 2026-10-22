@@ -58,8 +58,6 @@ jobs:
             .tools/llvm-mingw-20261006-ucrt-x86_64
             .tools/cmake-4.4.4-windows-x86_64
           key: windows-tools-${{ hashFiles('scripts/bootstrap-tools.ps1') }}
-      - name: Run synthetic audio and detached desktop checks
-        run: ./scripts/verify-offline.ps1 -ResultDirectory "$PWD/artifacts/ci-verification"
       - name: Verify updater and signed release preparation
         run: |
           & ./.tools/dotnet/dotnet.exe run --project desktop/VineMix.UpdateCore.Tests -c Release -- --report "$PWD/artifacts/ci-verification/update-core.json"
@@ -67,6 +65,8 @@ jobs:
           & ./.tools/dotnet/dotnet.exe run --project desktop/VineMix.UpdateWorkerTests -c Release
           if ($LASTEXITCODE) { throw 'Update-worker verification failed.' }
           ./scripts/test-update-release-tools.ps1 -EvidencePath "$PWD/artifacts/ci-verification/release-tools.json"
+      - name: Run synthetic audio and detached desktop checks
+        run: ./scripts/verify-offline.ps1 -ResultDirectory "$PWD/artifacts/ci-verification"
       - name: Retain verification reports
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
