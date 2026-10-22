@@ -1,5 +1,14 @@
 # Audio Mixer — Blender node style review
 
+> Historical development record. Results and procedures below belong to their
+> named versions; they do not qualify the current beta. See
+> [current qualification](docs/BETA_TESTING_CURRENT.md) for the active release checks.
+
+Evidence note: raw reports, historical renders and reference captures cited
+here are retained privately outside the repository. Their labels below identify
+archived evidence, not downloadable files; recorded results apply only to the
+versions and checks described.
+
 17 October 2026, UTC+10.
 
 ## Result and scope
@@ -17,14 +26,14 @@ and silent endurance run were left in place.
 ## Reference and comparison method
 
 - [Blender's official node anatomy](https://docs.blender.org/manual/en/latest/interface/controls/nodes/parts.html)
-  and unchanged [216 × 251 reference image](docs/design/blender-reference/node-parts-overview.png).
+  and unchanged 216 × 251 reference image.
 - [Official default theme](https://github.com/blender/blender/blob/main/release/datafiles/userdef/userdef_default_theme.c)
   and [category mapping](https://github.com/blender/blender/blob/main/source/blender/editors/interface/resources.cc).
-- [Final workspace](docs/design/blender-final/workspace.png): 1280 × 800 at 96 DPI;
+- Final workspace: 1280 × 800 at 96 DPI;
   the canvas's fit-to-content zoom is 89%.
-- [Effects overview](docs/design/blender-final/effects.png) and
-  [selected state](docs/design/blender-final/effects-selected.png): 120% canvas zoom.
-- [Focused EQ control](docs/design/blender-final/eq-closeup.png): 316 × 488 at
+- Effects overview and
+  selected state: 120% canvas zoom.
+- Focused EQ control: 316 × 488 at
   96 DPI, with 18-pixel padding, exactly one pixel per WPF DIP.
 
 The official reference and final full workspace, focused node, collapsed node,
@@ -43,11 +52,11 @@ GraphNodeView class in an isolated memory-only host, preserving its dimensions.
 - Compact label/value fields, device selectors, mute and effect controls inside nodes.
 - Five-band EQ curve and controls, compressor fields and balance control.
 - White selected outline; selection leaves all graph settings unchanged.
-- [Collapsed state](docs/design/blender-final/effects-collapsed.png): 27-DIP EQ header,
+- Collapsed state: 27-DIP EQ header,
   visible ports and non-overlapping rounded-layout target rectangles.
-- [Waiting state](docs/design/blender-final/waiting.png): missing choices and readable status remain.
-- [Empty state](docs/design/blender-final/empty.png): explanatory copy and an add action.
-- [High contrast](docs/design/blender-final/effects-high-contrast.png): Windows colours
+- Waiting state: missing choices and readable status remain.
+- Empty state: explanatory copy and an add action.
+- High contrast: Windows colours
   reach the entire node, numeric fields, text and sockets. This is not a complete
   accessibility conformance assessment.
 
@@ -60,7 +69,7 @@ GraphNodeView class in an isolated memory-only host, preserving its dimensions.
 | Render fixture retained stale colours after high-contrast switch | Preserve the unshown logical resource owner | Root, body, field and text resource assertions plus the final high-contrast image |
 | Close-up inherited canvas offset and was clipped | Render an isolated actual GraphNodeView with copied preview state | Final close-up is complete and preserves node dimensions |
 
-[Machine-readable results](docs/design/blender-final/results.json) include exact
+Machine-readable results include exact
 assertions, image sizes and expanded/collapsed socket coordinates. Numeric changes
 are applied only to in-memory models; one EQ gain change is compared against the
 entire expected graph and restored. The drag checks invoke the same adjustment
@@ -92,4 +101,4 @@ existing engine PID/start time and binary were retained. Two read-only snapshots
 showed the frame counter advancing across the controller replacement, and the
 settings hash was unchanged. This does not replace the remaining gesture,
 accessibility or audible qualification checks above. See
-[activation evidence](artifacts/ui-switch-20261017-210400/result.json).
+activation evidence.

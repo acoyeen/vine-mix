@@ -111,7 +111,7 @@ public partial class MainWindow : Window
     {
         var content = new StackPanel { Margin = new Thickness(24) };
         content.Children.Add(new TextBlock { Text = "VineMix", FontSize = 24, FontWeight = FontWeights.SemiBold });
-        content.Children.Add(new TextBlock { Text = "Local audio routing · Private beta", Margin = new Thickness(0, 4, 0, 16) });
+        content.Children.Add(new TextBlock { Text = "Local audio routing · Beta", Margin = new Thickness(0, 4, 0, 16) });
         var version = new TextBox { Text = ReleaseInfo.FullInformation, IsReadOnly = true, IsReadOnlyCaretVisible = true, TextWrapping = TextWrapping.Wrap,
             BorderThickness = new Thickness(0), Background = System.Windows.Media.Brushes.Transparent,
             Padding = new Thickness(0), Margin = new Thickness(0, 0, 0, 16) };

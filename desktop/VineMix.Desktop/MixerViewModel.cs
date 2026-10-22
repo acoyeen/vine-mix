@@ -89,7 +89,8 @@ public sealed partial class MixerViewModel : Observable, IDisposable
     private bool _connected, _visible = true, _startAtLogin, _reducedAnimation, _rightClickDragToPan;
     private bool _showDisabledAudioDevices, _showDisconnectedAudioDevices, _showAdvancedAudioDevices;
     private bool? _registeredStartup;
-    private string _connectionStatus = "Connecting to the audio engine…", _warning = "", _editError = "", _startupError = "", _uiError = "", _saveStatus = "", _frameLabel = "Engine offline";
+    private string _connectionStatus = "Connecting to the audio engine…", _warning = "", _editError = "", _saveError = "", _startupError = "", _uiError = "", _saveStatus = "", _frameLabel = "Engine offline";
+    private string PendingSaveStatus => _saveError.Length > 0 ? "Changes not saved · retrying…" : "Saving changes…";
     private List<Endpoint> _endpoints = [];
     private List<AudioApplication> _applications = [];
     public bool Applying { get; private set; }
@@ -236,7 +237,7 @@ public sealed partial class MixerViewModel : Observable, IDisposable
         { _uiError = "Workspace preferences apply for this session, but could not be saved: " + error.Message; }
         UpdateWarning();
     }
-    private void UpdateWarning() => Warning = string.Join("\n", new[] { _editError, _startupError, _uiError, _snapshot?.Warning ?? "" }.Where(s => !string.IsNullOrWhiteSpace(s)));
+    private void UpdateWarning() => Warning = string.Join("\n", new[] { _editError, _saveError, _startupError, _uiError, _snapshot?.Warning ?? "" }.Where(s => !string.IsNullOrWhiteSpace(s)));
     public bool HasSettingsRecovery => _snapshot is { SettingsState: not ("loaded" or "new") };
     public bool CanRestoreBackup => _snapshot?.SettingsState == "backupAvailable";
     public bool CanStartFresh => HasSettingsRecovery && _snapshot?.SettingsState != "unsupported";
@@ -338,7 +339,8 @@ public sealed partial class MixerViewModel : Observable, IDisposable
                 { if (!operation.TryApply(c, out replayError)) return false; Complete(c); return true; } });
         _editDispatch.Queue(_clock.Elapsed);
         _editError = "";
-        SaveStatus = "Saving changes…";
+        SaveStatus = PendingSaveStatus;
+        UpdateWarning();
         ApplyDesired();
         return true;
     }
@@ -394,7 +396,7 @@ public sealed partial class MixerViewModel : Observable, IDisposable
                 c.Graph = graph; return true;
             } });
             _editDispatch.Queue(_clock.Elapsed);
-            SaveStatus = "Saving changes…";
+            SaveStatus = PendingSaveStatus;
         }
         UpdateWarning(); NotifyHistory(); ApplyDesired();
         return true;
@@ -431,12 +433,34 @@ public sealed partial class MixerViewModel : Observable, IDisposable
         return new(configuration, _pending.ToArray());
     }
 
+    internal bool IsPendingSaveDue(TimeSpan now) => _pending.Count > 0 && _editDispatch.IsDue(now);
+
+    internal void HandleConfigureResponse(PendingBatch batch, MixerSnapshot basis, ProtocolResponse response, TimeSpan now)
+    {
+        if (response.Ok) AcknowledgePending(batch, response.Snapshot);
+        else if (response.ErrorCode == "settings_write_failed")
+        {
+            // The engine validated the configuration but could not persist it.
+            // Retain the exact queue and history; another edit or telemetry
+            // refresh must not hide that these values are still unsaved.
+            _saveError = "Changes are not saved. VineMix will keep retrying while it is running. " + response.Error;
+            _editDispatch.DeferRetry(now, TimeSpan.FromSeconds(1));
+            SaveStatus = PendingSaveStatus; UpdateWarning();
+        }
+        else if (response.Error.Contains("revision", StringComparison.OrdinalIgnoreCase) || response.Error.Contains("stale", StringComparison.OrdinalIgnoreCase))
+        { _editDispatch.DeferRetry(now); SaveStatus = _saveError.Length > 0 ? PendingSaveStatus : "Reconciling changes…"; }
+        else RejectPending(batch, basis, response.Error);
+    }
+
     internal void AcknowledgePending(PendingBatch batch, MixerSnapshot? snapshot)
     {
         // Use identities, not a prefix count: newer edits or retry snapshots
         // can arrive while the configure request is awaiting its response.
         _pending.RemoveAll(edit => batch.Edits.Contains(edit));
         _editDispatch.Complete(_pending.Count > 0);
+        _saveError = "";
+        if (_pending.Count > 0) SaveStatus = PendingSaveStatus;
+        UpdateWarning();
         if (snapshot is not null) Accept(snapshot, forceConfiguration: true);
     }
 
@@ -444,8 +468,10 @@ public sealed partial class MixerViewModel : Observable, IDisposable
     {
         _pending.RemoveAll(edit => batch.Edits.Contains(edit) || edit.Restore is not null);
         _editDispatch.Complete(_pending.Count > 0);
+        _saveError = "";
         EditHistory.Clear(); NotifyHistory();
         _editError = "The engine rejected a change: " + error + " Undo and redo were reset to keep the saved workspace consistent.";
+        if (_pending.Count > 0) SaveStatus = PendingSaveStatus;
         Accept(snapshot, forceConfiguration: true);
     }
 
@@ -519,7 +545,11 @@ public sealed partial class MixerViewModel : Observable, IDisposable
         { _applications = snapshot.Applications; Changed(nameof(Applications)); }
         ConnectionStatus = _preview ? "Preview · no audio engine" : "Audio engine connected";
         FrameLabel = $"{snapshot.Status.AudioFrames:N0} frames · 48 kHz";
-        if (_pending.Count == 0) SaveStatus = _preview ? "Preview · no settings are saved" : _editError.Length == 0 ? $"Saved · revision {snapshot.Configuration.Revision}" : "Change was not saved";
+        if (_pending.Count == 0)
+        {
+            _saveError = "";
+            SaveStatus = _preview ? "Preview · no settings are saved" : _editError.Length == 0 ? $"Saved · revision {snapshot.Configuration.Revision}" : "Change was not saved";
+        }
         if (!HasSettingsRecovery && !IsPreparingUpdate && !IsUpdateHealthMode && (configurationChanged || inventoryChanged))
         {
             var assignments = AutomaticAssignments()
@@ -533,7 +563,7 @@ public sealed partial class MixerViewModel : Observable, IDisposable
                     _pending.Add(new() { Change = c => VirtualDeviceBindings.Apply(c.Graph, assignments) });
                     _editDispatch.Queue(_clock.Elapsed);
                 }
-                SaveStatus = _preview ? "Preview · changes stay in this window" : "Saving changes…";
+                SaveStatus = _preview && !QueuePreviewEdits ? "Preview · changes stay in this window" : PendingSaveStatus;
                 configurationChanged = true;
             }
         }
@@ -764,22 +794,13 @@ public sealed partial class MixerViewModel : Observable, IDisposable
                     await Task.Delay(1000, _stop.Token);
                     continue;
                 }
-                if (CanEdit && _pending.Count > 0 && _editDispatch.IsDue(_clock.Elapsed))
+                if (CanEdit && IsPendingSaveDue(_clock.Elapsed))
                 {
                     var batch = PreparePendingConfiguration(response.Snapshot.Configuration);
                     if (batch.Edits.Count == 0) continue;
                     _editDispatch.BeginDispatch(_clock.Elapsed);
                     var configured = await _connection.RequestAsync("configure", batch.Configuration, response.Snapshot.Configuration.Revision, _stop.Token);
-                    if (configured.Ok)
-                    {
-                        AcknowledgePending(batch, configured.Snapshot);
-                    }
-                    else if (configured.Error.Contains("revision", StringComparison.OrdinalIgnoreCase) || configured.Error.Contains("stale", StringComparison.OrdinalIgnoreCase))
-                    { _editDispatch.DeferRetry(_clock.Elapsed); SaveStatus = "Reconciling changes…"; }
-                    else
-                    {
-                        RejectPending(batch, response.Snapshot, configured.Error);
-                    }
+                    HandleConfigureResponse(batch, response.Snapshot, configured, _clock.Elapsed);
                 }
             }
             catch (OperationCanceledException) when (_stop.IsCancellationRequested) { break; }
@@ -855,7 +876,9 @@ public sealed partial class MixerViewModel : Observable, IDisposable
                         break;
                     }
                     saveFailure = saved.Error;
-                    if (!saved.Error.Contains("revision", StringComparison.OrdinalIgnoreCase))
+                    if (saved.ErrorCode == "settings_write_failed") break;
+                    if (!saved.Error.Contains("revision", StringComparison.OrdinalIgnoreCase)
+                        && !saved.Error.Contains("stale", StringComparison.OrdinalIgnoreCase))
                     { RejectPending(batch, current.Snapshot, saved.Error); CanEdit = false; break; }
                 }
             }

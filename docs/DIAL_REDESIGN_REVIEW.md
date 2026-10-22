@@ -1,5 +1,14 @@
 # Audio Mixer dial and dynamics redesign — review
 
+> Historical development record. Results and procedures below belong to their
+> named versions; they do not qualify the current beta. See
+> [current qualification](BETA_TESTING_CURRENT.md) for the active release checks.
+
+Evidence note: raw reports, historical renders and reference captures cited
+here are retained privately outside the repository. Their labels below identify
+archived evidence, not downloadable files; recorded results apply only to the
+versions and checks described.
+
 18 October 2026 · Windows WPF desktop and C++ engine
 
 The current candidate in `artifacts/AudioMixer-PrimaryDials` restores EQ's three
@@ -33,9 +42,9 @@ the audio engine kept running, the window reopened, and settings bytes stayed
 unchanged. The Expander/Gate closeup is 232 pixels shorter and the saved Compressor
 143 pixels shorter at 96 DPI, with the same width and text/dial sizes.
 
-![Compact Expander](review-images/clean-nodes/expander.png)
+Archived image: Compact Expander
 
-![Compact saved Compressor](review-images/clean-nodes/compressor.png)
+Archived image: Compact saved Compressor
 
 The following sections retain the original review and its historical results.
 
@@ -113,40 +122,40 @@ built and captured before implementation. Each closeup has 18 DIPs of padding.
 
 | Before: combined compressor | After: focused Compressor |
 |---|---|
-| ![Old combined compressor](review-images/dials/before/compressor-ducking.png) | ![New Compressor](review-images/dials/after/compressor-new.png) |
+| Archived image: Old combined compressor | Archived image: New Compressor |
 
 | After: dedicated Limiter | After: fixed-depth Ducking |
 |---|---|
-| ![New Limiter](review-images/dials/after/limiter-new.png) | ![New Ducking](review-images/dials/after/ducking-new.png) |
+| Archived image: New Limiter | Archived image: New Ducking |
 
 | Before: filter | After: filter |
 |---|---|
-| ![Old filter fields](review-images/dials/before/high-pass-closeup.png) | ![New filter dials](review-images/dials/after/high-pass-closeup.png) |
+| Archived image: Old filter fields | Archived image: New filter dials |
 
 | Before: reverb | After: reverb |
 |---|---|
-| ![Old reverb fields](review-images/dials/before/reverb-closeup.png) | ![New reverb dials](review-images/dials/after/reverb-closeup.png) |
+| Archived image: Old reverb fields | Archived image: New reverb dials |
 
 | Before: Voice Color | After: Voice Color |
 |---|---|
-| ![Old Voice Color](review-images/dials/before/voice-color-neutral.png) | ![New Voice Color](review-images/dials/after/voice-color-neutral.png) |
+| Archived image: Old Voice Color | Archived image: New Voice Color |
 
 The same populated baseline workspace, before and after:
 
-![Populated workspace before](review-images/dials/before/workspace.png)
+Archived image: Populated workspace before
 
-![Populated workspace after](review-images/dials/after/workspace.png)
+Archived image: Populated workspace after
 
 The new populated routing example, with a detector-only voice branch and a
 separate audible voice branch:
 
-![Populated dynamics graph at 1920 by 1080](review-images/dials/after/dynamics-populated-1920x1080-96dpi.png)
+Archived image: Populated dynamics graph at 1920 by 1080
 
 At the supported minimum 900 × 580 window, Fit presents the entire route at
 approximately 33%. Dials and cable types remain identifiable; reading and precise
 editing require zooming toward 100%. The node geometry stays fixed at every zoom.
 
-![Minimum window](review-images/dials/after/dynamics-populated-900x580-96dpi.png)
+Archived image: Minimum window
 
 ## Verification
 
@@ -160,8 +169,9 @@ editing require zooming toward 100%. The node geometry stays fixed at every zoom
 | Build | **Passed.** Native engine and self-contained Windows desktop published separately. Desktop build has zero warnings/errors. Existing upstream CMake policy warnings remain. |
 | Listening, real pointer/keyboard gestures and hardware | **Not run.** No physical/virtual audio playback, real endpoint capture, personal-graph testing, live application routing, monitor DPI transitions, acoustic latency or endurance claims. |
 
-Raw evidence is retained in `artifacts/dial-redesign-before`,
-`artifacts/dial-redesign-final` and `artifacts/dial-redesign-native`.
+Raw evidence is retained privately outside the repository. The historical
+identifiers are `artifacts/dial-redesign-before`, `artifacts/dial-redesign-final`
+and `artifacts/dial-redesign-native`.
 [Verification manifest](DIAL_REDESIGN_EVIDENCE.json) records their paths, result
 counts and the hashes of the reviewed sources and candidate executables.
 Earlier intermediate render failures were stale verification assumptions about

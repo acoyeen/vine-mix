@@ -20,9 +20,6 @@ internal static class NativeCaption
     [DllImport("user32.dll", CharSet = CharSet.Auto)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool GetMonitorInfo(IntPtr monitor, ref MonitorInfo info);
-    [DllImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool InvalidateRect(IntPtr window, IntPtr rectangle, [MarshalAs(UnmanagedType.Bool)] bool erase);
 
     [StructLayout(LayoutKind.Sequential)]
     private struct NativePoint { public int X, Y; }
@@ -54,10 +51,8 @@ internal static class NativeCaption
             UseAeroCaptionButtons = false
         });
         HwndSource? source = null;
-        ResizeRedraw? resizeRedraw = null;
         IntPtr WindowHook(IntPtr handle, int message, IntPtr parameter, IntPtr data, ref bool handled)
         {
-            if (resizable && ResizeRedraw.IsResizeNotification(message, parameter)) resizeRedraw?.Request();
             // Keep auxiliary fixed-size windows fixed. The workspace retains native
             // edge resizing, caption double-click, snap, and restore-on-drag behavior.
             if (!resizable && (message == 0x0112 && ((parameter.ToInt64() & 0xFFF0) is 0xF000 or 0xF030)
@@ -95,12 +90,6 @@ internal static class NativeCaption
         void Initialize(object? sender, EventArgs args)
         {
             source = HwndSource.FromHwnd(new WindowInteropHelper(window).Handle);
-            if (resizable)
-                resizeRedraw = new ResizeRedraw(window.Dispatcher, () =>
-                {
-                    if (source is { IsDisposed: false } && window.IsVisible && window.WindowState != WindowState.Minimized)
-                        _ = InvalidateRect(source.Handle, IntPtr.Zero, erase: false);
-                });
             source?.AddHook(WindowHook);
             Apply(sender, args);
         }
@@ -116,7 +105,6 @@ internal static class NativeCaption
         window.PreviewKeyDown += SystemMenu;
         window.Closed += (_, _) =>
         {
-            resizeRedraw?.Dispose();
             if (source is { IsDisposed: false }) source.RemoveHook(WindowHook);
             window.SourceInitialized -= Initialize;
             window.PreviewKeyDown -= SystemMenu;

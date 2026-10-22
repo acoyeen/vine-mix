@@ -1,21 +1,19 @@
 name: Bug report
-description: Report a reproducible problem with a supplied VineMix beta or source build.
+description: Report a reproducible problem with VineMix.
 body:
   - type: textarea
     id: version
     attributes:
       label: VineMix version and build
-      description: >-
-        For the supplied beta, use Settings → About VineMix → Copy version information.
-        For a source build without About, include the version and commit you built.
-      placeholder: Paste version/build information and say whether this is a supplied beta or source build.
+      description: In Settings → About VineMix, use Copy version information and paste it here.
+      placeholder: Paste the full version information, including release and source revision.
     validations:
       required: true
   - type: input
     id: environment
     attributes:
       label: Windows version and package
-      placeholder: Windows 11 build…, Setup, standalone EXE or source build
+      placeholder: Windows 11 build…, Setup or standalone EXE
     validations:
       required: true
   - type: textarea

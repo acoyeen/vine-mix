@@ -17,7 +17,7 @@ internal sealed class EditDispatchCadence
     public void BeginDispatch(TimeSpan now) => _due = now + Interval;
     public void Complete(bool hasPending) { if (!hasPending) _due = null; }
 
-    // A stale revision needs a fresh snapshot before retrying. New edits must
-    // not extend this backoff, just as they must not extend a normal deadline.
-    public void DeferRetry(TimeSpan now) => _due = now + Interval;
+    // A stale revision needs a fresh snapshot before retrying. Persistence
+    // failures can use a longer delay. New edits must not extend either backoff.
+    public void DeferRetry(TimeSpan now, TimeSpan? delay = null) => _due = now + (delay ?? Interval);
 }

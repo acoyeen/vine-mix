@@ -1,5 +1,14 @@
 # Audio Mixer — UI overhaul plan
 
+> Historical development record. Results and procedures below belong to their
+> named versions; they do not qualify the current beta. See
+> [current qualification](BETA_TESTING_CURRENT.md) for the active release checks.
+
+Evidence note: raw reports, historical renders and reference captures cited
+here are retained privately outside the repository. Their labels below identify
+archived evidence, not downloadable files; recorded results apply only to the
+versions and checks described.
+
 Date: 17 October 2026. Status: control-detail refinement completed and running; final 37 UI-only checks passed. The earlier flat slate build passed 33 checks. The latest direction keeps one medium slate-grey canvas and integrated header actions, adding clearer recessed/beveled controls and larger fader details without rounded strip cards. Both buses retain the same muted green; blue/yellow coding remains superseded. Native audio and reliability qualification remains deferred. See [design-qa.md](../design-qa.md).
 
 ## 1. Direction and scope
@@ -20,7 +29,7 @@ The official [Anthropic frontend-design skill](https://github.com/anthropics/ski
 
 ### Step 1 — Main mixer: functional structure, weak operating layout
 
-![Current mixer window](design/evidence/01-current-mixer.png)
+Archived image: Current mixer window
 
 **Strengths:** three sources are clearly named; A/B destinations have plain-language explanations; independent send levels are already present; the A mute state is visible.
 
@@ -37,7 +46,7 @@ These are screenshot-based observations, not measured usability-test results. Ke
 
 ### Step 2 — Setup: complete information, excessive initial burden
 
-![Current setup window](design/evidence/02-current-setup.png)
+Archived image: Current setup window
 
 **Strengths:** exact endpoint identities are available; both sides of each virtual transport are explicit; availability and connection status are distinguished.
 
@@ -45,7 +54,7 @@ These are screenshot-based observations, not measured usability-test results. Ke
 
 ### Comparison — What to take from Voicemeeter
 
-![Installed Voicemeeter reference, inspected without changing controls](design/evidence/03-voicemeeter-reference.png)
+Archived image: Installed Voicemeeter reference, inspected without changing controls
 
 The useful visual pattern is repeated strip structure with faders, meters and clearly filled/unfilled state controls. In this capture, enabled B routes and the active red M button are conspicuous without reading a paragraph. Its effects panels and extra processing are irrelevant to our scope.
 
@@ -151,7 +160,7 @@ The current clip telemetry can miss events between UI polls. A presentation hold
 
 One master fader, output meter and **M · Mute** button. Beneath them, exactly two permanently visible rows: **Output 1** and **Output 2**, each with selected name and independent status. Both receive the same A mix; their numbering does not mean separate source routes.
 
-Current state should read **Listening device 1 — Connected** and **Output 2 — Not assigned**. If one drops out, identify that slot as waiting while the other retains its connected state. Do not replace the whole A section with a global error.
+Current state should read **Listening output 1 — Connected** and **Output 2 — Not assigned**. If one drops out, identify that slot as waiting while the other retains its connected state. Do not replace the whole A section with a global error.
 
 ### B · Send — what others hear
 
@@ -245,18 +254,18 @@ The checklist defines the design contract. Implementation and inert UI results a
 - Meter movement has correct pre-/post-mute meaning; scale/readout/peak hold/clip display match supplied telemetry and contain no simulated live activity.
 - Device labels remain correct when names are long, devices are missing or Windows names have not been renamed.
 - Keyboard-only operation, screen-reader names, focus, text/control contrast, high-contrast theme and agreed DPI cases pass review. Screenshots alone are insufficient proof.
-- Launching the redesigned UI against the current saved configuration preserves revision/state: A stays muted at −24 dB, mic monitoring stays off, microphone B remains enabled, and Listening device 1 remains assigned. A visual refresh must not write defaults.
+- Launching the redesigned UI against the current saved configuration preserves revision/state: A stays muted at −24 dB, mic monitoring stays off, the microphone B send remains enabled, and listening output 1 remains assigned. A visual refresh must not write defaults.
 - No test sound, playback start, automatic unmute or gain reset occurs as part of UI startup or navigation. The user controls the first audible test.
 - UI state checks use inert design data first. Live audio, latency and reliability checks remain a separate activity under [TESTING.md](../TESTING.md), with the agreed reboot before reliability qualification.
 
 ## 14. Implementation and verification status
 
-The [initial static mockup](design/console-mockup.png) and [mockup review](design/MOCKUP_REVIEW.md) preceded the first WPF overhaul. The [slate mockup](design/light-console-mockup.png) and [revision review](design/LIGHT_CONSOLE_REVIEW.md) then established the continuous medium slate canvas, thin separators and integrated header actions. The latest [control-detail mockup](design/detailed-console-mockup.png) and [review](design/CONTROL_DETAIL_REVIEW.md) add stronger control contrast, functional bevels, recessed device nameplates, a channel-name band and clearer fader/readout details. Generated illustrative gains and meter activity are not adopted. The approved five-strip layout and local destination rows remain: three sources, independent dual A/B sends, two masters, two physical A slots and one B endpoint. The Devices dialog has three fixed pages, with scrolling limited to detailed troubleshooting content and native text editors.
+The initial static mockup and [mockup review](design/MOCKUP_REVIEW.md) preceded the first WPF overhaul. The slate mockup and [revision review](design/LIGHT_CONSOLE_REVIEW.md) then established the continuous medium slate canvas, thin separators and integrated header actions. The latest control-detail mockup and [review](design/CONTROL_DETAIL_REVIEW.md) add stronger control contrast, functional bevels, recessed device nameplates, a channel-name band and clearer fader/readout details. Generated illustrative gains and meter activity are not adopted. The approved five-strip layout and local destination rows remain: three sources, independent dual A/B sends, two masters, two physical A slots and one B endpoint. The Devices dialog has three fixed pages, with scrolling limited to detailed troubleshooting content and native text editors.
 
-The final 18-DIP-readout build's inert `--verify-ui` run in `artifacts/ui-verification/detail-reviewed/results.json` passed **37 checks** and exited successfully, including four added assertions for cap size, off-route visibility, A/B labels and measured control separation. Existing coverage includes all 64 route-state combinations, independent gains/mutes, missing-device labels, picker filtering, fixed bounds, keyboard/automation semantics, contrast targets, clip-hold/offline behavior and **zero WPF binding errors**. Its retained [result copy](design/detail-verification/results.json) accompanies the review. The older 33-check slate and 28-check charcoal results are historical. Separate silent-preview interactions confirmed embedded minimise/restore, Devices open/close, preview main-window close, caption right-click system-menu access, mouse/keyboard route control and independent typed levels without connecting to an engine or audio devices. In the final preview, clicking an A fader thumb and pressing Up showed +0.5 dB while B remained 0 dB and A routing remained off; the preview was closed without applying its changes to live settings.
+The final 18-DIP-readout build's inert `--verify-ui` run in `artifacts/ui-verification/detail-reviewed/results.json` passed **37 checks** and exited successfully, including four added assertions for cap size, off-route visibility, A/B labels and measured control separation. Existing coverage includes all 64 route-state combinations, independent gains/mutes, missing-device labels, picker filtering, fixed bounds, keyboard/automation semantics, contrast targets, clip-hold/offline behavior and **zero WPF binding errors**. Its retained result copy accompanies the review. The older 33-check slate and 28-check charcoal results are historical. Separate silent-preview interactions confirmed embedded minimise/restore, Devices open/close, preview main-window close, caption right-click system-menu access, mouse/keyboard route control and independent typed levels without connecting to an engine or audio devices. In the final preview, clicking an A fader thumb and pressing Up showed +0.5 dB while B remained 0 dB and A routing remained off; the preview was closed without applying its changes to live settings.
 
 The 125% and 150% captures are render-density simulations, not changes to Windows display scaling. Actual display-scaling transitions and full screen-reader speech behavior remain to be checked. Alt+Space did not produce an observed system-menu popup in this environment and remains unverified; caption right-click access worked. Source/input and bus/output meter semantics were checked with supplied inert telemetry; no synthetic activity is shown as live data in normal operation.
 
-The completed detailed slate controller is running against the original native engine. Only the desktop executable was replaced; the engine process and start time are unchanged. The **current** saved baseline is revision 3, following user changes between UI requests, with A muted at −24 dB and existing routes retained. Its before/after SHA-256 is unchanged: `D082E5A80406C58E7ACD25EFD8B56FE57234C89F6780314F095177429EB1E0F5`. Preserve this baseline rather than restoring the historical revision-1 example. The prior charcoal update preserved revision 1 at that earlier point. No driver installation, Windows default, global display setting or other audio application was changed by this UI refinement. No test sound or playback was started.
+The completed detailed slate controller is running against the original native engine. Only the desktop executable was replaced; the engine process and start time are unchanged. The **current** saved baseline is revision 3, following user changes between UI requests, with A muted at −24 dB and existing routes retained. Its before/after SHA-256 is unchanged: `<private-settings-sha256-omitted>`. Preserve this baseline rather than restoring the historical revision-1 example. The prior charcoal update preserved revision 1 at that earlier point. No driver installation, Windows default, global display setting or other audio application was changed by this UI refinement. No test sound or playback was started.
 
 See [design-qa.md](../design-qa.md) for current captures, resolved review findings and limits. The next qualification work is the separately authorized native/audio/hardware procedure in [TESTING.md](../TESTING.md), including the agreed reboot before reliability validation. UI verification does not establish audio correctness, latency, reconnection or daily-use reliability.

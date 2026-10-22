@@ -1,5 +1,10 @@
 # Input and output availability
 
+Evidence note: raw reports, historical renders and reference captures cited
+here are retained privately outside the repository. Their labels below identify
+archived evidence, not downloadable files; recorded results apply only to the
+versions and checks described.
+
 An unavailable microphone, virtual input, application, listening output or virtual
 output gently flashes its existing device/app name red. A faint red glow sits
 outside the node, and a small steady red warning triangle sits directly above the vertical volume meter in
@@ -56,6 +61,6 @@ Actual device unplug/replug and listening checks remain manual.
 
 The warning-icon candidate passed **4,778 detached checks**, produced **136 renders**
 and reported **zero binding errors** on 19 October 2026. See the
-[final results](../artifacts/input-warning-icon-20261019/ui-final/results.json),
-[red text phase](../artifacts/input-warning-icon-20261019/ui-final/input-device-pulse-red.png)
-and [normal text phase](../artifacts/input-warning-icon-20261019/ui-final/input-device-pulse-normal.png).
+final results,
+red text phase
+and normal text phase.

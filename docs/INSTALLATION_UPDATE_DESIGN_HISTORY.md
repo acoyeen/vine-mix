@@ -1,10 +1,10 @@
-# Historical installation and update architecture
-
-Preserved from the earlier committed development snapshot. This document records
-that implementation and future proposals, including eventual public release
-hosting. It does not enable publication or describe the supplied beta's current
-update behavior. For the private 0.3.0-beta.1 files, use the
-[current installation guide](INSTALLATION_AND_UPDATES.md).
+> Historical installer/update design, captured before the 0.3.0-beta.1 rename.
+> This document preserves earlier implementation notes and future proposals.
+> Product paths, release URLs and version examples below are historical or
+> proposed, not current download instructions. Use
+> [current installation and updates](INSTALLATION_AND_UPDATES.md) and
+> [the beta tester guide](BETA_TESTER_GUIDE.md) for current behavior.
+# Vine Mix installation and update architecture
 
 Status: **first installer and manual upgrade/repair implemented 20 October 2026**.
 The online updater, version switching, recovery journal and release highlights

@@ -1,5 +1,10 @@
 # Blender-inspired audio node editor
 
+Evidence note: raw reports, historical renders and reference captures cited
+here are retained privately outside the repository. Their labels below identify
+archived evidence, not downloadable files; recorded results apply only to the
+versions and checks described.
+
 Updated 18 October 2026. This implements the requested Blender node-editor direction in
 the existing native Windows/WPF controller. The current update simplifies the
 creation library and effect controls, gives EQ more editing space and a measured
@@ -33,7 +38,7 @@ The reference is Blender's default dark node editor, grounded in its
 [default theme](https://github.com/blender/blender/blob/main/release/datafiles/userdef/userdef_default_theme.c),
 [category mapping](https://github.com/blender/blender/blob/main/source/blender/editors/interface/resources.cc),
 and [layout constants](https://github.com/blender/blender/blob/main/source/blender/editors/space_node/node_intern.hh).
-The unchanged [manual reference image](design/blender-reference/node-parts-overview.png)
+The unchanged manual reference image
 is credited in [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md).
 WPF controls implement the appearance independently; Blender source code is not
 compiled or copied into the application.
@@ -254,43 +259,43 @@ The records below are historical results for their named builds; references to
 collapse, old expanders or send controls describe those earlier interfaces.
 
 The earlier Mono, full-width controls and stereo-meter update passed
-[720 detached checks and 57 renders](design/stereo-meters-final/results.json),
+720 detached checks and 57 renders,
 with zero binding errors. Coverage includes independent L/R values, lane geometry,
 time-based release, reduced animation, toggle behavior and saved channel
 assignments. The later hands-on stereo-source procedure is in
 [TESTING.md](../TESTING.md); it has not been run against real audio or physical
 controls. Build and activation evidence is recorded in [design-qa.md](../design-qa.md).
 
-The selection/grab [published results](design/selection-grab-verified/results.json)
+The selection/grab published results
 passed **641 checks and 55 renders**, with zero binding errors. They cover
 constant two-screen-DIP selection outlines at 30–200%, multi-selection,
 collapsed nodes, unchanged node geometry and passive hit tests of the header
 grab area. Editable controls reject node dragging. The
-[22:56 activation](../artifacts/selection-grab-update-20261017-225617/result.json)
+22:56 activation
 replaced only the controller; the existing engine and saved configuration stayed
 unchanged. Physical pointer gestures remain a separate check in TESTING.md.
 
-The earlier uniform-zoom [published results](design/uniform-zoom-final/results.json)
+The earlier uniform-zoom published results
 passed **583 checks and 50 renders**, with zero binding errors. They verify
 unchanged node proportions, fonts, borders, visible editors and socket geometry
 from 30% through 200%, explicit collapse, and repeated Fit from 30% and 100%.
 Both Fit cases reach the same proportional scale of approximately 75.7%
 (displayed as 76%), with the complete EQ inside the 900 × 580 window. Review of
-[50% effects](design/uniform-zoom-final/effects-50percent.png),
-[75% effects](design/uniform-zoom-final/effects-75percent.png) and
-[small-window Fit](design/uniform-zoom-final/effects-fit-small-window.png)
+50% effects,
+75% effects and
+small-window Fit
 found no scoped issue. Existing dark/category colours, resize layouts, group
 editing and high-contrast checks remain covered. Physical-display sharpness and
 native gestures remain separate checks in [TESTING.md](../TESTING.md).
 
-The [22:42 controller-only activation](../artifacts/uniform-zoom-update-20261017-224232/result.json)
+The 22:42 controller-only activation
 opened responsive controller PID 45816 matching the verified package. Engine
 PID 43332, its start time and binary remained unchanged, and its frame counter
 advanced. Revision 733, the eight-node graph and settings bytes were preserved,
 including after opening the new window.
 
 The earlier dark/resizable controller, before the uniform-zoom correction, has
-[detached results](design/oled-final/results.json) that
+detached results that
 passed **499 checks and 41 renders**, with no binding errors. Fractional-zoom
 captures include 75%, 90%, 110% and 150% at 96/144 DPI, including EQ/dials at
 90%/110%, overview attention states and minimum/default/large window layouts.
@@ -299,40 +304,40 @@ controls and correctly contained Fit results. This establishes rendering and
 layout; physical-monitor sharpness and native resize gestures remain separate.
 See [design-qa.md](../design-qa.md) and [TESTING.md](../TESTING.md).
 
-At 22:32 UTC+10, the [controller-only activation](../artifacts/oled-ui-update-20261017-223221/result.json)
+At 22:32 UTC+10, the controller-only activation
 opened responsive controller PID 48788 matching the verified package. Original
 engine PID 43332, start time and binary remained unchanged, its frames advanced,
 and revision 578, the eight-node graph and settings bytes were preserved,
 including after opening. No engine restart or audio-route/device change occurred.
 
 At 22:11 UTC+10, multi-node editing was installed as a controller-only update.
-The [published results](design/group-edit-published/results.json) contain 368
+The published results contain 368
 passing checks and 24 detached renders with no binding errors, including group
 selection, move/cancel, clipboard validation/replay and deletion. The
-[activation record](../artifacts/group-ui-update-20261017-221057/result.json)
+activation record
 confirms a responsive new window, the same advancing engine process/binary and
 unchanged revision 549/settings. Physical gestures and the Windows clipboard
 remain separate checks in [TESTING.md](../TESTING.md).
 
 At 21:53 UTC+10, the zoom/rendering correction replaced only the controller.
-The [activation record](../artifacts/zoom-ui-update-20261017-215316/result.json)
+The activation record
 confirms that the original engine process and binary stayed unchanged, its
 frame counter advanced, and revision 310, settings bytes and saved layout were
 preserved. The installed UI opened a responsive window. Both the ordinary
 Release build and the published single-file executable passed **268 detached
 checks and 22 renders**, with no binding errors. See the
-[published results](design/zoom-fix-published/results.json),
+published results,
 [benchmark](ZOOM_RENDERING_BENCHMARK.md) and [review](../design-qa.md).
 These are controlled rendering results; live pointer feel and physical display
 rendering remain for the user to assess without desktop automation.
 
 The updated controller and matching native engine were installed and opened at
-21:35 UTC+10 on 17 October. The [activation record](../artifacts/readable-update-20261017-213523/result.json)
+21:35 UTC+10 on 17 October. The activation record
 confirms a responsive window, advancing frames and the identical saved
 configuration. See [design-qa.md](../design-qa.md) for scope, the two updater
 retries and the remaining interaction checks. The earlier
-[61-check style result](design/blender-final/results.json) and
-[21:04 controller-only activation](../artifacts/ui-switch-20261017-210400/result.json)
+61-check style result and
+21:04 controller-only activation
 remain historical evidence.
 
 The inert `--render-design --verification-dir <new directory>` mode renders
@@ -345,7 +350,7 @@ DPI, bundled font resolution, absence of whole-node/ancestor effects or bitmap
 caches, socket bounds, bindings and described programmatic edits. These checks
 do not exercise physical mouse/keyboard gestures or a real monitor DPI change.
 
-The final readable candidate's [results](design/blender-readable-final/results.json)
+The final readable candidate's results
 contain 226 passing scoped checks and 20 actual WPF renders at 96/144/192 DPI,
 with zero binding errors. Its Release build completed with zero warnings and
 errors. Visual review compared the official Blender reference, previous effects

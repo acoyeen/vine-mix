@@ -52,7 +52,11 @@ internal static class UpdateWorker
             platform.CheckFileVersion(context.AssetPath, context.Offer.Manifest.NumericVersion);
             ownership = platform.AcquireLock();
             journal = UpdateTransaction.ReadJournal(context);
-            if (UpdateTransaction.Terminal(journal.Phase)) return 0;
+            if (UpdateTransaction.Terminal(journal.Phase))
+            {
+                ClearTerminalRecovery(context, journal, platform);
+                return 0;
+            }
             if (journal.Attempts >= 3) throw new IOException("Automatic recovery reached its three-attempt limit. Retain the update backup and use manual repair.");
             if (journal.Phase == UpdatePhase.RecoveryRequired)
             {
@@ -78,7 +82,7 @@ internal static class UpdateWorker
                         || !platform.IsSameLiveProcess(context.Data.Parent))
                     {
                         journal = journal with { Phase = UpdatePhase.Cancelled, Message = "The update was cancelled before the application closed." };
-                        UpdateTransaction.SaveJournal(context, journal); platform.ClearRecovery(context); return 2;
+                        UpdateTransaction.SaveJournal(context, journal); ClearTerminalRecovery(context, journal, platform); return 2;
                     }
                     platform.Delay(100);
                 }
@@ -188,7 +192,7 @@ internal static class UpdateWorker
             if (journal.Phase == UpdatePhase.HealthCommitted)
             {
                 journal = journal with { Phase = UpdatePhase.Completed }; UpdateTransaction.SaveJournal(context, journal);
-                platform.ClearRecovery(context); return 0;
+                ClearTerminalRecovery(context, journal, platform); return 0;
             }
             throw new IOException("This update requires manual recovery. Its previous application payload is retained.");
         }
@@ -212,7 +216,7 @@ internal static class UpdateWorker
                     journal = journal with { Phase = UpdatePhase.RollingBack, Message = message }; UpdateTransaction.SaveJournal(context, journal);
                     Restore(context, journal.Backup!, journal.Candidate!, platform);
                     journal = journal with { Phase = UpdatePhase.RolledBack, Message = message + " The previous owned application payload was restored; personal settings were not replaced." };
-                    UpdateTransaction.SaveJournal(context, journal); platform.ClearRecovery(context);
+                    UpdateTransaction.SaveJournal(context, journal); ClearTerminalRecovery(context, journal, platform);
                     reopenPrevious = true;
                     return 3;
                 }
@@ -243,6 +247,29 @@ internal static class UpdateWorker
                 }
             }
         }
+    }
+
+    private static void ClearTerminalRecovery(VerifiedUpdate context, UpdateJournal journal, IUpdateWorkerPlatform platform)
+    {
+        string? failure = null;
+        try { platform.ClearRecovery(context); }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or InvalidOperationException
+            or Win32Exception or System.Security.SecurityException)
+        { failure = error.Message.Length > 512 ? error.Message[..512] : error.Message; }
+
+        // Registration housekeeping cannot undo a durably completed operation.
+        // A retained RunOnce command re-enters only this terminal cleanup path;
+        // normal startup ignores terminal history and never repeats the update.
+        string receipt = Path.Combine(context.Directory, "recovery-cleanup.json");
+        if (failure is null && !File.Exists(receipt)) return;
+        try
+        {
+            UpdateFiles.WriteJson(receipt, new { pending = failure is not null, phase = journal.Phase.ToString(),
+                updatedUtc = DateTimeOffset.UtcNow, message = failure ?? "Recovery registration cleanup completed." });
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or InvalidOperationException
+            or System.Security.SecurityException)
+        { Debug.WriteLine(error); } // Retain the terminal journal even if diagnostic storage is unavailable.
     }
 
     private static UpdatePhase? SafeResume(VerifiedUpdate context, UpdateJournal journal) => journal.Phase switch
@@ -401,7 +428,8 @@ internal static class UpdateWorker
         foreach (var old in original.Files)
         {
             string target = UpdateFiles.RelativeFile(context.TargetDirectory, old.Path);
-            if (!after.ContainsKey(old.Path) && File.Exists(target)) throw new IOException("A formerly missing payload file was recreated after the checkpoint; recovery retained it.");
+            if (!after.ContainsKey(old.Path) && File.Exists(target) && !UpdateFiles.EqualHash(UpdateFiles.Hash(target), old.Sha256))
+                throw new IOException("A formerly missing payload file was recreated after the checkpoint; recovery retained it.");
         }
         // Check the uninstall postimage before any file mutation too.
         var currentRegistry = original.Registry is null ? null : platform.ReadRegistration(context);

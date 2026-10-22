@@ -5,16 +5,16 @@
   "native": {
     "passed": true,
     "suites": 12,
-    "report": "C:\\path\\to\\vine-mix\\artifacts\\dial-redesign-native\\results.json"
+    "report": "artifacts\\dial-redesign-native\\results.json"
   },
   "desktop": {
     "passed": true,
     "checks": 3865,
     "renders": 108,
     "bindingErrors": 0,
-    "report": "C:\\path\\to\\vine-mix\\artifacts\\dial-redesign-final\\results.json"
+    "report": "artifacts\\dial-redesign-final\\results.json"
   },
-  "baseline": "C:\\path\\to\\vine-mix\\artifacts\\dial-redesign-before\\results.json",
+  "baseline": "artifacts\\dial-redesign-before\\results.json",
   "sourceSha256": {
     "desktop/AudioMixer.Desktop/App.xaml.cs": "d19667017558858aab68bee37e48651546043630ac846027cc1b5ed544b18ecf",
     "desktop/AudioMixer.Desktop/CaptionHitTestVerification.cs": "3cc831a5e575a8efbfabcc6b15a7ebbe356d9a6f027e01d9d4498e156147d2b1",

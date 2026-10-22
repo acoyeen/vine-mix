@@ -1,5 +1,9 @@
 # Fixed console mockup review
 
+> Historical development record. Results and procedures below belong to their
+> named versions; they do not qualify the current beta. See
+> [current qualification](../BETA_TESTING_CURRENT.md) for the active release checks.
+
 The initial generated reference was inspected before production UI edits on 17 October 2026 and is retained as `console-mockup-initial.png`. The user then explicitly requested neutral monochromatic green instead of blue/yellow. The revised, inspected `console-mockup.png` is the current style reference. Its raster is approximately 1.436 pixels per DIP relative to the 1120 × 680 target; native screenshots must be compared at a normalized density.
 
 Accepted: five aligned strips, three pairs of A/B faders, one meter per strip, filled route/mute controls, compact device names, both A output rows, and one B microphone destination. The saved-state example has silent meters, microphone 1 B on, app A on, and A master muted at −24 dB.

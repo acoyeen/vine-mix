@@ -2,6 +2,7 @@
 // against synthetic workers. windows_audio.cpp/process_capture.cpp are NEVER
 // linked into this executable, so it cannot open real audio endpoints.
 #include "am/engine.hpp"
+#include "am/control_server.hpp"
 #include "am/engine_instance.hpp"
 #include "am/process_capture.hpp"
 #include <windows.h>
@@ -13,6 +14,7 @@
 #include <fstream>
 #include <iostream>
 #include <map>
+#include <sstream>
 #include <stdexcept>
 extern "C" std::uint64_t am_speex_memory_operations(void);
 
@@ -477,6 +479,93 @@ void ownershipLocks() {
     }
     EngineInstance available(identity); // Rejected acquisition must not leak a lock.
 }
+void controlProtocol(const std::filesystem::path& directory) {
+    using namespace am;
+    const auto path = directory / "protocol-settings.json";
+    const auto read = [&] {
+        std::ifstream stream(path, std::ios::binary); std::ostringstream bytes; bytes << stream.rdbuf(); return bytes.str();
+    };
+    {
+        Engine engine(path); engine.start();
+        ControlServer server(engine);
+        // Parse wire-format JSON so positive numbers also exercise nlohmann's
+        // unsigned representation, as real desktop requests do.
+        auto request = Json::parse(Json{{"protocolVersion", 1}, {"requestId", "private-fixture"},
+            {"command", "configure"}, {"expectedRevision", 0}, {"configuration", defaultConfiguration()}}.dump());
+        const auto accepted = server.handle(request);
+        check(accepted.value("ok", false) && accepted["snapshot"]["configuration"]["revision"] == 1,
+            "An unsigned integer protocol version and revision commit through the actual command dispatcher");
+        request["expectedRevision"] = 1;
+        const auto committed = read();
+        const auto rejectsUnchanged = [&](const Json& malformed) {
+            const auto response = server.handle(malformed);
+            check(!response.value("ok", true) && response.contains("error") && !response.contains("errorCode")
+                && engine.snapshot()["configuration"]["revision"] == 1 && read() == committed,
+                "Malformed control input returns a protocol error without changing revision or saved bytes");
+        };
+        for (const auto& version : std::array<Json, 8>{Json(1.5), Json(1.0), Json(std::uint64_t{4294967297}),
+            Json(-1), Json(0), Json("1"), Json(true), Json(nullptr)}) {
+            auto malformed = request; malformed["protocolVersion"] = version; rejectsUnchanged(malformed);
+        }
+        for (const auto& revision : std::array<Json, 7>{Json(-1), Json(1.5), Json(1.0), Json("1"), Json(true), Json(nullptr), Json(1e30)}) {
+            auto malformed = request; malformed["expectedRevision"] = revision; rejectsUnchanged(malformed);
+        }
+        for (const auto& malformed : std::array<Json, 5>{Json(nullptr), Json(1), Json("request"), Json::array(), Json::object()})
+            rejectsUnchanged(malformed);
+        auto invalidSchema = request; invalidSchema["configuration"]["version"] = 999;
+        rejectsUnchanged(invalidSchema);
+        auto invalidGraph = request; invalidGraph["configuration"]["graph"]["nodes"][0]["gainDb"] = 13;
+        rejectsUnchanged(invalidGraph);
+        Configuration oversized; migrateLegacyGraph(oversized);
+        for (auto& node : oversized.graph.nodes) node.app.executablePath = std::string(32768, 'x');
+        auto invalidSize = request; invalidSize["configuration"] = oversized;
+        rejectsUnchanged(invalidSize);
+        engine.stop();
+        check(live == 0, "Control verification closes all synthetic workers");
+    }
+    for (const auto* suffix : {"", ".bak", ".new", ".established"}) std::filesystem::remove(path.string() + suffix);
+    std::cout << "PASS control: exact integer protocol/revision validation; 23 malformed requests preserve saved bytes/revision and remain permanent errors; direct dispatch with synthetic workers and no pipe\n";
+}
+void persistenceProtocol(const std::filesystem::path& directory) {
+    using namespace am;
+    const auto path = directory / "persistence-settings.json";
+    const auto backup = std::filesystem::path(path.wstring() + L".bak");
+    const auto read = [](const std::filesystem::path& file) {
+        std::ifstream stream(file, std::ios::binary); std::ostringstream bytes; bytes << stream.rdbuf(); return bytes.str();
+    };
+    auto initial = defaultConfiguration(); initial.revision = 7;
+    ConfigurationStore store(path); store.save(initial); ++initial.revision; store.save(initial);
+    const auto committed = read(path), priorBackup = read(backup);
+    {
+        Engine engine(path); engine.start(); ControlServer server(engine);
+        auto edited = initial; edited.graph.nodes[0].x += 32;
+        const auto request = Json::parse(Json{{"protocolVersion", 1}, {"requestId", "private-persistence-fixture"},
+            {"command", "configure"}, {"expectedRevision", initial.revision}, {"configuration", edited}}.dump());
+        const auto previous = engine.snapshot()["configuration"];
+        const int workers = created;
+        for (const bool lockPrimary : {false, true}) {
+            const auto lockedPath = lockPrimary ? path : std::filesystem::path(path.wstring() + L".new");
+            struct FileLock { HANDLE value; ~FileLock() { if (value != INVALID_HANDLE_VALUE) CloseHandle(value); } } locked{
+                CreateFileW(lockedPath.c_str(), lockPrimary ? GENERIC_READ : GENERIC_READ | GENERIC_WRITE,
+                    lockPrimary ? FILE_SHARE_READ : 0, nullptr, lockPrimary ? OPEN_EXISTING : OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
+            check(locked.value != INVALID_HANDLE_VALUE, "Lock only the temporary persistence fixture");
+            const auto response = server.handle(request);
+            check(!response.value("ok", true) && response.value("errorCode", "") == "settings_write_failed"
+                && response.contains("error"), "Staging/replacement I/O failure returns its explicit retryable error class");
+            check(engine.snapshot()["configuration"] == previous && read(path) == committed && read(backup) == priorBackup
+                && created == workers, "Rejected persistence preserves committed engine state, settings, backup and healthy synthetic workers");
+        }
+        const auto retried = server.handle(request);
+        check(retried.value("ok", false) && !retried.contains("errorCode")
+            && retried["snapshot"]["configuration"]["revision"] == initial.revision + 1
+            && retried["snapshot"]["configuration"]["graph"]["nodes"][0]["x"] == edited.graph.nodes[0].x
+            && ConfigurationStore(path).load().revision == initial.revision + 1 && read(backup) == committed,
+            "The identical request succeeds after releasing the file lock, advances one revision and retains the previous commit");
+        engine.stop(); check(live == 0, "Persistence verification closes every synthetic worker");
+    }
+    for (const auto* suffix : {"", ".bak", ".new", ".established"}) std::filesystem::remove(path.string() + suffix);
+    std::cout << "PASS persistence: locked staging and replacement preserve config/revision/backup; typed I/O response and identical-request retry; synthetic workers only\n";
+}
 void recovery(const std::filesystem::path& directory) {
     using namespace am;
     check(live == 0, "Recovery fixture must start without workers");
@@ -484,8 +573,22 @@ void recovery(const std::filesystem::path& directory) {
     std::filesystem::create_directory(root);
     const auto path = root / "settings.json";
     const auto nested = root / "not-created" / "nested" / "settings.json";
-    check(ConfigurationStore(nested).physicalPath() == nested && !std::filesystem::exists(nested.parent_path()),
-        "A new nested settings path resolves through its nearest existing ancestor without creating directories");
+    const auto checkUncreatedPath = [&](const std::filesystem::path& candidate) {
+        const auto physical = ConfigurationStore(candidate).physicalPath();
+        const auto physicalNested = physical.parent_path();
+        const auto physicalMissing = physicalNested.parent_path();
+        // TEMP can use a short name, different case or a redirected location.
+        // Compare the opened ancestor's identity, never its logical spelling.
+        check(physical.filename() == "settings.json" && physicalNested.filename() == "nested"
+            && physicalMissing.filename() == "not-created"
+            && std::filesystem::equivalent(physicalMissing.parent_path(), root)
+            && !std::filesystem::exists(nested.parent_path()) && !std::filesystem::exists(root / "not-created"),
+            "A new nested settings path resolves through its physical ancestor without creating directories");
+    };
+    checkUncreatedPath(nested);
+    const auto caseAlias = root.parent_path() / "ReCoVeRy";
+    if (std::filesystem::exists(caseAlias))
+        checkUncreatedPath(caseAlias / "not-created" / "nested" / "settings.json");
     const auto write = [&](const auto& file, const auto& text) {
         std::ofstream stream(file, std::ios::binary); stream << text;
         check(static_cast<bool>(stream), "Write isolated recovery fixture");
@@ -508,6 +611,10 @@ void recovery(const std::filesystem::path& directory) {
         Engine blocked(path); blocked.start();
         check(blocked.snapshot()["settingsState"] == "backupAvailable" && created == before && live == 0
             && blocked.snapshot()["status"]["nodes"].empty(), "Backup preview starts zero synthetic audio ports");
+        const auto blockedResponse = ControlServer(blocked).handle(Json{{"protocolVersion", 1}, {"command", "configure"},
+            {"expectedRevision", 11}, {"configuration", saved}});
+        check(!blockedResponse.value("ok", true) && !blockedResponse.contains("errorCode"),
+            "A pending recovery choice remains a permanent rejection instead of triggering automatic persistence retries");
         rejects([&] { blocked.configure(saved, 11); });
         blocked.retry(); blocked.recover("retry");
         check(created == before && read(path) == "broken original" && read(path.string() + ".bak") == backup,
@@ -898,6 +1005,8 @@ int main() {
         test::ownershipLocks();
         test::recovery(directory);
         test::streamedMicrophones(directory);
+        test::controlProtocol(directory);
+        test::persistenceProtocol(directory);
         for (const auto& fixture : {path, sharedPath})
             for (const auto& suffix : {"", ".bak", ".new", ".established"}) std::filesystem::remove(fixture.string() + suffix);
         std::filesystem::remove(directory / "engine.log"); std::filesystem::remove(directory / "engine.log.previous");

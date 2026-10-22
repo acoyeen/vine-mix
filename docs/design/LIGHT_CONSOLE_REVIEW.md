@@ -1,11 +1,20 @@
 # Flat slate console revision
 
+> Historical development record. Results and procedures below belong to their
+> named versions; they do not qualify the current beta. See
+> [current qualification](../BETA_TESTING_CURRENT.md) for the active release checks.
+
+Evidence note: raw reports, historical renders and reference captures cited
+here are retained privately outside the repository. Their labels below identify
+archived evidence, not downloadable files; recorded results apply only to the
+versions and checks described.
+
 The user requested a lighter, more neutral VoiceMeeter-inspired surface on
 17 October 2026. This supersedes the charcoal rounded-strip treatment.
 
-The actual [VoiceMeeter reference](evidence/03-voicemeeter-reference.png) and the
-[running prior console](implementation/07-live-console-handoff.png) were opened
-before generating and inspecting [the revised mockup](light-console-mockup.png).
+The actual VoiceMeeter reference and the
+running prior console were opened
+before generating and inspecting the revised mockup.
 Both references were attached to generation. The selected product and its
 functional inventory remain unchanged.
 
@@ -30,6 +39,6 @@ knobs, routes, logos or decorative graphics from the reference.
 
 The current live baseline at the start of this revision is saved configuration
 revision 3, A muted at −24 dB. Its SHA-256 is
-`D082E5A80406C58E7ACD25EFD8B56FE57234C89F6780314F095177429EB1E0F5`.
+`<private-settings-sha256-omitted>`.
 Preserve this current state rather than restoring the older revision-1 example.
 No audio playback or reliability test is part of this presentation change.

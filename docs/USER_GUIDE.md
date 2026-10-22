@@ -5,8 +5,8 @@ Create sources, processing chains and destinations on a resizable node canvas, w
 settings inside each node. The C++ engine handles audio in a separate process;
 the WPF desktop handles editing, telemetry and tray behavior.
 
-For installation, first-session setup, driver terms, updates and reporting,
-start with the
+For the current beta, installation, first-session setup, driver
+terms, manual updates and reporting, start with the
 [beta tester guide](BETA_TESTER_GUIDE.md). The version beside the connection dot
 identifies the beta; **Settings → About VineMix** provides copyable full release
 and build information.

@@ -1,46 +1,61 @@
-# Visual landing website review
+# Forest landing local review
 
-Checked 20 October 2026. Local-only preview: `http://127.0.0.1:4173/`.
+## 23 October release polish
 
-## Scope
+The opening links to the Beta 3 download and the current user guide. Product
+copy reflects versioned releases and the current beta limitations. These are
+content and link changes; the historical browser evidence below does not
+qualify this revision. No preview server or browser was started for this pass.
 
-The opening now emphasizes a large supplied wordmark, flowing source/output
-connections and one descriptive sentence. The real workspace image, three-step
-explanation, VRChat music-through-mic use case, reliability/source status and FAQ
-remain below the fold. The connection concept is informed by Magic UI Animated
-Beam on 21st.dev. Icons are local Lucide assets, with notices and website credits.
+## 21 October update — preview intentionally off
+
+The opening now contains a standalone centered VM mark, a GitHub button with
+the official Octicons mark and a disabled Documentation/Soon placeholder.
+The header wordmark/navigation, sentence, scroll prompt and motion control
+are removed. Existing Plex Sans is retained because the logo lettering is
+custom vector artwork, not a font file.
+
+The shader introduction settles after five seconds to avoid continuous
+rendering. Reduced-motion and offscreen/hidden-tab pausing remain in source.
+JavaScript syntax, local asset paths, same-page targets and whitespace checks
+passed. Browser rendering and timing have not been rechecked for this revision:
+the maintainer requested the lagging preview be shut down. The server was stopped and
+both preview tabs closed; port 4173 has no listener. Do not relaunch automatically.
+
+The prior reviewed version is retained in the private development archive.
+
+## Prior browser-verified revision
+
+Checked 20 October 2026. Preview: `http://127.0.0.1:4173/`.
+
+The opening now uses the maintainer's exact **frorest-green** shader reference, a small
+wordmark and one short use-case sentence. Scrolling transitions into the real
+workspace, then the VRChat music-sharing scene and factual project information.
+This replaces the rejected icon/beam composition.
+
+The implementation follows the researched `frontend-design` and
+`web-design-guidelines` skills plus Product Design reference/QA guidance.
+[DESIGN_NOTES.md](DESIGN_NOTES.md) records the direction and
+[SHADER_PROVENANCE.md](SHADER_PROVENANCE.md) records the exact source and licence.
 
 ## Verification
 
-- All 21 checked local page/asset/style/script/license resources returned HTTP 200.
-- Internal link targets exist; Explore VineMix reached the explanatory section.
-  Website credits and its return link were exercised successfully.
-- The driver FAQ opened with a pointer and closed with Enter.
-- Both images loaded and the supplied regular/semibold Plex fonts resolved.
-- Browser console inspection returned no warnings or errors.
-- Desktop viewport: 1280 × 800; document width 1265 px, no horizontal overflow.
-- Phone viewport: 390 × 844; document width 375 px, no horizontal overflow.
-- The opening occupies one viewport at both tested sizes. The phone illustration
-  changes to sources above the wordmark and outputs below it; five paths redraw.
-  Input labels were moved above their icons after review found tracks crossing them.
-- Pointer pause and keyboard Enter resume changed the CSS animation state.
-- Emulated reduced-motion preference automatically paused animation. Media
-  emulation was cleared after verification.
-- Phone and desktop hero screenshots were visually inspected. The explanatory
-  copy and existing full-size workspace image link remain available below.
-- Temporary phone viewport override was reset before handoff.
-- Repository metadata still reported private source and no public release.
-  The page includes no inaccessible source/download CTA and preserves the
-  experimental, virtual-driver and unqualified receiver-compatibility boundaries.
+- Desktop, phone, wide/short windows, reduced motion and JavaScript-disabled
+  fallback were checked in the local browser.
+- Pointer/keyboard motion controls, navigation, Credits and the driver
+  disclosure worked. The shader pauses outside the opening.
+- Fifteen referenced local resources returned HTTP 200; six anchor references
+  resolve. Both scripts passed syntax checks. No browser warnings/errors were
+  reported.
+- No horizontal overflow at the tested widths. Short windows and phones use
+  normal content flow; reduced motion starts with a still shader frame.
+- Shader source and preset match the selected reference. All runtime assets
+  are local. No application/audio-engine processes or personal settings changed.
 
-Screenshots are saved in the ignored local artifact directory:
+Full evidence, corrections and limits are in [design-qa.md](design-qa.md).
+Screenshots and preceding website files are retained in the private development
+archive outside the source checkout.
 
-- `artifacts/website-visual-review-20261020/desktop.jpg`
-- `artifacts/website-visual-review-20261020/mobile.jpg`
-
-The preceding version is retained in `artifacts/website-before-visual-20261020/`.
-
-The server binds only to 127.0.0.1 and serves only `website/dist`. No desktop
-application, audio engine, personal settings or drivers were changed.
-No comprehensive accessibility certification or real audio qualification is
-implied by these page checks.
+The server binds only to `127.0.0.1` and serves only `website/dist`. This remains
+a local review. VineMix is experimental; no public release, receiver
+qualification or long-session reliability is implied by website checks.

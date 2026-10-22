@@ -1,5 +1,14 @@
 # Audio Mixer — readable Blender nodes and graphical EQ
 
+> Historical development record. Results and procedures below belong to their
+> named versions; they do not qualify the current beta. See
+> [current qualification](docs/BETA_TESTING_CURRENT.md) for the active release checks.
+
+Evidence note: raw reports, historical renders and reference captures cited
+here are retained privately outside the repository. Their labels below identify
+archived evidence, not downloadable files; recorded results apply only to the
+versions and checks described.
+
 17 October 2026, UTC+10.
 
 ## 20 October — Clearer Controls section hierarchy
@@ -425,7 +434,7 @@ The eight-hour endurance test remains **Deferred** at the user's request.
 ## Reference and comparison
 
 - [Blender node anatomy](https://docs.blender.org/manual/en/latest/interface/controls/nodes/parts.html)
-  and its unchanged [reference image](docs/design/blender-reference/node-parts-overview.png).
+  and its unchanged reference image.
 - [Blender default theme](https://github.com/blender/blender/blob/main/release/datafiles/userdef/userdef_default_theme.c).
 - [FL Studio Parametric EQ 2](https://www.image-line.com/fl-studio-learning/fl-studio-online-manual/html/plugins/Fruity%20Parametric%20EQ%202.htm)
   as the interaction reference for direct point manipulation and band-width adjustment.
@@ -433,9 +442,9 @@ The eight-hour endurance test remains **Deferred** at the user's request.
 
 The reference, previous effects view, final effects, expanded EQ at 144 DPI,
 high contrast, full workspace, waiting and empty states were loaded together
-for comparison. The [effects overview](docs/design/blender-readable-final/effects.png)
+for comparison. The effects overview
 uses 100% canvas zoom in a 1280 × 800 DIP window. The
-[expanded EQ](docs/design/blender-readable-final/eq-closeup-144dpi.png) uses
+expanded EQ uses
 144-DPI output pixels and the actual node class, independently of canvas zoom.
 The reference has different controls and unspecified source zoom; this is a
 comparison of visual structure and interaction, not a pixel-identical clone.
@@ -472,7 +481,7 @@ comparison of visual structure and interaction, not a pixel-identical clone.
 
 ## Evidence and limits
 
-[Machine-readable UI results](docs/design/blender-readable-final/results.json)
+Machine-readable UI results
 record every assertion, image size, visual DPI and expanded/collapsed socket
 geometry. Tests also verify that the actual Mid dial changes only its assigned
 gain, incoming routes survive edits, a ninth EQ point is rejected, zero bands
@@ -500,7 +509,7 @@ native engine were installed into the personal package and opened. The published
 single-file build also passed the same 226 offscreen checks, including bundled
 font resolution, before activation.
 
-The [successful activation record](artifacts/readable-update-20261017-213523/result.json)
+The successful activation record
 confirms a responsive visible window, matching candidate binaries, an advancing
 audio frame counter, unchanged configuration revision 207 and identical settings
 file bytes. All previously running paths returned to Running. Listening output 1
@@ -512,8 +521,8 @@ The successful restart reached a running snapshot after 0.421 seconds. This is
 control/status timing, not a measured audible gap or hardware recovery benchmark.
 Two earlier updater attempts restarted the old application after shutdown-pipe
 cleanup/acknowledgement handling failed:
-[21:34 attempt](artifacts/readable-update-20261017-213437/result.json) and
-[21:35 attempt](artifacts/readable-update-20261017-213501/result.json).
+21:34 attempt and
+21:35 attempt.
 The updater was corrected to tolerate closure after shutdown and verify the exact
 engine process's exit. Their backups and failure evidence remain intact.
 
@@ -523,7 +532,7 @@ The user's overview screenshot showed multicoloured text fringes and excessive
 grid density. The previous node theme also contained rose/blue/purple headers.
 Scaled text now explicitly uses grayscale rendering, and every category header
 uses neutral charcoal. Audio cables/meters retain green and mute retains its
-alert colour. The new [30% view](docs/design/zoom-fix-v2/workspace-30percent.png)
+alert colour. The new 30% view
 was visually inspected; it has neutral text/headers and a sparse grid. At this
 scale small controls are an overview, not a substitute for full-size editing.
 
@@ -546,8 +555,8 @@ cause of the screenshot's artefact is inferred from its RGB fringe pattern and
 the previous Auto rendering mode; actual display output was not captured again.
 
 Release and published builds passed **268 checks / 22 renders**, with zero
-binding errors: [Release](docs/design/zoom-fix-v2/results.json),
-[published](docs/design/zoom-fix-published/results.json). New checks cover
+binding errors: Release,
+published. New checks cover
 grayscale inheritance, neutral palette, static telemetry retention, wheel
 accumulation, bounded grid density, geometry updates after movement/collapse,
 and config refresh decisions. An initial test caught floating-point cable
@@ -561,7 +570,7 @@ eight- and 24-node fixtures. At 30%, eight-node telemetry/layout dropped from
 Both 30% offscreen rendering workloads improved. Some other zoom/raster cases
 were slower, so this is not a universal rendering-speed or live-FPS claim.
 
-The [controller-only activation](artifacts/zoom-ui-update-20261017-215316/result.json)
+The controller-only activation
 opened a responsive updated window while engine PID 43332 and its binary stayed
 unchanged. Frames advanced from 51,544,800 to 51,560,880. Configuration revision
 310 and settings bytes were identical before/after opening. No engine restart,
@@ -594,7 +603,7 @@ The clipboard carries JSON strings, supported by the current
 [WPF clipboard guidance](https://learn.microsoft.com/en-us/dotnet/standard/serialization/binaryformatter-migration-guide/winforms-wpf-ole-guidance),
 and uses typed string retrieval instead of arbitrary-object deserialization.
 
-The [published executable results](docs/design/group-edit-published/results.json)
+The published executable results
 record **368 passing checks, 24 renders and zero binding errors**. New tests use
 the real selection/movement/paste/delete operations against detached WPF controls.
 They cover reversed and additive selection, overlay bounds/contraction, cancel,
@@ -602,12 +611,12 @@ telemetry during movement, shared snapping/bounds, one-edit commits, deep copies
 internal edges, repeated paste, unrelated route preservation, invalid payloads,
 capacity rejection, device conflicts and paste replay. The Release build and
 self-contained publish succeeded. The actual
-[selection box](docs/design/group-edit-published/group-box-selection.png) and
-[pasted group](docs/design/group-edit-published/group-pasted.png) were inspected.
+selection box and
+pasted group were inspected.
 No desktop input, OS clipboard access or live audio was used in these tests;
 physical gesture/Windows clipboard checks remain in TESTING.md.
 
-The [controller-only activation](artifacts/group-ui-update-20261017-221057/result.json)
+The controller-only activation
 opened responsive controller PID 43108. Engine PID 43332, its start time and
 binary stayed unchanged; frames advanced from 102,414,960 to 102,428,160.
 Revision 549, the user's eight-node graph and settings bytes remained identical,
@@ -636,7 +645,7 @@ view or moved to tooltips. The initial 1280 × 800 window can resize down to
 900 × 580 or maximise using its integrated caption. Resizing preserves graph
 positions and zoom rather than automatically rearranging nodes.
 
-The final [published results](docs/design/oled-final/results.json) passed
+The final published results passed
 **499 checks / 41 renders**, with zero binding errors. Actual WPF canvases are
 rendered at 75%, 90%, 110% and 150% zoom and 96/144 DPI, with additional 30%/50%
 overviews, EQ/dials at 90%/110%, attention states and 900 × 580, 1280 × 800 and
@@ -647,13 +656,13 @@ the WPF visual DPI and output pixel dimensions before rendering; images are
 not enlarged after capture. Existing group edits, cable handling, EQ/dials,
 meter retention, high contrast and no-native-window checks remain included.
 
-Visual review inspected [30% overview](docs/design/oled-final/workspace-30percent.png),
-[90% detail](docs/design/oled-final/workspace-90percent.png),
-[110% detail](docs/design/oled-final/workspace-110percent.png),
-[minimum window](docs/design/oled-final/workspace-window-900x580.png),
-[fractional effects](docs/design/oled-final/effects-110percent-144dpi.png),
-[attention marks](docs/design/oled-final/overview-attention.png) and
-[Fit in the small window](docs/design/oled-final/effects-fit-small-window.png).
+Visual review inspected 30% overview,
+90% detail,
+110% detail,
+minimum window,
+fractional effects,
+attention marks and
+Fit in the small window.
 The reviewed captures have neutral
 text without the earlier RGB speckles, distinguishable category bands and
 visible caption/toolbar controls. Long titles are ellipsised in the 30% overview
@@ -663,7 +672,7 @@ was found in these captures; they do not measure live GPU zoom latency or
 physical-display antialiasing. A stale group-test message in the effects fixture
 was cleared before final captures.
 
-The earlier [452-check candidate](docs/design/oled-first/results.json) preceded
+The earlier 452-check candidate preceded
 additional attention/Fit coverage. Two subsequent published verification
 attempts correctly failed: a status glyph's line box changed overview height,
 then deferred WPF child layout invalidation made repeated Fit unstable. The
@@ -673,7 +682,7 @@ Fit from both 30% and 100% reaches identical 79% zoom/pan and contains the
 single EQ inside the 900 × 580 window. Earlier reports remain in
 `docs/design/oled-published` and `docs/design/oled-published-v2`.
 
-The [22:32 controller-only activation](artifacts/oled-ui-update-20261017-223221/result.json)
+The 22:32 controller-only activation
 opened responsive controller PID 48788 matching the verified executable.
 Engine PID 43332, its start time and binary stayed unchanged; frames advanced
 from 164,072,160 to 164,086,560. Revision 578, the user's eight-node graph and
@@ -698,7 +707,7 @@ detail cutoff or minimum on-screen title size. Ideal font metrics, grayscale
 antialiasing and direct rendering remain, as do the dark surfaces, category
 colours and resizable window.
 
-The final [published result](docs/design/uniform-zoom-final/results.json) passed
+The final published result passed
 **583 checks and 50 renders**, with zero binding errors. Tests compare node
 dimensions, fonts, borders, editor visibility and socket geometry from 30%
 through 200%, verify manual collapse and unchanged cable geometry during zoom,
@@ -706,9 +715,9 @@ and retain group-editing, EQ/dial, high-contrast and resize coverage. A complete
 EQ fits inside the 900 × 580 window at approximately 75.7% (displayed as 76%).
 Starting at either 30% or 100% and repeating Fit produces the same zoom and pan.
 
-Visual review inspected [50% effects](docs/design/uniform-zoom-final/effects-50percent.png),
-[75% effects](docs/design/uniform-zoom-final/effects-75percent.png) and
-[small-window Fit](docs/design/uniform-zoom-final/effects-fit-small-window.png).
+Visual review inspected 50% effects,
+75% effects and
+small-window Fit.
 The controls remain visible with their original proportions; the fitted EQ is
 fully contained. No scoped issue was found. The earlier overview screenshots,
 499-check result and activation record above remain historical evidence rather
@@ -719,7 +728,7 @@ control, native window, audio stream, personal settings or engine connection.
 They do not establish physical-display sharpness, native mouse/resize behavior
 or audio reliability. The endurance run remains Deferred.
 
-The [22:42 controller-only activation](artifacts/uniform-zoom-update-20261017-224232/result.json)
+The 22:42 controller-only activation
 opened responsive controller PID 45816 with the verified executable hash.
 Engine PID 43332, its start time and binary remained unchanged; frames advanced
 from 193,418,640 to 193,431,840. Revision 733, the eight-node graph, full
@@ -738,7 +747,7 @@ padding above the header and six at its sides. These transparent targets sit
 outside layout and below sockets. Buttons, fields, numeric controls, expanders,
 EQ plots and dials reject node dragging and retain their normal input behavior.
 
-The [published results](docs/design/selection-grab-verified/results.json) passed
+The published results passed
 641 checks and 55 rendered views, with zero binding errors. Review of 30%, 100%
 and collapsed 30% selection confirms a clear outline with unchanged contents.
 The initial detached grab check used InputHitTest, which returned no target
@@ -747,7 +756,7 @@ with visibility/hit-test filters and still requires the actual grab target and
 node ancestry. No physical input was injected; hands-on checks remain documented
 in TESTING.md.
 
-The [activation record](artifacts/selection-grab-update-20261017-225617/result.json)
+The activation record
 confirms responsive controller PID 47656 and the identical engine PID 43332,
 start time and binary. Frames advanced from 233,022,960 to 233,035,440. Revision
 1019, eight nodes, full configuration and settings bytes were preserved,
@@ -763,14 +772,14 @@ they also clear pending canvas wheel fractions. Outside the list, only sources
 retargeted to the captured ComboBox are replaced with the actual canvas hit.
 Genuine context-menu and other editor sources retain their wheel protection.
 
-The [published results](docs/design/dropdown-wheel-verified/results.json) passed
+The published results passed
 651 checks and 55 renders, with zero binding errors. Added detached fixtures
 cover popup, content and template ancestry, editor protection, unchanged zoom,
 cleared partial wheel input and normal canvas zoom afterward. No native popup
 was opened and no physical mouse input was injected. The hands-on dropdown
 scrolling procedure is recorded in TESTING.md for later verification.
 
-The [activation record](artifacts/dropdown-wheel-update-20261017-232307/result.json)
+The activation record
 confirms responsive controller PID 44112, with engine PID 43332, its start time
 and binary unchanged. Frames advanced from 310,277,280 to 310,291,200. The
 current one-node graph at revision 1080, full configuration and settings bytes
@@ -785,7 +794,7 @@ their existing scrolling; click and keyboard handlers are unchanged. WPF's
 only creates the selection-changing bubbling wheel event when preview input is
 unhandled, so no focus manipulation or selection rollback is needed.
 
-The [published results](docs/design/closed-dropdown-verified/results.json) passed
+The published results passed
 656 checks and 55 renders, with zero binding errors. The new fixture uses the
 actual application style and raises preview events from its template surface
 in both directions. Both are consumed, selection stays unchanged and no
@@ -793,7 +802,7 @@ SelectionChanged event fires. Existing popup/canvas checks also pass. These are
 detached checks without a native window, focus changes or physical input; later
 hands-on coverage, including keyboard selection, is recorded in TESTING.md.
 
-The [controller activation](artifacts/closed-dropdown-update-20261017-233149/result.json)
+The controller activation
 opened responsive controller PID 50152. Engine PID 43332, its start time and
 binary were unchanged; frames advanced from 335,330,400 to 335,343,360. The
 one-node graph at revision 1080, full configuration and settings bytes were
@@ -809,7 +818,7 @@ parameters use model defaults, documented in TESTING.md and control tooltips.
 Reset cancels the control's active drag, replaces unfinished text, clears stale
 validation feedback and dispatches a change only when the value differs.
 
-The [final published results](docs/design/numeric-reset-final/results.json) passed
+The final published results passed
 669 checks and 55 renders, with no binding errors. Added checks cover actual
 numeric templates, validation borders, reset callbacks, cancelled dragging,
 uncommitted text, explicit nonzero defaults and local double-click event routes.
@@ -820,7 +829,7 @@ occurred. The rendered effects view retains the previous layout; focused native
 interaction remains a later hands-on check.
 
 The first activation deferred because settings were changing. The subsequent
-[successful controller activation](artifacts/numeric-reset-update-20261017-235027/result.json)
+successful controller activation
 opened responsive controller PID 26284. Engine PID 43332, its start time and
 binary remained unchanged, with frames advancing from 388,995,120 to 389,007,600.
 The current two-node graph at revision 1365, full configuration and settings
@@ -842,12 +851,12 @@ elapsed time. Mute and unavailable paths clear it immediately. Stale telemetry
 decays to silence; reduced animation retains peaks at four presentations per
 second. The display timer stops for detached, hidden, muted or silent meters.
 
-[Native verification](artifacts/verification/native-stereo-mono-20261018.txt)
+Native verification
 passed 48,561 offline assertions and 210 concurrent synthetic graph commits.
 Coverage includes independent channel peaks, averaging/cancellation, transitions,
 channel propagation, preserved settings and no worker recreation for Mono edits.
 These tests opened no hardware audio devices. The
-[detached UI results](docs/design/stereo-meters-final/results.json) passed 720
+detached UI results passed 720
 checks and 57 renders with zero binding errors, covering smoothing cadence,
 stale samples, reduced animation, Mono interaction, full-width layout and the
 existing zoom/selection/clipboard behavior. The first run found a strict
@@ -855,7 +864,7 @@ clipboard shape check rejecting the new optional flag; accepting that flag while
 retaining version-one compatibility resolved it, with added regression checks.
 The microphone stereo/mono closeups and effects view were visually inspected.
 
-The [activation record](artifacts/stereo-meter-update-20261018-001409/result.json)
+The activation record
 confirms the new engine and responsive controller were loaded. All three
 previously running paths reported Running within 0.309 seconds of beginning
 the engine restart, and the audio frame counter advanced. This is a software
@@ -894,13 +903,13 @@ linked controls, duplicate routes, cycles, full graphs and unrepresentable cable
 gain sums are rejected without partial rewiring. Hover and cancellation do not
 change audio routing. Grid rounding cannot switch the highlighted target.
 
-[Native results](artifacts/verification/native-filters-notch-20261018.txt) passed
+Native results passed
 265,572 offline assertions and 210 synthetic lifecycle commits. New coverage
 includes filter response and slopes, notch depth/width, stereo independence,
 extreme parameters, bypass, coefficient crossfades and persistence. The real
 audio worker implementations are not linked into those tests.
 
-The [verified published UI](docs/design/node-refinements-verified/results.json)
+The verified published UI
 passed 896 checks and 61 rendered previews with zero binding errors. Checks
 exercise actual effect buttons, filter numeric controls and unopened EQ menus;
 legacy collapsed data; clipboard compatibility; fixed-size snap targets across
@@ -914,7 +923,7 @@ Final previews were inspected for meter fill, EQ/notch layout, pass filters,
 effect on/bypass contrast, socket halo and insertion highlighting. The wider
 gesture previews show both endpoints without changing the saved fixture view.
 
-[Activation](artifacts/node-refinement-update-20261018-003325/result.json) loaded
+Activation loaded
 the matching controller and engine successfully. All four previously running
 nodes reported Running within 0.299 seconds of starting the engine restart;
 the fifth node remained Unassigned. Frames advanced and the window responded.
@@ -957,7 +966,7 @@ Navigation alone is session-only. Reserved status space prevents node size and
 socket shifts through waiting/running/clipping changes. Header/body grab areas
 and the captured drag use the move cursor; editable fields retain the I-beam.
 
-The [final published build](docs/design/cable-editing-20261018-010205/results.json)
+The final published build
 passed **1,001 detached checks and 65 rendered previews**, with no binding errors.
 Coverage includes gesture commit/cancel/stale-state cases, multi-input ambiguity,
 cutting at 30/100/200% zoom, actual zoom/Fit without saves, no-op edits, history
@@ -966,7 +975,7 @@ and control changes. Actual node, header, menu, history, rewire and cutting
 previews were inspected. A custom menu-style/Separator incompatibility found
 during rendering was corrected before publication. Native audio code is unchanged.
 
-[Controller-only activation](artifacts/cable-editing-update-20261018-010241/result.json)
+Controller-only activation
 replaced UI 45340 with responsive UI 49792. Engine 32504 retained its start time
 and binary hash, and frames advanced from 84,299,520 to 84,311,040. Configuration
 revision 2775 and settings bytes remained identical, including after reopening.
@@ -986,7 +995,7 @@ caption covers both header rows, ending at the canvas. Only actual buttons opt
 out. Shared row-height constants keep the geometry aligned; toolbar margins
 now leave the full 26 DIP button height available for clicking.
 
-The [published verification](docs/design/window-drag-20261018-011715/results.json)
+The published verification
 passed **1,075 detached checks and 65 renders**, with no binding errors. The new
 checks use WPF's actual caption geometry routine and detached visual hit tests
 across 900×580, 1280×800 and 1920×1080 at 96/144/192 DPI, with empty and populated
@@ -996,7 +1005,7 @@ small-window render was inspected. No HWND or desktop input was created for
 these checks; native snap/restore and physical dragging remain hands-on checks
 in TESTING.md.
 
-[Controller-only activation](artifacts/window-drag-update-20261018-011745/result.json)
+Controller-only activation
 replaced controller 49792 with responsive controller 46792. Engine 32504 retained
 its start time and binary hash, with frames advancing from 127,682,400 to
 127,694,160. Configuration revision 2935 and settings bytes stayed identical,
@@ -1022,7 +1031,7 @@ numeric field and right-click presets. Passive node surfaces use Arrow, actual
 text fields retain I-beam, and SizeAll appears only while holding a node or EQ
 point for a drag. Release/cancellation/capture loss restores the ordinary cursor.
 
-The [final published controller](docs/design/node-interactions-20261018-012712/results.json)
+The final published controller
 passed **1,200 detached checks and 65 renders**, with no binding errors. Actual
 PreviewMouseWheel routes cover representative child controls, including a text
 field's internal ScrollViewer, with unchanged audio parameters, dropdown
@@ -1031,20 +1040,20 @@ static-label grey/red bypass states, legacy mute recovery, active/idle cursors,
 and socket-highlight geometry/cleanup at 30%, 75%, 100% and 200% zoom. Grey/red
 pass-filter renders and the socket snap preview were inspected.
 
-Native silent verification passed [271,481 graph assertions](docs/design/node-interactions-20261018-012712/node-bypass-graph-results.txt),
-[7,901 qualification assertions over 4,527,360 synthetic frames](docs/design/node-interactions-20261018-012712/node-bypass-qualification-results.txt),
-and [210 lifecycle commits](docs/design/node-interactions-20261018-012712/node-bypass-lifecycle-results.txt).
+Native silent verification passed 271,481 graph assertions,
+7,901 qualification assertions over 4,527,360 synthetic frames,
+and 210 lifecycle commits.
 Coverage includes transparent stereo bypass for every intermediate kind,
 multiple-input mixing, linked controls, legacy mutes, cable weights, preserved
 settings/topology and reversible 10 ms level ramps. No audio endpoints were
 opened by these tests.
 
-[Activation](artifacts/node-interaction-update-20261018-012622/result.json)
+Activation
 started engine 41704; all four previously active paths reported Running within
 0.291 seconds of the restart, and frames advanced. This is a software-state
 measurement, not an audible-gap measurement. Configuration revision 2963 and
 settings bytes stayed identical. A final tooltip wording cleanup was applied
-by [controller-only replacement](artifacts/node-interaction-copy-update-20261018-012729/result.json),
+by controller-only replacement,
 without another engine restart. Responsive controller 48564 matches the final
 verified build. The user's then-current six-node configuration at revision 2967
 and settings bytes were preserved, with five Running paths and one Unassigned.
@@ -1085,7 +1094,7 @@ reduction and can also affect sustained bass; audible quality remains to be
 qualified. Research, algorithms, licences and limitations are recorded in
 [EFFECTS_RESEARCH.md](docs/EFFECTS_RESEARCH.md).
 
-The [final packaged controller verification](docs/design/effects-eq-20261018-020322/results.json)
+The final packaged controller verification
 passed **1,474 detached checks and 74 renders**, with zero binding errors.
 Coverage includes all 20 supported node resets, unchanged identity/assignments/
 weighted connections, 18-kind creation, old/new clipboard payloads and malformed
@@ -1097,15 +1106,15 @@ verification data; production only displays measured samples.
 
 Silent native results:
 
-- [49,995 advanced-effect assertions](docs/design/effects-eq-20261018-020322/advanced-effects-results.txt):
+- 49,995 advanced-effect assertions:
   denoiser delay/adaptation, band-selective dynamics, reverb tails/stereo,
   threshold/transient/extreme settings, parameter smoothing, bypass, state
   inheritance/reset and allocation instrumentation.
-- [271,481 graph assertions](docs/design/effects-eq-20261018-020322/advanced-effects-graph-results.txt)
-  and [7,901 qualification assertions](docs/design/effects-eq-20261018-020322/advanced-effects-qualification-results.txt)
+- 271,481 graph assertions
+  and 7,901 qualification assertions
   over 4,527,360 synthetic frames.
-- [410 spectrum checks](docs/design/effects-eq-20261018-020322/advanced-effects-spectrum-results.txt)
-  and [212 lifecycle commits](docs/design/effects-eq-20261018-020322/advanced-effects-lifecycle-results.txt),
+- 410 spectrum checks
+  and 212 lifecycle commits,
   using synthetic endpoint workers, including engine restart continuity.
 
 The eight-effect stereo chain measured 167 μs p99 per 5 ms quantum. The maximum
@@ -1116,7 +1125,7 @@ reset or parameter edits. These are offline CPU observations, not live latency
 or whole-PC scheduling guarantees. Independent native review found no blocking
 ownership, stability or audio-thread allocation defect.
 
-[Activation](artifacts/effects-eq-update-20261018-020354/result.json) replaced
+Activation replaced
 engine 41704 with 39456 and controller 48564 with responsive controller 43488.
 All seven previously running paths reported Running within **0.319 seconds**
 of restart, and the audio frame counter advanced. This is a software-state
@@ -1170,9 +1179,9 @@ bypass, mute or loss of audio. It does not add scalar reduction meters to
 denoiser/reverb or change node dimensions. Existing clipping/error and legacy
 level messages retain priority.
 
-The [published UI verification](docs/design/effects-audit-20261018-021825/results.json)
+The published UI verification
 passes **1,543 checks and 77 renders**, zero binding errors. The actual reduction
-render was inspected. The [dedicated quality probes](docs/design/effects-audit-20261018-021825/native-results.json)
+render was inspected. The dedicated quality probes
 pass **62 de-esser/plosive and 532 other-effect quality checks**. Raw before/after
 measurements are preserved beside that manifest. These probes use generated
 audio in memory and read effect output before sink saturation.
@@ -1192,7 +1201,7 @@ claims. Independent final review found no blocker in the shelf equations,
 reverb energy argument, buffer bounds, state transfer/reset or feedback semantics.
 The source build completed without compiler warnings.
 
-[Activation](artifacts/effects-quality-update-20261018-022058/result.json)
+Activation
 started engine 48740 and responsive controller 44848. All eleven previously
 running paths returned to Running within 0.322 seconds of restart, frames
 advanced and actual dynamics fields were present. This measures software state,
@@ -1227,21 +1236,21 @@ quality on this exact firmware remain later checks, not measured claims.
 
 The final staged build completed without warnings or errors. The detached run
 passed **1,598 checks**, rendered **79 images**, and reported **zero binding
-errors**: [results](docs/design/dials-tooltips-20261018-023804/results.json).
+errors**: results.
 Coverage includes rotary ranges, fine drags, logarithmic mapping, exact entry,
 idempotent resets, selected-band changes, accessible values, wheel routing,
 tooltips, fixed node geometry, zoom, DPI and high contrast. Earlier failed runs
 exposed test-harness assumptions about old slider names/templates and parented
 ToolTips; those assumptions were corrected before the passing final run.
 
-Reviewed renders: [EQ](docs/design/dials-tooltips-20261018-023804/eq-closeup.png),
-[tooltips](docs/design/dials-tooltips-20261018-023804/tooltips.png),
-[microphone](docs/design/dials-tooltips-20261018-023804/microphone-stereo-closeup.png),
-[high contrast](docs/design/dials-tooltips-20261018-023804/eq-high-contrast-closeup.png).
+Reviewed renders: EQ,
+tooltips,
+microphone,
+high contrast.
 These are detached WPF renders, not desktop screenshots or real pointer tests.
 Native popup placement and hands-on gestures remain in TESTING.md.
 
-[UI activation](artifacts/dials-tooltips-update-20261018-023836/result.json)
+UI activation
 opened responsive controller 48280 while keeping engine 48740 and its binary
 unchanged. Frames advanced from 50,761,200 to 50,773,680 during replacement;
 all eleven paths reported Running. Revision 3796, full configuration and exact
@@ -1262,13 +1271,13 @@ received targeted fixes. The retired console UI was removed while its saved
 configuration compatibility remains.
 
 The final staged Release build and all ten offline native suites passed.
-[Detached verification](docs/design/maintenance-final-20261018-025804/results.json)
+Detached verification
 passed **1,982 checks**, rendered **79 images** and reported **zero binding
 errors**, including 34 private control-pipe checks. Representative actual WPF
 renders were reviewed for workspace, EQ spectrum, hover help and scaled effects.
 No desktop input or real audio test signal was used.
 
-[Activation](artifacts/maintenance-update-20261018-025837/result.json) passed:
+Activation passed:
 engine 43552, responsive controller 26784, eleven paths Running and frame counter
 advancing. Software recovery to Running took 0.307 seconds; audible interruption
 was not measured. Full configuration, revision 3807 and exact settings bytes

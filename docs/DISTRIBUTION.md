@@ -2,8 +2,7 @@
 
 Reviewed 19 October 2026 against the dependencies and assets in this repository.
 Font, branding and installer notices updated 20 October 2026; beta package naming
-and driver information reviewed 21 October 2026. Font packaging descriptions
-updated against the Beta 2 source inventory on 22 October 2026.
+and driver information reviewed 21 October 2026.
 This records VineMix's distribution setup and its limits. The full upstream
 licences, rather than this summary, govern each component.
 
@@ -39,10 +38,10 @@ or installer, verify the final archive contains:
 - `VineMix.exe` and `VineMix.Engine.exe`, and the native runtime DLLs
   required by that build;
 - the root `LICENSE` and `THIRD_PARTY_NOTICES.md`;
-- the applicable notices under `licenses/` enumerated by the build, including
-  vendor source-file acknowledgements, Microsoft sample attribution, W3C EQ
-  acknowledgement, IBM Plex OFL and runtime notices;
-- `Assets/Fonts/IBM-Plex-LICENSE.txt` beside the
+- every checked-in file under `licenses/`, including vendor source-file
+  acknowledgements, Microsoft sample attribution, W3C EQ acknowledgement,
+  IBM Plex and Inter OFL and runtime notices;
+- `Assets/Fonts/LICENSE.txt` and `Assets/Fonts/IBM-Plex-LICENSE.txt` beside the
   self-contained desktop publish output;
 - the user guides, including this document.
 
@@ -55,7 +54,7 @@ linked or embedded inside a single executable.
 
 The checked-in notices correspond to libsamplerate 0.2.2, SpeexDSP 1.2.1,
 RNNoise v0.2/default model `0b50c45`, nlohmann/json 3.12.0, IBM Plex Sans 3.005
-and Mono 2.005, historical Inter 4.1 assets,
+and Mono 2.005, the retained Inter 4.1 assets,
 LLVM-MinGW 20261006 and the .NET 10.0.13 runtime packages. The .NET runtime
 licences are taken from `Microsoft.NETCore.App.Runtime.win-x64` and
 `Microsoft.WindowsDesktop.App.Runtime.win-x64`; their licence is MIT. The .NET
@@ -65,7 +64,7 @@ notices are included as well.
 
 The compiler, CMake, .NET SDK, RNNoise training checkpoint and datasets are not
 part of the application distribution. The current compiled audio libraries use
-permissive licences; IBM Plex and historical Inter fonts retain their OFL terms. The archived
+permissive licences; the IBM Plex and Inter fonts remain under OFL. The archived
 Blender image has separate CC BY-SA terms and must keep those terms and attribution if
 later published. Do not apply the application licence to that image.
 
@@ -74,8 +73,8 @@ numerical values and shortcuts, with VineMix's forest-green split VM symbol
 for application and tray identity. Font files are embedded, so users do not
 need to install a system font. Keep the font notices even though the files are
 inside the executable. The source/version/hash record is in
-[IBM_PLEX_FONTS.md](IBM_PLEX_FONTS.md). Inter is no longer embedded in the current
-app; its historical notice remains in the source. Beta 1 renames the executable and internal product
+[IBM_PLEX_FONTS.md](IBM_PLEX_FONTS.md). Inter assets remain embedded and retain
+their existing notices. Beta 1 renames the executable and internal product
 identity to VineMix and copies legacy AudioMixer settings into
 `%LOCALAPPDATA%\VineMix` with a restartable migration. Original data is preserved.
 The standalone EXE embeds a complete application payload; the verification

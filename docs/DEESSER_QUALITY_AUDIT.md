@@ -1,5 +1,9 @@
 # De-esser and plosive quality audit
 
+> Historical development record. Results and procedures below belong to their
+> named versions; they do not qualify the current beta. See
+> [current qualification](BETA_TESTING_CURRENT.md) for the active release checks.
+
 18 October 2026. All measurements below use generated signals in memory. No
 audio device, microphone recording, desktop input, personal settings or running
 engine was accessed by this audit. Listening quality on the user's voice remains

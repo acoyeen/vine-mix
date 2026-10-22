@@ -1,5 +1,14 @@
 # Audio Mixer — flat slate console review
 
+> Historical development record. Results and procedures below belong to their
+> named versions; they do not qualify the current beta. See
+> [current qualification](docs/BETA_TESTING_CURRENT.md) for the active release checks.
+
+Evidence note: raw reports, historical renders and reference captures cited
+here are retained privately outside the repository. Their labels below identify
+archived evidence, not downloadable files; recorded results apply only to the
+versions and checks described.
+
 Date: 17 October 2026, UTC+10.
 
 ## Findings
@@ -15,29 +24,29 @@ qualification remain deferred under [TESTING.md](TESTING.md).
 
 ## Source, state and comparison evidence
 
-- Original visual reference: [VoiceMeeter](docs/design/evidence/03-voicemeeter-reference.png),
+- Original visual reference: VoiceMeeter,
   1024 × 620 pixels. Its continuous chassis, grey palette, green controls and
   integrated window actions informed this revision.
-- Revised reference: [slate mockup](docs/design/light-console-mockup.png),
+- Revised reference: slate mockup,
   1609 × 977 pixels, approximately 1.437 pixels per target DIP. The actual
   VoiceMeeter image and prior app capture were attached to its generation.
 - Measured interpretation: [revision review](docs/design/LIGHT_CONSOLE_REVIEW.md).
-- Native implementation: [UI render](docs/design/light-verification/main-100.png),
+- Native implementation: UI render,
   exactly 1120 × 680 pixels/DIP at 100% rendering, including the integrated header.
-  [The live console](docs/design/implementation/12-light-live-console.png) shows
+  The live console shows
   the actual engine connection and saved revision 3 after replacement.
-- [Combined full-view comparison](docs/design/implementation/10-light-full-comparison.png):
+- Combined full-view comparison:
   both reference and implementation are together at 1120 × 680 each. The source
   was reduced with Lanczos; the native render was left at its original density.
-- [Focused comparison](docs/design/implementation/11-light-controls-comparison.png):
+- Focused comparison:
   header, source names, routing controls and scales were compared at equal scale.
-- Devices captures are in [light-verification](docs/design/light-verification/devices-0.png):
+- Devices captures are in light-verification:
   each page is exactly 880 × 600 pixels/DIP, with the persistent footer visible.
 
 The inert comparison represents microphone 1 B on, App Audio A on, other sends
 off, A muted at −24 dB and B unmuted at 0 dB. It explicitly says Preview, with
 no engine access. The live screenshot instead reports current telemetry and
-revision 3. Listening device 1 is currently Waiting for device while microphone 1, App Audio
+revision 3. Listening output A1 is currently Waiting for device while microphone 1, App Audio
 and B show Connected. We did not disconnect hardware to create this state.
 
 ## Review history and fixes
@@ -82,7 +91,7 @@ for fewer outlines while preserving existing behaviour.
 ## Verification
 
 The final self-contained publish succeeded without warnings or errors. The
-[saved UI result](docs/design/light-verification/results.json) reports exit 0,
+saved UI result reports exit 0,
 passed true, **33 checks**, and **zero WPF binding errors**. It includes all 64
 route-state combinations, independent levels/mutes, fixed bounds, missing-device
 names, cable filtering, typed levels, UI automation patterns, clipping/offline
@@ -110,7 +119,7 @@ Only the desktop executable was replaced. The original native engine process
 and its start time remained unchanged. Saved revision 3 retained this SHA-256
 before and after replacement:
 
-`D082E5A80406C58E7ACD25EFD8B56FE57234C89F6780314F095177429EB1E0F5`
+`<private-settings-sha256-omitted>`
 
 A remains muted at −24 dB. No assignment, gain, route, mute, driver, Windows default
 or other audio application was changed. No test playback or recording was started.

@@ -86,3 +86,6 @@ try {
     if ([IO.Path]::GetDirectoryName($resolved).TrimEnd('\') -ne [IO.Path]::GetTempPath().TrimEnd('\') -or [IO.Path]::GetFileName($resolved) -notlike 'VineMix.ReleaseTool.Tests-*') { throw 'Fixture cleanup escaped its named temporary root.' }
     Remove-Item -LiteralPath $resolved -Recurse -Force
 }
+# Rejection fixtures deliberately return a nonzero native exit code. Once every
+# assertion and cleanup succeeded, do not leak that expected code to CI/callers.
+$global:LASTEXITCODE = 0

@@ -17,9 +17,9 @@ Return to the [active ideas log](IDEAS.md).
 ## IDEA-007: Static and Dynamic modes in the Ducking node
 
 - **Captured:** 2026-10-20 (UTC+10). **Status:** Implemented and activated.
-- **Source:** the maintainer requested this proposal be passed from the chat
+- **Source:** The maintainer requested this proposal be passed from the chat
   "Explain sidechain processing" and recorded here for future development.
-  the maintainer subsequently explicitly requested implementation on 2026-10-20.
+  The maintainer subsequently explicitly requested implementation on 2026-10-20.
 - **User need and rationale:** Organize controls around lowering one signal in
   response to another, without requiring users to understand compressor detector
   terminology.
@@ -72,7 +72,7 @@ Return to the [active ideas log](IDEAS.md).
   saved external compressors are displayed and edited; retention of mode-specific
   values; and behavior during mode changes. Keep existing saved setups intact
   until a compatibility strategy is explicitly chosen.
-- **Implementation decision (2026-10-20):** the maintainer confirmed no current
+- **Implementation decision (2026-10-20):** The maintainer confirmed no current
   compressors use sidechains and that preserving such node/cable setups is not
   a concern. Compressor now always measures its own programme signal and has no
   detector selector or trigger socket. Only Ducking accepts trigger cables.
@@ -171,7 +171,7 @@ Return to the [active ideas log](IDEAS.md).
   device from playback startup/failure and an offline engine. Confirm which
   existing output statuses provide reliable evidence and suitable recovery text.
   A visual warning must not change assignments, routing, levels, or saved setups.
-- **Implementation update (2026-10-20):** the maintainer explicitly requested this work.
+- **Implementation update (2026-10-20):** The maintainer explicitly requested this work.
   Physical and virtual outputs now share the input warning presentation: red
   outer glow, steady triangle above the meter, and a 1.6-second device-name pulse.
   Playback state and render-device identities determine the warning; running
@@ -216,7 +216,7 @@ Return to the [active ideas log](IDEAS.md).
   Center within the usable plot area with clearance for axis labels rather than
   allowing long band details to overlap either scale. Keep Tone and dedicated
   filter defaults independent of this change.
-- **Implementation update (2026-10-20):** the maintainer requested implementation of new
+- **Implementation update (2026-10-20):** The maintainer requested implementation of new
   zero-band EQs and centred text. New workspace EQs now start empty and flat;
   explicit empty arrays remain empty through persistence, copying and Undo/Redo.
   Saved populated bands and older settings that omit the band field keep their
@@ -227,7 +227,7 @@ Return to the [active ideas log](IDEAS.md).
   narrow captions use one-line ellipsis with full details in accessible status.
   Alignment is part of the existing text cache, preserving redraw reuse.
 - **Reset follow-up (2026-10-20):** The first creation-only update retained
-  five-band resets. the maintainer then reported that right-click reset still restored
+  five-band resets. The maintainer then reported that right-click reset still restored
   the old defaults. Both **Reset node to defaults** and **Reset EQ to flat**
   now clear all bands, matching a new EQ. An already empty EQ does not publish
   another curve-reset edit. Undo retains the ability to restore populated bands;

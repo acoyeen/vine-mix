@@ -85,3 +85,11 @@ explicit go-ahead before replacing its uploaded files or treating a later build
 as the final Beta 2. Do not infer approval from completed tests or elapsed time.
 On approval, replace the Beta 2 downloads, signed update metadata, checksums and
 release notes as one verified release update. Preserve Beta 1's version history.
+
+## Beta 3 cleanup and release — 23 October 2026
+
+The maintainer authorized a clean Beta 3 release, removal of all experimental
+window-resize patches and labs from active source, and a codebase audit. Keep
+normal Windows/WPF resizing and all unrelated Beta 2 features. Preserve the
+earlier version tags and downloads; this new release does not finalize or
+replace Beta 2. Do not use computer-use tools for this work.

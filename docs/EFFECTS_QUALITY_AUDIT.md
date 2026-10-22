@@ -1,5 +1,9 @@
 # Effect quality audit — 18 October 2026
 
+> Historical development record. Results and procedures below belong to their
+> named versions; they do not qualify the current beta. See
+> [current qualification](BETA_TESTING_CURRENT.md) for the active release checks.
+
 This audit uses generated, memory-only audio at 48 kHz. It does not open an audio
 device, record a microphone, change personal settings, or play a test signal.
 `native/tests/effects_quality_tests.cpp` reads the processor output **before**

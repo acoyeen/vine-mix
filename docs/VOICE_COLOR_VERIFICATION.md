@@ -1,5 +1,14 @@
 # Voice Color verification — 18 October 2026
 
+> Historical development record. Results and procedures below belong to their
+> named versions; they do not qualify the current beta. See
+> [current qualification](BETA_TESTING_CURRENT.md) for the active release checks.
+
+Evidence note: raw reports, historical renders and reference captures cited
+here are retained privately outside the repository. Their labels below identify
+archived evidence, not downloadable files; recorded results apply only to the
+versions and checks described.
+
 The separate Release candidate is in `artifacts/AudioMixer-VoiceColor`.
 It contains the native engine, desktop application, runtime libraries and guides.
 During development and offline verification, the running personal package was
@@ -21,7 +30,7 @@ The recovery snapshot arrived after 0.292 seconds. This is a software status
 measurement, not a measured audible interruption or end-to-end latency.
 The new desktop/engine process IDs were 2864/46468. Prior binaries and settings
 were backed up alongside the
-[activation evidence](../artifacts/voice-color-update-20261018-200549/result.json).
+activation evidence.
 
 ## Audio and maintenance
 
@@ -71,9 +80,9 @@ These measure offline processing, without device I/O, and vary with system load.
 They are not end-to-end latency or a hardware reliability qualification.
 
 Native evidence:
-[`results.json`](../artifacts/voice-color-verification/maintenance/results.json),
-[`Voice Color measurements`](../artifacts/voice-color-verification/maintenance/AudioMixer.VoiceColorTests.txt),
-[`engine lifecycle`](../artifacts/voice-color-verification/maintenance/AudioMixer.EngineLifecycleTests.txt).
+`results.json`,
+`Voice Color measurements`,
+`engine lifecycle`.
 
 ## Desktop and visual inspection
 
@@ -93,10 +102,10 @@ fields remain visible without overlap or clipping. The 306-DIP square pad keeps
 its world dimensions; zoom scales the complete node.
 
 Desktop evidence:
-[`results.json`](../artifacts/voice-color-verification/ui-final/results.json),
-[`neutral node`](../artifacts/voice-color-verification/ui-final/voice-color-neutral.png),
-[`75% workspace at 144 DPI`](../artifacts/voice-color-verification/ui-final/voice-color-workspace-75percent-144dpi.png),
-[`high contrast`](../artifacts/voice-color-verification/ui-final/voice-color-high-contrast.png).
+`results.json`,
+`neutral node`,
+`75% workspace at 144 DPI`,
+`high contrast`.
 
 ## Listening still required
 

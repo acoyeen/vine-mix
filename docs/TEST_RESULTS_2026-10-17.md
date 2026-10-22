@@ -1,5 +1,17 @@
 # Audio Mixer qualification — 17 October 2026
 
+> Historical development record. Results and procedures below belong to their
+> named versions; they do not qualify the current beta. See
+> [current qualification](BETA_TESTING_CURRENT.md) for the active release checks.
+
+Evidence note: raw reports, historical renders and reference captures cited
+here are retained privately outside the repository. Their labels below identify
+archived evidence, not downloadable files; recorded results apply only to the
+versions and checks described.
+
+> Personal hardware names and settings fingerprints are omitted from this public
+> record; neutral role labels preserve the observed path distinctions.
+
 Date and time zone: **17 October 2026, UTC+10**. Source application
 version: **0.2.0**. This records the current testing session and supplements the
 earlier [implementation verification](NODE_VERIFICATION.md). It is not a full
@@ -8,22 +20,22 @@ release qualification.
 **Current result:** the additional offline suites and bounded real-driver checks
 passed within the scopes below. The **eight-hour silent endurance test is
 DEFERRED**: it was stopped at the user's request on 17 October at 21:04:00
-UTC+10 time. This is neither a test failure nor an eight-hour pass. An
+UTC+10. This is neither a test failure nor an eight-hour pass. An
 uninterrupted eight-hour run remains unqualified and requires a fresh run later.
 
 ## Completed evidence
 
 | Check | Result | Scope and evidence |
 |---|---|---|
-| Existing graph regression | Passed — 3,347 assertions | All 64 routing migrations, sends, effects, validation, persistence and transitions. [Log](../build/qualification/graph-regression-results.txt). |
-| Additional graph/settings/dynamics | Passed — 7,901 assertions; 4,527,360 synthetic frames | Corrupt/truncated/oversized/unknown-version settings, last-good recovery, failed saves, exact 32-node/96-cable limits, 80 seeded graph permutations against independent scalar results, compressor time constants, 40 EQ parameter extremes and transition slopes. [Log](../artifacts/qualification/qualification-results.txt). |
-| Drift, queues and sample-rate conversion | Passed — 87,598 assertions in the recorded run | 16,000 queue/reference operations; concurrent producer/consumer and flush checks; all nine combinations of 44.1/48/96 kHz; 12 independent analytical clock models × one simulated hour; four actual-resampler models × 120 simulated seconds at ±750 ppm. [Log](../artifacts/qualification/drift-queue-results.txt). |
-| Engine lifecycle with synthetic workers | Passed — 210 concurrent graph commits and snapshots | Actual engine, stub I/O: changing topology, rapid device rebinding, isolated loss/rejoin, retiring workers and shutdown. [Log](../artifacts/qualification/lifecycle-results.txt). |
-| Real shared-mode workers with muted graph | Passed — 120.294 seconds plus three missing/restored-assignment cycles | VB-CABLE capture, USB DAC output, HDMI monitor output and VAC render opened concurrently; every graph node remained muted. [JSON](../artifacts/qualification/hardware-muted.json). |
-| VB-CABLE stereo round trip with two shared consumers | Passed — short diagnostic | Both consumers identified the quiet stereo test chirp, with zero queue drops and nonfinite samples. [JSON](../artifacts/qualification/vb-direct.json). |
-| Windows process capture | Passed — synthetic sibling process | Captured only the explicitly selected diagnostic process, using the production process-capture worker. [JSON](../artifacts/qualification/process-capture-first/results.json). This is not a Spotify/game compatibility result. |
-| Spotify capture opening | Stream opening passed; music fidelity not confirmed | A ten-second passive capture reached Running and delivered 479,299 silent frames. Spotify's render session was inactive in the final inventory. [JSON](../artifacts/qualification/spotify-observation.json). |
-| VAC simultaneous capture consumers | Passed — passive six-second observation | Two shared clients opened and received finite frames with zero queue drops. No stimulus was rendered; audio samples were discarded after counters were updated. [JSON](../artifacts/qualification/vac-shared-observation.json). No signal-quality or Discord/game claim. |
+| Existing graph regression | Passed — 3,347 assertions | All 64 routing migrations, sends, effects, validation, persistence and transitions. Log. |
+| Additional graph/settings/dynamics | Passed — 7,901 assertions; 4,527,360 synthetic frames | Corrupt/truncated/oversized/unknown-version settings, last-good recovery, failed saves, exact 32-node/96-cable limits, 80 seeded graph permutations against independent scalar results, compressor time constants, 40 EQ parameter extremes and transition slopes. Log. |
+| Drift, queues and sample-rate conversion | Passed — 87,598 assertions in the recorded run | 16,000 queue/reference operations; concurrent producer/consumer and flush checks; all nine combinations of 44.1/48/96 kHz; 12 independent analytical clock models × one simulated hour; four actual-resampler models × 120 simulated seconds at ±750 ppm. Log. |
+| Engine lifecycle with synthetic workers | Passed — 210 concurrent graph commits and snapshots | Actual engine, stub I/O: changing topology, rapid device rebinding, isolated loss/rejoin, retiring workers and shutdown. Log. |
+| Real shared-mode workers with muted graph | Passed — 120.294 seconds plus three missing/restored-assignment cycles | VB-CABLE capture, a USB DAC output, HDMI monitor output and VAC render opened concurrently; every graph node remained muted. JSON. |
+| VB-CABLE stereo round trip with two shared consumers | Passed — short diagnostic | Both consumers identified the quiet stereo test chirp, with zero queue drops and nonfinite samples. JSON. |
+| Windows process capture | Passed — synthetic sibling process | Captured only the explicitly selected diagnostic process, using the production process-capture worker. JSON. This is not a Spotify/game compatibility result. |
+| Spotify capture opening | Stream opening passed; music fidelity not confirmed | A ten-second passive capture reached Running and delivered 479,299 silent frames. Spotify's render session was inactive in the final inventory. JSON. |
+| VAC simultaneous capture consumers | Passed — passive six-second observation | Two shared clients opened and received finite frames with zero queue drops. No stimulus was rendered; audio samples were discarded after counters were updated. JSON. No signal-quality or Discord/game claim. |
 
 The queue concurrency count can vary with thread scheduling. The retained log is
 the evidence for the count above; the invariant checks, not an exact interleaving,
@@ -34,7 +46,7 @@ They did not open hardware or contact the personal engine's control pipe.
 
 The muted engine used these independently opened 48 kHz stereo paths:
 
-| Role | Windows device name |
+| Role | Device role (personal hardware names omitted) |
 |---|---|
 | Virtual capture | CABLE Output (VB-Audio Virtual Cable) |
 | Listening output 1 | USB DAC output |
@@ -67,17 +79,17 @@ Across the 120-second steady observation:
 The silent test captures only the assigned virtual receive path; both physical
 microphone nodes are unassigned. It has private settings and no control server.
 It does not disable devices, restart Windows Audio, change Windows defaults or
-change endpoint/session volume. The initial [read-only device inventory](../artifacts/qualification/initial-endpoints.json)
-shows USB DAC as the default render device for all three Windows roles, unmuted at
-its existing level. The [final inventory](../artifacts/qualification/final-endpoints.json)
-and [preservation comparison](../artifacts/qualification/preservation.json),
-recorded at 20:35:49 UTC+10 time, found no changes to Windows default assignments
+change endpoint/session volume. The initial read-only device inventory
+shows the USB DAC as the default render device for all three Windows roles, unmuted at
+its existing level. The final inventory
+and preservation comparison,
+recorded at 20:35:49 UTC+10, found no changes to Windows default assignments
 or endpoint volume/mute settings. The original desktop and engine processes
 remained running with the same IDs and start times (14800 and 42360). The personal
 settings SHA-256 remained:
 
 ```text
-D082E5A80406C58E7ACD25EFD8B56FE57234C89F6780314F095177429EB1E0F5
+<private-settings-sha256-omitted>
 ```
 
 No personal package was replaced or restarted during that earlier check. These
@@ -85,7 +97,7 @@ observations establish configuration/process preservation at that time; they do
 not measure acoustic continuity or cover the later user-authorized desktop update.
 
 After stopping endurance at the user's request, the desktop interface was
-replaced and launched at 21:04:01.943 UTC+10 time. The [switch record](../artifacts/ui-switch-20261017-210400/result.json)
+replaced and launched at 21:04:01.943 UTC+10. The switch record
 shows the new desktop process (46600) with an initialized window and input-idle
 state. Engine process 42360 retained its start time and unchanged binary; its
 frame counter advanced from 153,794,160 to 153,802,800 across the interface
@@ -94,7 +106,7 @@ one controlled desktop replacement with a continuing engine, not full UI-fault,
 engine-crash, Discord/game or audible-continuity qualification.
 
 One routing item needs attention in the later call test: Discord had an active
-render session on VAC as well as USB DAC, while its microphone capture used the
+render session on VAC as well as the USB DAC, while its microphone capture used the
 physical USB microphone directly. Before choosing the mixer's virtual output as Discord's
 microphone, verify that incoming conversation audio stays outside VAC/B so it
 cannot be returned to the call. No Discord routing was changed during this run.
@@ -162,17 +174,17 @@ the partial observation is not a completed endurance qualification.
 
 | Run metadata | Value |
 |---|---|
-| Start | 17 October 2026, 20:34:53.824 UTC+10 (UTC+10) |
+| Start | 17 October 2026, 20:34:53.824 UTC+10 |
 | Originally expected completion | Approximately 18 October 2026, 04:34:54 UTC+10 — cancelled |
-| Stopped at user's request | 17 October 2026, 21:04:00.136 UTC+10 (UTC+10) |
+| Stopped at user's request | 17 October 2026, 21:04:00.136 UTC+10 |
 | Requested duration | 28,800 actual elapsed seconds |
 | Observed process elapsed time at stop | 1,746.263 seconds (approximately 29 minutes 6 seconds) |
 | Last recorded soak duration | 1,686.089 seconds (approximately 28 minutes 6 seconds) |
 | Stopped process | 19452 — `build/native/AudioMixer.HardwareTests.exe` |
 | Executable SHA-256 | `B461681E291F2FFFE034A16670554E1F21B1F820B1F0126DA1DA7F7E2F4992F2` |
-| Metadata | [run.json](../artifacts/qualification/endurance-20261017-203453/run.json) |
-| Preserved partial evidence | [results.json](../artifacts/qualification/endurance-20261017-203453/results.json) |
-| Stop record | [stopped-by-user.json](../artifacts/qualification/endurance-20261017-203453/stopped-by-user.json) |
+| Metadata | run.json |
+| Preserved partial evidence | results.json |
+| Stop record | stopped-by-user.json |
 | Follow-up automation | `audio-mixer-endurance-results` — PAUSED |
 
 The long-run harness records approximately one sample per minute, bounded to at
@@ -234,7 +246,7 @@ cadence, with deterministic sustained-edit/in-flight/retry checks.
   The published single-file executable independently passed the same 226 checks.
 - [Visual review and evidence](../design-qa.md) compares actual WPF renders
   against Blender's reference and the previous interface.
-- [Personal activation](../artifacts/readable-update-20261017-213523/result.json):
+- Personal activation:
   responsive UI, matching binaries, advancing frames, revision 207 and settings
   bytes unchanged. Previously running paths returned; A1 remains Waiting as
   before, and A2/microphone 2 remain Unassigned. The successful switch reached a
@@ -259,7 +271,7 @@ configuration copies and unnecessary EQ/dial refreshes.
   1.042 ms, with 98.4% less allocation. The 24-node case reduced allocation
   96.7%. [Benchmark methodology and limitations](ZOOM_RENDERING_BENCHMARK.md)
   retain all zoom results, including slower offscreen raster cases.
-- [Controller-only replacement](../artifacts/zoom-ui-update-20261017-215316/result.json)
+- Controller-only replacement
   preserved engine PID 43332, its start time/binary, revision 310 and exact
   settings bytes. The frame counter advanced and the new controller opened
   a responsive visible window. A1 stayed Waiting as before.
@@ -270,12 +282,12 @@ configuration copies and unnecessary EQ/dial refreshes.
 ## Multi-node editing — 17 October, 22:11 UTC+10
 
 - Published controller: **368 detached checks, 24 renders**, zero binding
-  errors. [Raw results](design/group-edit-published/results.json) cover existing
+  errors. Raw results cover existing
   controls plus box selection, shared movement/cancel, clipboard payloads,
   repeated paste, group deletion and replay against a changed configuration.
 - Source review addressed paste revalidation during pending-edit replay and
   context-menu selection/focus. Two new group views were visually inspected.
-- [Controller-only replacement](../artifacts/group-ui-update-20261017-221057/result.json)
+- Controller-only replacement
   preserved engine PID 43332/start time/binary, advancing frames, revision 549
   and exact settings bytes. New controller PID 43108 opened a responsive window.
 - No live audio settings, engine restart, test signal, OS clipboard content or

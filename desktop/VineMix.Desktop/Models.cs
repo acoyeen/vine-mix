@@ -151,6 +151,7 @@ public sealed class ProtocolResponse
     public string RequestId { get; set; } = "";
     public bool Ok { get; set; }
     public string Error { get; set; } = "";
+    public string ErrorCode { get; set; } = "";
     public MixerSnapshot? Snapshot { get; set; }
 }
 public static class Protocol

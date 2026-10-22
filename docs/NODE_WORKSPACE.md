@@ -1,5 +1,10 @@
 # VineMix — node workspace
 
+Evidence note: raw reports, historical renders and reference captures cited
+here are retained privately outside the repository. Their labels below identify
+archived evidence, not downloadable files; recorded results apply only to the
+versions and checks described.
+
 This development changes the mixer from a fixed console into an editable audio
 graph. The earlier two-microphone/two-output limit is superseded by spawnable
 nodes, bounded to 32 nodes and 96 connections in this version. Existing settings
@@ -638,8 +643,7 @@ or long-running stability. The later procedure in [TESTING.md](../TESTING.md)
 records those separately and preserves the user's quiet initial listening setup.
 
 The earlier uniform-zoom controller passed 583 detached checks
-and 50 renders with zero binding errors (local evidence:
-`docs/design/uniform-zoom-final/results.json`). Those tests compared fixed node dimensions,
+and 50 renders with zero binding errors. Those tests compared fixed node dimensions,
 fonts, borders, controls and socket positions across 30–200% zoom, verified the
 then-available explicit collapse and repeatable Fit, and retained the resizable-window
 checks. Visual
@@ -652,8 +656,7 @@ bands, zero-band flat response, each tone dial's boost/cut, bypass, linked-contr
 continuity, validation and JSON round trips. The broader qualification suite
 passed 7,901 assertions over 4,527,360 synthetic frames, and the stub-worker
 engine lifecycle suite passed 210 concurrent commits. The earlier readable-UI
-candidate passed 226 offscreen checks (local evidence:
-`docs/design/blender-readable-final/results.json`)
+candidate passed 226 offscreen checks
 with 20 actual WPF renders at 96/144/192 DPI, zero binding errors and a Release
 build with no warnings or errors. The visual review found no remaining scoped
 blocking issue. Consult [design-qa.md](../design-qa.md) for that review and the

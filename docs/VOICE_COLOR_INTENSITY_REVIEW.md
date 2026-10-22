@@ -1,5 +1,9 @@
 # Voice Color intensity increase — 18 October 2026
 
+> Historical development record. Results and procedures below belong to their
+> named versions; they do not qualify the current beta. See
+> [current qualification](BETA_TESTING_CURRENT.md) for the active release checks.
+
 The user requested substantially more intensity after testing the installed
 `voice-character-20261018` build. This revision expands the sound range again;
 the grid, captions and interaction remain the same.

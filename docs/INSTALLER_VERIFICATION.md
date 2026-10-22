@@ -1,6 +1,10 @@
-# Installer verification — 20 October 2026
+# Historical installer verification — 20 October 2026
 
-The Windows 11 x64 installer is built for private review and fresh-machine
+> This is evidence for the older 0.2.0 artifacts only. It does not qualify
+> the current beta. See [the beta record](BETA_IMPLEMENTATION.md) and
+> [current clean-machine instructions](INSTALLER_TESTING.md).
+
+The Windows 11 x64 installer was built for private review and fresh-machine
 testing. It is an unsigned development build, not a completed driver/hardware
 qualification. Fresh Windows testing is deferred to 21 October at the maintainer's
 request. See [the test instructions](INSTALLER_TESTING.md).
@@ -82,6 +86,6 @@ preserves vendor packages and terms; monetised distribution still requires a
 separate review. See [distribution conditions](DISTRIBUTION.md). Automatic online
 updates and journalled rollback remain future work, not installer features.
 
-Vine Mix was left running during automated verification. the maintainer subsequently
+Vine Mix was left running during automated verification. The maintainer subsequently
 quit it manually; a read-only process check confirmed that both desktop and
 engine had stopped. No normal installation was made at the default destination.

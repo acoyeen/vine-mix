@@ -1,63 +1,76 @@
-# Testing the Vine Mix installer on a fresh Windows machine
+# Testing the VineMix beta on a fresh Windows machine
 
-Prepared 20 October 2026 for testing on 21 October. Use Windows 11 on an x64 PC
-with no existing VB-CABLE or VAC installation. This is an unsigned experimental
-build. The installer contains the app and both original driver packages offline.
+Updated 23 October 2026 for **0.3.0-beta.3**. These are instructions, not a record
+of completed tests. Use Windows 11 x64 on a spare PC or VM with no existing
+VB-CABLE or VAC package for the clean-driver cases. The current app and packages
+are not Windows Authenticode signed. Get the exact versioned files and SHA-256
+checksums from the matching [GitHub release](https://github.com/acoyeen/vine-mix/releases).
+See the [qualification record](BETA_TESTING_CURRENT.md) for completed checks.
 
-## Download and install
+## Setup
 
-1. Download `VineMix-0.2.0-Setup-x64.exe` and its `.sha256` file from the private
-   repository's draft **Vine Mix 0.2.0** release. Repository access is required.
-2. Confirm the download's SHA-256 matches the accompanying checksum. In
-   PowerShell, `Get-FileHash .\VineMix-0.2.0-Setup-x64.exe -Algorithm SHA256`
-   should report
-   `AC27DEBEFF500F126D87777DBCA28561C910083387C69D02AD0D10D39BAC0C1E`.
-3. Run the installer. Check that Next remains unavailable until its terms are
-   accepted. Keep the default destination unless testing another dedicated folder.
-4. Choose whether to create a desktop shortcut. The driver page should identify
-   both drivers as missing on this clean machine. Read their separate terms.
-   VAC Lite permits private home use unrelated to earning income; only select it
-   if that applies. Both drivers can be skipped.
-5. If selecting missing drivers, accept their terms and continue. Each vendor's
-   original installer should open separately and request administrator approval.
-   Complete its normal installation. The app itself installs per user.
-6. Restart Windows if requested. Open Vine Mix from its Start menu shortcut.
-   Outputs initially require device assignment and may be muted; follow the
-   installed user guide before judging routing.
+1. Check the supplied `VineMix-0.3.0-beta.3-Setup-x64.exe` against the checksum
+   supplied for that exact file. Record the checksum and Windows build.
+2. Open Setup. Confirm terms must be accepted and the wizard text fits. Use its
+   default per-user application folder unless deliberately testing another one.
+3. Record how its driver page classifies VB-CABLE and VAC. On a genuinely clean
+   machine both should be missing. Read the separate vendor terms. VAC Lite is
+   restricted to private home use without income generation; select it only if
+   that applies. Both drivers can be skipped.
+4. For a selected missing driver, confirm the original vendor installer opens
+   separately with any required administrator prompt. Record its result.
+5. Restart Windows when required. Confirm Setup does not launch VineMix early
+   after a driver-triggered restart. Open the Start menu or desktop shortcut.
+6. Confirm the three-node starter, both outputs muted, physical devices
+   unassigned and Listening output at −24 dB. Follow the
+   [beta guide](BETA_TESTER_GUIDE.md) to assign headphones and test quietly.
 
-Application files should be under `%LOCALAPPDATA%\Programs\Vine Mix`. Workspaces,
-preferences, backups and logs should be under `%LOCALAPPDATA%\AudioMixer`.
-Installed help is in `SetupSupport\INSTALLATION.txt`; the user guide is
-`docs\USER_GUIDE.md` inside the application folder.
+Application files should be in `%LOCALAPPDATA%\Programs\VineMix`; personal data
+belongs in `%LOCALAPPDATA%\VineMix`. Installed support text and licence notices
+must be present and readable. Neither the verification executable nor detached
+render/test modes belong in the release payload.
 
-## Record these results
+## Standalone
 
-- [ ] Terms, all driver labels and the final summary fit the wizard and are clear.
-- [ ] Both missing drivers install through their original vendor windows.
-- [ ] Cancelling a vendor installer gives a clear result without losing the app.
-- [ ] Setup requests a restart after a newly installed driver and does not open
-      Vine Mix prematurely.
-- [ ] After restarting, both drivers appear in Windows sound devices.
-- [ ] Audio from another app reaches Vine Mix through VB-CABLE.
-- [ ] Vine Mix audio reaches a recording application through VAC.
+Use a separate clean-user test with `VineMix-0.3.0-beta.3-Standalone-x64.exe`.
+Check its supplied checksum, open it in File Explorer and confirm it prepares
+its bundled files and starts without installing .NET or registering an app
+uninstall entry. Confirm a useful error for unavailable/unwritable extraction
+storage. Test physical routing without virtual drivers, then optional virtual
+routes after using official vendor installers. Inspect the extracted payload's
+notice files. Do not mix files from different builds.
+
+## Record each case
+
+- [ ] Setup and standalone open from Explorer and retain saved assignments,
+      levels, mutes, layout and preferences after full quit and reopen.
+- [ ] Fresh state has exactly the three starter nodes and two audio cables.
+- [ ] Missing drivers can be skipped; physical routes remain usable.
+- [ ] Original driver installation, vendor cancellation and required restart
+      each produce an understandable result.
+- [ ] Re-running Setup recognises existing/disabled/staged drivers and avoids a
+      duplicate installation.
 - [ ] Start menu, optional desktop shortcut and Windows Installed apps entry work.
-- [ ] Re-running setup recognises existing drivers and offers no duplicate install.
-- [ ] Re-running the same version repairs app files and preserves a saved workspace.
-- [ ] A copy running from the target blocks replacement; quitting through its tray
-      allows retry. Closing the window alone only hides it.
-- [ ] Uninstall refuses while that installed copy is running.
-- [ ] After quitting, uninstall removes application files/shortcuts while retaining
-      saved workspaces and both shared audio drivers.
-- [ ] Installing again restores access to the retained workspace.
+- [ ] App-to-VineMix VB-CABLE and VineMix-to-recording-app VAC routing work.
+- [ ] Opening another installed/standalone copy activates the current session
+      instead of creating a competing desktop or engine.
+- [ ] Same-version repair and newer-version upgrade preserve saved state.
+- [ ] Replacement and uninstall refuse a target in use; tray Quit enables retry.
+- [ ] Uninstall removes owned files/shortcuts while retaining personal data,
+      unknown user files and shared drivers; reinstall uses retained state.
+- [ ] Legacy AudioMixer data is copied without deleting originals; conflict
+      selection and an interrupted migration recover predictably.
+- [ ] Recovery offers Retry/Restore/Start fresh for damaged or missing established
+      settings and preserves originals before changing them.
+- [ ] Device reconnect, sleep/resume and eight-hour audio use are recorded with
+      actual observations, including any audible gap or closure.
 
-Test skipping drivers and cancelling vendor setup separately from the successful
-installation path. Do not remove working drivers from a daily-use computer just
-to repeat these cases. Future-version upgrade and interrupted-install recovery
-need separate qualification when such versions are available.
+Test skipped drivers and cancelled vendor setup separately from success. Do not
+remove working drivers from a daily-use computer for a clean-machine case.
+An isolated installer policy test is different from a real driver installation.
 
-If something fails, record the Windows version, exact installer checksum,
-wizard step, vendor result, restart status and observed error. To retain a setup
-log, start it with `/LOG="<path-to-a-log-file>"`. Logs may contain local paths;
-review them before sharing. Keep findings in the private repository until ready
-for broader distribution. The [verification report](INSTALLER_VERIFICATION.md)
-states exactly which local checks have already run.
+Record exact app version from **Settings → About VineMix**, package checksum,
+Windows version, wizard step, driver result and restart status. Setup accepts
+`/LOG="<path-to-a-log-file>"`; logs can contain personal paths. Review them before
+sharing. Current evidence belongs in [the beta record](BETA_IMPLEMENTATION.md);
+[the earlier installer report](INSTALLER_VERIFICATION.md) covers 0.2.0 only.

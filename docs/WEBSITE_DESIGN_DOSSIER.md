@@ -1,8 +1,14 @@
 # VineMix website design dossier
 
+> Historical website research and design decisions, recorded 20–21 October 2026.
+> Dated implementation notes describe those stages. See the
+> [website documentation](../website/README.md) for the current site.
+
 Prepared **20 October 2026**, UTC+10. Internal research and design handoff for an informative product website. Status: research complete for an initial design brief; visual direction, release CTA and launch readiness remain decisions.
 
-**Subsequent local review direction, 20 October 2026:** the maintainer separately authorized a skeletal local website, then requested a memorable, almost purely visual first landing with about one sentence of descriptive copy and allowed resources such as 21st.dev. The current local implementation is in `website/dist/`: a large supplied wordmark connected to source/output icons with flowing green cables, informed by Magic UI Animated Beam. Explanation, the real desktop image, the VRChat use case and release requirements sit below the opening. This later direction supersedes the initial text-led hero recommendation for the current review page. The research and claim boundaries below remain applicable; earlier research-only scope statements describe the original dossier work.
+**21 October refinement:** The maintainer requested a standalone VM symbol centered on the landing, a GitHub button with the GitHub mark and a prepared documentation button. The visible opening sentence, header wordmark/navigation, scroll prompt and motion control are removed. The logo's lettering is custom vector artwork; the website retains the approved IBM Plex Sans, with SemiBold buttons. The GitHub button points to the existing project remote at the maintainer's explicit request, without changing its private visibility; Documentation is a disabled “Soon” placeholder. The shader settles after a five-second introduction. The maintainer subsequently requested the lagging preview be stopped during development, so the server and both preview tabs are closed; this refinement has static checks but awaits a new browser review. This paragraph supersedes the opening composition described in the 20 October note below.
+
+**Subsequent local review direction, 20 October 2026:** The maintainer separately authorized a skeletal local website, then requested a memorable, almost purely visual first landing with about one sentence of descriptive copy and allowed resources such as 21st.dev. After rejecting the icon-and-beam version as tacky and generic, the maintainer selected Allan Mesquita Brito's exact [frorest-green shader](https://21st.dev/@allanmesquitab/components/frorest-green), recipe `4314dd3b-67c5-4cfd-b2d2-cc1184dddc47`. The current local implementation in `website/dist/` opens with that shader's cream, lime and forest field, the supplied wordmark, quiet navigation and “Mix your mic, music and apps.” Scrolling reveals the actual desktop workspace, a restrained VRChat music-sharing story and compact project information; phone, short-window and reduced-motion layouts use ordinary document flow. The upstream frontend-design and web-design-guidelines skills were reread and applied alongside Product Design selected-reference guidance; the plan and exact shader source/MIT provenance are recorded in `website/DESIGN_NOTES.md` and `website/SHADER_PROVENANCE.md`. This direction supersedes the earlier Animated Beam treatment and initial text-led hero recommendation for the loopback-only review page. Product evidence, experimental status, private-source/release constraints and all claim boundaries below remain applicable; earlier research-only scope statements describe the original dossier work.
 
 VineMix should be introduced through a sound route that people can understand: bring in a microphone and an app, adjust their sound, and choose what reaches headphones or an outgoing virtual microphone. Its visible cables are both the product's defining visual feature and the clearest way to explain its usefulness. The website should feel like an approachable extension of the application: quiet dark surfaces, forest green, IBM Plex typography and purposeful connections, with larger text and more space than the desktop interface.
 
@@ -47,7 +53,7 @@ The question of the primary visitor action was left open. The working recommenda
 
 ### What VineMix is today
 
-VineMix is a Windows 11 x64 desktop audio mixer with a node canvas. Users connect physical microphones, virtual-cable inputs and running applications to processing, mixing and output nodes. The audio graph is real: a source can branch to several destinations, and several sources can join one mix. Listening outputs and a virtual microphone output can have independent levels and mutes. [Product overview](../README.md), [user guide](USER_GUIDE.md), [node catalog](../desktop/AudioMixer.Desktop/NodeCatalog.cs).
+VineMix is a Windows 11 x64 desktop audio mixer with a node canvas. Users connect physical microphones, virtual-cable inputs and running applications to processing, mixing and output nodes. The audio graph is real: a source can branch to several destinations, and several sources can join one mix. Listening outputs and a virtual microphone output can have independent levels and mutes. [Product overview](../README.md), [user guide](USER_GUIDE.md), [node catalog](../desktop/VineMix.Desktop/NodeCatalog.cs).
 
 Audio processing runs locally in a C++ engine. The desktop editor is a separate .NET/WPF process. Processing is 48 kHz stereo with 240-frame graph blocks. These facts belong in an optional technical detail area; a first-time visitor needs to understand what reaches whom before learning how the engine is built. [Architecture and graph behavior](NODE_WORKSPACE.md), [control protocol](CONTROL_PROTOCOL.md).
 
@@ -269,9 +275,9 @@ The native application is compact because it is a tool. The website should trans
 
 ### Identity and naming
 
-Use the supplied **VineMix** wide graphical wordmark, with green Vine and light Mix. Its split VM symbol has separate V and M pieces, a visible gap and shared diagonal geometry. Preserve its proportions and lettering. Plain accessible identity and Windows captions use **Vine Mix**, as documented in the current branding guide. Use “VineMix” consistently in website editorial prose, while retaining the existing accessible product identity when reusing assets.
+Use the supplied **VineMix** wide graphical wordmark, with green Vine and light Mix. Its split VM symbol has separate V and M pieces, a visible gap and shared diagonal geometry. Preserve its proportions and lettering. Beta 1 uses **VineMix** consistently for accessible identity, Windows captions and website editorial prose, as documented in the current branding guide.
 
-Do not redraw the logo with text, approximate its custom i dots, use old mark-only caption decisions as the current standard, or let an external design skill replace approved typography. [Current branding guide](BRANDING.md), [wide logo](../desktop/AudioMixer.Desktop/Assets/Branding/wordmark.svg).
+Do not redraw the logo with text, approximate its custom i dots, use old mark-only caption decisions as the current standard, or let an external design skill replace approved typography. [Current branding guide](BRANDING.md), [wide logo](../desktop/VineMix.Desktop/Assets/Branding/wordmark.svg).
 
 ### Palette and meaning
 
@@ -288,7 +294,7 @@ Do not redraw the logo with text, approximate its custom i dots, use old mark-on
 | Detector connection | `#B8A0D8` | Ducking trigger only. |
 | Control connection | `#A0A8B3` | A genuinely demonstrated shared-control route. |
 
-Muted source, effect and output category colors may appear naturally inside screenshots. Their purpose is recognition, not a rainbow page theme. Reserve amber/red for meaningful warnings. Existing desktop color choices do not automatically establish web contrast compliance; verify actual foreground/background pairs and focus states. [Palette implementation](../desktop/AudioMixer.Desktop/Controls/ConsoleTheme.cs).
+Muted source, effect and output category colors may appear naturally inside screenshots. Their purpose is recognition, not a rainbow page theme. Reserve amber/red for meaningful warnings. Existing desktop color choices do not automatically establish web contrast compliance; verify actual foreground/background pairs and focus states. [Palette implementation](../desktop/VineMix.Desktop/Controls/ConsoleTheme.cs).
 
 ### Typography and layout proposals
 
@@ -304,11 +310,11 @@ Use alignment, spacing and type before adding containers. Alternate a broad prod
 
 | Asset | Use and suitability | Caveat |
 | --- | --- | --- |
-| `desktop/AudioMixer.Desktop/Assets/Branding/wordmark.svg` | Primary navigation/footer identity; transparent original vector. | Light lettering needs an appropriate background; preserve the entire supplied lockup. |
-| `desktop/AudioMixer.Desktop/Assets/Branding/mark.svg` | Standalone symbol for compact identity. | Derive favicon sizes intentionally. |
-| `desktop/AudioMixer.Desktop/Assets/Branding/app.png` | 256 px icon preview. | Use vector for large display. |
+| `desktop/VineMix.Desktop/Assets/Branding/wordmark.svg` | Primary navigation/footer identity; transparent original vector. | Light lettering needs an appropriate background; preserve the entire supplied lockup. |
+| `desktop/VineMix.Desktop/Assets/Branding/mark.svg` | Standalone symbol for compact identity. | Derive favicon sizes intentionally. |
+| `desktop/VineMix.Desktop/Assets/Branding/app.png` | 256 px icon preview. | Use vector for large display. |
 | `app.ico` and `tray.ico` in the branding directory | Existing multi-resolution Windows artwork. | Not substitutes for a tailored social preview. |
-| `docs/images/workspace.png` | Current 1280 × 800 workspace overview with the current logo and real controls. | Says Preview; has specific hardware/driver names, unassigned nodes and illustrative activity. Useful reference, not ideal final hero. |
+| `docs/images/workspace.png` | Current 1280 × 800 workspace overview with the current logo and real controls. | Sanitized Beta 1 render: exactly three starter nodes, generic Example USB Microphone/Example Headphones, authentic Line 1 driver label, and both outputs muted. Uses simulated devices; it is not evidence of live audio. |
 | `docs/images/branding-settings.png` | Current compact settings crop. | Supporting discoverability proof, not primary storytelling. |
 | `docs/images/branding-ducking.png` | Current processor crop and control vocabulary. | Says Waiting for trigger audio; not proof of active ducking. |
 | `artifacts/logo-no-tooltip-20261020/ui-final/eq-editor-spectrum.png` | Strong EQ close-up. | Detached fixture render, not measured listening quality. |
@@ -586,7 +592,7 @@ Repository snapshot: local `audio-mixer` checkout, HEAD `07f57fc50c5c96f0267ad91
 | --- | --- |
 | [README](../README.md) | Product target, version, capability summary, build, limits and license. |
 | [User guide](USER_GUIDE.md) | Current controls, routing, processing, help, settings and unsupported features. |
-| [Node catalog](../desktop/AudioMixer.Desktop/NodeCatalog.cs) and [graph models](../desktop/AudioMixer.Desktop/GraphModels.cs) | Creatable types and capacity. |
+| [Node catalog](../desktop/VineMix.Desktop/NodeCatalog.cs) and [graph models](../desktop/VineMix.Desktop/GraphModels.cs) | Creatable types and capacity. |
 | [Graph processing](../native/src/graph.cpp) and [graph definitions](../native/include/am/graph.hpp) | Branches, mixing, sidechains and graph structure. |
 | [Node workspace](NODE_WORKSPACE.md) | Detailed behavior and architecture; older visual descriptions need current-brand cross-check. |
 | [App audio](APP_AUDIO.md) | Process capture, original playback, virtual send, scoped real observations and qualification limits. |
@@ -594,8 +600,8 @@ Repository snapshot: local `audio-mixer` checkout, HEAD `07f57fc50c5c96f0267ad91
 | [Voice Color](VOICE_COLOR.md) and [effects research](EFFECTS_RESEARCH.md) | Processing behavior and quality limits. |
 | [Audio latency](AUDIO_LATENCY.md) | Current timing policy and distinction from physical measurement. |
 | [Device visibility](DEVICE_VISIBILITY.md) and [input availability](INPUT_AVAILABILITY.md) | Preserved assignments, availability and user guidance. |
-| [Branding](BRANDING.md), [font provenance](IBM_PLEX_FONTS.md) and [theme source](../desktop/AudioMixer.Desktop/Controls/ConsoleTheme.cs) | Canonical current identity, typography and palette. |
-| [Main window](../desktop/AudioMixer.Desktop/MainWindow.cs) | Current website action target. |
+| [Branding](BRANDING.md), [font provenance](IBM_PLEX_FONTS.md) and [theme source](../desktop/VineMix.Desktop/Controls/ConsoleTheme.cs) | Canonical current identity, typography and palette. |
+| [Main window](../desktop/VineMix.Desktop/MainWindow.cs) | Current website action target. |
 | [Settings implementation](../native/src/configuration.cpp) | Validated save, replacement and backup behavior. |
 | [Testing](../TESTING.md), [historical qualification](TEST_RESULTS_2026-10-17.md), [offline script](../scripts/verify-offline.ps1) and [CI workflow](../.github/workflows/verify.yml) | Verification scope, evidence snapshots and remaining qualification. |
 | [License](../LICENSE), [notices](../THIRD_PARTY_NOTICES.md), [distribution](DISTRIBUTION.md) and [contributing](../CONTRIBUTING.md) | Rights, third-party boundaries, package requirements and contributor path. |

@@ -1,5 +1,9 @@
 # Vine Mix rebrand implementation and verification
 
+> Historical development record. Results and procedures below belong to their
+> named versions; they do not qualify the current beta. See
+> [current qualification](BETA_TESTING_CURRENT.md) for the active release checks.
+
 Decision: 20 October 2026, UTC+10. Status: completed and activated.
 
 The sections through the initial completion record describe the original rebrand.
@@ -29,7 +33,7 @@ It establishes typography and colour while retaining the existing native UI.
 - Keep AudioMixer executable, namespace, IPC, clipboard and storage identities.
 - Do not change DSP or routing to achieve a visual result. Do not imply hardware
   qualification from detached rendering or synthetic audio tests.
-- the maintainer states that the current setup is disposable. Ordinary rollback backups
+- The maintainer states that the current setup is disposable. Ordinary rollback backups
   and process/hash checks still apply; no repeated Saved/idle confirmation is
   needed. Use an interface-only update preserving the running engine.
 - Preserve unrelated uncommitted development changes in the working baseline.
@@ -115,7 +119,8 @@ remain outside this visual update's qualification.
 The final glyph audit replaced the empty-workspace fullwidth plus with the
 bundled font's ASCII plus. The complete UI suites passed again on that delivered
 binary. Backups, baseline patch/source archive, failed/successful installer
-records and full render evidence remain in `artifacts/` for local review.
+records and full render evidence are retained privately outside the repository.
+Any `artifacts/` paths below are historical record identifiers.
 
 ### Transparent Windows icons — 20 October 2026, 14:29
 

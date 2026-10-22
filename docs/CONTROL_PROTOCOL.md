@@ -16,6 +16,11 @@ are requested at approximately 30 Hz; hidden/offline polling is slower.
 
 Responses carry the same `requestId`, `protocolVersion:1` and `ok`. A successful
 snapshot/configure response includes `snapshot`; a failure includes `error`.
+An optional `errorCode: "settings_write_failed"` identifies a persistence I/O
+failure after configuration validation. The committed configuration and revision
+are unchanged. The desktop keeps edits and history queued, shows an unsaved
+warning and retries at its existing bounded cadence. Validation failures remain
+permanent rejections. Older clients can ignore the additive field.
 
 Commands:
 

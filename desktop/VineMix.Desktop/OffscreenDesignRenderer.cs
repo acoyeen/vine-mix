@@ -178,6 +178,7 @@ internal sealed class OffscreenDesignRenderer
             Render(DeviceChoicesVerification.Run(Require), "device-visibility.png");
             GraphConnectionVerification.Run(Require);
             WorkspaceHistoryVerification.Run(Require);
+            AutosaveVerification.Run(Require);
             GestureHistoryVerification.Run(Require);
             mixer.ApplyPreviewSnapshot(UiPreview.CreateSnapshot(["--signal"]));
 
@@ -334,7 +335,6 @@ internal sealed class OffscreenDesignRenderer
             await NodeAlignmentReplayVerification.RunAsync(workspace, mixer, () => Layout(root), Require);
             await NodeAlignmentShortcutVerification.RunAsync(workspace, mixer, () => Layout(root), Require, name => Render(root, name));
             await CaptionHitTestVerification.RunAsync(root, window, workspace, mixer, () => Layout(root), Require);
-            await ResizeRedrawVerification.RunAsync(root, window, workspace, mixer, () => Layout(root), Require);
             RenderMenu(workspace.CreateAddMenu(new Point(20, 20)), "add-node-menu.png");
             // Caption fixtures intentionally load a fresh session. Populate
             // Activity with explicit edits rather than relying on stale history

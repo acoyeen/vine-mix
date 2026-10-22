@@ -1,5 +1,9 @@
 # Voice Color broadcast character and pad — review
 
+> Historical development record. Results and procedures below belong to their
+> named versions; they do not qualify the current beta. See
+> [current qualification](BETA_TESTING_CURRENT.md) for the active release checks.
+
 18 October 2026 · Windows WPF desktop and C++ engine
 
 Candidate: `artifacts/AudioMixer-VoiceBroadcast`.

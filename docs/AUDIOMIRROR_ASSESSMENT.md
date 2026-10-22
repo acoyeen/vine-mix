@@ -36,8 +36,8 @@ objects were zero-initialized to match the upstream placement allocator. These
 checks execute the buffer algorithms without loading kernel code. They do not
 validate Windows locking, scheduling, driver installation or audible quality.
 Local results, matching upstream/probe source hashes, the probe and shim are
-retained under `artifacts/audiomirror-research-20261020/` (ignored research
-evidence, not part of an application package). Both upstream source copies were
+retained privately outside the repository with the 20 October research evidence;
+they are not part of an application package. Both upstream source copies were
 hash-identical, and both defects reproduced on the verification rerun.
 
 No upstream build scripts were executed. The complete WDK driver was **not built
@@ -231,7 +231,7 @@ Choose between these architectures before committing to endpoint identities.
 
 Use a test VM with kernel debugging for early failure investigation, then real
 test hardware for timing and security-feature qualification. Do not enable Driver
-Verifier or development signing on the maintainer's daily audio setup as part of this
+Verifier or development signing on a daily-use audio setup as part of this
 research.
 
 Microsoft references, checked 2026-10-20:

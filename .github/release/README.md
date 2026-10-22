@@ -10,21 +10,24 @@ It never installs a package, restarts audio or changes repository visibility.
    Keep its signing key and raw receipts outside release assets.
 2. Put only the two canonical EXEs and `VineMix-<version>-Updates.json` in a
    staging directory. Write release notes with changes, installation guidance
-   and actual known limitations. An optional audited exact-source ZIP must be
-   named `VineMix-<version>-Source.zip` in that same directory.
+   and actual known limitations. Include an audited exact-source ZIP named
+   `VineMix-<version>-Source.zip` in that same directory, with the matching
+   committed files and a source manifest. Check its build-input hashes against
+   both retained build receipts; the publisher does not establish that match.
 3. Push the matching source commit, then validate and publish:
 
 ```powershell
 ./.github/release/Publish-Release.ps1 `
-  -AssetDirectory '<release assets>' -NotesPath '<release notes.md>' -ValidateOnly
+  -AssetDirectory '<release assets>' -NotesPath '<release notes.md>' `
+  -SourceArchivePath '<release assets>/VineMix-<version>-Source.zip' -ValidateOnly
 
 ./.github/release/Publish-Release.ps1 `
   -AssetDirectory '<release assets>' -NotesPath '<release notes.md>' `
+  -SourceArchivePath '<release assets>/VineMix-<version>-Source.zip' `
   -SourceCommit '<full source commit SHA>' -Publish
 ```
 
-Pass `-SourceArchivePath '<release assets>/VineMix-<version>-Source.zip'` to both
-commands when including that archive. Source ZIPs must be audited for contents
+Source ZIPs must be audited for contents
 and metadata before publication; the script also rejects unsafe names, build
 outputs, credentials and private artifacts. It generates `SHA256SUMS.txt` using
 only the explicit asset basenames, never uploads build/preparation receipts and

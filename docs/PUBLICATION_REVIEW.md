@@ -1,5 +1,9 @@
 # Initial repository review — 19 October 2026
 
+> Historical development record. Results and procedures below belong to their
+> named versions; they do not qualify the current beta. See
+> [current qualification](BETA_TESTING_CURRENT.md) for the active release checks.
+
 Scope: a once-over for obvious bugs, unnecessary work and unused code, followed
 by source publication and distribution preparation. Existing audio processing,
 node types, saved graphs, routing and visual behavior remain intact.

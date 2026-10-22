@@ -1,12 +1,21 @@
 # Core dynamics verification — 18 October 2026
 
+> Historical development record. Results and procedures below belong to their
+> named versions; they do not qualify the current beta. See
+> [current qualification](BETA_TESTING_CURRENT.md) for the active release checks.
+
+Evidence note: raw reports, historical renders and reference captures cited
+here are retained privately outside the repository. Their labels below identify
+archived evidence, not downloadable files; recorded results apply only to the
+versions and checks described.
+
 The activated build is **`core-dynamics-20261018-202241`**. Implementation,
 offline verification, activation and controlled checks through the real
 application and engine completed. The original **13-node workspace** was restored
 at revision **4093**; all its previously running paths were Running afterward.
 The engine remained **PID 32956** throughout the live checks.
 
-The final [running-version check](../artifacts/core-dynamics-verification/running-version.json)
+The final running-version check
 confirmed the manifest hashes, engine PID 32956 and responsive controller PID
 31728 at 20:35:43 AEST. The application remains running from the active package.
 
@@ -20,7 +29,7 @@ The active package is `artifacts/AudioMixer`; the separately built candidate is
 
 ## Offline evidence
 
-[Final native results](../artifacts/core-dynamics-verification/native-final/results.json)
+Final native results
 passed **12 of 12 suites**. This includes existing graph, qualification,
 device-independent lifecycle, drift, effects, EQ spectrum, de-esser quality,
 performance, catalogue and Voice Color coverage, plus **80 focused Core Dynamics
@@ -43,7 +52,7 @@ Focused checks cover:
   deallocations in processing/configuration adoption/reset, JSON persistence and
   malformed/out-of-range setting rejection.
 
-The [final desktop report](../artifacts/core-dynamics-verification/candidate-ui/results.json)
+The final desktop report
 passed **2,506 checks**, produced **92 WPF renders**, and reported **zero binding
 errors**. These cover the real control classes and cable gestures in a detached
 workspace: defaults, reset, copy/paste, persistence, mode switching, sidechain
@@ -54,7 +63,7 @@ stops. Detached rendering is distinct from the live session below.
 One initial performance run failed an existing timing assertion: the maximum
 30-denoiser graph measured processing p99 **10,569.3 µs**, above the 5 ms quantum.
 That failure is retained in
-[the initial results](../artifacts/core-dynamics-verification/native/results.json).
+the initial results.
 The complete suite was rerun serially and passed; the same case then measured
 processing p99 **1,242.3 µs**, with inheritance p99 **214.9 µs**. This difference
 shows timing sensitivity to system load; it is not a universal real-time deadline
@@ -65,7 +74,7 @@ not microphone-to-output latency.
 
 ## Activation and real application checks
 
-[Activation](../artifacts/core-dynamics-update-20261018-202252/result.json)
+Activation
 backed up the complete working package and configuration before replacing the
 two verified executables. Both installed hashes matched the candidate. The
 configuration, its file bytes and all 13 Running paths survived activation.
@@ -82,7 +91,7 @@ inside these isolated branches to exercise attenuation and limiting.
 
 Actual window interaction changed controls, selected modes, connected the
 detector cable and toggled bypass. UI state and saved revisions are recorded in
-[the interaction log](../artifacts/core-dynamics-verification/live/ui-interactions.json).
+the interaction log.
 Engine snapshots were taken after briefly closing only the controller, then the
 controller was reopened. The audio engine continued throughout.
 
@@ -94,22 +103,22 @@ controller was reopened. The audio engine continued throughout.
 | Alignment Delay | The millisecond field committed **12.375 ms / 594 samples**. The sample field then committed **1 sample**, displayed as **0.021 ms**. Engine snapshots retained both exact settings across controller restarts; bypass was exercised. Exact waveform timing is established by the offline impulse checks, not the live meter. |
 
 The three saved observation sets are
-[20:27:33](../artifacts/core-dynamics-verification/live/observed-202733.json),
-[20:29:04](../artifacts/core-dynamics-verification/live/observed-202904.json) and
-[20:33:49](../artifacts/core-dynamics-verification/live/observed-203349.json).
+20:27:33,
+20:29:04 and
+20:33:49.
 Their frame counters advance and their saved configurations match the control
 changes. Copy was invoked in the live context menu, but a completed live paste
 or whole-node reset was **not** recorded. Reset/defaults and full copy/paste are
 covered by the passing detached UI/model checks; they are not claimed as live
 actions.
 
-The [live evidence assertions](../artifacts/core-dynamics-verification/live/verification-result.json)
+The live evidence assertions
 passed all 23 checks across 45 snapshots. All 30 enabled-Limit observations stayed
 below the exact −24 dB ceiling; active Ducking reduction ranged from 18.78 to
 22.60 dB. These checks also verify bypass, exact saved delay values, the detector
 cable type, and that no temporary route entered an original node or output.
 
-[Restoration](../artifacts/core-dynamics-verification/live/restoration-result.json)
+Restoration
 removed all diagnostic nodes and routes and restored the original configuration
 and layout, with only its committed revision advancing. All previously Running
 paths were restored, and the frame counter advanced. The updated application was

@@ -1,5 +1,14 @@
 # Detached node UI benchmark
 
+> Historical development record. Results and procedures below belong to their
+> named versions; they do not qualify the current beta. See
+> [current qualification](BETA_TESTING_CURRENT.md) for the active release checks.
+
+Evidence note: raw reports, historical renders and reference captures cited
+here are retained privately outside the repository. Their labels below identify
+archived evidence, not downloadable files; recorded results apply only to the
+versions and checks described.
+
 Measured on 17 October 2026. This compares the frozen pre-fix AudioMixer assembly with the final zoom-fix-v2 candidate, including the 1e-6 world-DIP cable-anchor tolerance, using identical in-memory fixtures. These are synchronous UI-thread timings and allocations, not displayed FPS, acoustic tests, desktop interaction, or GPU presentation latency.
 
 The harness used actual App resources, MainWindow content, GraphWorkspace, and MixerViewModel(preview: true). WPF constructor startup operations were aborted before pumping the private dispatcher. Every scene checked that no native window or PresentationSource existed. Engine connection and supervisor fields remained null. No personal settings were opened. The bundled Inter font was extracted from each assembly into a private output directory and resolved explicitly; no fonts were installed.
@@ -39,4 +48,4 @@ Full ApplyPreviewSnapshot results are also retained in the JSON. Preview intenti
 
 Final evidence: baseline-results-v2/results.json, after-v2-results/results.json, comparison.json, and six PNGs in each result folder. The frozen baseline remains unchanged. Earlier after-results and comparison-first-candidate.json are retained as historical candidate results. The initial baseline-results folder is exploratory and superseded by baseline-results-v2, which explicitly verifies the bundled font and adds the telemetry-only workload.
 
-Archived raw measurements: [baseline](design/zoom-performance/baseline.json), [candidate](design/zoom-performance/candidate.json), [comparison](design/zoom-performance/comparison.json). The reusable private harness and frozen assemblies remain under build/node-ui-benchmark; those paths above are relative to that directory.
+Archived raw measurements: baseline, candidate, comparison. The reusable private harness and frozen assemblies remain under build/node-ui-benchmark; those paths above are relative to that directory.

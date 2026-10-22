@@ -1,5 +1,10 @@
 # Application audio nodes
 
+Evidence note: raw reports, historical renders and reference captures cited
+here are retained privately outside the repository. Their labels below identify
+archived evidence, not downloadable files; recorded results apply only to the
+versions and checks described.
+
 An **Application** node can capture a running Windows application's audio without adding a separate virtual cable for that application. Choose Spotify, a browser, a game, or another listed application, then connect its audio socket to a mix, volume node, or output. The list includes applications with audio sessions and ordinary visible applications, so an application can be selected before it starts playing. The mixer never opens a microphone or starts playback while discovering this list.
 
 ## What Windows makes possible
@@ -52,8 +57,8 @@ that carries the microphone also makes that physical playback capturable.
 The 19 October 2026 investigation found this saved graph:
 
 ```text
-physical USB microphone -> Mix -> Voice Color -> Expander / Gate
-                                    |-> Listening output (USB DAC): muted
+USB microphone -> Mix -> Voice Color -> Expander / Gate
+                                     |-> Listening output (USB DAC): muted
                                     `-> Virtual output (Line 1): unmuted
 ```
 
@@ -78,8 +83,8 @@ The candidate passed 226 fake-client exclusive-render checks and 27 endpoint
 inventory checks. The prior graph test also covers independent physical/virtual
 mutes and state adoption. Activation restored all previously running assigned
 paths, opened a responsive app window, and preserved the saved settings file byte
-for byte. Evidence and the original engine backup are in
-[`artifacts/stream-isolation-20261019-125828`](../artifacts/stream-isolation-20261019-125828/).
+for byte. The original evidence and engine backup are retained privately outside
+the repository under the historical stream-isolation record.
 
 ## Implemented behavior
 

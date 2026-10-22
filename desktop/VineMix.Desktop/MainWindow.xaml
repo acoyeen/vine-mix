@@ -9,9 +9,9 @@
  Background="{DynamicResource ConsoleWindowBrush}" Foreground="{DynamicResource ConsoleTextBrush}"
  FontFamily="{DynamicResource NodeFontFamily}" FontSize="13" UseLayoutRounding="True" SnapsToDevicePixels="True"
  TextOptions.TextFormattingMode="Display" TextOptions.TextHintingMode="Fixed" TextOptions.TextRenderingMode="Auto">
- <Grid Margin="4,0,4,4" Background="{DynamicResource ConsoleWindowBrush}" ClipToBounds="True">
+ <Grid Margin="4,0,4,4">
   <Grid.RowDefinitions><RowDefinition Height="{x:Static local:MainWindow.TitleBarRowHeight}"/><RowDefinition Height="1"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-  <Grid x:Name="HeaderBar" Background="{DynamicResource ConsoleWindowBrush}" ClipToBounds="True">
+  <Grid x:Name="HeaderBar">
    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="122"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
    <DockPanel Margin="0,0,12,0" LastChildFill="True">
     <Ellipse x:Name="ConnectionIndicator" DockPanel.Dock="Left" Width="8" Height="8" Margin="16,0,8,0" VerticalAlignment="Center" ToolTip="{Binding ConnectionStatus}" AutomationProperties.Name="{Binding ConnectionStatus}">

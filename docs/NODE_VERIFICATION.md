@@ -1,5 +1,17 @@
 # Node workspace — implementation and verification
 
+> Historical development record. Results and procedures below belong to their
+> named versions; they do not qualify the current beta. See
+> [current qualification](BETA_TESTING_CURRENT.md) for the active release checks.
+
+Evidence note: raw reports, historical renders and reference captures cited
+here are retained privately outside the repository. Their labels below identify
+archived evidence, not downloadable files; recorded results apply only to the
+versions and checks described.
+
+> Personal hardware names and settings fingerprints are omitted from this public
+> record; neutral role labels preserve the observed path distinctions.
+
 Date: 17 October 2026, UTC+10. Application version: **0.2.0**.
 
 This replaces the fixed-console interface with an editable audio graph. The
@@ -25,16 +37,16 @@ linked control, listening output and virtual output. The graph is bounded to
   Checks exercise node creation, connections, feedback rejection, effects and
   layout persistence, independent sends, deletion, migration, ambiguous app
   selection, collapse activation, reduced meter animation and missing-device
-  presentation. See [the retained result](design/node-verification/ui-results.json).
-  [Workspace](design/node-verification/workspace.png),
-  [effect controls](design/node-verification/effects.png) and
-  [simulated high contrast](design/node-verification/effects-high-contrast.png)
+  presentation. See the retained result.
+  Workspace,
+  effect controls and
+  simulated high contrast
   were rendered from the real WPF controls and visually inspected.
 
 - **Isolated control protocol: passed 12 checks against the packaged engine.**
   The test verifies its temporary settings path, unassigned devices, advancing
   frame counter, revision checks, atomic graph edits, rejection without mutation
-  and control-client reconnection. See [the retained result](design/node-verification/engine-results.json).
+  and control-client reconnection. See the retained result.
 
 These tests use inert or unassigned configurations. Neither edits the personal
 settings file. They do not simulate every physical mouse gesture, exercise a
@@ -57,7 +69,7 @@ The listening mix retains its mute and −24 dB level; microphone monitoring to
 that mix remains off. The original file's SHA-256 is:
 
 ```text
-D082E5A80406C58E7ACD25EFD8B56FE57234C89F6780314F095177429EB1E0F5
+<private-settings-sha256-omitted>
 ```
 
 The first user edit saves version 2 and retains a separate `.v1.bak` copy of the
@@ -76,19 +88,19 @@ personal settings file remained byte-for-byte identical to the hash above.
 | Physical USB microphone | Running, 48 kHz mono |
 | Second microphone | Unassigned |
 | VB-CABLE app input | Running, 48 kHz stereo |
-| Listening device 1 listening output | Waiting for device; selection retained |
+| Listening output 1 | Waiting for device; selection retained |
 | Second listening output | Unassigned |
 | VAC Lite virtual microphone output | Running, 48 kHz stereo |
 
 Mix A remained muted at −24 dB. No generated sound, recording or hardware fault
 test was started. This is startup evidence, not confirmation that the audio was
-heard correctly. See [the startup observation](design/node-verification/startup-results.json).
+heard correctly. See the startup observation.
 
 The final desktop was then launched normally and attached to that engine. A
 read-only observation of its real window reported **Audio engine connected**,
 **Saved · revision 3**, the waiting listening device, and an advancing frame
 count. The window was responsive, and the settings hash remained unchanged.
-See [the desktop startup result](design/node-verification/desktop-results.json).
+See the desktop startup result.
 The application is left running for the user.
 
 ## Remaining qualification

@@ -72,7 +72,8 @@ and saved-workspace reopening remain tester checks.
 
 Historical results (19 October 2026): the combined build passed 8,178 detached checks with 159 renders and zero
 binding errors. All 14 offline native suites passed, including 44 fake COM
-catalog checks. Reports are under `artifacts/device-visibility-20261019/`.
+catalog checks. Reports are retained privately outside the repository under the
+historical `artifacts/device-visibility-20261019/` identifier.
 
 Local activation on 19 October 2026 replaced the desktop and engine with the
 verified binaries and reopened a responsive application. All nine previously

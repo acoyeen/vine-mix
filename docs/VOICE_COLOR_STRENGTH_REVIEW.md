@@ -1,5 +1,9 @@
 # Voice Color strength and grid review — 18 October 2026
 
+> Historical development record. Results and procedures below belong to their
+> named versions; they do not qualify the current beta. See
+> [current qualification](BETA_TESTING_CURRENT.md) for the active release checks.
+
 The previous Broadcast treatment remained too subtle on the user's isolated
 input → Voice Color → output chain. The user confirmed that Character reached
 100% and muting the output silenced the monitored voice. Source tracing found

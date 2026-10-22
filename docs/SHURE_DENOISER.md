@@ -5,7 +5,7 @@ speech, change Shure settings, install software, or restart a live process.
 
 ## The useful finding
 
-The MV7+ contains a hardware denoiser. Shure identifies
+The MV7+ provides an onboard denoiser. Shure identifies
 Real-time Denoiser as **on-board DSP**; MOTIV Mix provides its controls. The MV7+
 stores its last-used device settings. Its passive XLR output is unaffected by
 those settings. [MV7+ user guide](https://www.shure.com/en-US/docs/guide/MV7plus).
@@ -16,7 +16,7 @@ Microphone node:
 
 ```text
 MV7+ capsule → Shure hardware denoiser → MV7+ USB recording endpoint
-    → Vine Mix Microphone node → chosen effects and outputs
+    → VineMix Microphone node → chosen effects and outputs
 ```
 
 The inference from Shure's documented hardware architecture is that this path
@@ -91,7 +91,7 @@ its AI Denoiser is the MV7+'s algorithm, so it should not be presented as an
 interchangeable or free implementation.
 
 For this application, the supported integration is therefore **reuse the
-compatible Shure hardware through USB**, with clear setup help. A future embedded
+existing Shure hardware through USB**, with clear setup help. A future embedded
 Shure toggle or generic Shure effect requires a documented interface and any
 necessary permission from Shure. This task does not invent an ineffective
 toggle or relabel SpeexDSP as Shure.
@@ -117,9 +117,9 @@ noise, and measure latency/CPU. Keep a repeatable reference, preserve input
 level, listen for lost consonants and speech artifacts, and retain music tests
 to expose unsuitable use. The original research did not integrate it; the later
 dropdown implementation provides a separate software option, with perceived
-quality and the user's actual humming artifact still requiring listening tests.
+quality and any reported humming artifact still requiring listening tests.
 
-## Later verification on this PC
+## Later verification on a test PC
 
 When a local listening comparison is convenient:
 
@@ -134,6 +134,6 @@ When a local listening comparison is convenient:
 4. If direct USB and MOTIV Mix sound different, compare the complete gain/EQ/
    dynamics/monitoring paths before attributing the difference to denoising.
 
-These checks remain unperformed. The user's current hardware denoiser state and
+These checks remain unperformed. A connected microphone's hardware denoiser state and
 its measured quality are unknown to this application; this research supports
 the integration path, not an audible-quality certification.

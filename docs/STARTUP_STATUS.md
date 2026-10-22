@@ -1,5 +1,21 @@
 # Startup and driver-installation status
 
+Historical package/evidence paths and descriptions of the running session below
+refer to the original test date. Raw records and backups are retained privately
+outside this checkout.
+
+> Historical development record. Results and procedures below belong to their
+> named versions; they do not qualify the current beta. See
+> [current qualification](BETA_TESTING_CURRENT.md) for the active release checks.
+
+Evidence note: raw reports, historical renders and reference captures cited
+here are retained privately outside the repository. Their labels below identify
+archived evidence, not downloadable files; recorded results apply only to the
+versions and checks described.
+
+> Personal hardware names and settings fingerprints are omitted from this public
+> record; neutral role labels preserve the observed path distinctions.
+
 > **Historical fixed-console record.** The node workspace supersedes this build.
 > Statements below about running processes, VoiceMeeter installation and saved
 > assignments describe earlier sessions, not the current machine. VoiceMeeter was
@@ -53,11 +69,11 @@ recorded below:
 
 | Role | Installed device / setting |
 |---|---|
-| Microphone 1 | USB microphone, channel 0; A off, B on |
+| Microphone 1 | Physical USB microphone, channel 0; A off, B on |
 | Microphone 2 | Unassigned |
 | App Audio playback destination | Ordinary VB-CABLE **CABLE Input**, not the 16-channel alternate |
 | App Audio engine capture | VB-CABLE **CABLE Output**; A on, B off |
-| A1 listening output | Listening device 1 |
+| A1 listening output | Listening output 1 |
 | A2 listening output | Unassigned |
 | B engine playback / client recording | **Line 1 (Virtual Audio Cable)**, playback and recording partners |
 | A master | Muted, -24 dB |
@@ -86,10 +102,10 @@ byte-for-byte unchanged during that update; A remained muted at −24 dB and
 microphone monitoring remained off. The historical settings-file SHA-256 was:
 
 ```text
-95D0A5A22067FC9049CFA4A6880DC9C29BDDBB1CD62795AA75F9C6BE3930423A
+<private-revision-1-settings-sha256-omitted>
 ```
 
-At that update's read-only UI observation, Listening device 1 A1 showed **Waiting for device**;
+At that update's read-only UI observation, Listening output A1 showed **Waiting for device**;
 its saved name and assignment remained present. Microphone 1, App Audio and B showed
 Connected. No hardware change was induced and no route was changed. This is a
 historical status observation, not evidence of a controlled loss/reconnection test;
@@ -123,7 +139,7 @@ requests. It retains A muted at −24 dB and the existing routes. Its baseline S
 is:
 
 ```text
-D082E5A80406C58E7ACD25EFD8B56FE57234C89F6780314F095177429EB1E0F5
+<private-settings-sha256-omitted>
 ```
 
 The new build must preserve this current baseline; revision 1 and its earlier hash
@@ -135,7 +151,7 @@ The final self-contained desktop publish completed cleanly. The latest inert har
 **33 UI checks**, including five added chrome/card assertions, all 64 route-state
 combinations and zero WPF binding errors. Its result is
 `artifacts/ui-verification/light-console/results.json`, with a retained copy in
-[docs/design/light-verification/results.json](design/light-verification/results.json).
+docs/design/light-verification/results.json.
 Embedded minimise/restore, Devices open/close, preview main-window close and the
 caption's right-click system menu were also verified in a silent preview.
 
@@ -168,18 +184,18 @@ text. Off-route controls retain fully visible grey caps. Gain-position fill is
 not audio activity. Active travel uses green #79B99A, distinct from the light
 #B9E3CB caps; the caps' small 2-DIP corner radius belongs only to that functional
 control, while strip-card outlines remain absent. Incorrect illustrative levels and meter activity in the
-generated [mockup](design/detailed-console-mockup.png) are not adopted.
+generated mockup are not adopted.
 
 The final 18-DIP-readout build passed **37 inert UI checks**, exited successfully
 and reported zero WPF binding errors. Results are in
 `artifacts/ui-verification/detail-reviewed/results.json`; the retained copy is
-[docs/design/detail-verification/results.json](design/detail-verification/results.json).
+docs/design/detail-verification/results.json.
 The 33-check installed slate result above is historical evidence for that build.
 
 The detailed slate controller is now running against the original native engine;
 the engine process and start time are unchanged. Only the desktop executable was
 replaced. The before/after settings hashes are identical, preserving revision 3:
-`D082E5A80406C58E7ACD25EFD8B56FE57234C89F6780314F095177429EB1E0F5`, A muted at −24 dB
+`<private-settings-sha256-omitted>`, A muted at −24 dB
 and existing routes retained. A silent-preview fader-thumb/Up check changed A to
 +0.5 dB while B remained 0 dB and A routing stayed off; the preview was closed
 without applying those edits to the live engine. No new rounded cards, audio features, driver changes,
@@ -191,11 +207,11 @@ Windows setting changes or test sounds are part of this refinement. See the
 1. Start the source application's volume low. In Windows Volume Mixer,
    choose **CABLE Input (VB-Audio Virtual Cable)** for
    Spotify. Leave App Audio B off. Confirm its meter moves in Audio Mixer.
-2. Confirm the Listening device 1 listening device is the desired output and ready to use,
+2. Confirm the assigned listening device is the desired output and ready to use,
    then manually unmute A. Its saved master level starts at -24 dB. Raise levels
    gradually while listening.
 3. In Discord, explicitly select **Line 1 (Virtual Audio Cable)** as the input
-   microphone. Speak into the microphone and check the input indicator. Microphone A
+   microphone. Speak into the selected microphone and check the input indicator. Microphone A
    remains off to avoid unexpected live monitoring.
 4. Keep Discord's received conversation on a physical output, outside CABLE
    Input, whenever App Audio is sent to B. For this first check App Audio B stays

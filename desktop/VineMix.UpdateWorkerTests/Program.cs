@@ -31,7 +31,7 @@ internal static class Program
     {
         try
         {
-            SignedBoundaryTests(); SuccessfulStandalone(); RollbackTests(); RecoveryTests(); WorkspaceTests(); ManifestTests(); InstalledAttemptTests(); PendingDiscoveryTests();
+            SignedBoundaryTests(); SuccessfulStandalone(); RollbackTests(); RecoveryTests(); WorkspaceTests(); ManifestTests(); InstalledAttemptTests(); PendingDiscoveryTests(); TerminalCleanupTests();
             Console.WriteLine($"PASS: {_checks} updater worker checks; ephemeral signed fixtures, private temporary directories and fake process/registry/Setup operations only. No production app, audio endpoint, settings, driver or registry changes.");
             return 0;
         }
@@ -258,6 +258,62 @@ internal static class Program
             UpdateWorker.Restore(fixture.Context, original, candidate, platform);
             Require(fixture.OldTarget, "Rollback must resume idempotently when prior files were already restored before interruption.");
         }
+        using (var fixture = new Fixture(standalone: false))
+        {
+            var platform = new FakePlatform(fixture);
+            var original = UpdateWorker.Backup(fixture.Context, platform);
+            platform.RunSetup(fixture.Context, _ => { });
+            string engine = Path.Combine(fixture.Install, "VineMix.Engine.exe");
+            File.Delete(engine); // A failed Setup removed an owned file before its postimage was recorded.
+            var candidate = UpdateWorker.ObserveCandidate(fixture.Context, original, platform, false);
+            Require(candidate.Files.All(file => file.Path != "VineMix.Engine.exe"),
+                "The failed-Setup checkpoint records an absent owned file without inventing candidate bytes.");
+            UpdateWorker.Restore(fixture.Context, original, candidate, platform);
+            UpdateWorker.Restore(fixture.Context, original, candidate, platform);
+            Require(fixture.OldTarget && File.ReadAllText(engine) == "example old engine",
+                "Resuming rollback accepts the exact original bytes already restored for a file absent from the candidate checkpoint.");
+            File.WriteAllText(engine, "newer engine bytes outside the rollback");
+            Reject(() => UpdateWorker.Restore(fixture.Context, original, candidate, platform),
+                "A formerly absent file recreated with different bytes must still block rollback.");
+            Require(File.ReadAllText(engine) == "newer engine bytes outside the rollback",
+                "Rollback retains different bytes at a formerly absent file instead of overwriting them from backup.");
+        }
+    }
+
+    private static void TerminalCleanupTests()
+    {
+        foreach (var phase in new[] { UpdatePhase.Completed, UpdatePhase.RolledBack, UpdatePhase.Cancelled })
+        {
+            using var fixture = new Fixture();
+            var platform = new FakePlatform(fixture) { Healthy = phase != UpdatePhase.RolledBack, ClearRecoveryFails = true };
+            if (phase == UpdatePhase.Cancelled)
+            {
+                File.Delete(Path.Combine(fixture.Context.Directory, "commit.json"));
+                UpdateFiles.WriteJson(Path.Combine(fixture.Context.Directory, "abort.json"), fixture.Context.Signal());
+            }
+            int expectedCode = phase == UpdatePhase.Completed ? 0 : phase == UpdatePhase.RolledBack ? 3 : 2;
+            Require(fixture.Run(platform) == expectedCode && UpdateTransaction.ReadJournal(fixture.Context).Phase == phase,
+                "A recovery-registration cleanup failure retains the durable terminal result: " + phase + ".");
+            Require(fixture.OldTarget == (phase != UpdatePhase.Completed)
+                && (phase != UpdatePhase.RolledBack || platform.Events.IndexOf("previous-reopened") > platform.Events.IndexOf("lock-released")),
+                "Cleanup failure does not alter the completed payload or prevent safe reopening after rollback: " + phase + ".");
+            string receipt = Path.Combine(fixture.Context.Directory, "recovery-cleanup.json");
+            using (var pending = JsonDocument.Parse(File.ReadAllText(receipt)))
+                Require(pending.RootElement.GetProperty("pending").GetBoolean()
+                    && pending.RootElement.GetProperty("message").GetString()!.Contains("Example cleanup failure", StringComparison.Ordinal),
+                    "A failed terminal cleanup retains a private diagnostic receipt: " + phase + ".");
+            Require(UpdateTransaction.FindPending(fixture.Trust, fixture.Root).Count == 0,
+                "Terminal cleanup failure does not block ordinary startup as unfinished update recovery: " + phase + ".");
+            platform.ClearRecoveryFails = false; platform.Events.Clear();
+            string targetBefore = File.ReadAllText(fixture.Context.TargetPath);
+            Require(fixture.Run(platform) == 0 && UpdateTransaction.ReadJournal(fixture.Context).Phase == phase
+                && platform.Events.SequenceEqual(new[] { "version-check", "lock-held", "recovery-cleared", "lock-released" })
+                && File.ReadAllText(fixture.Context.TargetPath) == targetBefore,
+                "A stale recovery launch retries terminal cleanup without installation, rollback or another application launch: " + phase + ".");
+            using var resolved = JsonDocument.Parse(File.ReadAllText(receipt));
+            Require(!resolved.RootElement.GetProperty("pending").GetBoolean(),
+                "Successful terminal cleanup retry resolves its retained diagnostic receipt: " + phase + ".");
+        }
     }
 
     private sealed class Fixture : IDisposable
@@ -327,7 +383,7 @@ internal static class Program
     {
         internal List<string> Events { get; } = [];
         internal bool Healthy = true, ParentAlive = true, ParentExits = true, CandidateEngineExits = true, SmokePasses = true,
-            ChangeTargetAfterHealth, HealthWasRequired, ReopenFails;
+            ChangeTargetAfterHealth, HealthWasRequired, ReopenFails, ClearRecoveryFails;
         internal int SetupExitCode;
         private bool _candidateAlive;
         public IDisposable AcquireLock() { Events.Add("lock-held"); return new Lease(() => Events.Add("lock-released")); }
@@ -345,7 +401,11 @@ internal static class Program
             : new("example-owned-key", context.TargetDirectory, []);
         public void RestoreRegistration(UpdateRegistrySnapshot original, UpdateRegistrySnapshot? current) => Events.Add("registry-restored");
         public void RegisterRecovery(VerifiedUpdate context, int attempt) => Events.Add("recovery-registered");
-        public void ClearRecovery(VerifiedUpdate context) => Events.Add("recovery-cleared");
+        public void ClearRecovery(VerifiedUpdate context)
+        {
+            if (ClearRecoveryFails) { Events.Add("recovery-clear-failed"); throw new IOException("Example cleanup failure."); }
+            Events.Add("recovery-cleared");
+        }
         public int RunSetup(VerifiedUpdate context, Action<UpdateProcessIdentity> started)
         {
             Require(UpdateFiles.SamePath(context.TargetDirectory, fixture.Install), "Setup must retain the exact prior owned installation directory.");

@@ -1,5 +1,14 @@
 # Audio Mixer console — design verification
 
+> Historical development record. Results and procedures below belong to their
+> named versions; they do not qualify the current beta. See
+> [current qualification](docs/BETA_TESTING_CURRENT.md) for the active release checks.
+
+Evidence note: raw reports, historical renders and reference captures cited
+here are retained privately outside the repository. Their labels below identify
+archived evidence, not downloadable files; recorded results apply only to the
+versions and checks described.
+
 Date: 17 October 2026, UTC+10.
 
 Scope: the native WPF controller and its presentation. Audio, driver, latency,
@@ -15,30 +24,30 @@ The current saved configuration remains revision 1, with A muted at −24 dB.
 ## Source and rendered evidence
 
 - Measured design contract: [UI overhaul plan](docs/UI_REDESIGN_PLAN.md).
-- Visual source: [revised green mockup](docs/design/console-mockup.png),
+- Visual source: revised green mockup,
   1609 × 978 pixels, approximately 1.437 pixels per target DIP.
 - Reference interpretation: [mockup review](docs/design/MOCKUP_REVIEW.md), made
   before the production UI edits.
-- Native implementation: [connected console](docs/design/implementation/04-live-console-final.png)
-  and [handoff console](docs/design/implementation/07-live-console-handoff.png),
+- Native implementation: connected console
+  and handoff console,
   both 1108 × 674 captured pixels. Windows capture omits the invisible outer
   resize borders; the actual WPF window remains 1120 × 680 DIP, with minimise
   available and resizing/maximising disabled.
-- [Full-view comparison](docs/design/implementation/08-full-view-comparison.png)
+- Full-view comparison
   places the source and implementation together, each normalised to 1120 × 681
   pixels. This aligns overall scale; it does not imply pixel-identical native
   title chrome or a requirement to copy generated artwork.
-- [Focused comparison](docs/design/implementation/09-controls-comparison.png)
+- Focused comparison
   compares source/mute/fader and master/destination regions at that same scale.
   Small labels, units and state text were also inspected in the native captures.
-- [Devices assignments](docs/design/implementation/05-live-devices-final.png)
-  and [app connections](docs/design/implementation/06-live-app-connections-final.png)
+- Devices assignments
+  and app connections
   show the running controller. The dialog is fixed at 880 × 600 DIP; its native
   capture is 868 × 594 pixels.
 
 The source and first connected capture share the saved-state example: microphone
 1 B on, App Audio A on, A muted at −24 dB, B unmuted at 0 dB and silent meters.
-At handoff Listening device 1 had become unavailable independently of this work: A1 displays
+At handoff listening output A1 had become unavailable independently of this work: A1 displays
 **Waiting for device**, retains its saved name and does not replace it with a
 different output. The engine remains connected and B shows Connected. This is
 an observed UI state, not a controlled reconnection test.
@@ -91,7 +100,7 @@ runtime dependency or web framework was introduced.
 ## Verification and limits
 
 The self-contained desktop publish completed with zero warnings and zero errors.
-The [saved verification result](docs/design/verification/results.json) passed
+The saved verification result passed
 28 inert UI checks with no WPF binding errors. The harness opens no named pipe,
 audio device or real settings file. It checks all 64 source-route combinations
 against the actual toggle controls, independent gains/mutes, saved route intent,
@@ -101,7 +110,7 @@ patterns, contrast resources, observed clipping and disconnected editing.
 Additional mouse and keyboard checks used an isolated preview: click/Space route
 toggles, invalid input without a level change, A −6.5 dB independently of B,
 Tab/arrow adjustment of B by 0.5 dB, readable dropdown selection and Devices
-navigation. [The keyboard capture](docs/design/implementation/03-preview-keyboard-check.png)
+navigation. The keyboard capture
 records these preview values; they were never applied to the live configuration.
 
 | Captures | Interpretation |
@@ -120,7 +129,7 @@ accessibility certification is made.
 
 Only the desktop executable was replaced in the live package. The existing
 native engine stayed running. The settings SHA-256 before and after the update
-is `95D0A5A22067FC9049CFA4A6880DC9C29BDDBB1CD62795AA75F9C6BE3930423A`.
+is `<private-revision-1-settings-sha256-omitted>`.
 No route, assignment, gain, mute, Windows default or other audio application was
 changed. No test sound, playback start or recording was initiated.
 

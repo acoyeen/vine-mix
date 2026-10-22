@@ -33,6 +33,11 @@ template<class F> void rejects(F f, const std::string& why) {
     try { f(); } catch (const std::exception&) { caught = true; }
     require(caught, why);
 }
+template<class F> void rejectsPersistence(F f, const std::string& why) {
+    bool caught = false;
+    try { f(); } catch (const SettingsWriteError&) { caught = true; }
+    require(caught, why);
+}
 GraphNode node(std::string id, const std::string& kind) {
     GraphNode n; n.id = std::move(id); n.kind = kind; n.name = n.id; return n;
 }
@@ -77,6 +82,21 @@ void settings(const std::filesystem::path& root) {
     missingPrimary.save(committedMissing);
     require(ConfigurationStore(path).load().revision == 43 && read(path.string() + ".bak") == backup, "Saving recovered missing-primary settings retains the original good backup");
     write(path, primary);
+    for (const auto& revision : std::array<Json, 7>{Json(-1), Json(42.5), Json(42.0), Json("42"), Json(true), Json(nullptr), Json(1e30)}) {
+        auto malformed = Json(current); malformed["revision"] = revision;
+        rejects([&] { (void)malformed.get<Configuration>(); }, "Revision must not coerce a negative, fractional or noninteger JSON value");
+        const auto bytes = malformed.dump(); write(path, bytes);
+        ConfigurationStore invalidRevision(path); const auto preview = invalidRevision.load();
+        require(invalidRevision.loadState() == "backupAvailable" && !invalidRevision.writable() && preview.revision == 41,
+            "Malformed revision pauses saving and exposes the valid backup for review");
+        require(read(path) == bytes && read(path.string() + ".bak") == backup,
+            "Malformed revision recovery preserves both original and backup bytes");
+    }
+    for (const auto revision : {std::uint64_t{0}, std::uint64_t{42}, (std::uint64_t{1} << 53) + 1, std::numeric_limits<std::uint64_t>::max()}) {
+        auto exact = Json(current); exact["revision"] = revision;
+        require(Json::parse(exact.dump()).get<Configuration>().revision == revision,
+            "Every representable unsigned revision survives JSON without floating-point rounding");
+    }
     for (const auto version : {std::uint64_t{999}, std::numeric_limits<std::uint64_t>::max()}) {
         auto unsupported = Json(current); unsupported["version"] = version;
         write(path, unsupported.dump());
@@ -118,11 +138,11 @@ void settings(const std::filesystem::path& root) {
     HANDLE locked = CreateFileW((path.wstring() + L".new").c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
     require(locked != INVALID_HANDLE_VALUE, "Obtain test-only staging-file lock");
     auto next = restored; next.revision = 44;
-    rejects([&] { recovered.save(next); }, "Staging-file lock rejects save"); CloseHandle(locked);
+    rejectsPersistence([&] { recovered.save(next); }, "Staging-file lock rejects save with a typed persistence failure"); CloseHandle(locked);
     require(read(path) == beforeFailure && read(path.string() + ".bak") == backupBeforeFailure, "Failed staging leaves primary and backup byte-identical");
     locked = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
     require(locked != INVALID_HANDLE_VALUE, "Obtain test-only primary replacement lock");
-    rejects([&] { recovered.save(next); }, "Replacement lock rejects save"); CloseHandle(locked);
+    rejectsPersistence([&] { recovered.save(next); }, "Replacement lock rejects save with a typed persistence failure"); CloseHandle(locked);
     require(read(path) == beforeFailure && read(path.string() + ".bak") == backupBeforeFailure, "Failed replacement preserves last committed settings and backup");
     auto invalid = next; invalid.graph.nodes[0].gainDb = 13;
     rejects([&] { recovered.save(invalid); }, "Invalid configuration rejects before persistence");
@@ -133,6 +153,19 @@ void settings(const std::filesystem::path& root) {
     require(Json(oversized).dump(2).size() > 262144, "Construct legal-field oversized document");
     rejects([&] { recovered.save(oversized); }, "A commit must not create a file its loader refuses");
     require(read(path) == beforeFailure, "Oversized rejected commit preserves current configuration");
+    {
+        const auto parent = root / "obstructed-parent";
+        ConfigurationStore obstructed(parent / "settings.json");
+        (void)obstructed.load();
+        require(obstructed.loadState() == "new", "Inspect an initially missing test-only workspace directory");
+        write(parent, "temporary directory obstruction");
+        rejectsPersistence([&] { obstructed.save(initial); }, "Directory-creation failure has the same retryable persistence type as Windows write failures");
+        require(read(parent) == "temporary directory obstruction" && obstructed.loadState() == "new",
+            "Failed directory creation preserves its obstruction and does not claim a committed workspace");
+        std::filesystem::remove(parent);
+        obstructed.save(initial);
+        require(obstructed.load().revision == initial.revision, "The same store can save after its directory obstruction is removed");
+    }
     {
         // --settings also accepts a filename in the current directory. Keep
         // this process-wide change inside a new test-only fixture directory.

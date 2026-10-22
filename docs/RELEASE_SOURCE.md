@@ -3,6 +3,19 @@
 Every published version has its own source tag and retained executable downloads.
 The [release history](RELEASES.md) links each version's notes and assets.
 
+## 0.3.0-beta.3
+
+The Beta 3 packages are built from one committed source revision, identified by
+their About information and retained build receipts. Its exact-source ZIP
+contains the checked-in files plus `SOURCE-MANIFEST.json`, which records the
+release commit, exact build-input sizes and SHA-256 hashes, and a sanitized
+final-package verification record. The installer,
+standalone package and signed update metadata must agree on that input hash.
+
+Release qualification and remaining limits are recorded in the
+[Beta 3 notes](releases/0.3.0-beta.3.md). Earlier versions retain their original
+tags and downloads; Beta 3 does not replace the provisional Beta 2 files.
+
 ## 0.3.0-beta.2
 
 The release source was captured from the same frozen 276-file build input set as

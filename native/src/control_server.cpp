@@ -53,15 +53,17 @@ bool writeAll(HANDLE pipe, const std::string& text, Engine& engine, HANDLE event
 }
 }
 Json ControlServer::handle(const Json& request) {
-    const Json requestId = request.value("requestId", Json(""));
-    Json response{{"protocolVersion", 1}, {"requestId", requestId}, {"ok", true}};
+    Json response{{"protocolVersion", 1}, {"requestId", ""}, {"ok", true}};
     try {
-        if (!request.is_object() || request.at("protocolVersion").get<int>() != 1)
+        if (!request.is_object()) throw std::runtime_error("A control request must be a JSON object.");
+        response["requestId"] = request.value("requestId", Json(""));
+        const auto& protocol = request.at("protocolVersion");
+        if (!protocol.is_number_integer() || protocol != 1)
             throw std::runtime_error("Unsupported control protocol version.");
         const auto command = request.at("command").get<std::string>();
         if (command == "snapshot") response["snapshot"] = engine_.snapshot();
         else if (command == "configure") {
-            engine_.configure(request.at("configuration").get<Configuration>(), request.at("expectedRevision").get<std::uint64_t>());
+            engine_.configure(request.at("configuration").get<Configuration>(), readRevision(request.at("expectedRevision")));
             response["snapshot"] = engine_.snapshot();
         } else if (command == "retry") { engine_.retry(); response["snapshot"] = engine_.snapshot(); }
         else if (command == "recoveryRetry" || command == "restoreBackup" || command == "startFresh") {
@@ -70,6 +72,8 @@ Json ControlServer::handle(const Json& request) {
         }
         else if (command == "shutdown") { response["message"] = "Audio engine stopped."; }
         else throw std::runtime_error("Unknown control command.");
+    } catch (const SettingsWriteError& error) {
+        response["ok"] = false; response["error"] = error.what(); response["errorCode"] = "settings_write_failed";
     } catch (const std::exception& error) { response["ok"] = false; response["error"] = error.what(); }
     return response;
 }

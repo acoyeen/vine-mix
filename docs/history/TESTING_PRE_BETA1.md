@@ -1,12 +1,122 @@
-# Historical testing and hardware qualification
+# VineMix — testing and hardware qualification
 
-Preserved from the earlier committed development snapshot. Names, commands,
-procedures and results below describe their original source versions. For the
-supplied 0.3.0-beta.1 files, use the [beta qualification record](../BETA_IMPLEMENTATION.md)
-and [tester guide](../BETA_TESTER_GUIDE.md). Command paths in historical prose
-are recorded from the original repository-root location.
+Historical package/evidence paths and descriptions of the running session below
+refer to the original test date. Raw records and backups are retained privately
+outside this checkout.
+
+> Historical development record. Results and procedures below belong to their
+> named versions; they do not qualify the current beta. See
+> [current qualification](../BETA_TESTING_CURRENT.md) for the active release checks.
+
+Evidence note: raw reports, historical renders and reference captures cited
+here are retained privately outside the repository. Their labels below identify
+archived evidence, not downloadable files; recorded results apply only to the
+versions and checks described.
+
+## Beta 1 qualification — 21 October 2026
+
+Target **0.3.0-beta.1**, shown as **0.3.0 · Beta 1**. The current beta changes are
+in progress. Historical passes below describe their named source snapshots and
+artifacts; they do not independently qualify the new package. The canonical
+current status and exact final-artifact evidence are in
+[the beta implementation record](../BETA_IMPLEMENTATION.md).
+
+Required gates still need final evidence before distribution:
+
+- Normal Explorer/shortcut and tool-origin launch persistence, including the
+  physical file path from an open settings handle, saved graph/assignments,
+  independent desktop reads, shutdown and reopen.
+- Detached recovery, ownership, restart-safe migration and starter checks; fresh
+  data, damaged/missing established settings, backup restore, preserved originals,
+  interrupted migration and conflicting legacy copies.
+- Final standalone EXE and Setup identity, extracted content, .NET/runtime files,
+  notices, hashes, process coordination and safe replacement/uninstall behavior.
+- Clean Windows 11 x64 installation of both packages, optional-driver success,
+  cancellation, restart, no-driver operation, repair/upgrade and removal.
+- Real-device reconnect, sleep/resume, independent listening/virtual output mutes,
+  and an eight-hour sustained session with recorded observations.
+- Investigation of the earlier unexplained closure; low-memory correlation alone
+  is not an established cause or proof of a fix.
+
+Run detached verification with `scripts/verify-offline.ps1`. The verification
+build contains the render/test implementation and uses temporary state and
+synthetic audio; the release build excludes it. Render beta documentation with
+the verification executable's `--render-beta-docs --verification-dir <new-folder>`.
+Its fresh and configured fixtures contain exactly the three starter nodes and
+two routes, muted outputs, synthetic IDs and generic physical device names.
+Inspect every delivered screenshot; no personal workspace should be loaded to
+make a documentation image. This render mode is unavailable in the release app.
+
+The documentation render on 21 October passed **58 detached checks**, produced
+**six images** and reported **zero binding errors**:
+`artifacts/beta-preparation/beta-docs-4/results.json`. All six images were visually
+inspected, including fresh/configured starters at 96/192 DPI, Settings and About.
+The actual About Copy/Close handlers used inert callbacks, without accessing the
+system clipboard. Output bodies have a checked visible gap. The three selected
+repository images use synthetic devices and no personal workspace. This is
+documentation/UI evidence, separate from package and hardware qualification.
+
+For manual beta testing and useful bug reports, use
+[the beta tester guide](../BETA_TESTER_GUIDE.md). Record **Not run** when a real
+scenario is unavailable; offline simulations do not establish audible or hardware
+reliability. Keep exact source/build/version, artifact checksum, report path,
+date and tester context with a result. Review raw diagnostics for private paths
+and device identifiers before sharing.
+
+## Earlier verification evidence
+
+The entries below are retained as the record of work before Beta 1.
 
 ## Run the current checks
+
+The Windows launch-context correction on **21 October 2026** passed **10,821
+detached desktop checks / 215 renders / zero binding errors**, plus **eight
+detached activation-process tracking checks**. Reports:
+`artifacts/startup-priority-20261021/ui/results.json` and
+`artifacts/startup-priority-20261021/activation-tracking-results.json`.
+
+The earlier explicit `--settings` correction passed a tool-launched reopen but
+did not fix the cause. The next recurrence proved that identical printed paths
+opened two different physical files:
+
+| Launch context | Physical storage | Observed workspace |
+| --- | --- | --- |
+| Codex execution environment | Codex package `LocalCache\Local\AudioMixer` | Custom revision 6376, eleven nodes / eleven connections |
+| Ordinary Explorer/shortcut | `%LOCALAPPDATA%\AudioMixer` | Default revision 1, eight nodes / nine connections |
+
+Win32 file handles, native streams, `ConfigurationStore` and managed file reads
+all reproduced the split. Both probe processes reported no package identity,
+so that API alone cannot identify inherited AppData redirection. Passing an
+absolute settings filename or applying desktop-app policy 1 also failed to
+normalize the file view. The successful exact-source probe launches with the
+current desktop shell as its documented process parent. Ordinary application
+startup now performs that handoff before preferences, singleton or engine setup;
+preview/render modes remain detached. Checks cover argument preservation,
+Windows quoting, background mode, loop prevention and safe launch failures.
+
+Both settings views were backed up. The custom primary, last-good backup and UI
+preferences were then recovered byte-for-byte into the ordinary desktop folder.
+Full engine shutdown/reopen was verified separately through an Explorer shortcut
+and through the Codex tool environment. Both restored the exact saved graph,
+controls, assignments and camera without warnings; audio frames advanced. A final
+independent desktop-context read resolved the real folder and matched all three
+recovered file hashes. Native engine and runtime bytes were unchanged.
+
+Evidence is under `artifacts/startup-priority-20261021/`: `file-probe/`,
+`standalone-csharp-probe/shell-hidden-results.json`, `workspace-recovery.json`,
+`live-activation.json`, `tool-cold-reopen.json` and `final-state.json`.
+Activation scripts now check physical file paths before changing processes, and
+wait for the final responsive controller rather than its short-lived launcher.
+
+No application-specific Windows crash report was found for the unexpected exit.
+Windows logged low virtual memory at 15:39 UTC+10; a causal relationship is
+unproven. Normal desktop starts, exits and unhandled exceptions now write to
+`%LOCALAPPDATA%\AudioMixer\desktop.log` for future diagnosis. This verification
+does not replace listening or long-duration hardware qualification.
+
+Primary references verified **21 October 2026**:
+[Microsoft's AppData virtualization documentation](https://learn.microsoft.com/en-us/windows/msix/desktop/desktop-to-uwp-behind-the-scenes)
+and [Microsoft's shell-parent process launch example](https://devblogs.microsoft.com/oldnewthing/20190425-00/?p=102443).
 
 The GitHub synchronization review on **20 October 2026** rebuilt the current
 source and passed all **17 native offline suites** and **10,806 detached desktop
@@ -189,7 +299,7 @@ The initial publication review on 19 October 2026 passed all 14 native suites an
 **9,139 desktop checks / 166 renders / zero binding errors**. The native
 qualification suite includes **7,914 assertions** and the engine lifecycle suite
 checks relative settings and logging without opening audio endpoints. Details
-and evidence locations are recorded in [PUBLICATION_REVIEW.md](../../docs/PUBLICATION_REVIEW.md).
+and evidence locations are recorded in [PUBLICATION_REVIEW.md](../PUBLICATION_REVIEW.md).
 
 Historical evidence paths below refer to local, excluded build/render outputs.
 They document prior checks; they are not downloadable release artifacts. Current
@@ -197,14 +307,14 @@ checks are reproducible with the command above. Hardware and audible checks
 remain separate and incomplete.
 
 The node workspace supersedes the fixed console. The original detailed procedure
-is preserved in [V1_TESTING_HISTORY.md](../../docs/V1_TESTING_HISTORY.md) for reference.
+is preserved in [V1_TESTING_HISTORY.md](../V1_TESTING_HISTORY.md) for reference.
 The current graph supports up to 32 nodes and 96 cables; the old fixed slot counts
 are no longer acceptance requirements.
 
 The current Add/search library has 24 types. Gain / Multiply and Reroute remain
 supported only for existing graphs, giving 26 compatible engine types. Effects,
-Balance and Mono have no generic Level row. See [the workspace guide](../../docs/NODE_WORKSPACE.md),
-[effect research](../../docs/EFFECTS_RESEARCH.md) and [the measured EQ analyzer](../../docs/EQ_SPECTRUM_ANALYZER.md)
+Balance and Mono have no generic Level row. See [the workspace guide](../NODE_WORKSPACE.md),
+[effect research](../EFFECTS_RESEARCH.md) and [the measured EQ analyzer](../EQ_SPECTRUM_ANALYZER.md)
 before qualifying the expanded effects library.
 
 ### Device dropdown cleanup and combined EQ verification
@@ -231,7 +341,7 @@ bands, selection retention and Undo/Redo. Group and selection-box renders were
 inspected. Native pointer dispatch, popup scrolling and audible results remain
 for the user's running-app test. No computer use was performed.
 
-See [device visibility](../../docs/DEVICE_VISIBILITY.md) for defaults and supported
+See [device visibility](../DEVICE_VISIBILITY.md) for defaults and supported
 advanced categories. Local activation backs up both executables, preserves
 personal settings, and verifies prior running paths recover before opening the
 updated desktop. Activation evidence is recorded separately from these tests.
@@ -354,10 +464,10 @@ together.
 
 Current implementation and activation evidence is in [design-qa.md](../../design-qa.md).
 The hardware qualification record is
-[TEST_RESULTS_2026-10-17.md](../../docs/TEST_RESULTS_2026-10-17.md). Additional offline
+[TEST_RESULTS_2026-10-17.md](../TEST_RESULTS_2026-10-17.md). Additional offline
 coverage and short real-driver observations passed. The eight-hour silent
 endurance run was **DEFERRED / stopped at the user's request** on 17 October at
-21:04:00 UTC+10 time, after approximately 29 minutes of process runtime. It is
+21:04:00 UTC+10, after approximately 29 minutes of process runtime. It is
 neither a test failure nor an endurance pass. Full release qualification remains open.
 
 Keep implementation checks separate from real audio qualification. Compilation,
@@ -407,7 +517,7 @@ buffers. It never starts a real stream. `AudioMixer.CaptureIsolationProbe` is a
 separate opt-in live diagnostic requiring an exact process ID and virtual capture
 endpoint. It observes existing audio, renders nothing, and writes only aggregate
 statistics. It distinguishes actual silence from no packets and insufficient
-input. See [the stream-isolation results](../../docs/APP_AUDIO.md#microphone-audio-in-discord-screen-shares).
+input. See [the stream-isolation results](../APP_AUDIO.md#microphone-audio-in-discord-screen-shares).
 
 The suite covers graph routing and effect quality, bounded clock-drift queues,
 engine start/stop and failed-start cleanup, layout edits preserving DSP history,
@@ -415,7 +525,7 @@ backup recovery when the primary settings file is absent, partial device
 inventory failures, transport fragmentation/cancellation/reconnects, independent
 configuration copies, selector caching, dials, tooltips and EQ spectrum recovery.
 Performance measurements describe processing work and allocation, not audible
-end-to-end latency. See [the maintenance report](../../docs/MAINTENANCE_REVIEW.md).
+end-to-end latency. See [the maintenance report](../MAINTENANCE_REVIEW.md).
 
 ### Peak readings and clipping
 
@@ -489,7 +599,7 @@ checks, not a claim that the current candidate has already passed:
 | Ducking isolation | Main-only, trigger-only, missing/disconnected/silent trigger, zero amount; trigger never enters output and no main-detector fallback |
 | Ducking curve and time | Static fixed target, 3 dB hysteresis and 5/50 ms detector smoothing; Dynamic raw-peak ratio curve and unity below threshold; shared attack/release envelope, mode changes, stereo linking, bypass, edits and trigger changes |
 | Limiter | First-sample and steady ceiling enforcement with inherited and linked gain; release and bypass; ceiling edits; accurately disclosed no-lookahead sample-peak behavior |
-| Legacy compatibility | Compressor always measures its own audio; saved detector metadata remains readable but is ignored, and old Compressor trigger edges are rejected without converting nodes. Preserve legacy Compress/Limit behavior, IDs, names, positions, gains, hidden settings and bypass; loading leaves files untouched. Older Expander records in gate mode retain that mode and their settings. See the explicit compatibility decision in [IDEA-007](../../docs/IDEAS_IMPLEMENTED.md#idea-007-static-and-dynamic-modes-in-the-ducking-node). |
+| Legacy compatibility | Compressor always measures its own audio; saved detector metadata remains readable but is ignored, and old Compressor trigger edges are rejected without converting nodes. Preserve legacy Compress/Limit behavior, IDs, names, positions, gains, hidden settings and bypass; loading leaves files untouched. Older Expander records in gate mode retain that mode and their settings. See the explicit compatibility decision in [IDEA-007](../IDEAS.md#idea-007-static-and-dynamic-modes-in-the-ducking-node). |
 | Routing | Audio insertion with an attached trigger; typed rewiring; detector cycle rejection, including muted edges; detach refusal with detector/control connections and unchanged graph on failure |
 | Persistence | Temporary save/load, copy/paste and explicit reset for dedicated dynamics kinds and both Ducking modes; absent Ducking fields default to Static/4:1; marker 0 legacy / 1 new compressor; unchanged backup conventions |
 | Dials | Bounds, parameter defaults, vertical/Shift drag, exact entry, routed Enter/Escape and arrow/Page/Home keys, visible focus, accessible names and wheel-only canvas zoom |
@@ -516,8 +626,8 @@ bursts, post-consonant recovery, quiet/zero-effect transparency, stereo behavior
 EQ/filter response, compressor distortion, denoiser noise-versus-tone behavior,
 and reverb gain/energy/decay. Ordinary finite-output and routing tests are still
 required, but cannot substitute for these quality measurements. Read
-[the de-esser audit](../../docs/DEESSER_QUALITY_AUDIT.md) and
-[the other-effects audit](../../docs/EFFECTS_QUALITY_AUDIT.md) for findings and limits.
+[the de-esser audit](../DEESSER_QUALITY_AUDIT.md) and
+[the other-effects audit](../EFFECTS_QUALITY_AUDIT.md) for findings and limits.
 
 During later listening checks, compare the same phrase with Bypass grey and red.
 Watch the Reduction indicator on De-esser/Plosive/Compressor. If it remains
@@ -593,8 +703,8 @@ Additional background coverage completed on 17 October:
 
 Items 2–4 are covered by `AudioMixer.QualificationTests`; queue concurrency is
 covered by `AudioMixer.DriftQueueTests`. Detailed results and scope limits are in
-[the current report](../../docs/TEST_RESULTS_2026-10-17.md). The earlier UI/control
-baseline remains in [NODE_VERIFICATION.md](../../docs/NODE_VERIFICATION.md).
+[the current report](../TEST_RESULTS_2026-10-17.md). The earlier UI/control
+baseline remains in [NODE_VERIFICATION.md](../NODE_VERIFICATION.md).
 
 ### Current effects, EQ spectrum and reset coverage
 
@@ -654,11 +764,11 @@ personal engine, audio devices or settings:
 
 | Suite | Observed result | Log |
 |---|---|---|
-| GraphTests | 48,522 assertions, including zero/eight-band EQ, each tone band's boost/cut, bypass, control continuity, validation and exact JSON round trips with saved-layout preservation | Graph results (local evidence: `build/qualification/eq-tone-graph-results.txt`) |
-| QualificationTests | 7,901 assertions over 4,527,360 synthetic frames | Qualification results (local evidence: `build/qualification/eq-tone-qualification-results.txt`) |
-| EngineLifecycleTests | 210 graph commits with concurrent snapshots, worker reuse, synthetic output loss/rejoin and shutdown | Lifecycle results (local evidence: `build/qualification/eq-tone-lifecycle-results.txt`) |
+| GraphTests | 48,522 assertions, including zero/eight-band EQ, each tone band's boost/cut, bypass, control continuity, validation and exact JSON round trips with saved-layout preservation | Graph results |
+| QualificationTests | 7,901 assertions over 4,527,360 synthetic frames | Qualification results |
+| EngineLifecycleTests | 210 graph commits with concurrent snapshots, worker reuse, synthetic output loss/rejoin and shutdown | Lifecycle results |
 
-The final readable candidate's offscreen result (local evidence: `docs/design/blender-readable-final/results.json`)
+The final readable candidate's offscreen result
 contains 226 passing scoped checks, 20 actual WPF renders at 96/144/192 DPI and
 zero binding errors. The Release build completed with zero warnings and errors.
 Visual comparison with the official Blender reference and earlier effects view,
@@ -835,7 +945,7 @@ base VB-CABLE capture and VAC Lite render:
 
 ```powershell
 & '.\build\native\AudioMixer.HardwareTests.exe' --run-muted `
-    --a1 '<current USB DAC render ID>' --a2 '<current second physical render ID>' `
+    --a1 '<current first physical render ID>' --a2 '<current second physical render ID>' `
     --vb-capture '<current VB-CABLE recording ID>' --vac-render '<current VAC playback ID>' `
     --seconds 120 --cycles 3 --output '<new absolute result.json path>'
 ```
@@ -844,7 +954,7 @@ The helper verifies that every node is muted before startup and every graph
 commit. Physical microphones are unassigned. It creates its own unique settings
 file beside the result; it never contacts the personal mixer. Preserve endpoint
 defaults, session levels and the personal configuration. A healthy shared-mode
-open is expected to coexist with ordinary USB DAC playback, but actual listening
+open is expected to coexist with ordinary playback through the selected output, but actual listening
 quality remains a separate observation.
 
 For an explicitly authorized eight-hour background run use `--seconds 28800
@@ -856,7 +966,7 @@ with the retained telemetry overhead in mind. Successful completion requires
 the final result, full observed duration and healthy frame/counter trends;
 an interim `passed: false` is not a terminal result.
 
-The 17 October run is stopped, with its stop record (local evidence: `artifacts/qualification/endurance-20261017-203453/stopped-by-user.json`)
+The 17 October run is stopped, with its stop record
 preserved separately from the unchanged partial `results.json`, which still
 ends with status `running`. Its follow-up automation,
 `audio-mixer-endurance-results`, is **PAUSED**. Do not infer liveness or failure
@@ -896,12 +1006,12 @@ identity. It writes statistics, never audio samples.
   user's current graph, never blindly restore historical revision 1 or 3.
 - Verify the user has completed the planned reboot before reliability claims.
   VoiceMeeter was removed at the user's request; do not reinstall or depend on it.
-- Check that base VB-CABLE and VAC Lite are active. Do not remove existing microphone or other
+- Check that base VB-CABLE and VAC Lite are active. Do not remove microphone software or other
   unrelated device software. Keep both transport sides enabled.
 - Keep “Listen to this device” disabled. Use modest headphone volume and agree
   a quiet test period before any sound is generated or routed differently.
 - Inspect the actual intended listening device with the user. The historical
-  Listening device 1 assignment is not proof that it is today's intended headphones.
+  listening-output assignment is not proof that it is today's intended headphones.
 - Confirm incoming call audio is outside any path sent back to the call.
 - Measure complete end-to-end paths; do not infer latency from a queue size.
 
@@ -1071,7 +1181,7 @@ change the test audio route.
 
 ## Application-node qualification
 
-Follow [APP_AUDIO.md](../../docs/APP_AUDIO.md), recording per application:
+Follow [APP_AUDIO.md](../APP_AUDIO.md), recording per application:
 
 1. Capture Spotify while it plays; confirm browser/call audio is excluded.
 2. Stop and restart the app. The node should wait, then resolve the same executable
@@ -1136,8 +1246,8 @@ profile; record that rather than claiming the mixer eliminates the transport lim
 
 The published 17 October group-edit build passed **368 detached checks and 24
 renders**, including existing rendering/control checks. See the
-results (local evidence: `docs/design/group-edit-published/results.json`) and
-controller-only activation (local evidence: `artifacts/group-ui-update-20261017-221057/result.json`).
+results and
+controller-only activation.
 
 Use a detached preview graph for the later hands-on UI session. These checks do
 not require changing live audio or taking over the user's current desktop.
@@ -1183,9 +1293,9 @@ mouse/keyboard or Windows clipboard integration testing.
 
 The 17 October correction passed 268 detached checks and 22 renders in both
 the Release and published controller. Evidence:
-published results (local evidence: `docs/design/zoom-fix-published/results.json`),
-[before/after benchmark](../../docs/ZOOM_RENDERING_BENCHMARK.md) and
-controller-only activation (local evidence: `artifacts/zoom-ui-update-20261017-215316/result.json`).
+published results,
+[before/after benchmark](../ZOOM_RENDERING_BENCHMARK.md) and
+controller-only activation.
 No live audio settings or engine binary changed for this correction.
 
 In the later agreed UI session, use a copied preview graph:
@@ -1210,7 +1320,7 @@ interrupting a call, or restarting the deferred endurance run.
 ## Dark theme, fractional zoom and window resizing
 
 The selection/grab update passed **641 detached checks and 55 renders**, with
-zero binding errors: results (local evidence: `docs/design/selection-grab-verified/results.json`).
+zero binding errors: results.
 Checks cover fixed on-screen selection thickness, unchanged node proportions,
 multi-selection/collapse, header grab geometry and protection of setting
 controls from node dragging. Header tests use visual hit testing on the detached
@@ -1219,7 +1329,7 @@ pointer events or substitute for the physical gesture checks below.
 
 The earlier uniform-zoom published controller passed **583 detached checks and
 50 renders**, with zero binding errors:
-results (local evidence: `docs/design/uniform-zoom-final/results.json`). The checks compare node
+results. The checks compare node
 dimensions, fonts, borders, editor visibility and socket geometry from 30–200%
 zoom, plus explicit collapse, group editing, window sizes and repeatable Fit.
 The single-EQ Fit case reaches approximately 75.7% with all controls visible in
@@ -1229,8 +1339,8 @@ establish physical-display sharpness or live pointer responsiveness.
 
 The earlier dark/resizable controller, before the uniform-zoom correction,
 passed **499 detached checks and 41 renders**, with no binding errors:
-results (local evidence: `docs/design/oled-final/results.json`).
-The separate controller-only activation (local evidence: `artifacts/oled-ui-update-20261017-223221/result.json`)
+results.
+The separate controller-only activation
 confirmed a responsive window while the same engine kept advancing and saved
 settings remained unchanged. Neither result establishes native resize gestures
 or physical-display sharpness.
@@ -1330,7 +1440,7 @@ The following remain checks for a later agreed hands-on UI session:
     Detached renders cover styles/layout; native popup placement needs this
     later hands-on check.
 12. For the MV7+'s hardware denoiser comparison and persistence check, follow
-    [the Shure research and setup steps](../../docs/SHURE_DENOISER.md). The app's
+    [the Shure research and setup steps](../SHURE_DENOISER.md). The app's
     software Denoiser and Shure's hardware processing are separate. No Shure
     hardware setting was changed or read back during this UI update.
 
@@ -1497,7 +1607,7 @@ recheck). Reproduce with `scripts/verify-offline.ps1`.
 Actual microphone-to-headphone latency, listening under load, driver-specific
 minimum-period reliability, hotplug and endurance remain manual qualifications.
 The separate candidate package does not replace or restart the running app.
-See [audio latency](../../docs/AUDIO_LATENCY.md) for policy, diagnostics and primary
+See [audio latency](../AUDIO_LATENCY.md) for policy, diagnostics and primary
 Windows API references.
 
 
@@ -1508,7 +1618,7 @@ native offline suites passed (`artifacts/rebrand-20261020-native/results.json`).
 Detached WPF passed **10,012 checks**, produced **189 renders** and reported
 **zero binding errors**. The shown-window harness passed **43 checks**, also
 with zero binding errors. Final UI report paths and installed identity are in
-[the implementation record](../../docs/BRANDING_IMPLEMENTATION_PLAN.md).
+[the implementation record](../BRANDING_IMPLEMENTATION_PLAN.md).
 
 `BrandingVerification` inspects real packaged Plex Sans Regular/Medium/SemiBold
 and Mono Regular without simulated styles, numeric glyph alignment, real

@@ -7,7 +7,7 @@ only; no driver or application implementation selected or installed.
 
 **Deep-review update, 20 October 2026:** the subsequent
 [MicDeck and AudioRouter comparison](VIRTUAL_DRIVER_FOUNDATION_COMPARISON.md)
-supersedes the initial ranking below. the maintainer accepts four clearly labelled
+supersedes the initial ranking below. The maintainer accepts four clearly labelled
 endpoints and requires both cables to work with Vine Mix closed. Prototype
 **AudioRouter's Windows driver framework with two new internal loopback paths**
 first. Its unchanged private bridge cannot satisfy that requirement. MicDeck's

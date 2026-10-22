@@ -14,6 +14,13 @@ namespace {
 constexpr std::size_t maximumSettingsBytes = 262144;
 struct UnsupportedSettings : std::runtime_error { using std::runtime_error::runtime_error; };
 }
+std::uint64_t readRevision(const Json& value) {
+    // JSON arithmetic conversion otherwise truncates fractions and wraps
+    // negative values. Revisions are exact conflict tokens, not quantities.
+    if (!value.is_number_integer() || (!value.is_number_unsigned() && value.get<std::int64_t>() < 0))
+        throw std::runtime_error("Configuration revision must be a nonnegative whole number.");
+    return value.get<std::uint64_t>();
+}
 void from_json(const Json& value, Configuration& config) {
     if (!value.is_object()) throw std::runtime_error("Settings must be a JSON object.");
     const auto& schema = value.at("version");
@@ -29,7 +36,7 @@ void from_json(const Json& value, Configuration& config) {
         || !value.at("mainOutputs").is_array() || value.at("mainOutputs").size() != 2
         || !value.at("sources").is_array() || value.at("sources").size() != 3)
         throw std::runtime_error("Settings require exactly two microphones, two A outputs, and three sources.");
-    value.at("version").get_to(config.version); value.at("revision").get_to(config.revision);
+    value.at("version").get_to(config.version); config.revision = readRevision(value.at("revision"));
     value.at("microphones").get_to(config.microphones); value.at("mainOutputs").get_to(config.mainOutputs);
     value.at("virtualInputCapture").get_to(config.virtualInputCapture);
     value.at("virtualInputPlayback").get_to(config.virtualInputPlayback);
@@ -297,47 +304,53 @@ void ConfigurationStore::save(const Configuration& configuration) {
     const auto text = Json(configuration).dump(2) + "\n";
     if (text.size() > maximumSettingsBytes)
         throw std::runtime_error("Settings are too large to save. Shorten saved application or device details.");
-    // A bare --settings filename lives in the current directory, whose empty
-    // parent path is not a directory that create_directories can create.
-    if (const auto parent = path_.parent_path(); !parent.empty())
-        std::filesystem::create_directories(parent);
-    // Establish the store before committing. An interrupted first commit must
-    // not be mistaken for a new workspace on the next launch.
-    auto established = path_; established += L".established";
-    if (!std::filesystem::exists(established)) {
-        HANDLE marker = CreateFileW(established.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
-        if (marker == INVALID_HANDLE_VALUE) throw std::runtime_error("Cannot record the workspace identity.");
-        const char identity[] = "VineMix workspace\n"; DWORD count{};
-        const bool marked = WriteFile(marker, identity, sizeof(identity) - 1, &count, nullptr)
-            && count == sizeof(identity) - 1 && FlushFileBuffers(marker);
-        CloseHandle(marker);
-        if (!marked) throw std::runtime_error("Cannot commit the workspace identity.");
-    }
-    if (!legacySource_.empty()) {
-        auto preserved = path_; preserved += L".v1.bak";
-        if (!std::filesystem::exists(preserved) && !CopyFileW(legacySource_.c_str(), preserved.c_str(), TRUE))
-            throw std::runtime_error("Cannot preserve the original mixer settings before upgrading the canvas.");
-    }
-    auto temporary = path_; temporary += L".new";
-    auto backup = path_; backup += L".bak";
-    HANDLE file = CreateFileW(temporary.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS,
-        FILE_ATTRIBUTE_NORMAL, nullptr);
-    if (file == INVALID_HANDLE_VALUE) throw std::runtime_error("Cannot save settings to your local application folder.");
-    DWORD written{};
-    const bool success = WriteFile(file, text.data(), static_cast<DWORD>(text.size()), &written, nullptr)
-        && written == text.size() && FlushFileBuffers(file);
-    CloseHandle(file);
-    if (!success) throw std::runtime_error("Settings could not be written completely.");
-    if (std::filesystem::exists(path_)) {
-        if (!primaryValid_) {
-            auto damaged = path_; damaged += L".corrupt-" + std::to_wstring(GetTickCount64());
-            if (!CopyFileW(path_.c_str(), damaged.c_str(), TRUE))
-                throw std::runtime_error("Cannot preserve the damaged settings file.");
+    // Only persistence failures are retryable. Recovery choices, schema/graph
+    // validation and document-size rejection above remain permanent errors.
+    try {
+        // A bare --settings filename lives in the current directory, whose empty
+        // parent path is not a directory that create_directories can create.
+        if (const auto parent = path_.parent_path(); !parent.empty())
+            std::filesystem::create_directories(parent);
+        // Establish the store before committing. An interrupted first commit must
+        // not be mistaken for a new workspace on the next launch.
+        auto established = path_; established += L".established";
+        if (!std::filesystem::exists(established)) {
+            HANDLE marker = CreateFileW(established.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
+            if (marker == INVALID_HANDLE_VALUE) throw SettingsWriteError("Cannot record the workspace identity.");
+            const char identity[] = "VineMix workspace\n"; DWORD count{};
+            const bool marked = WriteFile(marker, identity, sizeof(identity) - 1, &count, nullptr)
+                && count == sizeof(identity) - 1 && FlushFileBuffers(marker);
+            CloseHandle(marker);
+            if (!marked) throw SettingsWriteError("Cannot commit the workspace identity.");
         }
-        if (!ReplaceFileW(path_.c_str(), temporary.c_str(), primaryValid_ ? backup.c_str() : nullptr, REPLACEFILE_IGNORE_MERGE_ERRORS,
-            nullptr, nullptr)) throw std::runtime_error("Cannot replace settings; the previous file was preserved.");
-    } else if (!MoveFileExW(temporary.c_str(), path_.c_str(), MOVEFILE_WRITE_THROUGH)) {
-        throw std::runtime_error("Cannot commit the settings file.");
+        if (!legacySource_.empty()) {
+            auto preserved = path_; preserved += L".v1.bak";
+            if (!std::filesystem::exists(preserved) && !CopyFileW(legacySource_.c_str(), preserved.c_str(), TRUE))
+                throw SettingsWriteError("Cannot preserve the original mixer settings before upgrading the canvas.");
+        }
+        auto temporary = path_; temporary += L".new";
+        auto backup = path_; backup += L".bak";
+        HANDLE file = CreateFileW(temporary.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS,
+            FILE_ATTRIBUTE_NORMAL, nullptr);
+        if (file == INVALID_HANDLE_VALUE) throw SettingsWriteError("Cannot save settings to your local application folder.");
+        DWORD written{};
+        const bool success = WriteFile(file, text.data(), static_cast<DWORD>(text.size()), &written, nullptr)
+            && written == text.size() && FlushFileBuffers(file);
+        CloseHandle(file);
+        if (!success) throw SettingsWriteError("Settings could not be written completely.");
+        if (std::filesystem::exists(path_)) {
+            if (!primaryValid_) {
+                auto damaged = path_; damaged += L".corrupt-" + std::to_wstring(GetTickCount64());
+                if (!CopyFileW(path_.c_str(), damaged.c_str(), TRUE))
+                    throw SettingsWriteError("Cannot preserve the damaged settings file.");
+            }
+            if (!ReplaceFileW(path_.c_str(), temporary.c_str(), primaryValid_ ? backup.c_str() : nullptr, REPLACEFILE_IGNORE_MERGE_ERRORS,
+                nullptr, nullptr)) throw SettingsWriteError("Cannot replace settings; the previous file was preserved.");
+        } else if (!MoveFileExW(temporary.c_str(), path_.c_str(), MOVEFILE_WRITE_THROUGH)) {
+            throw SettingsWriteError("Cannot commit the settings file.");
+        }
+    } catch (const std::filesystem::filesystem_error& error) {
+        throw SettingsWriteError(error.what());
     }
     primaryValid_ = true;
     loadState_ = "loaded";

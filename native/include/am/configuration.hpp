@@ -2,6 +2,7 @@
 #include "am/types.hpp"
 #include <filesystem>
 #include <nlohmann/json.hpp>
+#include <stdexcept>
 #include <string>
 
 namespace am {
@@ -53,6 +54,7 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(AudioGraph, nodes, edges, panX, 
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_ONLY_SERIALIZE(Configuration, version, revision, microphones,
     virtualInputCapture, virtualInputPlayback, mainOutputs, virtualOutputRender,
     virtualOutputCapture, sources, busA, busB, startAtLogin, graph)
+std::uint64_t readRevision(const Json&);
 void from_json(const Json&, Configuration&);
 void migrateLegacyGraph(Configuration&);
 Configuration defaultConfiguration();
@@ -70,6 +72,10 @@ std::string currentUserSid();
 std::wstring pipeName();
 std::wstring widen(const std::string&);
 std::string narrow(const std::wstring&);
+class SettingsWriteError : public std::runtime_error {
+public:
+    using std::runtime_error::runtime_error;
+};
 class ConfigurationStore {
 public:
     explicit ConfigurationStore(std::filesystem::path path = {});

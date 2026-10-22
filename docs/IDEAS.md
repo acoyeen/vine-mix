@@ -1,4 +1,4 @@
-# Vine Mix development ideas
+# VineMix development ideas
 
 A working log for rough ideas, researched options, and possible future features.
 Entries are proposals, not delivery commitments or instructions to implement.
@@ -38,10 +38,11 @@ order; subsequent implementation decisions are recorded in the individual entrie
 | [IDEA-005](#idea-005-pin-nodes-and-tasks-to-the-top-of-the-window) | Pin nodes and tasks to the top of the window | Researched |
 | [IDEA-006](#idea-006-external-parameters-and-conditional-task-triggers) | External parameters and conditional task triggers | Researched |
 | [IDEA-011](#idea-011-compact-bypass-control-and-clear-processing-semantics) | Compact bypass control and clear processing semantics | Captured |
-| [IDEA-012](#idea-012-silence-an-apps-direct-playback-while-monitoring-through-vine-mix) | Silence an app's direct playback while monitoring through Vine Mix | Researched |
+| [IDEA-012](#idea-012-silence-an-apps-direct-playback-while-monitoring-through-vinemix) | Silence an app's direct playback while monitoring through VineMix | Researched |
 | [IDEA-013](#idea-013-audio-file-inputs-and-soundboard-playback) | Audio-file inputs and soundboard playback | Researched |
-| [IDEA-014](#idea-014-dedicated-vine-mix-virtual-audio-driver) | Dedicated Vine Mix virtual audio driver | Parked |
+| [IDEA-014](#idea-014-dedicated-vinemix-virtual-audio-driver) | Dedicated VineMix virtual audio driver | Parked |
 | [IDEA-015](#idea-015-support-additional-virtual-audio-drivers) | Support additional virtual audio drivers | Captured |
+| [IDEA-016](#idea-016-guided-node-calibration-and-learn-settings) | Guided node calibration and Learn settings | Researched |
 
 ## IDEA-001: Dedicated visualization nodes
 
@@ -112,7 +113,7 @@ order; subsequent implementation decisions are recorded in the individual entrie
   However, today's intermediate-node UI exposes Bypass, which passes audio
   through; it would not implement the intended switch-off behavior. The existing
   audio-reactive Expander and Gate nodes perform different operations. See
-  [workspace controls](NODE_WORKSPACE.md), `desktop/AudioMixer.Desktop/GraphModels.cs`,
+  [workspace controls](NODE_WORKSPACE.md), `desktop/VineMix.Desktop/GraphModels.cs`,
   and `native/include/am/graph.hpp`.
 - **Scope and tradeoffs:** Small to medium relative to the other proposals.
   Reuse graph insertion, persistence, undo, and short click-prevention gain ramps.
@@ -147,7 +148,7 @@ order; subsequent implementation decisions are recorded in the individual entrie
   handles grouped edits, but the inspected graph configuration has no task
   definitions. Existing Linked control nodes share gain offsets; they are not
   multi-action tasks. See [control protocol](CONTROL_PROTOCOL.md),
-  [node workspace](NODE_WORKSPACE.md), and `desktop/AudioMixer.Desktop/GraphModels.cs`.
+  [node workspace](NODE_WORKSPACE.md), and `desktop/VineMix.Desktop/GraphModels.cs`.
 - **Suggested design:** Store references by ID rather than displayed name. Prefer
   explicit Set On/Off actions for predictable repeat execution; offer Toggle only
   when intentionally selected. Restrict the task action list and execution
@@ -178,8 +179,8 @@ order; subsequent implementation decisions are recorded in the individual entrie
 - **Project fit and research:** The workspace already separates toolbar controls
   from a panning/zooming node canvas, and saves graph positions and camera state.
   The inspected graph model has no pin metadata. See [workspace](NODE_WORKSPACE.md),
-  `desktop/AudioMixer.Desktop/GraphWorkspace.cs`, and
-  `desktop/AudioMixer.Desktop/GraphModels.cs`.
+  `desktop/VineMix.Desktop/GraphWorkspace.cs`, and
+  `desktop/VineMix.Desktop/GraphModels.cs`.
 - **Suggested design:** A pinned control references the original object, so both
   representations display the same live state and never process duplicate audio.
   Include a way to locate the node on the canvas. Persist pin order and handle
@@ -213,7 +214,7 @@ order; subsequent implementation decisions are recorded in the individual entrie
   - [Baballonia's official repository](https://github.com/Project-Babble/Baballonia)
     confirms eye/face tracking, integration through VRCFaceTracking's Babble
     module, and an alternative native VRChat eye-look mode. This does not by
-    itself establish a generic broadcast endpoint available to Vine Mix.
+    itself establish a generic broadcast endpoint available to VineMix.
   - [VRCFaceTracking's parameter reference](https://docs.vrcft.io/docs/tutorial-avatars/tutorial-avatars-extras/parameters)
     documents left/right eyelid openness values and the widening range. Exact OSC
     prefixes, active parameters, and availability must be discovered or configured
@@ -290,7 +291,7 @@ order; subsequent implementation decisions are recorded in the individual entrie
   inferred from the implementation, not a measured CPU/transition comparison.
   No external research, CPU benchmark, or live audio check was performed.
 - **Current UI and likely scope:**
-  `desktop/AudioMixer.Desktop/GraphNodeView.cs` creates the full-width bottom
+  `desktop/VineMix.Desktop/GraphNodeView.cs` creates the full-width bottom
   button, grey during normal processing and red when bypass is on. Explore a
   compact control, potentially in the header or beside effect controls (suggested
   placements only). Make processing-active versus bypass-active unambiguous,
@@ -301,7 +302,7 @@ order; subsequent implementation decisions are recorded in the individual entrie
   state cues deliberately. The later two-control proposal below gives suspension
   its own Disable action; effect history, tails, latency, and re-enable transitions
   still need decisions before implementation.
-- **Follow-up investigation (2026-10-20):** the maintainer asked whether fully stopping
+- **Follow-up investigation (2026-10-20):** The maintainer asked whether fully stopping
   processing on click would disrupt the engine and whether it would improve
   latency. Stopping work need not restart the engine: a proposed implementation
   could crossfade to dry first, then suspend processing while keeping resources
@@ -341,7 +342,9 @@ order; subsequent implementation decisions are recorded in the individual entrie
   placement/state wording, and define disable/resume and latency behavior before
   implementation. Measure savings and verify smooth transitions separately.
 
-## IDEA-012: Silence an app's direct playback while monitoring through Vine Mix
+<a id="idea-012-silence-an-apps-direct-playback-while-monitoring-through-vine-mix"></a>
+
+## IDEA-012: Silence an app's direct playback while monitoring through VineMix
 
 - **Captured:** 2026-10-20 (UTC+10). **Status:** Researched.
 - **User need:** Apply EQ or other effects to a running application's audio and
@@ -351,7 +354,7 @@ order; subsequent implementation decisions are recorded in the individual entrie
 - **Requested direction:** Add a button on running-app input nodes to silence
   the application's direct local playback while retaining capture and the
   processed listening route. This differs from the node's existing Mute, which
-  silences its signal inside Vine Mix. Suggested label: **Mute original playback**,
+  silences its signal inside VineMix. Suggested label: **Mute original playback**,
   with a tooltip explaining the distinction; wording is not yet chosen.
 - **Project fit:** [Application audio](APP_AUDIO.md) documents that process
   loopback copies the selected process tree's audio without suppressing original
@@ -376,7 +379,7 @@ order; subsequent implementation decisions are recorded in the individual entrie
   test performed for this research. Do not present a simple mute API call as a
   proven solution to duplicate monitoring.
 - **Alternative:** Explicitly route the source application to an installed virtual
-  cable, then capture one path and listen through Vine Mix. This is already
+  cable, then capture one path and listen through VineMix. This is already
   described in APP_AUDIO.md and in the
   [OBS application capture guide](https://obsproject.com/kb/application-audio-capture-guide).
   A guided routing action could be explored if session mute also silences capture,
@@ -387,7 +390,7 @@ order; subsequent implementation decisions are recorded in the individual entrie
   process tree, including child processes and new sessions after app restarts or
   endpoint changes. A session may affect more than one stream; a browser target
   may include multiple tabs. Original playback mute affects the Windows session,
-  not just the Vine Mix node, and might affect other consumers. Account for
+  not just the VineMix node, and might affect other consumers. Account for
   multiple nodes targeting the same app, external mute changes, and preserving a
   pre-existing user mute. Keep control and session discovery off the audio thread.
 - **Open questions:** Reliable capture-after-session-mute behavior; intended scope
@@ -413,7 +416,7 @@ order; subsequent implementation decisions are recorded in the individual entrie
   listening outputs, and virtual microphone routes as other sources, without
   running a separate player and capturing it.
 - **Project fit and local review (2026-10-20):**
-  `desktop/AudioMixer.Desktop/NodeCatalog.cs` currently offers microphone,
+  `desktop/VineMix.Desktop/NodeCatalog.cs` currently offers microphone,
   virtual-input, and running-app sources; `native/include/am/graph.hpp` has no
   audio-file source kind. Existing graph routing, resampling, bounded audio
   queues, and playback status offer reusable patterns, but file decoding and a
@@ -424,7 +427,7 @@ order; subsequent implementation decisions are recorded in the individual entrie
   provides the desktop drop interaction. Windows
   [Media Foundation Source Reader](https://learn.microsoft.com/en-us/windows/win32/medfound/source-reader)
   can decode files into samples for an application's own pipeline, but does not
-  manage playback timing; Vine Mix would schedule the samples itself. Microsoft's
+  manage playback timing; VineMix would schedule the samples itself. Microsoft's
   [format reference](https://learn.microsoft.com/en-us/windows/win32/medfound/supported-media-formats-in-media-foundation)
   lists MP3, WAVE, and AAC/MPEG-4 support. MP3/WAV are candidate initial formats;
   verify exact container/codec and Windows-installation coverage before promising
@@ -462,22 +465,24 @@ order; subsequent implementation decisions are recorded in the individual entrie
   and drop-to-node interaction. Plan global shortcuts after manual playback works.
   This is a future-development note, not implementation authorization.
 
-## IDEA-014: Dedicated Vine Mix virtual audio driver
+<a id="idea-014-dedicated-vine-mix-virtual-audio-driver"></a>
+
+## IDEA-014: Dedicated VineMix virtual audio driver
 
 - **Captured and researched:** 2026-10-20 (UTC+10).
-  **Status:** Parked. the maintainer decided on 2026-10-20 to retain VB-CABLE for virtual
+  **Status:** Parked. The maintainer decided on 2026-10-20 to retain VB-CABLE for virtual
   input and VAC Lite for virtual output for now. Custom driver development is
   outside the current scope. The completed research is retained for a future
   reconsideration; broader application compatibility is recorded in IDEA-015.
 - **User need:** A streamlined installer and predictable virtual input/output
   devices without paid cable dependencies or restrictions that prevent accepting
-  donations or selling Vine Mix. the maintainer requested investigation of AudioMirror's
+  donations or selling VineMix. The maintainer requested investigation of AudioMirror's
   legitimacy/reliability and the work needed to adapt it.
-- **Proposal:** One maintained Vine Mix driver package with two independent
+- **Proposal:** One maintained VineMix driver package with two independent
   cable paths: applications into the mixer, and the finished mix into recording
-  applications. Initial assumption: Windows 11 x64, stereo 48 kHz. the maintainer confirmed
+  applications. Initial assumption: Windows 11 x64, stereo 48 kHz. The maintainer confirmed
   that **four clearly labelled Windows endpoints are acceptable**, and that
-  **the cables must also work between other applications with Vine Mix closed**.
+  **the cables must also work between other applications with VineMix closed**.
   Each playback/recording pair therefore needs an autonomous internal connection.
 - **Evidence and rationale:** See the dated
   [AudioMirror assessment](AUDIOMIRROR_ASSESSMENT.md) and subsequent
@@ -532,7 +537,7 @@ order; subsequent implementation decisions are recorded in the individual entrie
   [VAC EULA](https://vac.muzychenko.net/en/license.txt): base VB-CABLE explicitly
   permits compliant free/commercial application bundles; VAC Lite restricts use
   to private homes without income generation and prohibits profiting from its
-  provision to others. These are distinct from monetising Vine Mix's separate
+  provision to others. These are distinct from monetising VineMix's separate
   application. Paid-app/donation scenarios must not be represented as blanket
   permission to bundle Lite or use it for income-generating audio work. A
   driver-independent application with separately obtained, appropriately licensed
@@ -549,7 +554,7 @@ order; subsequent implementation decisions are recorded in the individual entrie
   If custom implementation is
   later requested, run the separate
   one-to-two-week AudioRouter feasibility gate: build/package, add two isolated
-  internal cable paths and test both simultaneously with Vine Mix closed in a
+  internal cable paths and test both simultaneously with VineMix closed in a
   disposable Windows target. A more complete prototype is estimated at two to
   five weeks and release qualification at several months, with explicit
   uncertainty and an experienced driver engineer assumed. This entry does not
@@ -561,14 +566,14 @@ order; subsequent implementation decisions are recorded in the individual entrie
   the maintainer explicitly chose to keep the current two drivers for now.
 - **User need:** Let users choose compatible virtual audio cables they already
   have, including appropriately licensed alternatives for commercial activity,
-  without requiring Vine Mix to develop or maintain a kernel driver.
+  without requiring VineMix to develop or maintain a kernel driver.
 - **Proposal:** Extend **Troubleshooting → Reassign device** to offer compatible
   virtual recording devices for Virtual Input and compatible virtual playback
   devices for Virtual Output. Preserve explicit saved assignments, missing-device
   recovery and output-ownership protection. Keep the current VB-CABLE/VAC Lite
   defaults until a separate implementation decision is made. This is an
   application compatibility feature, distinct from the parked custom-driver
-  proposal in [IDEA-014](#idea-014-dedicated-vine-mix-virtual-audio-driver).
+  proposal in [IDEA-014](#idea-014-dedicated-vinemix-virtual-audio-driver).
 - **Project fit and feasibility:** Checked the current code on 2026-10-20.
   `VirtualDeviceBindings.Matches` restricts the menu to VB-CABLE capture and VAC
   playback endpoints. Native graph validation and audio workers enforce matching
@@ -576,7 +581,7 @@ order; subsequent implementation decisions are recorded in the individual entrie
   Initial assumption: standard Windows endpoints accessed through the existing
   WASAPI engine; private driver protocols or ASIO would require separate scope.
   See [virtual device selection](VIRTUAL_DEVICE_UI.md),
-  `desktop/AudioMixer.Desktop/VirtualDeviceBindings.cs`,
+  `desktop/VineMix.Desktop/VirtualDeviceBindings.cs`,
   `native/src/engine.cpp` and `native/src/windows_audio.cpp`.
 - **Scope and tradeoffs:** Update device classification, menu filtering, engine
   validation and audio-opening policy together. Qualify format support, shared
@@ -588,6 +593,76 @@ order; subsequent implementation decisions are recorded in the individual entrie
   and choose a small driver compatibility matrix, then test both independent
   audio paths while preserving existing saved bindings. Recording this idea does
   not authorize implementation, installation or changes to the running app.
+
+## IDEA-016: Guided node calibration and Learn settings
+
+- **Captured:** 2026-10-21. **Status:** Researched.
+- **User's idea:** Add a Calculate/Learn option inside the de-esser. Let a user
+  capture themselves making an "sss" sound and estimate an appropriate Frequency
+  setting for their voice. Investigate which other nodes can suggest settings
+  from measured audio rather than requiring users to set every dial manually.
+- **User need:** Make voice-processing setup approachable and account for the
+  user's voice, microphone, distance, input level, and upstream processing.
+- **Current behavior verified locally (2026-10-21):**
+  `native/src/advanced_effects.cpp` implements a high-pass detector driving a
+  dynamic high shelf. Frequency controls the detector cutoff and shelf midpoint,
+  not a narrow band centered on one exact "sss" pitch. The current range is
+  2–12 kHz. Threshold determines when reduction activates; Maximum reduction
+  caps it. Consequently, copying the loudest FFT frequency into Frequency is not
+  sufficient calibration. See [effects](EFFECTS_RESEARCH.md#de-esser-and-plosive-remover)
+  and [de-esser audit](DEESSER_QUALITY_AUDIT.md).
+- **Suggested workflow, not yet approved detail:** An in-node Learn action guides
+  a brief quiet-room sample, ordinary speech, and sibilant phrases (including
+  "sss", "sh", and words containing them). Analyze a bounded temporary capture
+  of the node's input before its own processing. Compare ordinary and sibilant
+  frames across candidate cutoff frequencies, simulate the actual detector, and
+  suggest Frequency and Threshold. Keep Maximum reduction conservative or
+  user-selected: preferred strength is not uniquely measurable. Reject clipped,
+  too-quiet, contaminated, or insufficiently separable samples with a helpful
+  retry message rather than inventing a precise answer.
+- **Result presentation:** Show proposed values, a short explanation and sample
+  quality/confidence, allow an explicit Apply/Cancel and Undo, and retain manual
+  controls. A/B or optional playback audition can help assess dullness or a lisp;
+  avoid automatic monitoring or feedback. Keep samples in temporary local memory
+  by default, discard them after use, and persist settings rather than raw voice
+  recordings. No capture, audio playback, model training, or uploads were performed
+  for this note. Upstream gain/EQ/routing changes can invalidate calibration.
+- **Primary-source research (2026-10-21):**
+  [FabFilter de-esser metering](https://www.fabfilter.com/help/pro-ds/using/metering)
+  distinguishes filtered detector level/Threshold from frequency selection.
+  [iZotope Vocal Assistant](https://www.izotope.com/community/blog/nectar-vocal-assistant)
+  demonstrates analysis-assisted level, EQ, and compressor setup; its user-selected
+  targets also illustrate that results depend on the desired sound. These are
+  feasibility precedents, not algorithms adopted by VineMix or evidence of equal
+  results. [iZotope Dialogue De-noise Learn](https://help.izotope.com/docs/rx-plug-in-pack/Dialogue_De-noise.html)
+  is a precedent for learning a noise reference, but VineMix's current RNNoise and
+  SpeexDSP controls do not expose that same editable noise-profile architecture.
+- **Other candidate nodes (engineering proposals):**
+
+  | Node | Useful measurement and possible suggestion | Limit or required user choice |
+  | --- | --- | --- |
+  | Gate / Expander | Quiet room plus quiet/normal speech: Threshold, possibly Hysteresis and Range | Noise and quiet speech may overlap; Hold/Release and acceptable suppression need listening |
+  | Compressor / input or Mix gain | Representative quiet, normal and loud speech: level statistics, initial Threshold/Ratio or headroom adjustment | Desired dynamics/target level must be chosen; do not automatically raise physical playback volume |
+  | Ducking | Quiet and spoken trigger samples: Threshold; Dynamic Ratio as a starting point | Static Duck amount and preferred recovery timing express how much background audio the user wants |
+  | Plosive remover | Normal speech plus "p/b" phrases: frequency limit and Threshold candidates | Avoid treating desired bass as a plosive; sample/mic position may not reproduce real problems |
+  | EQ / high-pass | Speech spectrum: rumble cutoff or candidate resonances | No objectively correct tonal curve from voice spectrum alone; boosts/cuts need a target and review |
+  | Denoiser | Background noise plus speech: suggest existing Reduction/Mix settings | RNNoise is already pretrained; a sample does not train a personal model, and denoising artifacts need listening |
+
+- **Scope, tradeoffs, and dependencies:** Medium to large for reusable guided
+  capture, analysis workers, results UI, cancellation, quality checks, and undo.
+  Keep analysis, allocation, and storage work off the real-time audio thread.
+  It need not add permanent processing latency after calibration. Shared analysis
+  infrastructure could support IDEA-001 visualizers; IDEA-013 file playback could
+  later allow calibrating from a clip, but neither is required for a first pass.
+  Calibration accuracy and development effort are unmeasured; no implementation
+  has been prototyped.
+- **Open questions:** Calculate versus Learn naming; capture length/prompts;
+  Frequency-only versus multi-control suggestions; confidence/retry policy;
+  quiet versus live-use mode; and when to mark a result outdated after edits.
+- **Next step:** Start with de-esser Frequency/Threshold suggestions and Gate
+  Threshold as separate experiments. Evaluate against varied non-personal test
+  clips and listening review, including counterexamples where calibration should
+  decline. Specify the guided flow before implementing or capturing user audio.
 
 ## Relationships and possible investigation order
 

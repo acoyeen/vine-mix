@@ -26,7 +26,7 @@ underline or mouse highlight. Its accessible name remains available. A separate
 outline appears for keyboard navigation and follows the live theme.
 
 An 8 × 8 DIP connection dot sits at the far left, vertically centred in the same
-header, with the compact **0.3.0 · Beta 1** version beside it. Green means the interface is connected to the audio engine and ready to
+header, with the current compact version (**0.3.0 · Beta 3**) beside it. Green means the interface is connected to the audio engine and ready to
 accept edits; it dims during disconnection or restart. Its hover text and
 accessible name expose the current connection status. Warnings occupy the left
 half; saved status, Settings and window actions occupy the right without shifting

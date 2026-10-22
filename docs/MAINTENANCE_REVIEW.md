@@ -1,5 +1,14 @@
 # Maintenance review — 18 October 2026
 
+> Historical development record. Results and procedures below belong to their
+> named versions; they do not qualify the current beta. See
+> [current qualification](BETA_TESTING_CURRENT.md) for the active release checks.
+
+Evidence note: raw reports, historical renders and reference captures cited
+here are retained privately outside the repository. Their labels below identify
+archived evidence, not downloadable files; recorded results apply only to the
+versions and checks described.
+
 Scope: audio processing, device recovery, controller responsiveness, settings
 integrity and obsolete code. Existing node types, saved graphs, routing, dials,
 tooltips and compatibility with older settings remain supported.
@@ -60,13 +69,13 @@ cost of repeated filter work; ordinary graphs will have different totals.
 | 30 fully populated eight-band EQs | 166.3 µs | 166.6 µs | Essentially unchanged |
 
 Checksums matched before and after. These are single before/after observations,
-subject to system load. See [native benchmark evidence](../build/maintenance-native-summary.json).
+subject to system load. See native benchmark evidence.
 
 Copying the same 32-node, 31-edge graph 500 times in one process allocated
 77,000,040 bytes with the previous JSON implementation versus 16,100,040 bytes
 with direct copies: **79% fewer allocated bytes**. Recorded elapsed time was
 310.8 ms versus 11.8 ms; timing is diagnostic rather than a pass/fail threshold.
-See [copy benchmark evidence](design/maintenance-final-20261018-025804/model-copy-performance.json).
+See copy benchmark evidence.
 
 No processing quantum, hardware buffer size, queue target or effect delay was
 reduced. These changes improve available processing headroom and UI work;
@@ -78,7 +87,7 @@ The staged Release package compiled successfully. Desktop compilation reported
 no warnings/errors; native configuration retains upstream libsamplerate CMake
 deprecation notices. No third-party source was modified to hide them.
 
-[All ten offline native suites passed](../artifacts/maintenance-native-final/results.json):
+All ten offline native suites passed:
 
 | Suite | Evidence |
 |---|---|
@@ -93,7 +102,7 @@ deprecation notices. No third-party source was modified to hide them.
 | Graph performance | Four maximum-size filter scenarios with matching checksums |
 | Windows catalog | 27 checks using fake endpoint interfaces |
 
-[Detached desktop verification](design/maintenance-final-20261018-025804/results.json)
+Detached desktop verification
 passed **1,982 checks**, produced **79 renders**, and reported **zero binding
 errors**. This includes 34 private-pipe transport checks, deep-copy integrity,
 100 unchanged telemetry updates without selector rebuilds, repeated spectrum
@@ -122,8 +131,8 @@ possible defect has been eliminated.
 
 ## Activation
 
-[Activation passed](../artifacts/maintenance-update-20261018-025837/result.json)
-at 02:58 UTC+10 time. Controller 26784 is responsive; engine 43552 advances
+Activation passed
+at 02:58 UTC+10. Controller 26784 is responsive; engine 43552 advances
 its frame counter. All eleven previously running paths reported Running within
 0.307 seconds of the engine restart. This is a software recovery observation,
 not a measurement of the audible gap. Revision 3807, full configuration, and

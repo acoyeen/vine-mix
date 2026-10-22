@@ -148,7 +148,7 @@ if(AUDIO_MIXER_OFFLINE_TESTS)
     target_link_options(VineMix.GraphTests PRIVATE -static-libgcc -static-libstdc++)
   endif()
   add_executable(VineMix.EngineLifecycleTests
-    native/tests/engine_lifecycle_tests.cpp native/src/engine.cpp native/src/graph.cpp native/src/configuration.cpp native/src/dsp.cpp)
+    native/tests/engine_lifecycle_tests.cpp native/src/engine.cpp native/src/control_server.cpp native/src/graph.cpp native/src/configuration.cpp native/src/dsp.cpp)
   target_include_directories(VineMix.EngineLifecycleTests PRIVATE native/include ${CMAKE_CURRENT_BINARY_DIR}/generated)
   target_compile_definitions(VineMix.EngineLifecycleTests PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
   target_link_libraries(VineMix.EngineLifecycleTests PRIVATE samplerate nlohmann_json::nlohmann_json advapi32 avrt)

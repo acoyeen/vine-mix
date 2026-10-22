@@ -1,13 +1,12 @@
 # Preparing signed update releases
 
-The updater reads versioned GitHub releases from `acoyeen/vine-mix`, using tags
-`v<version>`. Beta versions are published as prereleases. Canonical release asset
-URLs, signed update metadata and the embedded public trust key are configured
-before publication. The client contains no GitHub credential.
-
-Release signing prepares verified assets; the publication step uploads and
-validates those exact bytes before making the version downloadable. The
-maintainer's standing release policy is in [AGENTS.md](../AGENTS.md#product-releases-and-repository-visibility).
+The updater reads GitHub releases from `acoyeen/vine-mix`, using tags `v<version>`.
+Publish normal versioned prereleases, notes, checksums, matching source and signed
+update metadata. Prepare that complete release path before a repository visibility
+change; visibility is a separate maintainer decision. The updater uses anonymous
+requests and never embeds a repository credential. Verify anonymous discovery when
+the release service is accessible. This preparation tool itself does not upload,
+change visibility, install a candidate or restart the application/audio engine.
 
 Build Setup and standalone candidates from the same stable source snapshot and
 the authoritative `release.json`. Keep the existing installer `.exe.json` receipt
@@ -41,17 +40,63 @@ The fourth output, `preparation-receipt.json`, contains sanitized local provenan
 it is not a release asset. A source change during preparation invalidates the
 output metadata, and the candidates must be rebuilt.
 
-The three update assets must be the two canonical `.exe` filenames and
-the matching `Updates.json`, all attached to the same published `v<version>`
-release. Mark prereleases consistently with their semantic version. Use the [release publisher](../.github/release/README.md) to validate and publish
-the prepared version with release notes and checksums. Review archive contents, notices,
-metadata and privacy before distribution, then verify release discovery/download
+Publish the two canonical `.exe` files, the matching `Updates.json`, a matching
+source ZIP and `SHA256SUMS.txt` together on the same `v<version>` release.
+Checksums must cover the two executables, signed update metadata and source ZIP. Mark prereleases consistently with their semantic version. Upload and
+publication are separate release operations. Review archive contents, notices,
+metadata and privacy before distribution, then verify public discovery/download
 and the complete update/rollback flow on isolated installations.
 
 These manifest signatures authenticate package hashes for VineMix. They do not
 claim a Windows Authenticode certificate, SmartScreen reputation, or completion
 of end-to-end update testing. Never publish a private key or add credentials to
 the updater.
+
+## Qualify a delivered update
+
+The first updater-enabled release is `0.3.0-beta.2`. Beta 1 has no update control,
+and Beta 2 accepts only a strictly newer release. Qualify the actual Beta 2 client
+against the legitimate signed Beta 3 release; do not relabel existing files, bypass
+version checks or publish a dummy version merely to produce a passing result.
+Signed metadata verification and isolated worker tests remain separate evidence.
+
+Use an authorized separate Windows account or machine, with no personal workspace.
+`--settings` alone leaves the updater storage, uninstall registration and session
+coordination shared with the current user. Retain raw logs and backups outside
+the source checkout and record only sanitized results.
+
+For each distribution, retain the old and new executable hashes, versions,
+matching source identities, verified release envelope and the actual scenario
+outcome:
+
+1. Install or open the exact older delivered client normally. Create a small
+   example workspace, deliberately assign available test devices, wait for Saved,
+   then quit and reopen to establish its baseline. Record the complete workspace
+   and its physical settings path from an open file handle.
+2. Use **Check for updates** against the real release channel. Confirm the newer
+   version and release notes. **Download update** must retain audio and verify the
+   signed artifact. Declining installation must leave the old app usable.
+3. Choose **Install and restart**. Confirm a saved final edit, normal UI/engine
+   shutdown, unchanged drivers and startup preference, and exactly one replacement
+   session. For Setup, check the existing directory and owned uninstall entry;
+   for standalone, check that the original launcher path now has the new bytes.
+4. Confirm the candidate version, the same physical workspace, routing, effects,
+   assignments, positions, camera and preferences. Editing must resume only after
+   candidate health commits. Check advancing engine frames and actual audio;
+   an inert smoke result or a surviving process is insufficient. Quit and reopen
+   again using the original shortcut or launcher.
+5. On fresh disposable copies, exercise failed candidate health and interrupted
+   handoffs at the supported journal checkpoints. Verify safe rollback reopens
+   the exact previous bytes, newer settings remain intact and no process is killed.
+   An ambiguous installed-Setup postimage must preserve its backup and request
+   manual repair instead of overwriting unfamiliar files. Preserve the observed
+   journals and actual failure evidence; do not simulate success by writing health
+   markers from a fixture.
+
+Leave each unperformed branch pending. The delivered updater's installed and
+standalone success, rollback and interruption cases must be reported separately.
+Physical resize, headset, clean-machine and sustained-use checks have their own
+scope and are not established by this procedure.
 
 Run `./scripts/test-update-release-tools.ps1` for isolated synthetic preparation
 checks. Research checked 21 October 2026:

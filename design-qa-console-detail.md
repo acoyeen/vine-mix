@@ -1,5 +1,14 @@
 # Audio Mixer — control detail and contrast review
 
+> Historical development record. Results and procedures below belong to their
+> named versions; they do not qualify the current beta. See
+> [current qualification](docs/BETA_TESTING_CURRENT.md) for the active release checks.
+
+Evidence note: raw reports, historical renders and reference captures cited
+here are retained privately outside the repository. Their labels below identify
+archived evidence, not downloadable files; recorded results apply only to the
+versions and checks described.
+
 Date: 17 October 2026, UTC+10.
 
 ## Findings and final result
@@ -14,21 +23,21 @@ separate under [TESTING.md](TESTING.md).
 
 ## Visual sources, state and comparison
 
-- [Fresh previous interface](docs/design/implementation/13-before-control-detail.png)
-  and [VoiceMeeter reference](docs/design/evidence/03-voicemeeter-reference.png)
+- Fresh previous interface
+  and VoiceMeeter reference
   were opened before the changes and attached to image generation.
-- [Revised detail reference](docs/design/detailed-console-mockup.png), 1609 × 977
+- Revised detail reference, 1609 × 977
   pixels; [interpretation](docs/design/CONTROL_DETAIL_REVIEW.md).
-- [Final native render](docs/design/detail-verification/main-100.png), exactly
+- Final native render, exactly
   1120 × 680 pixels/DIP. Both Devices pages and troubleshooting remain 880 × 600.
-- [Equal-density full comparison](docs/design/implementation/16-final-detail-comparison.png)
+- Equal-density full comparison
   places the source and final native render together at 1120 × 680 each. Only
   the source was reduced, using Lanczos; the implementation remains unscaled.
-- [Focused before/after comparison](docs/design/implementation/17-final-control-before-after.png)
+- Focused before/after comparison
   shows the actual old/new faders, route controls, units and readouts at equal
   native scale. The source and implementation were reviewed together, followed
   by the focused comparison.
-- [Live controller](docs/design/implementation/19-detailed-console-handoff.png)
+- Live controller
   confirms Audio engine connected, current revision 3 and preserved live values.
 
 The source image contains illustrative signal activity and an incorrect
@@ -67,7 +76,7 @@ review found no remaining P1/P2 issues.
 ## Verification and limitations
 
 The final self-contained publish completed without warnings or errors. The
-[saved result](docs/design/detail-verification/results.json) passed **37 inert
+saved result passed **37 inert
 UI checks**, exit 0, with **zero WPF binding errors**. In addition to all 64 route
 combinations and prior control/state checks, it verifies larger caps, fully
 visible off-route faders, A/B lane labels and measurable control separation.
@@ -89,7 +98,7 @@ Only the desktop executable was replaced. The original audio engine and its
 start time remained unchanged. Before and after replacement, saved revision 3
 retained this SHA-256:
 
-`D082E5A80406C58E7ACD25EFD8B56FE57234C89F6780314F095177429EB1E0F5`
+`<private-settings-sha256-omitted>`
 
 A remains muted at −24 dB. No routing, gain, mute, assignment, Windows default,
 driver or other audio application was changed. No test playback was started.

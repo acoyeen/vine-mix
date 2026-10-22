@@ -1,5 +1,18 @@
 # Audio Mixer v1 — deferred testing and hardware qualification
 
+Historical package/evidence paths and descriptions of the running session below
+refer to the original test date. Raw records and backups are retained privately
+outside this checkout.
+
+> Historical development record. Results and procedures below belong to their
+> named versions; they do not qualify the current beta. See
+> [current qualification](BETA_TESTING_CURRENT.md) for the active release checks.
+
+Evidence note: raw reports, historical renders and reference captures cited
+here are retained privately outside the repository. Their labels below identify
+archived evidence, not downloadable files; recorded results apply only to the
+versions and checks described.
+
 ## Status and purpose
 
 Audio and hardware qualification was explicitly deferred by the user. This file
@@ -11,7 +24,7 @@ revision 1. The current saved baseline is revision 3 after subsequent user
 changes; the slate UI revision must preserve it rather than restore revision 1.
 A remains muted at −24 dB. The user installed base VB-CABLE and VAC Lite after an earlier
 non-elevated installation attempt was rejected. A reboot remains pending and is
-agreed before reliability validation. See [the setup record](docs/STARTUP_STATUS.md).
+agreed before reliability validation. See [the setup record](STARTUP_STATUS.md).
 Opening assigned streams does not establish audio correctness or daily-use
 suitability.
 
@@ -56,9 +69,9 @@ Inspect the process exit code and generated `results.json`; require both exit
 code 0 and `passed: true`. The latest run is recorded in
 `artifacts/ui-verification/detail-reviewed/results.json`, with captures in the same
 directory. The final retained result is in
-[docs/design/detail-verification/results.json](docs/design/detail-verification/results.json).
+docs/design/detail-verification/results.json.
 The older `light-console` and `reviewed` directories record superseded builds.
-See [design-qa.md](design-qa.md) for visual evidence and limits.
+See [design-qa.md](../design-qa.md) for visual evidence and limits.
 
 The checks cover the fixed 1120 × 680 DIP main window and 880 × 600 DIP Devices
 dialog, control inventory and bounds, all **64 UI route-state combinations**,
@@ -112,7 +125,7 @@ hardware. Keep every native and hardware case below unqualified until run.
    devices; the user's per-app assignments; and the Voicemeeter configuration.
    **Voicemeeter need not be removed.** Keep it installed for rollback. During live
    qualification, close its engine temporarily if it owns endpoints, changes
-   device formats, or duplicates a route. Do not remove existing
+   device formats, or duplicates a route. Do not remove existing microphone or other
    hardware software.
 4. Use headphones and modest levels for microphone monitoring. Keep Windows
    **Listen to this device** off on all virtual helper endpoints. Verify the test
@@ -121,7 +134,8 @@ hardware. Keep every native and hardware case below unqualified until run.
    disabling endpoints, sleep/hibernate, and restarting Windows Audio affect other
    apps. Perform these only when included in the later user's authorized test
    scope; do not restart the service merely to obtain a complete report.
-6. Record reference hardware actually present. The intended examples are physical USB microphone, USB DAC output, HDMI monitor audio, and Bluetooth headphones. Do not infer presence
+6. Record reference hardware actually present. Examples include a USB
+   microphone, USB DAC output, HDMI monitor audio, and Bluetooth earbuds. Do not infer presence
    from the plan. Without a second physical microphone, mark simultaneous
    two-microphone hardware qualification blocked while testing both paths
    synthetically.
@@ -233,7 +247,7 @@ assignments. Missing-device selections must remain in the configuration.
 ## 4. Exercise the desktop application and control protocol
 
 Launch `artifacts/AudioMixer/AudioMixer.exe`. Use
-[docs/CONTROL_PROTOCOL.md](docs/CONTROL_PROTOCOL.md) to capture snapshots and revision
+[docs/CONTROL_PROTOCOL.md](CONTROL_PROTOCOL.md) to capture snapshots and revision
 values; there is no documented `--snapshot` CLI command. The engine and UI are
 separate processes. Audio remains in the engine, never in pipe messages.
 
@@ -324,7 +338,7 @@ seconds on reference hardware; report actual values and outliers.
 | Block microphone access | Accurate blocked/access-denied state, recover after permission returns. |
 | USB unplug, DAC power cycle | Repeat for each actual hardware endpoint; no persistent dead handles. |
 | HDMI display sleeps/disconnects | Other A and B remain live; reconnect when endpoint becomes usable. |
-| Bluetooth headphones disconnect/reconnect | No global stall; measure radio negotiation separately from stream reopening. |
+| Bluetooth earbuds disconnect/reconnect | No global stall; measure radio negotiation separately from stream reopening. |
 | Select Bluetooth headset microphone | Record hands-free profile/format changes and resulting playback quality. Opening an unselected headset microphone is a failure. |
 | Lock/unlock; sleep/resume; hibernate/resume | Clear old queues/timing state; resume current live audio without backlog. |
 | Windows Audio service restart | Run only when explicitly authorized. Clear service-unavailable state and recover fresh endpoints after service returns; preserve selections. |

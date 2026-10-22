@@ -3,121 +3,62 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="VineMix is an experimental visual audio mixer for Windows. Connect microphones, apps and effects with visible audio cables.">
-  <meta name="theme-color" content="#0C0D0F">
-  <title>VineMix — Visual audio mixer for Windows</title>
+  <meta name="theme-color" content="#0d1b0f">
+  <meta name="description" content="VineMix is a visual audio mixer for Windows. Mix your microphone, music and apps, then choose who hears what.">
+  <title>VineMix — A visual audio mixer for Windows</title>
   <link rel="icon" href="assets/mark.svg" type="image/svg+xml">
+  <link rel="preload" href="assets/IBM-Plex-Sans-Regular.ttf" as="font" type="font/ttf" crossorigin>
   <link rel="stylesheet" href="styles.css">
-  <script src="hero.js" defer></script>
+  <script type="module" src="hero.js"></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
-  <header class="site-header">
-    <a class="brand" href="#top" aria-label="Vine Mix home">
-      <img src="assets/mark.svg" alt="Vine Mix" width="34" height="35">
-    </a>
-    <nav aria-label="Main navigation">
-      <a href="#how-it-works">Explore</a>
-      <a href="#project">The project</a>
-    </nav>
-  </header>
-
+  <div class="atmosphere" aria-hidden="true"><canvas id="forest-canvas"></canvas></div>
   <main id="main">
-    <section class="hero" id="top" aria-labelledby="hero-title">
-      <div class="hero-stage" id="hero-stage">
-        <svg class="cables" aria-hidden="true" focusable="false">
-          <g class="cable-route" data-from="source-mic" data-to="mix-core" data-offset="-22"><path class="cable-base"/><path class="cable-pulse" pathLength="1000"/></g>
-          <g class="cable-route" data-from="source-music" data-to="mix-core" data-offset="0"><path class="cable-base"/><path class="cable-pulse" pathLength="1000"/></g>
-          <g class="cable-route" data-from="source-apps" data-to="mix-core" data-offset="22"><path class="cable-base"/><path class="cable-pulse" pathLength="1000"/></g>
-          <g class="cable-route" data-from="mix-core" data-to="output-headphones" data-offset="-16"><path class="cable-base"/><path class="cable-pulse" pathLength="1000"/></g>
-          <g class="cable-route" data-from="mix-core" data-to="output-mic" data-offset="16"><path class="cable-base"/><path class="cable-pulse" pathLength="1000"/></g>
-        </svg>
-        <div class="sound-node source-mic" id="source-mic" aria-hidden="true"><div class="node-face"><img src="assets/mic.svg" alt="" width="28" height="28"></div><span>Microphone</span></div>
-        <div class="sound-node source-music" id="source-music" aria-hidden="true"><div class="node-face"><img src="assets/music.svg" alt="" width="28" height="28"></div><span>Music</span></div>
-        <div class="sound-node source-apps" id="source-apps" aria-hidden="true"><div class="node-face"><img src="assets/app-window.svg" alt="" width="28" height="28"></div><span>Apps</span></div>
-        <h1 class="mix-core" id="mix-core"><img src="assets/wordmark.svg" alt="VineMix" width="460" height="120"></h1>
-        <div class="sound-node output-headphones" id="output-headphones" aria-hidden="true"><div class="node-face"><img src="assets/headphones.svg" alt="" width="28" height="28"></div><span>Headphones</span></div>
-        <div class="sound-node output-mic" id="output-mic" aria-hidden="true"><div class="node-face"><img src="assets/audio-lines.svg" alt="" width="28" height="28"></div><span>Virtual mic</span></div>
-      </div>
-      <p class="intro" id="hero-title">Mix your microphone, music and apps—and choose who hears what.</p>
-      <p class="visually-hidden">Illustrative routing: microphone, music and apps connect to VineMix, which sends a mix to headphones or a virtual microphone. This is a visual illustration, not live audio.</p>
-      <div class="hero-footer">
-        <span class="scene-caption">Illustrative routing</span>
-        <a class="explore-cue" href="#how-it-works">Explore VineMix<img src="assets/arrow-down.svg" alt="" width="17" height="17"></a>
-        <button class="motion-toggle" id="motion-toggle" type="button" hidden><img src="assets/pause.svg" alt="" width="14" height="14"><span>Pause motion</span></button>
-      </div>
+    <section class="arrival" id="top" aria-labelledby="arrival-title">
+      <h1 class="sr-only" id="arrival-title">VineMix</h1>
+      <div class="arrival-identity"><img class="hero-mark" src="assets/mark.svg" alt="" width="160" height="163" aria-hidden="true"></div>
+      <nav class="arrival-actions" aria-label="Project links">
+        <a class="hero-button github-button" href="https://github.com/acoyeen/vine-mix/releases/tag/v0.3.0-beta.3" target="_blank" rel="noopener" aria-label="Download VineMix Beta 3 from GitHub (opens in a new tab)"><img src="assets/github.svg" alt="" width="18" height="18">Download Beta 3</a>
+        <a class="hero-button documentation-button" href="https://github.com/acoyeen/vine-mix/blob/main/docs/USER_GUIDE.md" target="_blank" rel="noopener" aria-label="VineMix documentation (opens in a new tab)">Documentation</a>
+      </nav>
     </section>
 
-    <div class="page-width">
-    <section id="how-it-works" class="section" aria-labelledby="how-title">
-      <p class="muted release-note">Windows 11 x64 · Experimental v0.2.0</p>
-      <h2 id="how-title">Start with a sound. Follow the cable.</h2>
-      <ol class="steps">
-        <li><h3>Add a source</h3><p>Your microphone or a running app.</p></li>
-        <li><h3>Shape the sound</h3><p>Adjust levels, combine sources, or add EQ and noise reduction.</p></li>
-        <li><h3>Choose an output</h3><p>Send the result to your headphones or a virtual microphone.</p></li>
-      </ol>
-      <p class="muted">Separate listening and outgoing paths have independent levels and mutes. Virtual microphone routing needs a separately installed audio driver.</p>
-      <figure>
-        <a class="workspace-link" href="assets/workspace.png" target="_blank" rel="noopener" aria-label="View the full-size illustrative Vine Mix workspace in a new tab">
-          <img class="workspace" src="assets/workspace.png" alt="VineMix desktop preview showing microphone and app-audio nodes connected to separate listening and virtual-microphone paths." width="1280" height="800" loading="lazy">
-        </a>
-        <figcaption>The actual workspace, shown in an illustrative desktop preview. <a href="assets/workspace.png" target="_blank" rel="noopener">View full size<span class="visually-hidden"> in a new tab</span></a>.</figcaption>
-      </figure>
-    </section>
-
-    <section id="use-cases" class="section" aria-labelledby="use-title">
-      <h2 id="use-title">For voice chat. And the soundtrack.</h2>
-      <p>Shape your mic for a game with friends, keep your listening mix separate, or combine voice and music into one outgoing microphone mix.</p>
-      <h3 class="vrchat-title">VRChat’s unofficial DJ?<br>At least get the mix right.</h3>
-      <p>Balance voice and music separately, or let music step back when you speak with Ducking.</p>
-      <p class="route" aria-label="Example route: microphone and music player feed a mix, then a virtual microphone.">Mic + music player <span aria-hidden="true">→</span> Mix <span aria-hidden="true">→</span> Virtual mic</p>
-      <p class="muted">An intended use case for Windows desktop and PCVR. The virtual audio driver is separate, and end-to-end VRChat compatibility is still being qualified.</p>
-    </section>
-
-    <section id="project" class="section" aria-labelledby="project-title">
-      <h2 id="project-title">A small project. A considered approach.</h2>
-      <div class="project-columns">
-        <div>
-          <h3>Built with care. Still experimental.</h3>
-          <p>Audio processing runs locally on your PC. VineMix remembers your workspace, keeps automatic settings backups and shows when a device needs attention.</p>
-          <p class="muted">Automated checks cover synthetic audio processing and desktop controls. Real-device and long-session testing remain incomplete.</p>
+    <section class="product-story" id="workspace" aria-labelledby="workspace-title">
+      <div class="product-pin">
+        <div class="product-copy">
+          <h2 id="workspace-title">See where<br> your sound goes.</h2>
+          <p>Connect a source, shape its sound, choose an output.</p>
+          <p class="story-follow">Keep what you hear separate from what you share.</p>
         </div>
-        <div>
-          <h3>MIT licensed. Open source is the plan.</h3>
-          <p>VineMix’s original application code is MIT licensed. Public source and downloads are not available yet.</p>
-          <p class="muted">Third-party components and virtual audio drivers keep their own terms.</p>
-          <a href="assets/LICENSE.txt">Read the application license</a>
-        </div>
+        <figure class="product-frame">
+          <a href="assets/workspace.png" target="_blank" rel="noopener" aria-label="Open the full-size illustrative VineMix workspace in a new tab"><img src="assets/workspace.png" alt="VineMix’s real node workspace, with separate listening and outgoing virtual-microphone paths." width="1280" height="800" loading="lazy"></a>
+          <figcaption>Inside VineMix. Illustrative desktop preview.</figcaption>
+        </figure>
       </div>
     </section>
 
-    <section id="questions" class="section faq" aria-labelledby="faq-title">
-      <h2 id="faq-title">A few useful details.</h2>
-      <details>
-        <summary>Do I need an audio driver?</summary>
-        <p>Physical microphones and running-app capture work without virtual audio drivers. Virtual routes use separately installed drivers: the documented input uses VB-CABLE, and the outgoing virtual microphone uses Virtual Audio Cable. Check the publisher’s terms for your use.</p>
-        <p><a href="https://vb-audio.com/Cable/">VB-CABLE</a> · <a href="https://vac.muzychenko.net/en/license.txt">Virtual Audio Cable terms</a></p>
-      </details>
-      <details>
-        <summary>Will it mute my music player’s original sound?</summary>
-        <p>No. App capture copies existing playback. You can keep the player’s normal headphone audio while sending its captured copy to the virtual microphone. Sending both copies to the same headphones can double the sound.</p>
-      </details>
-      <details>
-        <summary>Does it run on a standalone VR headset?</summary>
-        <p>VineMix currently targets Windows 11 x64. The VRChat use case is for Windows desktop and PCVR, rather than an application running natively on a standalone headset.</p>
-      </details>
-      <details>
-        <summary>Can I download it yet?</summary>
-        <p>There is no public release yet. This page introduces the project while release preparation and testing continue.</p>
-      </details>
+    <section class="music-story" id="music" aria-labelledby="music-title">
+      <div class="music-heading"><h2 id="music-title">For VRChat’s<br>unofficial DJ.</h2></div>
+      <div class="music-copy"><p class="music-lead">Voice and music,<br>through one mic.</p><p>Balance them separately, or let the music step back when you speak.</p><p class="qualification">For Windows desktop and PCVR. Virtual microphone routing needs a separate audio driver. End-to-end VRChat qualification is ongoing.</p></div>
     </section>
-    </div>
+
+    <section class="project" id="project" aria-labelledby="project-title">
+      <h2 id="project-title">A work in progress.</h2>
+      <div class="project-copy">
+        <p>VineMix processes audio on your PC, remembers your workspace and keeps automatic settings backups.</p>
+        <p>Version 0.3.0-beta.3 is available for Windows 11 x64. Automated checks cover synthetic processing and desktop controls; real-device and long-session qualification remain incomplete.</p>
+        <p>The original application is MIT licensed. Versioned downloads and matching source are on <a href="https://github.com/acoyeen/vine-mix/releases">GitHub Releases</a>. Third-party components and audio drivers have their own terms.</p>
+        <a href="assets/LICENSE.txt">Read the application license</a>
+      </div>
+      <div class="questions">
+        <details><summary>What do I need?</summary><p>Windows 11 x64. Physical microphones and running-app capture work without virtual audio drivers. Virtual input uses separately installed VB-CABLE; the outgoing virtual microphone uses Virtual Audio Cable. <a href="https://vac.muzychenko.net/en/license.txt">Check the driver’s terms</a>, especially for monetized use.</p></details>
+        <details><summary>Will app capture mute the original sound?</summary><p>No. It copies existing playback. Keep the player’s normal headphone audio while sending its captured copy to the virtual microphone. Sending both copies to the same headphones can double the sound.</p></details>
+        <details><summary>Does it run on a standalone headset?</summary><p>The current application runs on Windows 11 x64. The VRChat example is for desktop and PCVR, rather than an application running natively on a standalone headset.</p></details>
+      </div>
+    </section>
   </main>
 
-  <footer class="site-footer page-width">
-    <p>VineMix <span class="muted">· A visual audio mixer for Windows.</span></p>
-    <div><a href="assets/LICENSE.txt">Application license</a><a href="assets/IBM-Plex-OFL.txt">Font license</a><a href="credits.html">Website credits</a><a href="#top">Back to top</a></div>
-  </footer>
+  <footer><a href="#top" aria-label="Back to VineMix at the top"><img src="assets/wordmark.svg" alt="VineMix" width="123" height="32" translate="no"></a><div><a href="credits.html">Credits</a><a href="assets/LICENSE.txt">License</a><span>Windows 11 x64</span></div></footer>
 </body>
 </html>
