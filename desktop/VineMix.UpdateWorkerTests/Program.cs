@@ -31,7 +31,7 @@ internal static class Program
     {
         try
         {
-            SignedBoundaryTests(); SuccessfulStandalone(); RollbackTests(); RecoveryTests(); WorkspaceTests(); ManifestTests(); InstalledAttemptTests(); PendingDiscoveryTests(); TerminalCleanupTests();
+            SignedBoundaryTests(); PrivateCreationTests(); SuccessfulStandalone(); RollbackTests(); RecoveryTests(); WorkspaceTests(); ManifestTests(); InstalledAttemptTests(); PendingDiscoveryTests(); TerminalCleanupTests();
             Console.WriteLine($"PASS: {_checks} updater worker checks; ephemeral signed fixtures, private temporary directories and fake process/registry/Setup operations only. No production app, audio endpoint, settings, driver or registry changes.");
             return 0;
         }
@@ -87,6 +87,43 @@ internal static class Program
             && platform.Events.IndexOf("engine-exit") < platform.Events.IndexOf("candidate-start")
             && platform.Events[^1] == "lock-released", "Process exits must precede replacement/launch and lock must span completion.");
         Require(platform.HealthWasRequired, "The candidate must provide its identity-bound health acknowledgment.");
+    }
+    private static void PrivateCreationTests()
+    {
+        using var fixture = new Fixture();
+        string directory = Path.Combine(fixture.Base, "inherited-access"); Directory.CreateDirectory(directory);
+        var everyone = new SecurityIdentifier(WellKnownSidType.WorldSid, null);
+        var inherited = new DirectoryInfo(directory).GetAccessControl();
+        inherited.AddAccessRule(new FileSystemAccessRule(everyone, FileSystemRights.Read,
+            InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit, PropagationFlags.None, AccessControlType.Allow));
+        new DirectoryInfo(directory).SetAccessControl(inherited);
+        bool CurrentUserOnly(string path)
+        {
+            try { UpdateFiles.RequirePrivate(path); return true; }
+            catch (IOException) { return false; }
+        }
+        string metadata = Path.Combine(directory, "metadata.json");
+        UpdateFiles.WriteJson(metadata, new { value = "first" });
+        Require(CurrentUserOnly(metadata), "New transaction metadata must be owned by the current user with no inherited grants to another account.");
+        UpdateFiles.WriteJson(metadata, new { value = "replacement" });
+        Require(CurrentUserOnly(metadata) && File.ReadAllText(metadata).Contains("replacement", StringComparison.Ordinal),
+            "Atomic metadata replacement must retain exact current-user ownership and private access.");
+        string privateCopy = Path.Combine(directory, "private-copy.exe"), ordinaryCopy = Path.Combine(directory, "ordinary-copy.exe");
+        var asset = fixture.Context.Offer.Manifest.Standalone;
+        UpdateFiles.CopyPrivateChecked(fixture.Context.AssetPath, privateCopy, asset.Size, asset.Sha256);
+        Require(CurrentUserOnly(privateCopy) && UpdateFiles.EqualHash(UpdateFiles.Hash(privateCopy), asset.Sha256),
+            "Private staged copies must establish current-user ownership and access while retaining exact verified bytes.");
+        Reject(() => UpdateFiles.CopyPrivateChecked(fixture.Context.AssetPath, privateCopy, asset.Size, asset.Sha256),
+            "Private copy creation must refuse an existing destination rather than replace its bytes or repair its permissions.");
+        UpdateFiles.CopyChecked(fixture.Context.AssetPath, ordinaryCopy, asset.Size, asset.Sha256);
+        Require(new FileInfo(ordinaryCopy).GetAccessControl().GetAccessRules(true, true, typeof(SecurityIdentifier))
+            .Cast<FileSystemAccessRule>().Any(rule => rule.AccessControlType == AccessControlType.Allow && rule.IdentityReference.Equals(everyone))
+            && UpdateFiles.EqualHash(UpdateFiles.Hash(ordinaryCopy), asset.Sha256),
+            "Ordinary target and rollback copies must keep their destination's inherited access instead of taking private staging permissions.");
+        var broadened = new FileInfo(privateCopy).GetAccessControl();
+        broadened.AddAccessRule(new FileSystemAccessRule(everyone, FileSystemRights.Read, AccessControlType.Allow));
+        new FileInfo(privateCopy).SetAccessControl(broadened);
+        Reject(() => UpdateFiles.RequirePrivate(privateCopy), "Private verification must still reject a staged file whose permissions were broadened after creation.");
     }
     private static void RollbackTests()
     {
@@ -350,14 +387,16 @@ internal static class Program
                 Standalone = standalone, CreatedUtc = DateTimeOffset.UtcNow, Parent = new(101, 1001, target, oldHash),
                 Engine = new(102, 1002, Path.Combine(Install, "VineMix.Engine.exe"), oldHash), SettingsPath = settings ? Path.Combine(Base, "saved-workspace.json") : null };
             Context = new(stage, data, offer);
-            File.Copy(target, Context.WorkerPath); File.WriteAllText(Context.AssetPath, NewBytes);
+            UpdateFiles.CopyPrivateChecked(target, Context.WorkerPath, new FileInfo(target).Length, oldHash);
+            UpdateFiles.WriteBytes(Context.AssetPath, Encoding.UTF8.GetBytes(NewBytes));
             UpdateFiles.WriteBytes(Path.Combine(stage, "envelope.json"), envelope); UpdateFiles.WriteJson(Context.TransactionPath, data);
             UpdateFiles.WriteJson(Context.JournalPath, new UpdateJournal());
             UpdateFiles.WriteJson(Path.Combine(stage, "commit.json"), Context.Signal());
             if (settings)
             {
                 File.WriteAllText(data.SettingsPath!, "saved workspace");
-                string backup = Path.Combine(stage, "workspace-before.json"); File.Copy(data.SettingsPath!, backup);
+                string backup = Path.Combine(stage, "workspace-before.json");
+                UpdateFiles.CopyPrivateChecked(data.SettingsPath!, backup, new FileInfo(data.SettingsPath!).Length, UpdateFiles.Hash(data.SettingsPath!));
                 UpdateFiles.WriteJson(Path.Combine(stage, "workspace.json"), new UpdateWorkspaceCheckpoint(data.Token, data.EnvelopeSha256,
                     data.SettingsPath!, new FileInfo(backup).Length, UpdateFiles.Hash(backup)));
             }

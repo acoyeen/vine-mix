@@ -304,7 +304,7 @@ internal static class UpdateWorker
             string source = UpdateFiles.RelativeFile(context.TargetDirectory, file.Path), destination = UpdateFiles.RelativeFile(root, file.Path);
             Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
             if (File.Exists(destination)) GuardSnapshot(root, [file]);
-            else UpdateFiles.CopyChecked(source, destination, file.Size, file.Sha256);
+            else UpdateFiles.CopyPrivateChecked(source, destination, file.Size, file.Sha256);
         }
         return new(files, registry);
     }

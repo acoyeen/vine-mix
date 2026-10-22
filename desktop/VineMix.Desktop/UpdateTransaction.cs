@@ -117,8 +117,8 @@ internal static class UpdateTransaction
             Token = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)),
             EnvelopeSha256 = offer.EnvelopeSha256, AssetFileName = expected.FileName
         };
-        UpdateFiles.CopyChecked(download.FilePath, Path.Combine(directory, expected.FileName), expected.Size, expected.Sha256);
-        UpdateFiles.CopyChecked(parent.ImagePath, Path.Combine(directory, "worker.exe"), new FileInfo(parent.ImagePath).Length, parent.Sha256);
+        UpdateFiles.CopyPrivateChecked(download.FilePath, Path.Combine(directory, expected.FileName), expected.Size, expected.Sha256);
+        UpdateFiles.CopyPrivateChecked(parent.ImagePath, Path.Combine(directory, "worker.exe"), new FileInfo(parent.ImagePath).Length, parent.Sha256);
         UpdateFiles.WriteBytes(Path.Combine(directory, "envelope.json"), offer.EnvelopeBytes);
         UpdateFiles.WriteJson(Path.Combine(directory, "transaction.json"), data);
         UpdateFiles.WriteJson(Path.Combine(directory, "journal.json"), new UpdateJournal { UpdatedUtc = DateTimeOffset.UtcNow });
@@ -384,7 +384,7 @@ internal sealed class PreparedUpdate(VerifiedUpdate context) : IDisposable
             var checkpoint = new UpdateWorkspaceCheckpoint(context.Data.Token, context.Data.EnvelopeSha256, settings,
                 new FileInfo(settings).Length, UpdateFiles.Hash(settings));
             if (checkpoint.Size is <= 0 or > 32 * 1024 * 1024) throw new IOException("The saved workspace exceeds the update checkpoint size limit.");
-            UpdateFiles.CopyChecked(settings, Path.Combine(context.Directory, "workspace-before.json"), checkpoint.Size, checkpoint.Sha256);
+            UpdateFiles.CopyPrivateChecked(settings, Path.Combine(context.Directory, "workspace-before.json"), checkpoint.Size, checkpoint.Sha256);
             UpdateFiles.WriteJson(Path.Combine(context.Directory, "workspace.json"), checkpoint);
         }
         UpdateFiles.WriteJson(Path.Combine(context.Directory, "commit.json"), context.Signal());
@@ -416,15 +416,31 @@ internal static class UpdateFiles
             throw new IOException("The update payload size or SHA-256 no longer matches its signed release.");
     }
     internal static void CopyChecked(string source, string destination, long size, string hash)
+        => CopyChecked(source, destination, size, hash, privateDestination: false);
+    internal static void CopyPrivateChecked(string source, string destination, long size, string hash)
+        => CopyChecked(source, destination, size, hash, privateDestination: true);
+    private static void CopyChecked(string source, string destination, long size, string hash, bool privateDestination)
     {
         NoReparse(source); NoReparse(destination);
         using (var input = new FileStream(source, FileMode.Open, FileAccess.Read, FileShare.Read))
-        using (var output = new FileStream(destination, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+        using (var output = privateDestination ? CreatePrivateFile(destination)
+            : new FileStream(destination, FileMode.CreateNew, FileAccess.Write, FileShare.None))
         {
             if (input.Length != size) throw new IOException("An update file changed size before copying.");
             input.CopyTo(output); output.Flush(true);
         }
         if (new FileInfo(destination).Length != size || !EqualHash(Hash(destination), hash)) throw new IOException("An update file changed while copying.");
+    }
+    private static FileStream CreatePrivateFile(string path)
+    {
+        // An elevated token can default new-file ownership to Administrators,
+        // even inside a directory owned solely by the current user. Set owner
+        // and access at creation; do not relax verification or repair old ACLs.
+        using var identity = WindowsIdentity.GetCurrent();
+        var sid = identity.User ?? throw new IOException("The Windows user cannot be identified.");
+        var acl = new FileSecurity(); acl.SetOwner(sid); acl.SetAccessRuleProtection(true, false);
+        acl.AddAccessRule(new FileSystemAccessRule(sid, FileSystemRights.FullControl, AccessControlType.Allow));
+        return new FileInfo(path).Create(FileMode.CreateNew, FileSystemRights.FullControl, FileShare.None, 4096, FileOptions.None, acl);
     }
     internal static void CreatePrivateDirectory(string path)
     {
@@ -490,7 +506,9 @@ internal static class UpdateFiles
     {
         NoReparse(path);
         string temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
-        using (var output = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None)) { output.Write(bytes); output.Flush(true); }
+        // This writer is for private transaction metadata only. Installed
+        // payload replacement uses CopyChecked and retains its normal ACLs.
+        using (var output = CreatePrivateFile(temporary)) { output.Write(bytes); output.Flush(true); }
         if (File.Exists(path)) File.Replace(temporary, path, null, false); else File.Move(temporary, path);
     }
     internal static bool TrySignal(VerifiedUpdate context, string name, out UpdateSignal? signal)
