@@ -19,8 +19,8 @@ namespace VineMix.Desktop
 internal static class Program
 {
     private static int _checks;
-    private static void Require(bool value, string message)
-    { ++_checks; if (!value) throw new InvalidOperationException(message); }
+    private static void Require(bool value, string message, Func<string>? diagnostics = null)
+    { ++_checks; if (!value) throw new InvalidOperationException(message + (diagnostics is null ? "" : "\n" + diagnostics())); }
     private static void Reject(Action action, string message)
     {
         bool rejected = false;
@@ -41,6 +41,7 @@ internal static class Program
     private static void SignedBoundaryTests()
     {
         using var fixture = new Fixture(); var platform = new FakePlatform(fixture);
+        fixture.RequireValidBaseline();
         byte[] original = File.ReadAllBytes(fixture.Context.AssetPath);
         File.AppendAllText(fixture.Context.AssetPath, "changed");
         Require(fixture.Run(platform) == 1 && platform.Events.Count == 0 && fixture.OldTarget,
@@ -75,8 +76,9 @@ internal static class Program
     private static void SuccessfulStandalone()
     {
         using var fixture = new Fixture(); var platform = new FakePlatform(fixture);
-        Require(fixture.Run(platform) == 0 && File.ReadAllText(fixture.Context.TargetPath) == Fixture.NewBytes,
-            "Verified standalone replacement must install the exact signed bytes.");
+        int result = fixture.Run(platform);
+        Require(result == 0 && File.ReadAllText(fixture.Context.TargetPath) == Fixture.NewBytes,
+            "Verified standalone replacement must install the exact signed bytes.", () => fixture.Diagnostics(result, platform));
         Require(UpdateTransaction.ReadJournal(fixture.Context).Phase == UpdatePhase.Completed,
             "A successful update needs full candidate health, beyond inert smoke.");
         Require(File.ReadAllText(fixture.Context.TargetPath + ".vinemix-" + fixture.Context.Data.Id + ".old") == Fixture.OldBytes,
@@ -370,6 +372,42 @@ internal static class Program
             }
         }
         internal int Run(FakePlatform platform) => UpdateWorker.Run(Context.TransactionPath, platform, Trust, Root);
+        internal void RequireValidBaseline()
+        {
+            string? failure = null;
+            try { UpdateTransaction.Verify(Context.TransactionPath, Trust, Root); }
+            catch (Exception error) { failure = Sanitize(error.GetType().Name + ": " + error.Message); }
+            Require(failure is null, "A valid signed fixture must pass verification before any rejection test. " + failure,
+                () => Diagnostics(null, null));
+        }
+        internal string Diagnostics(int? result, FakePlatform? platform)
+        {
+            string journal;
+            try
+            {
+                var value = UpdateTransaction.ReadJournal(Context);
+                journal = $"phase={value.Phase}, resume={value.ResumePhase}, attempts={value.Attempts}, message={Sanitize(value.Message)}";
+            }
+            catch (Exception error) { journal = Sanitize(error.GetType().Name + ": " + error.Message); }
+            string Owner(string path)
+            {
+                try
+                {
+                    FileSystemSecurity acl = Directory.Exists(path) ? new DirectoryInfo(path).GetAccessControl() : new FileInfo(path).GetAccessControl();
+                    var owner = acl.GetOwner(typeof(SecurityIdentifier));
+                    if (owner is null) return "missing-owner";
+                    return owner.Equals(WindowsIdentity.GetCurrent().User) ? "current-user"
+                        : owner.Equals(new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null)) ? "administrators" : "other-owner";
+                }
+                catch (Exception error) { return error.GetType().Name; }
+            }
+            return JsonSerializer.Serialize(new { result, journal, events = platform?.Events,
+                owners = new { root = Owner(Root), transactionDirectory = Owner(Context.Directory), transaction = Owner(Context.TransactionPath),
+                    worker = Owner(Context.WorkerPath), asset = Owner(Context.AssetPath), journal = Owner(Context.JournalPath) } });
+        }
+        private string Sanitize(string value) => value.Replace(Base, "<fixture>", StringComparison.OrdinalIgnoreCase)
+            .Replace(Path.GetTempPath().TrimEnd(Path.DirectorySeparatorChar), "<temp>", StringComparison.OrdinalIgnoreCase)
+            .Replace(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "<user-profile>", StringComparison.OrdinalIgnoreCase);
         public void Dispose()
         {
             string resolved = Path.GetFullPath(Base);
