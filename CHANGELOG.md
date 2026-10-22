@@ -12,6 +12,8 @@
   revision numbers before they can change the saved configuration.
 - Make interrupted rollback retry safely and keep completed updates complete
   when recovery-registration cleanup needs another attempt.
+- Create private updater files with explicit user ownership so administrator-run
+  updates pass the same strict staging checks as ordinary desktop updates.
 - Reconcile the local checkout with the published release infrastructure,
   retire rejected packages from the source checkout, and refresh product,
   release and testing documentation for a clean development baseline.

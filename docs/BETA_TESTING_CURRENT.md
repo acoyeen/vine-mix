@@ -8,7 +8,7 @@ Updated 23 October 2026. Results below belong to the Beta 3 baseline.
 | --- | --- |
 | Native offline suites | Seventeen suites covered. Sixteen passed together; AdvancedEffects exceeded its unchanged timing limit, then passed its isolated repeat (50,026 assertions). Configuration qualification passed 7,959 checks. See timing detail below. |
 | Detached desktop | 12,142 checks, 215 renders, zero binding errors; includes 15 autosave regression checks. Publish completed without compiler warnings/errors. |
-| Update-core, worker and release-preparation fixtures | 71 core checks, 90 worker checks and eight signing/preparation checks passed. These use ephemeral/private fixtures. |
+| Update-core, worker and release-preparation fixtures | 71 core checks, 97 worker checks and eight signing/preparation checks passed. These use ephemeral/private fixtures. The worker suite includes positive staging verification and explicit private-file ownership checks. |
 | Documentation renders | 58 checks, six images at 96/192 DPI, zero binding errors. All images visually reviewed; devices are generic examples. About is an illustrative verification build, not the delivered package identity. |
 | Installed/Standalone package smoke and payload audit | Both candidate formats passed with matching candidate-input hashes. Final-byte results and executable identities accompany `SOURCE-MANIFEST.json` in the release source ZIP. |
 | Runtime extraction and isolated Setup checks | 17 runtime and 189 Setup checks passed on the candidate. The release process repeats these gates on the committed-source packages. No driver installation or personal engine activation is part of these checks. |
@@ -20,10 +20,10 @@ completed gate. Keep unperformed cases pending and publish the remaining beta
 limitations with the release. A successful build alone is not qualification.
 
 The final canonical production input set contains 275 files with snapshot SHA-256
-`3875412259c7f98f461f24ecc69ee80e7e33d8d71c2eebc711fd29409b567268`.
-Local text line endings were normalized to the committed source after candidate
-qualification; no runtime logic changed. Final packaging repeats the package
-gates using that canonical source and committed-build metadata. The release
+`72985307c1b855f1fefb04d6ffaedeb0c0d42e013fb80ad7d5e4e0c64338669f`.
+The final inputs include the elevated updater staging correction and canonical
+text line endings matching Git. Final packaging repeats the package gates using
+that source and committed-build metadata. The release
 source ZIP records the final commit,
 input inventory, exact executable identities and final package-check results;
 raw diagnostics remain outside source and release assets.
