@@ -115,7 +115,7 @@ Return to the [active ideas log](IDEAS.md).
   Hold, Release, Range, and Hysteresis. These control lists are a suggested reuse
   of current behavior, not newly confirmed requirements.
 - **Project fit and internal review (2026-10-20):**
-  [Current dynamics documentation](CORE_DYNAMICS.md#expander--gate),
+  [Current dynamics documentation](CORE_DYNAMICS.md#expander-and-gate),
   `desktop/AudioMixer.Desktop/NodeCatalog.cs`, and
   `desktop/AudioMixer.Desktop/GraphModels.cs` describe one `expander` node kind
   with a saved mode and separate mode-specific settings. Existing processing

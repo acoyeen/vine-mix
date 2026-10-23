@@ -119,7 +119,7 @@ also used inert data. No test sound, playback or recording was started during
 this update.
 
 See [the design review](../design-qa.md), [UI implementation plan](UI_REDESIGN_PLAN.md)
-and [UI-only verification procedure](../TESTING.md#ui-only-verification-completed).
+and [current UI verification procedure](BETA_TESTING_CURRENT.md#automated-checks).
 The 125%/150% images simulate render density; actual Windows scaling changes and
 full screen-reader speech behavior remain unverified. These UI results do not
 qualify the native audio paths or replace the deferred hardware tests.
