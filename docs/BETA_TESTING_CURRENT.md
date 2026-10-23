@@ -13,8 +13,8 @@ own source snapshots and executable bytes.
 | Update-core, worker and release preparation | 71 core, 97 worker and eight signing/preparation checks passed using isolated fixtures. |
 | Activation safeguards | 34 activation and 54 interface-only activation checks passed using temporary files, synthetic state and an inert shell child. No personal app or engine was stopped, replaced or launched. |
 | Documentation images | Existing generic-device images remain illustrative. They were not regenerated as Beta 4 screenshots. Detached render inspection is recorded in the audit. |
-| Installed/Standalone smoke, runtime extraction and isolated Setup | Mandatory checks on the committed-source packages before publication. Exact executable identities and the final results are retained in the source ZIP's SOURCE-MANIFEST.json; earlier candidate results are not substituted. |
-| Signature, source archive and published downloads | Publication requires the pinned-key signature, matching build receipts, an audited exact-source ZIP and every uploaded asset downloaded and rehashed. Final identities are in SOURCE-MANIFEST.json and SHA256SUMS.txt. |
+| Installed/Standalone smoke, runtime extraction and isolated Setup | Both final package smoke checks passed; all 17 standalone runtime checks and 189 isolated Setup checks passed. The two packages contain identical engine bytes. Exact executable identities and final results are retained in the source ZIP's SOURCE-MANIFEST.json. |
+| Signature, source archive and published downloads | Passed: pinned-key signature, matching build receipts, audited exact-source ZIP and all five uploaded assets downloaded and rehashed before publication. The published tag and GitHub asset digests also match. Final identities are in SOURCE-MANIFEST.json and SHA256SUMS.txt. |
 | Real-device, clean-machine, sustained-use and delivered update/rollback | Pending. Synthetic checks and package download verification do not establish these outcomes. |
 
 The release review is recorded in [the Beta 4 audit](BETA4_AUDIT.md). Builds use
@@ -24,6 +24,16 @@ The numeric file version is **0.3.0.5**, above the earlier local candidate's
 inventory and hashes, package hashes and sanitized final verification results.
 Raw diagnostics, settings, recovery backups and signing keys stay outside the
 checkout and distributed assets.
+
+Beta 4 was published on 23 October 2026 from source commit
+`459c2bb96ecf68f24e27f55dfd970346d2b82bc3`. The 292 build inputs have snapshot
+SHA-256 `0b1df54f340b56bc3ff028d5efd426deaa8cd6daac63838e56ff92a5a89394db`.
+An independent archive audit confirmed all 423 committed files and all build
+inputs match byte for byte, with neutral archive metadata and no private data.
+The final desktop and native packages were not activated over the running app.
+GitHub's [source checks](https://github.com/acoyeen/vine-mix/actions/runs/39962545477)
+and independent [published-release checks](https://github.com/acoyeen/vine-mix/actions/runs/39964789273)
+both passed for this exact release commit and its assets.
 
 The historical unexpected-closure report remains unresolved. Actual streamed
 headset playback/reconnect, physical display behavior, sleep/resume, eight-hour

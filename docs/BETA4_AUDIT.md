@@ -56,6 +56,17 @@ The published package assets are downloaded and hashed before publication. The
 release workflow then verifies the published assets independently. Repository
 visibility and previous release tags/downloads are preserved.
 
+Final release outcome: Beta 4 is published as a prerelease with Setup,
+standalone, signed update metadata, exact source and checksums. Both final smoke
+checks, all 17 runtime checks and 189 isolated Setup checks passed. The source
+archive contains the exact 423 committed files plus its manifest; all 292 build
+inputs match the frozen source snapshot. The
+[source verification run](https://github.com/acoyeen/vine-mix/actions/runs/39962545477)
+and [published-release verification run](https://github.com/acoyeen/vine-mix/actions/runs/39964789273)
+both passed. All five published asset digests and the source tag match the
+verified release. Three stale historical documentation anchors were corrected
+in a subsequent documentation-only commit; the frozen release remains unchanged.
+
 ## Limits
 
 See [current qualification](BETA_TESTING_CURRENT.md) and [Beta 4's release notes](releases/0.3.0-beta.4.md).
