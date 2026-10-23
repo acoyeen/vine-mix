@@ -32,6 +32,13 @@ internal static class DeviceChoicesVerification
         var streamedMic = Device("Streamed microphone", form: 0); streamedMic.Transport = "otherVirtual"; streamedMic.IsVirtual = true; inventory.Add(streamedMic);
         var remoteMic = Device("Network microphone", form: 0); inventory.Add(remoteMic);
         var disabledStream = Device("Disabled streamed microphone", state: "Disabled", form: 0); disabledStream.Transport = "otherVirtual"; disabledStream.IsVirtual = true; inventory.Add(disabledStream);
+        var streamedOutput = Device("Example streamed headset", "render", form: 0); streamedOutput.Transport = "otherVirtual"; streamedOutput.IsVirtual = true; inventory.Add(streamedOutput);
+        var remoteOutput = Device("Example network headphones", "render", form: 0); inventory.Add(remoteOutput);
+        var softwareOutput = Device("Example software playback", "render", form: 10); softwareOutput.Transport = "otherVirtual"; softwareOutput.IsVirtual = true; inventory.Add(softwareOutput);
+        var disabledOutput = Device("Disabled streamed output", "render", "Disabled", 0); disabledOutput.Transport = "otherVirtual"; disabledOutput.IsVirtual = true; inventory.Add(disabledOutput);
+        var missingOutput = Device("Unplugged streamed output", "render", "Unplugged", 0); missingOutput.Transport = "otherVirtual"; missingOutput.IsVirtual = true; inventory.Add(missingOutput);
+        var vacOutput = Device("Example VAC send", "render", form: 2); vacOutput.Transport = "vacLite"; vacOutput.IsVirtual = true; inventory.Add(vacOutput);
+        var vbOutput = Device("Example VB-CABLE send", "render", form: 2); vbOutput.Transport = "vbCable"; vbOutput.IsVirtual = true; inventory.Add(vbOutput);
         var defaults = DeviceChoices.Build(inventory, "capture", new(), default);
         require(defaults.Where(choice => choice.Id.Length > 0).Select(choice => choice.Id).Order().SequenceEqual(new[]
             { "Microphone", "Old engine", "Unknown", "Virtual cable", "Software microphone", "Streamed microphone", "Network microphone" }.Order()),
@@ -41,8 +48,12 @@ internal static class DeviceChoicesVerification
             && defaults.Single(choice => choice.Id == softwareMic.Id).Help.Contains("streamed and virtual microphones"),
             "Streamed and virtual microphones are assignable as generic Windows capture without losing helpful network metadata.");
         var outputs = DeviceChoices.Build(inventory, "render", new(), default);
-        require(outputs.Where(choice => choice.Id.Length > 0).Select(choice => choice.Id).Order().SequenceEqual(new[] { "Display audio", "Headphones", "Speakers" }.Order()),
-            "HDMI/display audio, speakers and headphones remain ordinary output choices while S/PDIF and passthrough are advanced.");
+        require(outputs.Where(choice => choice.Id.Length > 0).Select(choice => choice.Id).Order().SequenceEqual(new[]
+            { "Display audio", "Headphones", "Speakers", streamedOutput.Id, remoteOutput.Id, softwareOutput.Id }.Order()),
+            "Default listening outputs include streamed/network/software endpoints alongside physical playback; known cables stay reserved and S/PDIF/passthrough remain advanced.");
+        require(outputs.Where(choice => choice.Id.Length > 0).All(choice => DeviceChoices.CanAssign(choice, inventory, "render"))
+            && outputs.Single(choice => choice.Id == streamedOutput.Id).Help.Contains("streamed and virtual listening devices"),
+            "Every available generic listening choice is selectable, including a streamed headset.");
         foreach (bool disabled in new[] { false, true })
         foreach (bool disconnected in new[] { false, true })
         foreach (bool advanced in new[] { false, true })
@@ -56,6 +67,14 @@ internal static class DeviceChoicesVerification
             require(Has(cable.Id) && Has(softwareMic.Id) && Has(streamedMic.Id) && Has(remoteMic.Id) && !Has("Headphones")
                 && choices.Where(choice => choice.State is "Disabled" or "Missing" or "Unplugged").All(choice => !choice.IsSelectable),
                 "Every visibility combination accepts Windows capture regardless of vendor, respects direction and exposes unavailable devices as informational entries.");
+            var listening = DeviceChoices.Build(inventory, "render", new(), new(disabled, disconnected, advanced));
+            require(listening.Any(choice => choice.Id == streamedOutput.Id) && listening.Any(choice => choice.Id == remoteOutput.Id)
+                && listening.Any(choice => choice.Id == disabledOutput.Id) == disabled
+                && listening.Any(choice => choice.Id == missingOutput.Id) == disconnected
+                && listening.Any(choice => choice.Id == "S/PDIF") == advanced
+                && !listening.Any(choice => choice.Id == vacOutput.Id || choice.Id == vbOutput.Id || choice.Id == streamedMic.Id)
+                && listening.Where(choice => choice.State is "Disabled" or "Missing" or "Unplugged").All(choice => !choice.IsSelectable),
+                "Listening visibility switches preserve streamed playback, unavailable-state gating, direction and dedicated cable boundaries.");
         }
         foreach (string id in new[] { "Disabled mic", "Unplugged mic", "Missing mic", "Line input", cable.Id, softwareMic.Id, disabledStream.Id, "Absent saved mic" })
         {
@@ -89,6 +108,22 @@ internal static class DeviceChoicesVerification
         require(streamSelected is { Id: "stream-replacement", IsSelectable: true, IsCurrent: true }
             && streamSaved.Id == "stream-old-id" && streamSaved.Name == "Saved streamed microphone",
             "A streamed microphone reconnects by its unique stable identity without rewriting its saved endpoint or name.");
+        var outputSaved = new DeviceBinding { Id = "example-old-playback", StableId = streamedOutput.StableId, Name = "Saved streamed headphones", Channel = -1 };
+        var outputSelected = DeviceChoices.Selected(DeviceChoices.Build(inventory, "render", outputSaved, default), outputSaved);
+        require(outputSelected is { IsSelectable: true, IsCurrent: true } && outputSelected.Id == streamedOutput.Id
+            && outputSaved.Id == "example-old-playback" && outputSaved.Name == "Saved streamed headphones",
+            "Returning streamed playback resolves a unique stable identity without changing its saved exact ID or display name.");
+        foreach (string state in new[] { "Disabled", "Unplugged", "Missing" })
+        {
+            var lost = Device(streamedOutput.Id, "render", state, 0); lost.IsVirtual = true; lost.Transport = "otherVirtual";
+            var binding = new DeviceBinding { Id = lost.Id, StableId = lost.StableId, Name = "Saved streamed headphones" };
+            require(DeviceChoices.Selected(DeviceChoices.Build([lost], "render", binding, default), binding) is { IsCurrent: true, IsSelectable: false }
+                && !DeviceChoices.CanAssign(outputSelected!, [lost], "render"),
+                "An assigned streamed output remains displayed while " + state + "; a stale open list cannot assign it anew.");
+        }
+        var alias = Device("example-output-alias", "render", form: 0); alias.StableId = streamedOutput.StableId;
+        require(DeviceChoices.Selected(DeviceChoices.Build([streamedOutput, alias], "render", outputSaved, default), outputSaved) is { State: "Missing", IsSelectable: false },
+            "Ambiguous returning playback identities retain the unresolved saved choice instead of selecting an arbitrary headset.");
         var stale = new EndpointChoice { Id = "Microphone", Name = "Microphone", State = "Active" };
         require(DeviceChoices.CanAssign(stale, inventory, "capture")
             && !DeviceChoices.CanAssign(stale, [Device("Microphone", state: "Missing")], "capture")
@@ -105,7 +140,33 @@ internal static class DeviceChoicesVerification
             && empty[1].Label.Contains("Settings") && empty[1].Help.Contains("Audio device visibility"),
             "An empty selector retains Not assigned and explains the route to visibility settings.");
         CheckRealSelector(inventory, require);
+        CheckRealOutputSelector(inventory, require);
         return Preview(inventory);
+    }
+
+    private static void CheckRealOutputSelector(List<Endpoint> inventory, Action<bool, string> require)
+    {
+        using var mixer = new MixerViewModel(preview: true);
+        var node = GraphDefaults.NewNode("output", 20, 20); node.Id = "example-output";
+        var snapshot = UiPreview.CreateSnapshot([]); snapshot.Configuration.Graph = new() { Nodes = [node] }; snapshot.Endpoints = inventory;
+        mixer.ApplyPreviewSnapshot(snapshot);
+        var workspace = new GraphWorkspace(mixer);
+        workspace.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent, workspace));
+        workspace.Measure(new Size(1280, 800)); workspace.Arrange(new Rect(0, 0, 1280, 800)); workspace.UpdateLayout();
+        try
+        {
+            var picker = Descendants<ComboBox>(Descendants<GraphNodeView>(workspace).Single()).Single();
+            mixer.QueuePreviewEdits = true;
+            picker.SelectedItem = picker.Items.OfType<EndpointChoice>().Single(choice => choice.Id == "Example streamed headset");
+            require(mixer.GraphConfig.Nodes.Single().Device is { Id: "Example streamed headset", StableId: "stable-Example streamed headset", Channel: -1 }
+                && mixer.GraphConfig.Nodes.Single().Muted && mixer.PendingEditCount > 0,
+                "The detached real Listening output selector assigns streamed playback through normal graph editing while retaining the new output's muted state.");
+            var persisted = JsonSerializer.Deserialize<GraphConfiguration>(JsonSerializer.Serialize(mixer.GraphConfig, Protocol.Json), Protocol.Json)!;
+            require(persisted.Nodes.Single().Device is { Id: "Example streamed headset", StableId: "stable-Example streamed headset" }
+                && !VirtualDeviceBindings.FindAutomaticAssignments(persisted, inventory).Any(),
+                "Serialized streamed-output identities round-trip without cable auto-assignment replacing the chosen listening route.");
+        }
+        finally { workspace.RaiseEvent(new RoutedEventArgs(FrameworkElement.UnloadedEvent, workspace)); }
     }
 
     private static void CheckRealSelector(List<Endpoint> inventory, Action<bool, string> require)

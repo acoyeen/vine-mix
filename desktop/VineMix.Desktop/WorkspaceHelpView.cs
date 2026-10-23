@@ -227,13 +227,12 @@ internal sealed class WorkspaceHelpView : UserControl
 
     private static readonly ControlTemplate ReferenceButtonTemplate = (ControlTemplate)XamlReader.Parse("""
         <ControlTemplate xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" TargetType="Button">
-          <Border x:Name="Face" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}" BorderBrush="Transparent" BorderThickness="0,0,0,1">
+          <Border x:Name="Face" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
             <ContentPresenter HorizontalAlignment="Stretch" VerticalAlignment="Center"/>
           </Border>
           <ControlTemplate.Triggers>
             <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Face" Property="Background" Value="{DynamicResource ConsoleButtonHoverBrush}"/></Trigger>
             <Trigger Property="IsPressed" Value="True"><Setter TargetName="Face" Property="Background" Value="{DynamicResource ConsoleControlBorderBrush}"/></Trigger>
-            <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Face" Property="BorderBrush" Value="{DynamicResource ConsoleFocusBrush}"/></Trigger>
           </ControlTemplate.Triggers>
         </ControlTemplate>
         """);

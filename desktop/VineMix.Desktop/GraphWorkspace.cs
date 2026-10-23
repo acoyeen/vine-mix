@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -12,6 +13,7 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Shapes;
 using VineMix.Desktop.Controls;
 
@@ -31,9 +33,17 @@ public sealed class GraphWorkspace : UserControl
     private readonly Dictionary<string, WireVisual> _wires = [];
     private string _lastMessage = "";
     private bool _feedbackIsModelWarning;
-    private const string DialInstructions = "Dials: drag ↑↓ · Shift: fine · Double-click: reset · Click value: type · Enter: apply · Esc: cancel";
     private readonly TextBlock _feedback = new() { FontSize = 12, TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center };
     private readonly Button _dismissFeedback = new() { Content = "Dismiss", MinHeight = 26, Padding = new Thickness(8, 1, 8, 1), Margin = new Thickness(12, 0, 0, 0), Visibility = Visibility.Collapsed };
+    private readonly DockPanel _feedbackContent = new() { LastChildFill = true, Margin = new Thickness(12, 4, 12, 4), Visibility = Visibility.Collapsed };
+    private readonly Border _footerStatusHost = new() { HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 4, 12, 4) };
+    private readonly Border _feedbackCountdown = new() { Height = 2, VerticalAlignment = VerticalAlignment.Top, IsHitTestVisible = false, Visibility = Visibility.Hidden, RenderTransformOrigin = new Point(0, 0) };
+    private readonly ScaleTransform _feedbackCountdownScale = new(1, 1);
+    private readonly System.Windows.Threading.DispatcherTimer _feedbackTimer = new();
+    private AnimationClock? _feedbackCountdownClock;
+    private double _feedbackDeadline;
+    private const double FeedbackDurationSeconds = 5;
+    private static double FeedbackNow => Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
     private readonly Button _undo = new() { Content = "Undo", ToolTip = "Reverts the last workspace edit." };
     private readonly Button _redo = new() { Content = "Redo", ToolTip = "Restores the last undone workspace edit." };
     private readonly Button _history = new() { Content = "Activity", ToolTip = "Recent workspace edits and messages" };
@@ -43,6 +53,7 @@ public sealed class GraphWorkspace : UserControl
     private readonly Border _empty;
     private readonly Button _add;
     private readonly Button _delete;
+    private readonly Button _emptyAdd;
     private readonly CanvasGrid _grid;
     private readonly System.Windows.Shapes.Path _previewWire = new() { StrokeThickness = 2, StrokeDashArray = new DoubleCollection([3, 3]), IsHitTestVisible = false };
     private readonly HashSet<string> _selectedNodes = [];
@@ -70,6 +81,8 @@ public sealed class GraphWorkspace : UserControl
     private Socket? _pendingSocket;
     private Point _pointer, _gestureStart, _originalPosition;
     private GraphNodeView? _dragged;
+    private Point? _lockedLayoutGestureStart;
+    private bool _lockedLayoutGestureNotified;
     private bool _panning, _socketDragging, _moved, _loaded, _syncing;
     private MouseButton? _panButton;
     private const double RightPanThreshold = 6; // Viewport DIPs, independent of canvas zoom.
@@ -102,6 +115,12 @@ public sealed class GraphWorkspace : UserControl
     internal bool IsCanvasPanning => _panning;
     internal string FeedbackText => _feedback.Text;
     internal bool HasFeedback => _dismissFeedback.Visibility == Visibility.Visible;
+    internal FrameworkElement CountdownElement => _feedbackCountdown;
+    internal double FeedbackCountdownFraction => _feedbackCountdownScale.ScaleX;
+    internal bool FeedbackCountdownAnimationActive => _feedbackCountdownClock is not null;
+    internal bool FeedbackCountdownTimerRunning => _feedbackTimer.IsEnabled;
+    internal bool? PreviewFeedbackMotion { get; set; }
+    private bool FeedbackMotionEnabled => (_mixer.IsPreview ? PreviewFeedbackMotion : null) ?? SystemParameters.ClientAreaAnimation;
     internal IReadOnlyCollection<string> CutPreviewIds => _cutEdges.Keys.ToArray();
     internal double ConnectionHitWidth(string id) => _wires.TryGetValue(id, out var wire) ? wire.Hit.StrokeThickness * _zoom : 0;
     internal object? ConnectionToolTip(string id) => _wires.TryGetValue(id, out var wire) ? wire.Hit.ToolTip : null;
@@ -112,7 +131,7 @@ public sealed class GraphWorkspace : UserControl
     private string? _practiceClipboard;
     private readonly List<ContextMenu> _practiceMenus = [];
     internal bool HasActiveGesture => _pendingSocket is not null || _dragged is not null
-        || _boxSelecting || _cutting || _panButton is not null || _socketDragging;
+        || _boxSelecting || _cutting || _panButton is not null || _socketDragging || _lockedLayoutGestureStart is not null;
     internal bool ClosePracticeMenus()
     {
         bool closed = false;
@@ -179,7 +198,7 @@ public sealed class GraphWorkspace : UserControl
         _empty = new Border { Padding = new Thickness(24), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Visibility = Visibility.Collapsed };
         var emptyText = new StackPanel();
         _add.SetResourceReference(StyleProperty, "PrimaryWorkspaceToolbarButton");
-        var start = Button("+  Add node", "Opens the node library."); start.Click += (_, _) => ShowAddMenu(start, VisibleCenter()); emptyText.Children.Add(start);
+        var start = _emptyAdd = Button("+  Add node", "Opens the node library."); start.Click += (_, _) => ShowAddMenu(start, VisibleCenter()); emptyText.Children.Add(start);
         var emptyHint = Text("Connect an input to an output.", 13); emptyHint.Margin = new Thickness(0, 10, 0, 0); emptyHint.SetResourceReference(TextBlock.ForegroundProperty, "ConsoleMutedBrush"); emptyText.Children.Add(emptyHint); _empty.Child = emptyText; _viewport.Children.Add(_empty);
         _selectionBox.SetResourceReference(Border.BorderBrushProperty, "NodeSelectedBrush");
         _cutStroke.SetResourceReference(Shape.StrokeProperty, "NodeSelectedBrush");
@@ -187,17 +206,19 @@ public sealed class GraphWorkspace : UserControl
         Grid.SetRow(_viewport, 1); root.Children.Add(_viewport);
         // Keep feedback outside the zoomed canvas. Long messages wrap instead
         // of hiding their recovery instructions in a tooltip or activity menu.
-        var footerContent = new DockPanel { LastChildFill = true };
         DockPanel.SetDock(_dismissFeedback, Dock.Right);
         _dismissFeedback.SetResourceReference(StyleProperty, "WorkspaceToolbarButton");
         AutomationProperties.SetName(_dismissFeedback, "Dismiss workspace message");
         _dismissFeedback.Click += (_, _) => DismissMessage();
-        footerContent.Children.Add(_dismissFeedback); footerContent.Children.Add(_feedback);
+        _feedbackContent.Children.Add(_dismissFeedback); _feedbackContent.Children.Add(_feedback);
         AutomationProperties.SetLiveSetting(_feedback, AutomationLiveSetting.Polite);
-        var footer = new Border { Child = footerContent, Padding = new Thickness(12, 3, 12, 3),
-            BorderThickness = new Thickness(0, 1, 0, 0), Focusable = false };
-        footer.SetResourceReference(Border.BorderBrushProperty, "ConsoleBorderBrush");
-        footer.SetResourceReference(Border.BackgroundProperty, "ConsoleWindowBrush");
+        var footer = new Grid { MinHeight = 34, Focusable = false };
+        footer.SetResourceReference(Panel.BackgroundProperty, "ConsoleWindowBrush");
+        var footerBorder = new Border { BorderThickness = new Thickness(0, 1, 0, 0), IsHitTestVisible = false };
+        footerBorder.SetResourceReference(Border.BorderBrushProperty, "ConsoleBorderBrush");
+        _feedbackCountdown.SetResourceReference(Border.BackgroundProperty, "ConsoleMeterLowBrush");
+        _feedbackCountdown.RenderTransform = _feedbackCountdownScale;
+        footer.Children.Add(footerBorder); footer.Children.Add(_footerStatusHost); footer.Children.Add(_feedbackContent); footer.Children.Add(_feedbackCountdown);
         Grid.SetRow(footer, 2); root.Children.Add(footer);
         Content = root;
         _viewport.PreviewMouseWheel += OnWheel; _viewport.PreviewMouseLeftButtonDown += CanvasPreviewMouseLeftButtonDown; _viewport.MouseDown += CanvasMouseDown; _viewport.MouseMove += CanvasMouseMove; _viewport.MouseUp += CanvasMouseUp; _viewport.MouseLeave += (_, _) => { if (_pendingSocket is null) SetSnapSocket(null); }; _viewport.LostMouseCapture += (_, _) => HandleCaptureLoss();
@@ -205,9 +226,10 @@ public sealed class GraphWorkspace : UserControl
         _viewport.PreviewMouseRightButtonUp += CanvasPreviewMouseRightButtonUp;
         _viewport.ContextMenuOpening += (_, args) => { if (_suppressContextMenu && args.CursorLeft >= 0) args.Handled = true; };
         PreviewKeyDown += WorkspaceKeyDown;
-        Loaded += (_, _) => { if (_loaded) return; _loaded = true; _mixer.GraphChanged += GraphChanged; _mixer.PropertyChanged += ModelPropertyChanged; ConsoleTheme.Changed += ThemeChanged; Refresh(); };
+        _feedbackTimer.Tick += (_, _) => ResumeFeedbackCountdown();
+        Loaded += (_, _) => { if (_loaded) return; _loaded = true; _mixer.GraphChanged += GraphChanged; _mixer.PropertyChanged += ModelPropertyChanged; ConsoleTheme.Changed += ThemeChanged; Refresh(); ResumeFeedbackCountdown(); };
         _viewport.SizeChanged += (_, _) => QueueInitialFrame();
-        Unloaded += (_, _) => { CancelActiveGesture(); _loaded = false; _mixer.GraphChanged -= GraphChanged; _mixer.PropertyChanged -= ModelPropertyChanged; ConsoleTheme.Changed -= ThemeChanged; };
+        Unloaded += (_, _) => { CancelActiveGesture(); StopFeedbackCountdown(); _loaded = false; _mixer.GraphChanged -= GraphChanged; _mixer.PropertyChanged -= ModelPropertyChanged; ConsoleTheme.Changed -= ThemeChanged; };
         DismissMessage();
         AutomationProperties.SetName(this, "Audio routing canvas");
         AutomationProperties.SetHelpText(this, "Drag an existing cable from its input to move it; release on empty canvas to remove it. For multiple incoming cables, select one first or follow its curve away from the input. Ctrl and right-drag cuts crossed cables. Drag empty space to box-select nodes. Shift-click toggles a node in the selection; Shift-drag adds to it. Drag any selected header to move the group. Alt-drag a single processing node to detach it while keeping its path connected. Drop an unconnected processing node onto a highlighted audio cable to insert it. Ctrl+C copies nodes and their internal connections; Ctrl+V pastes. Right-click also provides Copy, Paste, Detach and Delete. Ctrl+A selects all nodes. F frames the selected nodes; Home or Fit shows all nodes. Middle mouse or Space and drag pans. Enable Right-click drag to pan in Settings to pan empty canvas with the right button; release without dragging for the menu. Scroll zooms; Ctrl+0 resets zoom. Delete removes the selection; Escape cancels a gesture or connection.");
@@ -225,6 +247,14 @@ public sealed class GraphWorkspace : UserControl
     private void GraphChanged(object? sender, EventArgs args) => Refresh();
     private void ModelPropertyChanged(object? sender, PropertyChangedEventArgs args)
     {
+        if (args.PropertyName == nameof(MixerViewModel.IsLayoutLocked))
+        {
+            if (_mixer.IsLayoutLocked || _lockedLayoutGestureStart is not null) CancelActiveGesture();
+            Refresh();
+            SetMessage(_mixer.IsLayoutLocked
+                ? "Layout locked. Sound controls, selection, pan and zoom remain available."
+                : "Layout unlocked. Nodes and connections can be edited.");
+        }
         if (args.PropertyName is nameof(MixerViewModel.CanEdit) or nameof(MixerViewModel.ReducedAnimation)) Refresh();
         if (args.PropertyName is nameof(MixerViewModel.CanUndo) or nameof(MixerViewModel.CanRedo)
             or nameof(MixerViewModel.UndoDescription) or nameof(MixerViewModel.RedoDescription)) UpdateHistoryButtons();
@@ -235,7 +265,7 @@ public sealed class GraphWorkspace : UserControl
             else if (_feedbackIsModelWarning) DismissMessage();
         }
     }
-    private void ThemeChanged(object? sender, EventArgs args) { _grid.InvalidateVisual(); Refresh(); }
+    private void ThemeChanged(object? sender, EventArgs args) { _grid.InvalidateVisual(); Refresh(); ResumeFeedbackCountdown(); }
 
     private void Refresh()
     {
@@ -279,7 +309,8 @@ public sealed class GraphWorkspace : UserControl
                 UpdateConnectionDetails(edge, wire);
                 UpdateWireAppearance(edge, wire);
             }
-            _add.IsEnabled = _mixer.CanEdit && graph.Nodes.Count < 32; _delete.IsEnabled = _mixer.CanEdit && (_selectedNodes.Count > 0 || _selectedEdge is not null);
+            _emptyAdd.IsEnabled = _add.IsEnabled = _mixer.CanEditLayout && graph.Nodes.Count < 32;
+            _delete.IsEnabled = _mixer.CanEditLayout && (_selectedNodes.Count > 0 || _selectedEdge is not null);
             UpdateHistoryButtons();
             _empty.Visibility = graph.Nodes.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
             _countText.Text = $"{graph.Nodes.Count} nodes" + (_selectedNodes.Count > 0 ? $" · {_selectedNodes.Count} selected" : "");
@@ -375,7 +406,7 @@ public sealed class GraphWorkspace : UserControl
         _panY = (_viewport.ActualHeight - bounds.Height * _zoom) / 2 - bounds.Top * _zoom;
         ApplyTransform(); PersistView();
     }
-    private bool CanFrameSelection => _dragged is null && !HasCanvasPanGesture && !_boxSelecting && !_cutting
+    private bool CanFrameSelection => _dragged is null && _lockedLayoutGestureStart is null && !HasCanvasPanGesture && !_boxSelecting && !_cutting
         && _pendingSocket is null && !_socketDragging && !IsFrameSelectionPointerBusy(Mouse.Captured) && !_mixer.EditHistory.HasGestureEdit;
     internal bool CanOpenNodeSearch => CanFrameSelection;
     internal bool FindAndFrameNode(string id)
@@ -433,7 +464,7 @@ public sealed class GraphWorkspace : UserControl
     }
     private void OnWheel(object sender, MouseWheelEventArgs args)
     {
-        if (_dragged is not null || _boxSelecting || HasCanvasPanGesture || _cutting || _socketDragging) { args.Handled = true; return; }
+        if (_dragged is not null || _lockedLayoutGestureStart is not null || _boxSelecting || HasCanvasPanGesture || _cutting || _socketDragging) { args.Handled = true; return; }
         var anchor = args.GetPosition(_viewport);
         DependencyObject? source = args.OriginalSource as DependencyObject, hovered = Mouse.DirectlyOver as DependencyObject;
         bool openDropDown = _nodes.Values.Any(node => node.HasOpenDropDown);
@@ -496,6 +527,10 @@ public sealed class GraphWorkspace : UserControl
         _feedback.Text = display;
         _feedback.SetResourceReference(TextBlock.ForegroundProperty, isError ? "ConsoleAlertTextBrush" : "ConsoleTextBrush");
         _dismissFeedback.Visibility = Visibility.Visible;
+        _feedbackContent.Visibility = Visibility.Visible;
+        _footerStatusHost.Visibility = Visibility.Collapsed;
+        _feedbackDeadline = FeedbackNow + FeedbackDurationSeconds;
+        StartFeedbackCountdown(FeedbackDurationSeconds);
         if (changed && IsLoaded)
         {
             var peer = FrameworkElementAutomationPeer.FromElement(_feedback) ?? FrameworkElementAutomationPeer.CreatePeerForElement(_feedback);
@@ -504,17 +539,60 @@ public sealed class GraphWorkspace : UserControl
     }
     internal void DismissMessage()
     {
+        StopFeedbackCountdown();
+        _feedbackDeadline = 0;
+        _feedbackCountdownScale.ScaleX = 0;
+        _feedbackCountdown.Visibility = Visibility.Hidden;
         _feedbackIsModelWarning = false;
-        _feedback.Text = DialInstructions;
+        _feedback.Text = "";
         _feedback.SetResourceReference(TextBlock.ForegroundProperty, "ConsoleMutedBrush");
         _dismissFeedback.Visibility = Visibility.Collapsed;
+        _feedbackContent.Visibility = Visibility.Collapsed;
+        _footerStatusHost.Visibility = Visibility.Visible;
+    }
+    internal void SetFooterStatus(FrameworkElement status)
+    {
+        ArgumentNullException.ThrowIfNull(status);
+        if (!ReferenceEquals(_footerStatusHost.Child, status)) _footerStatusHost.Child = status;
+    }
+    private void StartFeedbackCountdown(double remainingSeconds)
+    {
+        StopFeedbackCountdown();
+        _feedbackCountdown.Visibility = Visibility.Visible;
+        double fraction = Math.Clamp(remainingSeconds / FeedbackDurationSeconds, 0, 1);
+        _feedbackCountdownScale.ScaleX = FeedbackMotionEnabled ? fraction : 1;
+        if (!_loaded) return;
+        _feedbackTimer.Interval = TimeSpan.FromSeconds(remainingSeconds);
+        _feedbackTimer.Start();
+        if (!FeedbackMotionEnabled) return;
+        var animation = new DoubleAnimation(fraction, 0, TimeSpan.FromSeconds(remainingSeconds)) { FillBehavior = FillBehavior.HoldEnd };
+        _feedbackCountdownClock = (AnimationClock)animation.CreateClock(true);
+        _feedbackCountdownScale.ApplyAnimationClock(ScaleTransform.ScaleXProperty, _feedbackCountdownClock);
+    }
+    private void ResumeFeedbackCountdown()
+    {
+        if (!HasFeedback || !_loaded) return;
+        double remainingSeconds = _feedbackDeadline - FeedbackNow;
+        if (remainingSeconds <= 0) DismissMessage();
+        else StartFeedbackCountdown(remainingSeconds);
+    }
+    private void StopFeedbackCountdown()
+    {
+        _feedbackTimer.Stop();
+        _feedbackCountdownClock?.Controller?.Remove(); _feedbackCountdownClock = null;
+        _feedbackCountdownScale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+    }
+    internal void SeekFeedbackCountdown(double elapsedSeconds)
+    {
+        if (!_mixer.IsPreview) throw new InvalidOperationException("Only detached preview checks may seek the footer countdown.");
+        _feedbackCountdownClock?.Controller?.SeekAlignedToLastTick(TimeSpan.FromSeconds(elapsedSeconds), TimeSeekOrigin.BeginTime);
     }
     private void UpdateHistoryButtons()
     {
         _undo.IsEnabled = _mixer.CanUndo; _redo.IsEnabled = _mixer.CanRedo;
         string undo = _mixer.UndoDescription, redo = _mixer.RedoDescription;
-        _undo.ToolTip = undo.Length > 0 ? "Undo: " + undo : "Nothing to undo";
-        _redo.ToolTip = redo.Length > 0 ? "Redo: " + redo : "Nothing to redo";
+        _undo.ToolTip = _mixer.IsLayoutLocked && _mixer.EditHistory.UndoChangesLayout ? "Unlock layout to undo: " + undo : undo.Length > 0 ? "Undo: " + undo : "Nothing to undo";
+        _redo.ToolTip = _mixer.IsLayoutLocked && _mixer.EditHistory.RedoChangesLayout ? "Unlock layout to redo: " + redo : redo.Length > 0 ? "Redo: " + redo : "Nothing to redo";
         AutomationProperties.SetName(_undo, undo.Length > 0 ? "Undo: " + undo : "Undo");
         AutomationProperties.SetName(_redo, redo.Length > 0 ? "Redo: " + redo : "Redo");
     }
@@ -526,6 +604,7 @@ public sealed class GraphWorkspace : UserControl
         string description = redo ? _mixer.RedoDescription : _mixer.UndoDescription;
         bool restored = redo ? _mixer.Redo() : _mixer.Undo();
         if (restored) SetMessage((redo ? "Redone: " : "Undone: ") + description + ".");
+        else if (_mixer.IsLayoutLocked && (redo ? _mixer.EditHistory.RedoChangesLayout : _mixer.EditHistory.UndoChangesLayout)) SetMessage(MixerViewModel.LayoutLockedMessage);
         else if (!string.IsNullOrWhiteSpace(_mixer.Warning)) SetMessage(_mixer.Warning, isError: true);
         else SetMessage(_mixer.CanEdit ? (redo ? "Nothing to redo." : "Nothing to undo.") : "Reconnect to the audio engine before changing the graph.");
         Refresh();
@@ -605,7 +684,7 @@ public sealed class GraphWorkspace : UserControl
         Refresh();
         var edge = Graph.Edges.FirstOrDefault(e => e.Id == id); if (edge is null) return;
         var details = DescribeConnection(Graph, edge);
-        SetMessage($"{details.Route} · {details.Title} · {details.State} · Delete removes this cable.");
+        SetMessage($"{details.Route} · {details.Title} · {details.State} · " + (_mixer.IsLayoutLocked ? "Layout locked; sound controls remain available." : "Delete removes this cable."));
     }
     internal static (string Title, string Route, string State, string Purpose) DescribeConnection(GraphConfiguration graph, GraphEdge edge)
     {
@@ -639,13 +718,40 @@ public sealed class GraphWorkspace : UserControl
     internal void BeginDrag(GraphNodeView node, MouseButtonEventArgs args)
     {
         if (!_mixer.CanEdit || args.ChangedButton != MouseButton.Left) return;
-        SelectNodeForPointer(node.Id, Keyboard.Modifiers); Focus(); args.Handled = true;
-        if (!_selectedNodes.Contains(node.Id)) return;
-        BeginNodeMove(node.Id, args.GetPosition(_viewport), Keyboard.Modifiers.HasFlag(ModifierKeys.Alt)); _viewport.CaptureMouse();
+        Focus(); args.Handled = true;
+        if (BeginNodePointerGesture(node.Id, args.GetPosition(_viewport), Keyboard.Modifiers)
+            && !_viewport.CaptureMouse()) FinishGesture(cancel: true);
+    }
+    internal bool BeginNodePointerGesture(string id, Point viewportStart, ModifierKeys modifiers)
+    {
+        if (!_mixer.CanEdit || !_nodes.ContainsKey(id)) return false;
+        SelectNodeForPointer(id, modifiers);
+        if (!_selectedNodes.Contains(id)) return false;
+        // A header click is ordinary selection, even while locked. Wait for
+        // movement before reporting a refused edit; never move its visual.
+        if (_mixer.IsLayoutLocked) BeginLockedLayoutGesture(viewportStart);
+        else BeginNodeMove(id, viewportStart, modifiers.HasFlag(ModifierKeys.Alt));
+        return true;
+    }
+    internal void BeginLockedLayoutGesture(Point viewportStart)
+    {
+        if (!_mixer.IsLayoutLocked) return;
+        _lockedLayoutGestureStart = viewportStart;
+        _lockedLayoutGestureNotified = false;
+    }
+    internal bool UpdateLockedLayoutGesture(Point viewportPoint)
+    {
+        if (_lockedLayoutGestureStart is not Point start) return false;
+        if (!_lockedLayoutGestureNotified && (viewportPoint - start).Length > 3 && _mixer.IsLayoutLocked)
+        {
+            _lockedLayoutGestureNotified = true;
+            RequireLayoutEdit();
+        }
+        return true;
     }
     internal void BeginNodeMove(string id, Point viewportStart, bool detach = false)
     {
-        if (!_mixer.CanEdit || !_nodes.TryGetValue(id, out var node)) return;
+        if (!_nodes.TryGetValue(id, out var node) || !RequireLayoutEdit()) return;
         if (!_selectedNodes.Contains(id)) SelectNode(id);
         CancelCable(); _dragged = node; _gestureStart = viewportStart; _moved = false; _viewport.Cursor = Cursors.SizeAll;
         _detachOnDrop = detach; SetInsertionEdge(null);
@@ -675,6 +781,7 @@ public sealed class GraphWorkspace : UserControl
     }
     internal void FinishNodeMove(bool cancel = false)
     {
+        cancel |= !_mixer.CanEditLayout;
         var dragged = _dragged; _dragged = null;
         if (dragged is null) return;
         _viewport.Cursor = null;
@@ -723,11 +830,17 @@ public sealed class GraphWorkspace : UserControl
     {
         _mixer.Edit(c => { var edge = c.Graph.Edges.FirstOrDefault(e => e.Id == id); if (edge is not null) change(edge); });
     }
-    internal void RemoveEdge(string id) { _mixer.Edit(c => c.Graph.Edges.RemoveAll(e => e.Id == id)); SetMessage("Connection removed."); }
+    private bool RequireLayoutEdit()
+    {
+        if (_mixer.IsLayoutLocked) { SetMessage(MixerViewModel.LayoutLockedMessage); _mixer.NotifyLayoutEditBlocked(); return false; }
+        return _mixer.CanEdit;
+    }
+    internal void RemoveEdge(string id) { if (!Graph.Edges.Any(edge => edge.Id == id) || !RequireLayoutEdit()) return; _mixer.Edit(c => c.Graph.Edges.RemoveAll(e => e.Id == id)); SetMessage("Connection removed."); }
     internal void SocketPressed(Socket socket, MouseButtonEventArgs args)
     {
         if (!_mixer.CanEdit || args.ChangedButton != MouseButton.Left) return;
         Focus(); args.Handled = true;
+        if (!RequireLayoutEdit()) return;
         if (_pendingSocket is not null && _pendingSocket != socket) { Connect(_pendingSocket, socket); return; }
         if (!socket.Output)
         {
@@ -745,12 +858,18 @@ public sealed class GraphWorkspace : UserControl
         var edge = Graph.Edges.FirstOrDefault(e => e.Id == id);
         if (edge is null || !_nodes.TryGetValue(edge.To, out var node) || node.FindSocket(edge.Kind, false) is not Socket input) return;
         Point endpoint = SocketPosition(input), pointer = args.GetPosition(_viewport);
+        if (_mixer.IsLayoutLocked)
+        {
+            BeginLockedLayoutGesture(pointer);
+            if (!_viewport.CaptureMouse()) FinishGesture(cancel: true);
+            return;
+        }
         if ((new Point(endpoint.X * _zoom + _panX, endpoint.Y * _zoom + _panY) - pointer).Length > 64) return;
         if (BeginInputLinkDrag(input, pointer, id)) _viewport.CaptureMouse();
     }
     internal bool BeginInputLinkDrag(Socket input, Point viewportStart, string? edgeId = null)
     {
-        if (!_mixer.CanEdit || input.Output || !IsCurrentSocket(input)) return false;
+        if (input.Output || !IsCurrentSocket(input) || !RequireLayoutEdit()) return false;
         var incoming = Graph.Edges.Where(e => e.To == input.NodeId && e.Kind == input.Kind).ToArray();
         string? selected = edgeId ?? _selectedEdge;
         GraphEdge? edge = incoming.FirstOrDefault(e => e.Id == selected);
@@ -811,6 +930,7 @@ public sealed class GraphWorkspace : UserControl
     }
     public string ConnectNodes(string from, string to, string kind = "audio")
     {
+        if (_mixer.IsLayoutLocked) { RequireLayoutEdit(); return MixerViewModel.LayoutLockedMessage; }
         if (!_mixer.CanEdit) return "Wait for the audio engine before editing connections.";
         var edge = new GraphEdge { Id = Guid.NewGuid().ToString("N"), From = from, To = to, Kind = kind };
         string error = GraphDefaults.ConnectionError(Graph, edge); if (error.Length > 0) return error;
@@ -818,6 +938,7 @@ public sealed class GraphWorkspace : UserControl
     }
     public void RemoveNode(string id)
     {
+        if (!Graph.Nodes.Any(node => node.Id == id) || !RequireLayoutEdit()) return;
         CancelCable();
         _mixer.Edit(c => { c.Graph.Nodes.RemoveAll(n => n.Id == id); c.Graph.Edges.RemoveAll(e => e.From == id || e.To == id); });
         _selectedNodes.Remove(id); CancelCable(); SetMessage("Node and its connections removed."); Refresh();
@@ -828,7 +949,7 @@ public sealed class GraphWorkspace : UserControl
         _rewireOriginal = null; _inputLinkSocket = null; _inputLinkCandidates = []; SetInputLinkCandidate(null);
         _pendingSocket = null; _socketDragging = false; SetSnapSocket(null); ClearPreview();
         if (old is not null) RefreshWireAppearance(old);
-        if (_dragged is null && !HasCanvasPanGesture && !_boxSelecting && !_cutting && Mouse.Captured == _viewport) _viewport.ReleaseMouseCapture();
+        if (_dragged is null && _lockedLayoutGestureStart is null && !HasCanvasPanGesture && !_boxSelecting && !_cutting && Mouse.Captured == _viewport) _viewport.ReleaseMouseCapture();
     }
     private void CanvasPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs args)
     {
@@ -845,6 +966,7 @@ public sealed class GraphWorkspace : UserControl
         if (HasCanvasPanGesture) { args.Handled = true; return; }
         _suppressContextMenu = false;
         if (!_mixer.CanEdit || !Keyboard.Modifiers.HasFlag(ModifierKeys.Control)) return;
+        if (!RequireLayoutEdit()) { _suppressContextMenu = true; args.Handled = true; return; }
         BeginCableCut(args.GetPosition(_viewport)); _viewport.CaptureMouse(); args.Handled = true;
     }
     private void CanvasPreviewMouseRightButtonUp(object sender, MouseButtonEventArgs args)
@@ -874,13 +996,14 @@ public sealed class GraphWorkspace : UserControl
     private void CanvasMouseMove(object sender, MouseEventArgs args)
     {
         Point point = args.GetPosition(_viewport); _pointer = ToWorld(point);
+        if (UpdateLockedLayoutGesture(point)) { args.Handled = true; return; }
         if (_cutting) { UpdateCableCut(point); return; }
         if (HasCanvasPanGesture) { UpdateCanvasPan(point); args.Handled = true; return; }
         if (_pendingSocket is not null) UpdateConnectionPointer(point);
         else if (_dragged is null && !_boxSelecting)
         {
             var source = args.OriginalSource as DependencyObject;
-            SetSnapSocket(_pendingSocket is not null || !IsEditingControl(source) && (FindParent<ButtonBase>(source) is null || FindParent<Socket>(source) is not null)
+            SetSnapSocket(_mixer.CanEditLayout && (_pendingSocket is not null || !IsEditingControl(source) && (FindParent<ButtonBase>(source) is null || FindParent<Socket>(source) is not null))
                 ? FindSnapSocket(point, _pendingSocket) : null);
         }
         Vector delta = point - _gestureStart;
@@ -892,6 +1015,11 @@ public sealed class GraphWorkspace : UserControl
     {
         if (_cutting) { if (args.ChangedButton == MouseButton.Right) { UpdateCableCut(args.GetPosition(_viewport)); FinishCableCut(); } args.Handled = true; return; }
         Point point = args.GetPosition(_viewport);
+        if (_lockedLayoutGestureStart is not null)
+        {
+            if (args.ChangedButton == MouseButton.Left) { UpdateLockedLayoutGesture(point); FinishGesture(); }
+            args.Handled = true; return;
+        }
         if (FinishCanvasPan(args.ChangedButton, point, out var menuPosition))
         {
             args.Handled = true;
@@ -943,6 +1071,7 @@ public sealed class GraphWorkspace : UserControl
     }
     internal void BeginConnectionPreview(Socket socket, Point viewportStart, bool dragging = false)
     {
+        if (!RequireLayoutEdit()) return;
         CancelCable();
         _pendingSocket = socket; _gestureStart = viewportStart; _pointer = ToWorld(viewportStart); _socketDragging = dragging; _moved = false;
         SetSnapSocket(null); UpdatePreview();
@@ -957,6 +1086,7 @@ public sealed class GraphWorkspace : UserControl
     }
     internal bool FinishConnectionPointer(MouseButton button, Point viewportPoint, bool blankCanvas = true)
     {
+        if (_mixer.IsLayoutLocked) { bool active = _pendingSocket is not null; CancelCable(); return active; }
         if (!_socketDragging || _pendingSocket is null) return false;
         if (button != MouseButton.Left) return true;
         _socketDragging = false;
@@ -991,7 +1121,7 @@ public sealed class GraphWorkspace : UserControl
     {
         if (_cutting) FinishCableCut(cancel: true);
         if (_socketDragging) CancelCable();
-        if (_dragged is not null || HasCanvasPanGesture || _boxSelecting) FinishGesture(cancel: true);
+        if (_dragged is not null || HasCanvasPanGesture || _boxSelecting || _lockedLayoutGestureStart is not null) FinishGesture(cancel: true);
     }
     internal void CancelActiveGesture()
     {
@@ -1000,6 +1130,7 @@ public sealed class GraphWorkspace : UserControl
     }
     internal void FinishGesture(bool cancel = false)
     {
+        _lockedLayoutGestureStart = null; _lockedLayoutGestureNotified = false;
         bool panned = _panning; _panning = false; _panButton = null; _viewport.Cursor = null;
         FinishNodeMove(cancel);
         if (_boxSelecting) { _boxSelecting = false; _selectionBox.Visibility = Visibility.Collapsed; if (cancel) SetNodeSelection(_boxOriginalSelection); }
@@ -1008,6 +1139,7 @@ public sealed class GraphWorkspace : UserControl
     }
     internal void BeginCableCut(Point point)
     {
+        if (!RequireLayoutEdit()) return;
         CancelActiveGesture(); Focus(); _cutting = true; _suppressContextMenu = true;
         _cutCandidates.Clear(); _cutEdges.Clear();
         foreach (var edge in Graph.Edges) _cutCandidates[edge.Id] = edge.Copy();
@@ -1033,7 +1165,7 @@ public sealed class GraphWorkspace : UserControl
         _cutEdges.Clear(); _cutCandidates.Clear(); _cutStroke.Points.Clear(); _cutStroke.Visibility = Visibility.Collapsed; _viewport.Cursor = null;
         foreach (var edge in originals) RefreshWireAppearance(edge.Id);
         if (Mouse.Captured == _viewport) _viewport.ReleaseMouseCapture();
-        if (cancel || originals.Length == 0 || !_mixer.CanEdit) return;
+        if (cancel || originals.Length == 0 || !_mixer.CanEditLayout) return;
         if (!GraphConnectionEditing.TryPrepareRemoval(Graph, originals, out var plan, out string error)) { SetMessage(error, isError: true); return; }
         _mixer.Edit(c => { if (!GraphConnectionEditing.TryApply(c.Graph, plan!, out string message)) SetMessage(message); });
         SetMessage($"Removed {originals.Length} connection{(originals.Length == 1 ? "" : "s")}.");
@@ -1075,7 +1207,7 @@ public sealed class GraphWorkspace : UserControl
         { args.Handled = true; return; }
         if (IsEditingControl(Keyboard.FocusedElement as DependencyObject)) return;
         if (args.Key == Key.Escape) { CancelActiveGesture(); SetMessage("Gesture cancelled."); args.Handled = true; return; }
-        if (_dragged is not null || HasCanvasPanGesture || _boxSelecting || _cutting || _socketDragging) return;
+        if (_dragged is not null || _lockedLayoutGestureStart is not null || HasCanvasPanGesture || _boxSelecting || _cutting || _socketDragging) return;
         if (args.Key is Key.Delete or Key.Back) { DeleteSelection(); args.Handled = true; }
         else if (args.Key == Key.C && Keyboard.Modifiers == ModifierKeys.Control) { CopyToClipboard(); args.Handled = true; }
         else if (args.Key == Key.V && Keyboard.Modifiers == ModifierKeys.Control) { PasteFromClipboard(); args.Handled = true; }
@@ -1106,7 +1238,8 @@ public sealed class GraphWorkspace : UserControl
         || FindParent<VoiceColorPad>(element) is not null;
     internal void DeleteSelection()
     {
-        if (!_mixer.CanEdit) return;
+        if (_selectedEdge is null && _selectedNodes.Count == 0) return;
+        if (!RequireLayoutEdit()) return;
         FinishGesture(cancel: true);
         CancelCable();
         if (_selectedEdge is string edge) { RemoveEdge(edge); _selectedEdge = null; }
@@ -1121,6 +1254,7 @@ public sealed class GraphWorkspace : UserControl
     internal string CopySelection() => GraphClipboard.Serialize(Graph, _selectedNodes);
     internal bool PasteSelection(string payload, Point worldAnchor)
     {
+        if (_mixer.IsLayoutLocked) { RequireLayoutEdit(); return false; }
         if (!_mixer.CanEdit) { SetMessage("Wait for the audio engine before pasting nodes.", isError: true); return false; }
         if (!GraphClipboard.TryCreatePaste(payload, Graph, worldAnchor, out var paste, out string error)) { SetMessage(error, isError: true); return false; }
         return ApplyPaste(paste, $"Pasted {paste.Nodes.Count} {(paste.Nodes.Count == 1 ? "node" : "nodes")}." + (paste.ClearedAssignments > 0 ? $" Choose a device for {paste.ClearedAssignments} copied {(paste.ClearedAssignments == 1 ? "output" : "outputs")}; the originals keep their assignments." : " Drag a selected header to position the group."));
@@ -1138,6 +1272,7 @@ public sealed class GraphWorkspace : UserControl
     }
     internal bool DuplicateInput(string id)
     {
+        if (_mixer.IsLayoutLocked) { RequireLayoutEdit(); return false; }
         if (!_mixer.CanEdit) { SetMessage("Wait for the audio engine before duplicating an input.", isError: true); return false; }
         var node = Graph.Nodes.FirstOrDefault(n => n.Id == id);
         if (node is null || node.Kind is not ("microphone" or "virtualInput" or "appInput")) return false;
@@ -1207,9 +1342,9 @@ public sealed class GraphWorkspace : UserControl
     {
         var copy = new MenuItem { Header = "Copy", InputGestureText = "Ctrl+C", IsEnabled = _selectedNodes.Count > 0 };
         copy.Click += (_, _) => CopyToClipboard(); menu.Items.Add(copy);
-        var paste = new MenuItem { Header = "Paste", InputGestureText = "Ctrl+V", IsEnabled = _mixer.CanEdit && ClipboardHasNodes() };
+        var paste = new MenuItem { Header = "Paste", InputGestureText = "Ctrl+V", IsEnabled = _mixer.CanEditLayout && ClipboardHasNodes() };
         paste.Click += (_, _) => PasteFromClipboard(position); menu.Items.Add(paste);
-        var remove = new MenuItem { Header = _selectedNodes.Count > 1 ? $"Delete {_selectedNodes.Count} nodes" : "Delete node", InputGestureText = "Delete", IsEnabled = _mixer.CanEdit && _selectedNodes.Count > 0 };
+        var remove = new MenuItem { Header = _selectedNodes.Count > 1 ? $"Delete {_selectedNodes.Count} nodes" : "Delete node", InputGestureText = "Delete", IsEnabled = _mixer.CanEditLayout && _selectedNodes.Count > 0 };
         remove.Click += (_, _) => DeleteSelection(); menu.Items.Add(remove);
         if (CreateNodeAlignmentMenuItem() is { } align) menu.Items.Add(align);
     }
@@ -1232,16 +1367,18 @@ public sealed class GraphWorkspace : UserControl
     }
     internal bool TryNodeAlignmentShortcut(Key key, ModifierKeys modifiers, DependencyObject? focused)
     {
-        if (modifiers != ModifierKeys.Alt || !ReferenceEquals(focused, this) || !CanAlignSelectedNodes
+        if (modifiers != ModifierKeys.Alt || !ReferenceEquals(focused, this) || !CanAttemptNodeAlignment
             || Graph.Nodes.Count(node => _selectedNodes.Contains(node.Id)) < 2) return false;
         NodeAlignment? alignment = key switch { Key.X => NodeAlignment.Top, Key.Y => NodeAlignment.Left, Key.A => NodeAlignment.Auto, _ => null };
         if (alignment is null) return false;
+        if (!RequireLayoutEdit()) return false;
         AlignSelectedNodes(alignment.Value);
         // Consume an eligible, already-aligned selection too, so Alt does not
         // transfer focus into menu access-key mode or add another history step.
         return true;
     }
-    private bool CanAlignSelectedNodes => _mixer.CanEdit && !_mixer.Applying && IsEnabled && CanFrameSelection;
+    private bool CanAttemptNodeAlignment => _mixer.CanEdit && !_mixer.Applying && IsEnabled && CanFrameSelection;
+    private bool CanAlignSelectedNodes => !_mixer.IsLayoutLocked && CanAttemptNodeAlignment;
     private Dictionary<string, Size> NodeAlignmentSizes(IEnumerable<string> ids)
     {
         // Use the current controls' real dimensions, including taller effects,
@@ -1254,7 +1391,7 @@ public sealed class GraphWorkspace : UserControl
     }
     internal bool AlignSelectedNodes(NodeAlignment alignment)
     {
-        if (!CanAlignSelectedNodes) return false;
+        if (!CanAttemptNodeAlignment || Graph.Nodes.Count(node => _selectedNodes.Contains(node.Id)) < 2 || !RequireLayoutEdit()) return false;
         string[] selected = _selectedNodes.ToArray();
         NodeAlignment resolved = alignment == NodeAlignment.Auto ? GraphNodeAlignment.ResolveAuto(Graph, selected) : alignment;
         var sizes = NodeAlignmentSizes(selected);
@@ -1301,12 +1438,12 @@ public sealed class GraphWorkspace : UserControl
         var node = Graph.Nodes.FirstOrDefault(n => n.Id == id);
         if (node?.Kind is "microphone" or "virtualInput" or "appInput")
         {
-            var duplicate = new MenuItem { Header = "Duplicate input", IsEnabled = _mixer.CanEdit && _selectedNodes.Count == 1 && Graph.Nodes.Count < 32,
+            var duplicate = new MenuItem { Header = "Duplicate input", IsEnabled = _mixer.CanEditLayout && _selectedNodes.Count == 1 && Graph.Nodes.Count < 32,
                 ToolTip = NodeToolTip.Create("Duplicate input", "Use the same source in another part of the graph", "Copies its controls; starts without connections") };
             duplicate.Click += (_, _) => DuplicateInput(id); menu.Items.Add(duplicate);
         }
         menu.Items.Add(new Separator());
-        var detach = new MenuItem { Header = "Detach node (reconnect)", InputGestureText = "Alt+drag", IsEnabled = _mixer.CanEdit && _selectedNodes.Count == 1,
+        var detach = new MenuItem { Header = "Detach node (reconnect)", InputGestureText = "Alt+drag", IsEnabled = _mixer.CanEditLayout && _selectedNodes.Count == 1,
             ToolTip = NodeToolTip.Create("Detach node", "Reconnects the surrounding audio path", "Keeps this node and its settings") };
         detach.Click += (_, _) => DetachNode(id); menu.Items.Add(detach);
         var renameItem = new MenuItem { Header = "Rename", IsEnabled = _mixer.CanEdit && _selectedNodes.Count == 1 };
@@ -1366,7 +1503,7 @@ public sealed class GraphWorkspace : UserControl
     }
     internal bool DetachNode(string id)
     {
-        if (!_mixer.CanEdit) return false;
+        if (!RequireLayoutEdit()) return false;
         if (!GraphConnectionEditing.TryPrepareDetach(Graph, id, out var plan, out string error)) { SetMessage(error, isError: true); return false; }
         CancelCable(); SetMessage("Node detached; its audio path stays connected.");
         _mixer.Edit(c => { if (!GraphConnectionEditing.TryApply(c.Graph, plan!, out string applyError)) SetMessage(applyError); });
@@ -1376,7 +1513,7 @@ public sealed class GraphWorkspace : UserControl
     {
         Focus();
         var menu = TrackPracticeMenu(new ContextMenu());
-        var add = new MenuItem { Header = "Add node", InputGestureText = "Shift+A", IsEnabled = _mixer.CanEdit && Graph.Nodes.Count < 32 };
+        var add = new MenuItem { Header = "Add node", InputGestureText = "Shift+A", IsEnabled = _mixer.CanEditLayout && Graph.Nodes.Count < 32 };
         add.Click += (_, _) => ShowAddMenu(_viewport, position); menu.Items.Add(add); menu.Items.Add(new Separator());
         AddSelectionMenuItems(menu, position);
         MenuHoverHelp.Attach(menu);
@@ -1384,6 +1521,7 @@ public sealed class GraphWorkspace : UserControl
     }
     private void ShowAddMenu(FrameworkElement anchor, Point position)
     {
+        if (!RequireLayoutEdit()) return;
         var menu = CreateAddMenu(position); menu.PlacementTarget = anchor; menu.IsOpen = true;
     }
     internal ContextMenu CreateAddMenu(Point position)
@@ -1400,10 +1538,10 @@ public sealed class GraphWorkspace : UserControl
         var groups = new List<MenuItem>();
         MenuItem NodeItem(string kind)
         {
-            var item = new MenuItem { Header = NodeCatalog.Title(kind), Icon = new Rectangle { Width = 10, Height = 10, Fill = NodeCatalog.HeaderBrush(kind) }, IsEnabled = _mixer.CanEdit && Graph.Nodes.Count < 32 };
+            var item = new MenuItem { Header = NodeCatalog.Title(kind), Icon = new Rectangle { Width = 10, Height = 10, Fill = NodeCatalog.HeaderBrush(kind) }, IsEnabled = _mixer.CanEditLayout && Graph.Nodes.Count < 32 };
             string purpose = NodeCatalog.Description(kind);
             string unavailable = Graph.Nodes.Count >= 32 ? "The workspace has reached its limit of 32 nodes. Remove a node before adding another."
-                : !_mixer.CanEdit ? "Wait for the audio engine before adding a node." : "";
+                : _mixer.IsLayoutLocked ? MixerViewModel.LayoutLockedMessage : !_mixer.CanEdit ? "Wait for the audio engine before adding a node." : "";
             item.ToolTip = NodeToolTip.Create(NodeCatalog.Title(kind), purpose, unavailable);
             ToolTipService.SetShowOnDisabled(item, true);
             AutomationProperties.SetName(item, NodeCatalog.Title(kind));
@@ -1444,7 +1582,7 @@ public sealed class GraphWorkspace : UserControl
     }
     public string Spawn(string kind, Point position)
     {
-        if (!_mixer.CanEdit || Graph.Nodes.Count >= 32 || !NodeCatalog.CanCreate(kind)) return "";
+        if (Graph.Nodes.Count >= 32 || !NodeCatalog.CanCreate(kind) || !RequireLayoutEdit()) return "";
         var node = GraphDefaults.NewNode(kind, Math.Round(position.X / 8) * 8, Math.Round(position.Y / 8) * 8);
         int count = Graph.Nodes.Count(n => n.Kind == kind); if (count > 0) node.Name += " " + (count + 1);
         _mixer.Edit(c => { if (c.Graph.Nodes.Count < 32 && c.Graph.Nodes.All(n => n.Id != node.Id)) c.Graph.Nodes.Add(node.Copy()); }); SelectNode(node.Id);
@@ -1461,11 +1599,11 @@ public sealed class GraphWorkspace : UserControl
         var menu = TrackPracticeMenu(new ContextMenu()); var edge = Graph.Edges.FirstOrDefault(e => e.Id == id); if (edge is null) return menu;
         var expected = edge.Copy();
         bool Current() => _mixer.CanEdit && Graph.Edges.Any(e => SameConnection(e, expected));
-        MenuItem AddAction(string header, Action click)
+        MenuItem AddAction(string header, Action click, bool structural = false)
         {
             var item = new MenuItem { Header = header };
-            item.SetBinding(IsEnabledProperty, new System.Windows.Data.Binding(nameof(MixerViewModel.CanEdit)) { Source = _mixer });
-            item.Click += (_, _) => { if (Current()) click(); };
+            item.SetBinding(IsEnabledProperty, new System.Windows.Data.Binding(structural ? nameof(MixerViewModel.CanEditLayout) : nameof(MixerViewModel.CanEdit)) { Source = _mixer });
+            item.Click += (_, _) => { if (Current() && (!structural || RequireLayoutEdit())) click(); };
             menu.Items.Add(item); return item;
         }
         if (edge.Kind == "audio")
@@ -1482,7 +1620,7 @@ public sealed class GraphWorkspace : UserControl
                 "Can increase volume if this cable is attenuated", "Keeps its on/off state and routing");
         }
         AddAction("Remove connection", () => ChangeConnectionFromMenu(expected,
-            (graph, current) => graph.Edges.Remove(current), "Connection removed.", allowMissing: true));
+            (graph, current) => graph.Edges.Remove(current), "Connection removed.", allowMissing: true), structural: true);
         MenuHoverHelp.Attach(menu);
         return menu;
     }
@@ -1774,7 +1912,7 @@ public sealed class GraphWorkspace : UserControl
             AutomationProperties.SetName(this, (output ? "Output" : "Input") + " " + kind + " socket");
             AutomationProperties.SetItemStatus(this, "Not connected");
             PreviewMouseLeftButtonDown += (_, e) => owner.SocketPressed(this, e);
-            Click += (_, _) => { if (owner._pendingSocket is null) { owner._pendingSocket = this; owner.SetMessage("Choose a matching socket to complete the connection."); } else if (owner._pendingSocket != this) owner.Connect(owner._pendingSocket, this); };
+            Click += (_, _) => { if (!owner.RequireLayoutEdit()) return; if (owner._pendingSocket is null) { owner._pendingSocket = this; owner.SetMessage("Choose a matching socket to complete the connection."); } else if (owner._pendingSocket != this) owner.Connect(owner._pendingSocket, this); };
         }
         internal void SetConnectionHighlight(bool highlighted)
         {

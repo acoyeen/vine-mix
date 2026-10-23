@@ -374,7 +374,7 @@ internal sealed class GraphNodeView : Border
         "mix" => NodeToolTip.Create("Mix", "Combines incoming audio", "Level · Adjusts the combined volume"),
         "highPass" => NodeToolTip.Create("High-pass", "Reduces sound below the cutoff"),
         "lowPass" => NodeToolTip.Create("Low-pass", "Reduces sound above the cutoff"),
-        "denoiser" => NodeToolTip.Create("Denoiser", "SpeexDSP · Steady noise reduction", "RNNoise · Neural speech denoising", "Speech focused · May alter humming or singing", "Delay · SpeexDSP 20 ms / RNNoise 30 ms, including bypass"),
+        "denoiser" => NodeToolTip.Create("Denoiser", "SpeexDSP: faster, lighter cleanup.", "RNNoise: more delay, usually cleaner speech.", "20/30 ms is added node delay."),
         "deEsser" => NodeToolTip.Create("De-esser", "Tames harsh S and SH sounds", "Acts above the threshold"),
         "plosive" => NodeToolTip.Create("Plosive remover", "Tames low P and B thumps", "Acts above the threshold"),
         "reverb" => NodeToolTip.Create("Reverb", "Adds room-like decay", "Mix · Blends dry sound and reverb"),
@@ -477,7 +477,7 @@ internal sealed class GraphNodeView : Border
         // The ordinary border remains neutral; colouring it as well would add
         // another zoom-scaled stroke underneath the constant-width selection.
         BorderBrush = ConsoleTheme.Get("NodeOutlineBrush");
-        _selectionOutline.Visibility = selected ? Visibility.Visible : Visibility.Hidden;
+        _selectionOutline.Visibility = selected && !_owner.Mixer.IsLayoutLocked ? Visibility.Visible : Visibility.Hidden;
     }
     public void Apply(GraphNode node, GraphNodeStatus? status, bool selected)
     {
@@ -820,7 +820,6 @@ internal sealed class GraphNodeView : Border
                   </Border>
                   <ControlTemplate.Triggers>
                     <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Face" Property="BorderBrush" Value="{DynamicResource ConsoleTextBrush}"/></Trigger>
-                    <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Face" Property="BorderBrush" Value="{DynamicResource ConsoleFocusBrush}"/></Trigger>
                     <Trigger Property="IsPressed" Value="True"><Setter Property="Opacity" Value="0.8"/></Trigger>
                     <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.55"/></Trigger>
                   </ControlTemplate.Triggers>
@@ -866,9 +865,10 @@ internal sealed class GraphNodeView : Border
         {
             var algorithmLabel = GraphWorkspace.Text("Algorithm", 12, true);
             algorithmLabel.Margin = new Thickness(0, 0, 0, 4); _body.Children.Add(algorithmLabel);
-            var algorithm = EffectChoice("Denoiser algorithm", [("speex", "SpeexDSP"), ("rnnoise", "RNNoise")],
+            var algorithm = EffectChoice("Denoiser algorithm", [("speex", "SpeexDSP · 20 ms"), ("rnnoise", "RNNoise · 30 ms")],
                 n => n.Denoiser.Algorithm, (n, value) => n.Denoiser.Algorithm = value);
-            algorithm.ToolTip = NodeToolTip.Create("Algorithm", "SpeexDSP · Adjustable steady noise reduction", "RNNoise · Neural speech denoising", "Both process audio locally", "Singing and humming may be altered");
+            algorithm.ToolTip = NodeToolTip.Create("Algorithm", "SpeexDSP: faster, lighter cleanup.", "RNNoise: more delay, usually cleaner speech.", "20/30 ms is added node delay.");
+            AutomationProperties.SetHelpText(algorithm, "SpeexDSP: faster, lighter cleanup, 20 milliseconds. RNNoise: more delay, usually cleaner speech, 30 milliseconds. VineMix node delay including bypass, not total system latency.");
             StartDialGroup(1);
             EffectNumber("Reduction", 0, 40, 1, "dB", n => -n.Denoiser.SuppressionDb, (n, v) => n.Denoiser.SuppressionDb = -v, primary: true);
             var spectral = _dialGroup!; _body.Children.Remove(spectral);

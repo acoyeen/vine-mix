@@ -8,20 +8,26 @@
   <title>VineMix — A visual audio mixer for Windows</title>
   <link rel="icon" href="assets/mark.svg" type="image/svg+xml">
   <link rel="preload" href="assets/IBM-Plex-Sans-Regular.ttf" as="font" type="font/ttf" crossorigin>
-  <link rel="stylesheet" href="styles.css">
-  <script type="module" src="hero.js"></script>
+  <link rel="stylesheet" href="styles.css?v=20261023-morph-scaled">
+  <script type="module" src="hero.js?v=20261023-morph-scaled"></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
   <div class="atmosphere" aria-hidden="true"><canvas id="forest-canvas"></canvas></div>
   <main id="main">
     <section class="arrival" id="top" aria-labelledby="arrival-title">
-      <h1 class="sr-only" id="arrival-title">VineMix</h1>
+      <h1 class="hero-headline" id="arrival-title">
+        <span class="sr-only">VineMix. Mix your microphone, music and apps, and choose who hears what.</span>
+        <span class="morph-shadow" aria-hidden="true"><span class="morph-text" id="morphing-headline"><span data-morph-from>Your sound. Your rules.</span><span data-morph-to></span></span></span>
+      </h1>
+      <svg class="morph-filter" aria-hidden="true" focusable="false" width="0" height="0"><defs><filter id="morph-threshold" x="-20%" y="-50%" width="140%" height="200%" color-interpolation-filters="sRGB"><feColorMatrix in="SourceGraphic" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 255 -140"/></filter></defs></svg>
       <div class="arrival-identity"><img class="hero-mark" src="assets/mark.svg" alt="" width="160" height="163" aria-hidden="true"></div>
       <nav class="arrival-actions" aria-label="Project links">
-        <a class="hero-button github-button" href="https://github.com/acoyeen/vine-mix/releases/tag/v0.3.0-beta.3" target="_blank" rel="noopener" aria-label="Download VineMix Beta 3 from GitHub (opens in a new tab)"><img src="assets/github.svg" alt="" width="18" height="18">Download Beta 3</a>
+        <a class="hero-button github-button" href="https://github.com/acoyeen/vine-mix/releases/tag/v0.3.0-beta.4" target="_blank" rel="noopener" aria-label="Download VineMix Beta 4 from GitHub (opens in a new tab)"><img src="assets/github.svg" alt="" width="18" height="18">Download Beta 4</a>
         <a class="hero-button documentation-button" href="https://github.com/acoyeen/vine-mix/blob/main/docs/USER_GUIDE.md" target="_blank" rel="noopener" aria-label="VineMix documentation (opens in a new tab)">Documentation</a>
       </nav>
+      <a class="scroll-hint" id="scroll-hint" href="#workspace" hidden>Scroll for more<svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="m4 6 4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+      <button class="motion-toggle" id="motion-toggle" type="button" aria-label="Pause animations" title="Pause animations" aria-pressed="false" hidden><svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor" aria-hidden="true"><path class="motion-pause" d="M5 4h3v10H5zm5 0h3v10h-3z"/><path class="motion-play" d="m6 3 9 6-9 6z"/></svg></button>
     </section>
 
     <section class="product-story" id="workspace" aria-labelledby="workspace-title">
@@ -47,7 +53,7 @@
       <h2 id="project-title">A work in progress.</h2>
       <div class="project-copy">
         <p>VineMix processes audio on your PC, remembers your workspace and keeps automatic settings backups.</p>
-        <p>Version 0.3.0-beta.3 is available for Windows 11 x64. Automated checks cover synthetic processing and desktop controls; real-device and long-session qualification remain incomplete.</p>
+        <p>Version 0.3.0-beta.4 is available for Windows 11 x64. Automated checks cover synthetic processing and desktop controls; real-device and long-session qualification remain incomplete.</p>
         <p>The original application is MIT licensed. Versioned downloads and matching source are on <a href="https://github.com/acoyeen/vine-mix/releases">GitHub Releases</a>. Third-party components and audio drivers have their own terms.</p>
         <a href="assets/LICENSE.txt">Read the application license</a>
       </div>

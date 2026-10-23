@@ -24,6 +24,7 @@ public partial class App : Application
     private MixerViewModel? _mixer;
     private MainWindow? _window;
     private bool _quitting;
+    private bool _quitRequested;
 #if VINEMIX_VERIFICATION
     private System.Windows.Threading.DispatcherTimer? _previewTelemetry;
 #endif
@@ -210,6 +211,7 @@ public partial class App : Application
         _tray.DoubleClick += (_, _) => Dispatcher.BeginInvoke(new Action(ShowMixer));
         if (!e.Args.Contains("--background", StringComparer.OrdinalIgnoreCase)) _window.Show();
         else _mixer.IsVisible = false;
+        _window.BeginWhatsNew(System.IO.File.Exists(WorkspacePaths.Settings));
         _mixer.Start();
         if (_updateHealthTransaction is not null) _ = ObserveUpdatedCandidateAsync(_updateHealthTransaction);
         else if (ReadUpdateRollbackNotice(e.Args) is { } rollbackNotice) _window.Workspace.SetMessage(rollbackNotice, true);
@@ -218,7 +220,7 @@ public partial class App : Application
 
     public void ShowMixer()
     {
-        if (_window is null || _quitting) return;
+        if (_window is null || _quitting || _quitRequested) return;
         _window.Show();
         if (_window.WindowState == WindowState.Minimized) _window.WindowState = WindowState.Normal;
         _window.Activate();
@@ -226,20 +228,47 @@ public partial class App : Application
     }
     public async Task QuitAsync()
     {
-        if (_quitting) return;
-        if (_updating) return;
-        _quitting = true;
-        if (_tray is not null) _tray.Visible = false;
+        if (_quitting || _quitRequested || _updating
+            || _mixer is { IsUpdateHealthMode: true, CanQuitAfterFailedUpdateHealth: false }) return;
+        if (_window is not null && !_window.TryPrepareQuitEditors()) { ShowMixer(); return; }
+        if (_mixer?.IsRestartingEngine == true)
+        { _window?.Workspace.SetMessage("Wait for the audio engine restart to finish before quitting.", true); ShowMixer(); return; }
+        _quitRequested = true;
         if (_window is not null) _window.IsEnabled = false;
         try
         {
-            if (_mixer is not null)
+            if (_mixer is null || _window is null) { _quitting = true; Shutdown(); return; }
+            await QuitFlow.RunAsync(async () =>
+                {
+                    using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                    return await _mixer.PrepareForQuitAsync(deadline.Token);
+                }, _window.ChooseQuitRecoveryAsync, _window.SaveQuitRecoveryCopyAsync,
+                _mixer.CancelQuitPreparation, async () =>
+                {
+                    _quitting = true;
+                    if (_tray is not null) _tray.Visible = false;
+                    await _mixer.StopAsync();
+                    Shutdown();
+                });
+        }
+        catch (Exception error)
+        {
+            if (_quitting) { Debug.WriteLine(error); Shutdown(); }
+            else
             {
-                string warning = await _mixer.StopAsync();
-                if (warning.Length > 0) MessageBox.Show(warning, "VineMix · Settings not saved", MessageBoxButton.OK, MessageBoxImage.Information);
+                _mixer?.CancelQuitPreparation();
+                _window?.Workspace.SetMessage("VineMix stayed open because quitting did not finish. " + error.Message, true);
             }
         }
-        finally { Shutdown(); }
+        finally
+        {
+            if (!_quitting)
+            {
+                _quitRequested = false;
+                if (_window is not null) _window.IsEnabled = true;
+                ShowMixer();
+            }
+        }
     }
 
     public static void OpenExternal(string destination)

@@ -40,7 +40,7 @@ internal static class NodeCatalog
         "microphone" => "Bring audio from a Windows recording device into the workspace, including a physical, virtual or streamed microphone.",
         "virtualInput" => "Receive the combined audio sent to the VB-CABLE virtual cable by other apps.",
         "appInput" => "Capture a running app's audio as a separate source. Its original playback continues.",
-        "output" => "Send audio to headphones, speakers or another listening device. Starts muted so you can choose a device and level first.",
+        "output" => "Send audio to headphones, speakers or a streamed headset such as Virtual Desktop. Starts muted so you can choose a device and level first.",
         "virtualOutput" => "Send audio to VAC Lite so another app can use your mix as its microphone. Starts muted.",
         "eq" => "Shape specific parts of the sound with up to eight adjustable frequency bands.",
         "tone" => "Adjust bass, midrange and treble with three simple tone controls.",

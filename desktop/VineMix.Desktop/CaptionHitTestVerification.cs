@@ -77,8 +77,8 @@ internal static class CaptionHitTestVerification
                                 || Classify(point) != "CLIENT") failures.Add($"{button.Content}: {point} hit {hit?.GetType().Name ?? "none"}");
                         }
                     }
-                    require(buttons.Length == 14 && failures.Count == 0,
-                        $"All fourteen caption/toolbar buttons, including the website symbol and disabled history controls, remain client targets at their centres and inner edges ({scope}). {string.Join("; ", failures.Take(4))}");
+                    require(buttons.Length == 15 && buttons.Contains(window.LayoutLockButton) && failures.Count == 0,
+                        $"All fifteen caption/toolbar buttons, including the padlock, website symbol and disabled history controls, remain client targets at their centres and inner edges ({scope}). {string.Join("; ", failures.Take(4))}");
 
                     failures.Clear();
                     var passive = Descendants<TextBlock>(root).Where(text => HasVisibleAncestors(text) && Bounds(text).Bottom <= canvas.Top
@@ -103,8 +103,8 @@ internal static class CaptionHitTestVerification
                     Rect websiteBounds = Bounds(website);
                     Rect headerBounds = Bounds(window.HeaderBar), brandBounds = Bounds(brand);
                     Rect indicatorBounds = Bounds(window.ConnectionIndicator);
-                    Rect warningBounds = Bounds(window.HeaderWarning), saveBounds = Bounds(window.SaveIndicator);
-                    Rect settingsBounds = Bounds(window.SettingsButton), actionBounds = Bounds(window.WindowActions);
+                    Rect warningBounds = Bounds(window.HeaderWarning);
+                    Rect lockBounds = Bounds(window.LayoutLockButton), settingsBounds = Bounds(window.SettingsButton), actionBounds = Bounds(window.WindowActions);
                     double pixelTolerance = 96 / dpi + .001;
                     Point headerCenter = Center(headerBounds), brandCenter = Center(brandBounds), websiteCenter = Center(websiteBounds);
                     require(Math.Abs(headerCenter.X - root.Width / 2) <= pixelTolerance
@@ -123,13 +123,20 @@ internal static class CaptionHitTestVerification
                         && window.HeaderWarning.TextWrapping == TextWrapping.NoWrap
                         && warningBounds.Left >= indicatorBounds.Right - pixelTolerance
                         && warningBounds.Right <= websiteBounds.Left + pixelTolerance
-                        && saveBounds.Left >= websiteBounds.Right - pixelTolerance
-                        && saveBounds.Right <= settingsBounds.Left + pixelTolerance
+                        && lockBounds.Left >= websiteBounds.Right - pixelTolerance
+                        && lockBounds.Right <= settingsBounds.Left + pixelTolerance
                         && settingsBounds.Right <= actionBounds.Left + pixelTolerance
-                        && !Overlaps(warningBounds, saveBounds, pixelTolerance)
-                        && !Overlaps(saveBounds, websiteBounds, pixelTolerance)
                         && !Overlaps(warningBounds, websiteBounds, pixelTolerance),
-                        $"Warning and saved status retain separate header space without overlapping the centred logo, Settings or window actions ({scope}); warning={warningBounds}, saved={saveBounds}, logo={websiteBounds}, settings={settingsBounds}, actions={actionBounds}.");
+                        $"Warning and header buttons retain their separate space without overlapping the centred logo, padlock, Settings or window actions ({scope}); warning={warningBounds}, logo={websiteBounds}, padlock={lockBounds}, settings={settingsBounds}, actions={actionBounds}.");
+                    require(!Descendants<TextBlock>(window.HeaderBar).Contains(window.SaveIndicator)
+                        && workspace.IsAncestorOf(window.SaveIndicator) && !passive.Contains(window.SaveIndicator),
+                        $"Save status belongs to the workspace footer and is absent from both draggable header rows ({scope}).");
+                    if (HasVisibleAncestors(window.SaveIndicator))
+                    {
+                        Rect saveBounds = Bounds(window.SaveIndicator);
+                        require(saveBounds.Top >= canvas.Bottom - pixelTolerance && Classify(Center(saveBounds)) == "CLIENT",
+                            $"Visible save status stays below the canvas in client content, outside the title-bar drag region ({scope}); saved={saveBounds}, canvas={canvas}.");
+                    }
                     require(WindowChrome.GetIsHitTestVisibleInChrome(website)
                         && HasButtonAncestor(brand) && Classify(Center(Bounds(brand))) == "CLIENT"
                         && website.Focusable && website.IsTabStop
@@ -138,10 +145,9 @@ internal static class CaptionHitTestVerification
                         $"The wide website logo has a keyboard-focusable client target inside the resize border ({scope}).");
                     require(Classify(new Point(websiteBounds.Left - 1, websiteBounds.Top + websiteBounds.Height / 2)) == "CAPTION"
                         && Classify(new Point(websiteBounds.Right + 1, websiteBounds.Top + websiteBounds.Height / 2)) == "CAPTION"
-                        && passive.Any(text => text.Name == "SaveIndicator")
                         && passive.Any(text => BindingOperations.GetBinding(text, TextBlock.TextProperty)?.Path?.Path == nameof(MixerViewModel.Warning))
                         && failures.Count == 0,
-                        $"Save status, warning and unused space around the website button and across both rows remain draggable ({scope}). {string.Join("; ", failures.Take(4))}");
+                        $"Warning and unused space around the website button and across both header rows remain draggable ({scope}). {string.Join("; ", failures.Take(4))}");
 
                     double captionBottom = chrome.ResizeBorderThickness.Top + chrome.CaptionHeight;
                     double firstCanvasPixel = Math.Ceiling(canvas.Top * dpi / 96) * 96 / dpi;

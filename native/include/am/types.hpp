@@ -138,6 +138,11 @@ struct Endpoint {
     std::string description;
     std::string interfaceName;
 };
+// A streamed headset is a listening destination even when its driver is virtual.
+// Known routing cables retain their dedicated node policy (VAC renders directly).
+inline bool listeningEndpoint(const Endpoint& endpoint) noexcept {
+    return endpoint.direction == "render" && endpoint.transport != "vbCable" && endpoint.transport != "vacLite";
+}
 struct PathState {
     std::string state = "Unassigned";
     std::string message;

@@ -223,7 +223,8 @@ void streamedMicrophones(const std::filesystem::path& directory) {
         rejects("microphone", "example-streamed", 2);
         rejects("virtualInput", "example-streamed");
         rejects("virtualOutput", "example-streamed-playback");
-        rejects("output", "example-streamed-playback");
+        rejects("output", "example-streamed");
+        rejects("output", "example-vac-output");
         config.graph.nodes[0].kind = "virtualOutput";
         config.graph.nodes[0].device = {"example-vac-output", "", "Example virtual output", -1};
         engine.configure(config, config.revision); ++config.revision;
@@ -237,6 +238,89 @@ void streamedMicrophones(const std::filesystem::path& directory) {
     catalogEndpoints.clear();
     for (const auto* suffix : {"", ".bak", ".new", ".established"}) std::filesystem::remove(path.string() + suffix);
     std::cout << "PASS streamed inputs: actual engine accepts generic Windows capture across vendor families, preserves exact/stable assignments and keeps direction/channel/cable restrictions; synthetic workers only\n";
+}
+
+void streamedOutputs(const std::filesystem::path& directory) {
+    using namespace am;
+    check(live == 0 && catalogEndpoints.empty(), "Streamed-output fixture must start without another catalog or worker");
+    const auto path = directory / "streamed-output-settings.json";
+    auto endpoint = [](std::string id, std::string direction, std::string transport, int formFactor) {
+        Endpoint value;
+        value.id = std::move(id); value.stableId = "stable-" + value.id; value.name = "Example audio endpoint";
+        value.direction = std::move(direction); value.state = "Active"; value.transport = std::move(transport);
+        value.isVirtual = value.transport != "physical"; value.formFactor = formFactor; value.channels = 2; value.rate = 48000;
+        return value;
+    };
+    catalogEndpoints = {endpoint("example-input", "capture", "otherVirtual", 0),
+        endpoint("out1", "render", "otherVirtual", 0), endpoint("out2", "render", "physical", 3),
+        endpoint("example-vac", "render", "vacLite", 2), endpoint("example-vb", "render", "vbCable", 2)};
+    auto config = defaultConfiguration(); config.graph.nodes.clear(); config.graph.edges.clear();
+    GraphNode input; input.id = "source"; input.kind = "microphone";
+    input.device = {"example-input", "stable-example-input", "Example streamed microphone", -1};
+    GraphNode output; output.id = "streamed-output"; output.kind = "output"; output.gainDb = -6.0206f;
+    output.device = {"out1", "stable-out1", "Example streamed headset", -1};
+    GraphNode local; local.id = "local-output"; local.kind = "output";
+    local.device = {"out2", "stable-out2", "Example headphones", -1};
+    config.graph.nodes = {input, output, local};
+    config.graph.edges = {{"streamed-route", input.id, output.id}, {"local-route", input.id, local.id}};
+    const auto initialDuplicates = duplicates.load();
+    output1Available = output2Available = true;
+    {
+        const int previousRender1 = render1, previousRender2 = render2;
+        Engine engine(path); engine.start();
+        engine.configure(config, config.revision); ++config.revision;
+        check(eventually([&] { return render1 > previousRender1 && render2 > previousRender2
+                && std::abs(heard1.load() - .15f) < .003f && std::abs(heard2.load() - .3f) < .003f; }),
+            "Actual engine renders the streamed input to both the selected streamed output and independent physical output at their own levels");
+        {
+            std::lock_guard lock(portsMutex);
+            check(configuredTransports.at("out1") == "listening" && configuredTransports.at("out2") == "listening",
+                "Both ordinary and streamed listening outputs use the listening policy rather than a physical-driver restriction");
+        }
+        const int workers = created;
+        config.graph.nodes[1].muted = true;
+        engine.configure(config, config.revision); ++config.revision;
+        check(eventually([&] { return std::abs(heard1.load()) < .0001f && std::abs(heard2.load() - .3f) < .003f; }) && created == workers,
+            "Muting the streamed output silences only its rendered queue and keeps existing workers");
+        config.graph.nodes[1].muted = false;
+        engine.configure(config, config.revision); ++config.revision;
+        check(eventually([&] { return std::abs(heard1.load() - .15f) < .003f; }), "Unmuting restores the streamed route");
+        output1Available = false; wait(30);
+        const int stoppedWrites = render1, healthyWrites = render2;
+        wait(60);
+        check(render1 == stoppedWrites && render2 > healthyWrites && created == workers,
+            "Streamed output loss stops its renderer while the other output continues without worker recreation");
+        config.graph.nodes[1].gainDb = -12.0412f;
+        engine.configure(config, config.revision); ++config.revision;
+        output1Available = true;
+        check(eventually([&] { return render1 > stoppedWrites && std::abs(heard1.load() - .075f) < .003f
+                && std::abs(heard2.load() - .3f) < .003f; }),
+            "The returning streamed renderer receives its current route level while the other path is unchanged");
+        for (const auto* id : {"example-input", "example-vac", "example-vb"}) {
+            auto invalid = config; invalid.graph.nodes[1].device = {id, "", "Example incompatible destination", -1};
+            bool rejected{}; try { engine.configure(invalid, config.revision); } catch (const std::exception&) { rejected = true; }
+            check(rejected && engine.snapshot()["configuration"]["revision"] == config.revision,
+                "Listening output still rejects capture and dedicated routing cable endpoints without changing the live graph");
+        }
+        auto duplicate = config; duplicate.graph.nodes[2].device = config.graph.nodes[1].device;
+        bool rejected{}; try { engine.configure(duplicate, config.revision); } catch (const std::exception&) { rejected = true; }
+        check(rejected && duplicates == initialDuplicates, "A streamed render endpoint retains single-output ownership");
+        check(Json(ConfigurationStore(path).load()) == Json(config),
+            "The actual persisted workspace contains streamed input/output identities, routes, gain and independent output state");
+        engine.stop(); check(live == 0, "Streamed-output stop releases every synthetic worker");
+    }
+    {
+        const int previousRender1 = render1, previousRender2 = render2;
+        Engine reopened(path); reopened.start();
+        check(reopened.snapshot()["configuration"] == Json(config), "Full reopen restores the saved streamed output assignment and graph");
+        check(eventually([&] { return render1 > previousRender1 && render2 > previousRender2
+                && std::abs(heard1.load() - .075f) < .003f && std::abs(heard2.load() - .3f) < .003f; }),
+            "Reopened streamed and physical routes render their saved levels");
+        reopened.stop(); check(live == 0 && duplicates == initialDuplicates, "Reopening streamed playback leaks no workers or duplicate device owners");
+    }
+    catalogEndpoints.clear();
+    for (const auto* suffix : {"", ".bak", ".new", ".established"}) std::filesystem::remove(path.string() + suffix);
+    std::cout << "PASS streamed outputs: real engine graph rendering through synthetic workers, level/mute isolation, loss/return, duplicate/cable rejection, persistence and full reopen; no live endpoints opened\n";
 }
 
 void defaultSettings(const std::filesystem::path& directory) {
@@ -1005,6 +1089,7 @@ int main() {
         test::ownershipLocks();
         test::recovery(directory);
         test::streamedMicrophones(directory);
+        test::streamedOutputs(directory);
         test::controlProtocol(directory);
         test::persistenceProtocol(directory);
         for (const auto& fixture : {path, sharedPath})

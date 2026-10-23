@@ -39,7 +39,7 @@ struct Engine::Port {
         if (kind == GraphKind::appInput) app = std::make_unique<ProcessCaptureWorker>(queue);
         else device = std::make_unique<AudioWorker>(isSource(kind), kind == GraphKind::microphone, queue, catalog,
             kind == GraphKind::virtualInput ? "vbCable" : kind == GraphKind::virtualOutput ? "vacLite"
-                : kind == GraphKind::microphone ? "" : "physical");
+                : kind == GraphKind::microphone ? "" : "listening");
     }
     bool matches(const GraphNode& node) const noexcept {
         return identity.kind == node.kind
@@ -145,8 +145,8 @@ void Engine::validateEndpoints(const Configuration& config) {
             })) throw std::runtime_error("The device has the wrong audio direction for this node.");
             continue;
         }
-        if (node.kind == "output" && match->isVirtual)
-            throw std::runtime_error("Choose physical hardware for a listening output node.");
+        if (node.kind == "output" && !listeningEndpoint(*match))
+            throw std::runtime_error("Choose a listening device here; use Virtual output for VAC.");
         if (node.kind == "virtualInput" && match->transport != "vbCable")
             throw std::runtime_error("Choose the base VB-CABLE receive endpoint for a virtual input.");
         if (node.kind == "virtualOutput" && match->transport != "vacLite")

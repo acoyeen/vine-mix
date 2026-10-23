@@ -1,5 +1,76 @@
 # VineMix forest landing direction
 
+## 23 October Beta 4 release links
+
+The download action and product version now point to `0.3.0-beta.4`. This
+release update keeps the existing layout, shader, headline and motion behavior.
+Earlier dated entries below retain their original version references.
+
+## 23 October morphing headline refinement
+
+The maintainer requested a Magic UI morphing headline above the centered logo.
+The chosen source is [Morphing Text on 21st.dev](https://21st.dev/@dillionverma/components/morphing-text),
+with [Magic UI's upstream documentation](https://magicui.design/docs/components/morphing-text).
+Its blur and alpha-threshold technique is adapted to local plain JavaScript,
+without a React dependency. The logo remains centered in the viewport. The new
+headline uses dark forest letters over the lighter upper shader field, bundled
+IBM Plex Sans SemiBold and the same `drop-shadow(0 8px 20px #07170e73)` as the logo.
+
+The sequence starts with “Your sound. Your rules.” and begins a transition every
+five seconds of active playback. The five phrases are:
+
+- Your sound. Your rules.
+- Choose who hears what.
+- Bring music to your mic.
+- Be VRChat’s unofficial DJ.
+- See where sound goes.
+
+Each appears once per shuffled bag; a reshuffle cannot immediately repeat the
+last phrase of the previous bag. The shared motion button pauses both the
+headline and shader. Both pause while the opening is offscreen or the tab is
+hidden. Reduced motion starts with a static first phrase, with explicit Play
+available to enable motion. A stable accessible heading prevents repeated
+announcements as the visual text changes.
+
+This refinement supersedes the earlier no-headline direction below. Source and
+adaptation details are recorded in `MORPHING_TEXT_PROVENANCE.md`; browser review
+results belong in `REVIEW.md` and `design-qa.md`.
+
+## 23 October logo and motion refinement
+
+The maintainer requested a stronger central logo that retains its signature
+colours, a delayed scroll prompt and an animated shader in the preview. The VM
+mark now keeps its original green `#3B8C66` and light `#E8EBF2` fills. Its size is
+`clamp(150px, 15vw, 220px)`, with a soft shadow to separate it from the moving
+field. Its center remains at the center of the viewport; the two existing links
+remain below it. The minimum landing height is now 440px.
+The obvious dark edge was first softened to a 28px blur at 20% opacity; after
+feedback that this became invisible, the shadow is now slightly tighter and
+stronger: `drop-shadow(0 8px 20px #07170e73)`, approximately 45% opacity.
+
+Small pointer movement and tilt give the mark a restrained response on devices
+with a fine pointer. Reduced motion disables that response. The opening retains
+the sparse composition: no headline, wordmark, header navigation or visible
+motion label. The Beta 3 download and current documentation links remain in place.
+
+“Scroll for more” appears at the bottom center after five seconds with the
+opening visible and the page unscrolled. It disappears on the first positive
+scroll or when activated and stays dismissed for that page visit. The prompt's
+entrance is brief; it does not repeatedly bounce.
+
+The forest shader now continues animating while the opening and tab are visible.
+The previous five-second stop is removed. A small icon-only pause/play button in
+the lower-right corner provides manual control, and reduced motion starts the
+field paused. Rendering remains capped at 30 frames per second, with a reduced
+900,000-pixel budget and maximum device-pixel ratio of 1.5. The exact selected
+shader, palette and preset are preserved; this budget is a rendering limit, not
+a measured performance claim.
+
+The maintainer's request to relaunch the preview for viewing supersedes the
+earlier instruction to keep it stopped during development. The current local
+review uses `http://127.0.0.1:4173/`. This note records the implementation policy;
+browser verification results belong in `REVIEW.md` and `design-qa.md`.
+
 ## 23 October release polish
 
 The opening now links to the Beta 3 downloads and current user guide. The

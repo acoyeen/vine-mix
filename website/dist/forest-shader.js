@@ -313,6 +313,10 @@ export function mountForest(canvas, { onError } = {}) {
   let cssWidth = 1;
   let cssHeight = 1;
   const frameInterval = 1000 / 30;
+  // Broad, soft waves can render below screen resolution; keep continuous
+  // animation inexpensive while the separate SVG logo stays full resolution.
+  const maxDevicePixelRatio = 1.5;
+  const maxRenderPixels = 900_000;
 
   function stopFrame() {
     if (animationFrame) cancelAnimationFrame(animationFrame);
@@ -348,10 +352,10 @@ export function mountForest(canvas, { onError } = {}) {
   }
 
   function resize() {
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const dpr = Math.min(window.devicePixelRatio || 1, maxDevicePixelRatio);
     const width = Math.max(1, Math.round(cssWidth * dpr));
     const height = Math.max(1, Math.round(cssHeight * dpr));
-    const ratio = Math.min(1, Math.sqrt(2_000_000 / (width * height)));
+    const ratio = Math.min(1, Math.sqrt(maxRenderPixels / (width * height)));
     const renderWidth = Math.max(1, Math.floor(width * ratio));
     const renderHeight = Math.max(1, Math.floor(height * ratio));
     if (canvas.width !== renderWidth || canvas.height !== renderHeight) {

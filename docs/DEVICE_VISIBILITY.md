@@ -3,6 +3,10 @@
 Input and output dropdowns normally show **Not assigned** and available,
 compatible devices. **Physical input** accepts Windows recording endpoints,
 including microphones supplied by streamed-headset and virtual-audio drivers.
+**Listening output** accepts physical, streamed-headset and software playback
+endpoints, including the playback device supplied by Virtual Desktop. The
+dedicated **Virtual output** remains the VAC microphone send path; it is not the
+headset listening destination.
 Disabled, unplugged and missing devices are hidden unless
 they are already assigned to that node. A saved assignment is retained while
 unavailable, with its state shown; filtering never clears or replaces it.
@@ -14,11 +18,11 @@ all off by default:
   Enable the device in Windows sound settings before using it.
 - **Show disconnected or missing devices** exposes unavailable endpoints for
   troubleshooting. Reconnect the device before selecting it for a new route.
-- **Show advanced inputs and outputs** exposes known line-level inputs, network
-  outputs and telephone endpoints, S/PDIF and digital passthrough outputs. These can
+- **Show advanced inputs and outputs** exposes known line-level inputs and
+  telephone endpoints, S/PDIF and digital passthrough outputs. These can
   connect an external mixer, remote audio endpoint or digital receiver.
 
-Ordinary microphones, headsets, network microphones, headphones, speakers and
+Ordinary microphones, headsets, network microphones and headphones, speakers and
 HDMI/display outputs remain visible. Classification uses Windows endpoint form-factor metadata.
 Unknown metadata remains visible rather than guessing from a device name.
 Stereo Mix and other internal/streaming endpoints are not automatically hidden
@@ -27,7 +31,9 @@ filtering still applies. A capture endpoint's software or network origin does no
 prevent manual selection. Opening still depends on Windows allowing capture and
 the driver supporting a compatible audio format. VB-CABLE receive and VAC Lite
 send nodes retain their explicit transport checks and conservative automatic
-assignment; unrelated streamed microphones never become cable defaults.
+assignment; unrelated streamed microphones and listening devices never become
+cable defaults. Known VB-CABLE and VAC playback endpoints stay excluded from
+Listening output, preserving the dedicated routing and direct VAC output design.
 
 Unavailable entries are informational and cannot create a new assignment. A
 node's current unavailable selection remains displayed and can be cleared with
@@ -69,6 +75,46 @@ dates from 2020, so current interface wording may differ). The policy fix follow
 those API semantics; no particular Virtual Desktop endpoint metadata or actual
 headset session has been measured. Real headset capture, disconnect/reconnect
 and saved-workspace reopening remain tester checks.
+
+## Streamed-headset output support — 23 October 2026
+
+“Virtual Desktop” here means the VR/streamed-headset audio provider from the
+earlier microphone fix, not Windows desktop switching. To hear a VineMix route
+through that headset, connect it and enable its audio forwarding, check for its
+playback endpoint under **Windows Settings → System → Sound → Output**, then
+choose that endpoint on **Listening output**. No bundled cable is required for
+an existing Windows playback endpoint. Select it deliberately; VineMix does not
+switch listening devices when the Windows default changes. Availability still
+depends on the provider, Windows and the endpoint's supported formats.
+
+The output fix removes the former physical-driver restriction from the selector,
+engine validation and playback worker. Remote-network playback stays visible by
+default, just like remote microphone capture. Existing identity resolution,
+saved-route preservation, output mute/level and one-output-owner rules continue
+to apply. An unavailable headset stays assigned; one active stable replacement
+can reconnect it, but ambiguous replacements and matching friendly names never
+cause an arbitrary route change. VAC keeps its exclusive direct output policy.
+
+Primary-source review on 2026-10-23: Microsoft's
+[EndpointFormFactor reference](https://learn.microsoft.com/en-us/windows/win32/api/mmdeviceapi/ne-mmdeviceapi-endpointformfactor)
+defines remote-network metadata as endpoint attributes, and
+[Rendering a Stream](https://learn.microsoft.com/en-us/windows/win32/coreaudio/rendering-a-stream)
+describes writing playback frames to a selected render endpoint. Applying ordinary
+shared playback to a streamed listening endpoint is the project's interpretation
+of those APIs; this is not a vendor-specific format or latency guarantee.
+
+Unattended verification on 2026-10-23 passed 81 fake Windows catalog/policy
+checks, 981 shared-audio checks, 226 exclusive-render checks and the engine
+lifecycle suite. The new lifecycle fixture measures frames rendered through
+the actual engine graph into synthetic output workers: separate output gain and
+mute, one unavailable output while another continues, recovery at the current
+level, output ownership, settings persistence and full reopen. The production
+endpoint resolver is checked for exact-ID precedence, unique stable-ID return,
+disabled/unplugged/missing states, ambiguous identities and direction isolation.
+Detached WPF checks exercise actual Listening output selection and its serialized
+binding. These tests open no real audio endpoints and establish no headset
+listening, provider reconnect or end-to-end latency result; those remain later
+device-specific checks.
 
 Historical results (19 October 2026): the combined build passed 8,178 detached checks with 159 renders and zero
 binding errors. All 14 offline native suites passed, including 44 fake COM

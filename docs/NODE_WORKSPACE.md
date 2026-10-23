@@ -160,9 +160,12 @@ All value fields remain 110 × 28 DIPs with 12-DIP type and the same quiet borde
 behavior. Categorical choices
 use selectors, actions use buttons and passive meters/readouts stay distinct.
 The workspace footer shows action results, connection instructions and errors
-as they happen. Messages wrap at narrow window sizes and remain until replaced
-or dismissed. Dismiss returns to the essential dial instructions: vertical
-drag, Shift for fine adjustment, exact entry, Enter/Escape and reset.
+as they happen, temporarily replacing the centred save status. Messages wrap at
+narrow window sizes. A thin green bar depletes from right to left over five
+seconds, then the message dismisses and save status returns. A new message
+restarts the countdown; **Dismiss** closes it immediately. The latest message
+remains in Activity. Windows reduced motion keeps the bar static, with the same
+five-second dismissal. Control instructions are available in Help & shortcuts.
 Nodes omit repeated gesture instructions and parameter-category headings.
 Tooltips describe a control's audio role or current state, including the dial
 face and its numeric field. Gesture and shortcut references are in Help & shortcuts.
@@ -630,7 +633,9 @@ Reading does not rewrite settings; later edits use the existing save/backup
 conventions.
 
 The interface and engine remain separate processes. Closing the window hides it
-to the tray, and explicit Quit stops mixing. A controller failure does not stop
+to the tray, and explicit Quit from Settings or the tray saves before stopping
+mixing. A failed final save keeps the session available for retry, a recovery
+copy, cancellation or explicit discard. A controller failure does not stop
 the native engine. Start at login remains optional. The application does not
 install drivers, change Windows defaults, launch apps or reassign their outputs.
 

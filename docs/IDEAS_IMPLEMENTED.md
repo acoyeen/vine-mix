@@ -7,12 +7,19 @@ questions below describe the discussion at that time; implementation updates
 record the decisions that followed. Recorded checks were not rerun for this
 cleanup, and remaining hardware/listening checks are not claimed complete.
 
+A second batch, IDEA-017 through IDEA-021, was implemented on 23 October 2026 as an unpublished local candidate. Its current verification and activation status is recorded separately; earlier release evidence is unchanged.
+
 Return to the [active ideas log](IDEAS.md).
 
 - [IDEA-007: Static and Dynamic ducking](#idea-007-static-and-dynamic-modes-in-the-ducking-node)
 - [IDEA-008: Separate Expander and Gate nodes](#idea-008-separate-expander-and-gate-nodes)
 - [IDEA-009: Unavailable output warnings](#idea-009-unavailable-output-warnings-matching-inputs)
 - [IDEA-010: Empty EQ default and centered text](#idea-010-empty-eq-default-and-centered-plot-text)
+- [IDEA-017: Visible layout lock](#idea-017)
+- [IDEA-018: Minimise on close and Settings quit](#idea-018)
+- [IDEA-019: Denoiser dropdown delay labels](#idea-019)
+- [IDEA-020: Post-update What's new](#idea-020)
+- [IDEA-021: Save recovery before quitting](#idea-021)
 
 ## IDEA-007: Static and Dynamic modes in the Ducking node
 
@@ -246,3 +253,137 @@ Return to the [active ideas log](IDEAS.md).
   `artifacts/eq-empty-centred-20261020/activation.json`.
 - **Next step:** Review creation and pointer interaction in the running workspace.
   No audio processing changes.
+
+
+<a id="idea-017"></a>
+## IDEA-017: Visible layout lock
+
+- **Implementation (2026-10-23):** Added the requested top-right red/closed and white/open padlock, with high-contrast shapes and accessible state. Session-only state survives hiding/reconnecting and resets unlocked after Quit. Move/add/delete/duplicate/paste/align, structural cable actions and structural or mixed Undo/Redo are blocked centrally, including stale callbacks. Selection, copy, inspection, pan/zoom, device choices, renaming and sound controls remain usable. No group feature was added.
+- **Maintainer refinement (2026-10-23):** Replaced the prominent white unlocked symbol with a 16-pixel muted grey padlock matching Saved, while retaining the click target and red locked state. The shackle opens/closes briefly on toggle. Refused node/cable edits briefly highlight the padlock; ordinary selection stays quiet. Reduced motion uses an immediate state change and static emphasis. This supersedes the original white unlocked appearance below.
+- **Second maintainer refinement (2026-10-23):** Locked now uses the meter's warning yellow. Refused edits smoothly turn the padlock red and enlarge it, then return it to normal. An initially requested affected-node outline became a fading yellow outer glow; the maintainer subsequently rejected that glow. The current behavior removes it and hides normal node selection outlines while locked, restoring them for the current selection on unlock. Missing-device warnings, selection state, sound controls and saved layout remain unchanged. The hover text is shorter.
+- **Latest maintainer refinement (2026-10-23):** The locked padlock returns to constant red. Refused edits now change size only, with a 1.4× peak replacing the 1.25× emphasis and its colour transition. The first 400 ms pulse was then refined to grow over 120 ms, hold briefly, and shrink over 480 ms, making the return visibly slower than the enlargement. Locked node selection outlines remain hidden, with no yellow glow.
+- **Delivery status:** Implemented in the unpublished local candidate; see [the verification and activation record](LOCAL_CANDIDATE_2026-10-23.md) for exact checks and remaining limits. Original proposal and research are retained below for history.
+
+- **Captured:** 2026-10-23. **Status:** Captured. **Priority:** P1, first.
+- **Maintainer request and rationale:** Prevent accidental workspace edits with a
+  padlock in the top right: **red closed padlock = locked**, **white open padlock
+  = unlocked**. Make the state immediately recognizable during ordinary use or VR.
+- **Proposed behavior:** Lock node movement and structural cable edits while
+  leaving volume, mute, bypass and other sound controls usable. Preserve pan,
+  zoom, selection and inspection. Provide state text/accessible naming as well as
+  the requested color and shape; high contrast must remain usable.
+- **Project fit / research:** `desktop/VineMix.Desktop/GraphWorkspace.cs` already
+  centralizes drag, cable and selection actions. No layout-lock state is exposed.
+  Repository review only; no external research or prototype performed.
+- **Scope, dependencies and decisions:** Small to medium UI/control work, with
+  no intended DSP change. Define one lock rule for move, delete, paste, align,
+  add, group, reconnect and structural Undo/Redo so shortcuts cannot bypass it.
+  Assumption: structural actions are blocked while ordinary parameter Undo can
+  remain available. Decide whether lock state persists per workspace or session.
+  IDEA-004 tasks already exclude structural edits.
+- **Next step:** Review the icon placement and a short allowed/blocked action
+  matrix, then verify mouse, keyboard and context-menu consistency.
+
+
+<a id="idea-018"></a>
+## IDEA-018: Minimise on close and a clear Settings quit action
+
+- **Implementation decision (2026-10-23):** Retained the existing documented close-to-tray convention: closing minimises to the notification area and leaves audio running. Added a separated red **Quit VineMix** action as the final Settings item, with accessible intent. It invokes the same coordinated quit flow as the tray action. No close-behavior preference was added.
+- **Delivery status:** Implemented in the unpublished local candidate; see [the verification and activation record](LOCAL_CANDIDATE_2026-10-23.md) for exact checks and remaining limits. Original proposal and research are retained below for history.
+
+- **Captured:** 2026-10-23. **Status:** Captured. **Priority:** P1.
+- **Maintainer request and rationale:** The close button should minimise; put a
+  **red Quit VineMix** action at the **bottom of Settings** so stopping the app
+  is discoverable without finding the tray icon. A behavior chooser is not wanted.
+- **Assumption to verify in design:** Interpret "minimise" as retaining today's
+  hide-to-tray behavior and continuing audio. Current `MainWindow.OnClosing`
+  calls `Hide()`, rather than minimizing to the taskbar. Taskbar minimization
+  was not independently confirmed; do not silently change that distinction.
+- **Project fit / research:** `desktop/VineMix.Desktop/MainWindow.cs` builds
+  Settings; `App.xaml.cs` already provides the tray's coordinated `QuitAsync`.
+  Reuse that path, with the normal save/engine shutdown handling. Local review
+  only; no external research needed for the proposal.
+- **Scope and tradeoffs:** Small, with clear spacing/separation at the bottom,
+  readable red styling and an accessible action name. Closing remains reversible
+  and leaves audio running; Quit intentionally ends the session. IDEA-021 improves
+  the existing save-failure path without requiring a new shutdown implementation.
+- **Next step:** Review the bottom-of-Settings placement and wording, confirm
+  the tray assumption, then check both Quit entry points use the same behavior.
+
+
+<a id="idea-019"></a>
+## IDEA-019: Denoiser delay labels in the algorithm dropdown
+
+- **Implementation (2026-10-23):** The real dropdown now reads **SpeexDSP · 20 ms** and **RNNoise · 30 ms**, with equivalent accessible help. The current source still uses 960 and 1440 frames at 48 kHz, and offline signal verification passed. Labels describe this node including bypass, not CPU cost, algorithm minima or total system latency. Saved values, defaults and DSP remain unchanged.
+- **Delivery status:** Implemented in the unpublished local candidate; see [the verification and activation record](LOCAL_CANDIDATE_2026-10-23.md) for exact checks and remaining limits. Original proposal and research are retained below for history.
+
+- **Captured:** 2026-10-23. **Status:** Captured. **Priority:** P1.
+- **Maintainer decision and rationale:** SpeexDSP is the faster/lower-quality
+  choice in the maintainer's listening assessment; RNNoise trades more delay for
+  better perceived cleanup. Users should see the delay when choosing an algorithm.
+- **Proposed dropdown labels:** **SpeexDSP · 20 ms** and **RNNoise · 30 ms**.
+  Brief help can explain the quality/delay tradeoff without promising the same
+  ranking for every voice, noise source, humming or singing example.
+- **Verified project evidence:** [Denoiser options](DENOISER_OPTIONS.md) records
+  current measured node delays, including bypass. `GraphNodeView.cs` already
+  shows selected delay elsewhere but its dropdown rows contain names alone.
+  These are this implementation's delays, not universal algorithm minimums or
+  the total microphone-to-output latency. "Faster" here does not assert a measured
+  CPU-performance ranking. No new external research or listening test performed.
+- **Scope and dependencies:** Small presentation change; preserve saved algorithm
+  values, defaults and DSP. Ensure both rows fit and expose equivalent accessible
+  text. The former general quality-comparison task is superseded by this decision;
+  targeted regression listening remains appropriate when processing changes.
+- **Next step:** Review the two labels and concise help in the existing selector.
+
+
+<a id="idea-020"></a>
+## IDEA-020: Post-update What's new screen
+
+- **Implementation (2026-10-23):** Bundled plain-text highlights show after a healthy updated launch when the workspace is visible, active and idle. Background/tray launches, editors, gestures, pending edits, other surfaces and update/quit preparation defer the screen. **Settings → What's new?**, immediately above **About VineMix**, reopens it; the earlier Help-header action was removed in the later interface refinement. Fresh installs establish a baseline without a notice; older installations without state get one transition notice; skipped versions include all available bundled highlights. Dismissal alone records `lastSeenReleaseVersion` in separate update state; graph and Undo are untouched. Downgrades cannot lower the watermark. No remote HTML or forced tutorial was added.
+- **Delivery status:** Implemented in the unpublished local candidate; see [the verification and activation record](LOCAL_CANDIDATE_2026-10-23.md) for exact checks and remaining limits. Original proposal and research are retained below for history.
+
+- **Captured:** 2026-10-23; earlier installer/update request recovered in the
+  chat review. **Status:** Captured. **Priority:** P1.
+- **Maintainer request and rationale:** Tell users what changed after installing
+  an update, once per version, and allow reopening **What's new** from Help.
+- **Proposal:** Short, curated bundled highlights with clear feature explanations
+  and an optional route to full release notes. Show after a healthy updated launch
+  when the workspace is visible; defer background/tray launches and active edits.
+  Dismiss without altering audio or forcing a tutorial. Track dismissal separately
+  from graph settings; define first-install and skipped-version behavior.
+- **Project fit / research:** `MainWindow.Updates.cs` already shows release notes
+  during updating. It does not provide this post-update flow. Reuse the relevant
+  [earlier feature-screen design](INSTALLATION_UPDATE_DESIGN_HISTORY.md#feature-and-release-screens),
+  while ignoring superseded publication restrictions elsewhere in that history.
+  Repository evidence only; no fresh external research.
+- **Scope, tradeoffs and dependencies:** Small to medium UI and release-content
+  work. Depends on existing release identity, not a new updater. Avoid repetitive
+  prompts; decide how much to show after several skipped releases and whether
+  optional Show me links open help or an inert example.
+- **Next step:** Design one compact example and the first-install/update/dismiss/
+  reopen state flow before adding a release-content format.
+
+
+<a id="idea-021"></a>
+## IDEA-021: Recover unsaved work before quitting
+
+- **Implementation (2026-10-23):** Final Quit now saves before irreversible teardown. Failure offers Retry, save a recovery copy and quit, Cancel, or explicit Quit without saving. Recovery retains queued edits and reconciled newer saved changes, uses a complete workspace JSON file and refuses overwriting an existing file. Failed/cancelled recovery writes keep the decision open. Cancel restores the interactive session. Lost replies reconcile before replaying edits; structural replay conflicts preserve the original desired work for recovery. Both quit entry points share this flow.
+- **Delivery status:** Implemented in the unpublished local candidate; see [the verification and activation record](LOCAL_CANDIDATE_2026-10-23.md) for exact checks and remaining limits. Original proposal and research are retained below for history.
+
+- **Captured:** 2026-10-23. **Status:** Captured. **Priority:** P1.
+- **Origin and need:** Earlier UI-review suggestion retained for review. A user
+  should be able to rescue pending edits if the final save fails during Quit.
+- **Proposal:** Offer Retry, save a recovery copy, cancel quitting, or explicitly
+  quit without saving, with a concise explanation of what is unsaved. Do not add
+  prompts to ordinary successful quits.
+- **Project fit / research:** `App.xaml.cs` currently shows an OK-only warning
+  from `MixerViewModel.StopAsync` and then shuts down. Beta 3's running save-retry
+  fix is already implemented; this is the separate final-quit decision. Local
+  code inspection only; external research not performed.
+- **Scope, tradeoffs and dependencies:** Medium lifecycle work shared by the tray
+  and IDEA-018 Settings action. The recovery decision must occur while saving or
+  cancelling remains possible; do not offer Cancel after irreversible teardown.
+  Recovery copies must retain queued graph changes and be clearly identified.
+- **Next step:** Specify the failure-only state flow, including failed recovery
+  copy writes and restoring an interactive window after Cancel.

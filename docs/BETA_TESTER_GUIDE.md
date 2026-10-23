@@ -1,6 +1,6 @@
 # VineMix beta test guide
 
-For **0.3.0-beta.3**, displayed as **0.3.0 · Beta 3**. Updated 23 October 2026.
+For **0.3.0-beta.4**, displayed as **0.3.0 · Beta 4**. Updated 23 October 2026.
 VineMix is an MIT-licensed open-source beta for **Windows 11 x64**.
 Download a version from [GitHub Releases](https://github.com/acoyeen/vine-mix/releases).
 The [current qualification record](BETA_TESTING_CURRENT.md) separates completed
@@ -11,8 +11,8 @@ matching published release.
 
 | Download | How to use it |
 | --- | --- |
-| `VineMix-0.3.0-beta.3-Setup-x64.exe` | Installs the app and shortcuts for your account; can offer missing optional drivers. |
-| `VineMix-0.3.0-beta.3-Standalone-x64.exe` | Open the supplied EXE in File Explorer. Its bundled app files are prepared automatically; drivers are installed separately. |
+| `VineMix-0.3.0-beta.4-Setup-x64.exe` | Installs the app and shortcuts for your account; can offer missing optional drivers. |
+| `VineMix-0.3.0-beta.4-Standalone-x64.exe` | Open the supplied EXE in File Explorer. Its bundled app files are prepared automatically; drivers are installed separately. |
 
 You do not need to install .NET. The standalone EXE includes the app and runtime;
 it does not register an app installation. Setup installs under
@@ -45,8 +45,9 @@ and headphones available in Windows. For a Virtual Desktop microphone, connect
 the headset and enable its microphone passthrough. Confirm the device appears in
 **Windows Settings → System → Sound → Input**, then select it on **Physical input**.
 That node also accepts virtual and streamed recording devices; the optional
-bundled cables are not prerequisites. Actual Virtual Desktop headset validation
-is still needed for this candidate.
+bundled cables are not prerequisites. For streamed headset playback, choose its
+Windows playback endpoint in **Listening output**. Actual Virtual Desktop
+headset sound, reconnect and sustained-use validation remain pending for Beta 4.
 
 Setup offers original driver installers only when it detects the corresponding
 package is missing. A disabled or unplugged endpoint is not a reason to install a
@@ -84,7 +85,10 @@ These images are detached renders of the actual app controls with synthetic
 devices. They do not access audio hardware or load a personal workspace.
 
 Closing the main window hides it in the tray and leaves audio running.
-**Quit VineMix** in the tray menu stops the desktop and engine. Standalone and
+**Quit VineMix** at the bottom of Settings or in the tray menu saves and stops
+the desktop and engine. If the final save fails, retry, save a recovery copy,
+cancel quitting or explicitly quit without saving. Closing alone never stops audio.
+Standalone and
 installed copies share one workspace and session; opening another copy should
 bring the current app forward instead of starting a competing engine.
 

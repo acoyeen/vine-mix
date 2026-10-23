@@ -170,11 +170,15 @@ internal sealed class OffscreenDesignRenderer
             await EngineRestartVerification.RunAsync(Require);
             await SettingsRestartVerification.RunAsync(Require);
             await UpdatePreparationVerification.RunAsync(Require);
+            await QuitRecoveryVerification.RunAsync(Require);
+            Render(QuitRecoveryVerification.Preview(), "quit-recovery.png");
             await UpdateUiVerification.RunAsync(Require);
+            Render(WhatsNewVerification.Run(Require), "whats-new.png");
             await AddNodeHelpVerification.RunAsync(Require);
             DeviceVisibilitySettingsVerification.Run(Require);
             NodeSearchVerification.Run(Require);
             GraphNodeAlignmentVerification.Run(Require);
+            LayoutLockVerification.Run(Require, (element, name) => Render(element, name));
             Render(DeviceChoicesVerification.Run(Require), "device-visibility.png");
             GraphConnectionVerification.Run(Require);
             WorkspaceHistoryVerification.Run(Require);
@@ -241,6 +245,7 @@ internal sealed class OffscreenDesignRenderer
             await MenuHoverHandoffVerification.RunAsync(window, mixer, root, () => Layout(root), Require);
             await OrdinaryHoverHelpVerification.RunAsync(window, mixer, root, () => Layout(root), Require);
             await BrandingVerification.RunAsync(window, root, () => Layout(root), Require);
+            Render(ButtonFeedbackVerification.Run(window, root, Require), "button-feedback.png");
             window.WebsiteButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Require(openedWebsites.SequenceEqual(new[] { "https://vinemix.app" }),
                 "Activating the actual caption button opens exactly the public VineMix website through the injected browser launcher.");

@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.3.0-beta.4 — 23 October 2026
+
+- Allow streamed Windows playback devices, including Virtual Desktop headset
+  output, in Listening output while preserving dedicated cable routing.
+- Add the top-right red/closed and muted-grey/open session layout lock, with a
+  small animated shackle and a quick size pulse when it blocks an edit.
+  Node selection outlines stay hidden while locked. Sound controls
+  remain usable while structural graph edits and their Undo/Redo are blocked.
+- Add a red Quit VineMix action at the bottom of Settings. Closing continues to
+  minimise to the tray and keep audio running.
+- Pause a failed final quit save for retry, recovery copy, cancellation or
+  explicit discard before stopping the engine.
+- Show denoiser node delays in both algorithm choices, including bypass.
+- Add bundled post-update highlights with idle/healthy launch deferral, durable
+  dismissal outside the graph and reopening from Settings above About VineMix.
+- Shorten Quit, layout-lock and denoiser hover help, keeping delay values in the
+  denoiser dropdown. Replace button click underlines with keyboard-only focus cues.
+- Centre save status in the footer and remove the persistent controls hint.
+  Action messages replace save status for five seconds, with a thin green
+  countdown bar and an immediate Dismiss option.
+- Publish separate Beta 4 downloads, matching source, checksums and signed update
+  metadata. Earlier releases retain their existing tags and downloads.
+  See the [Beta 4 notes](docs/releases/0.3.0-beta.4.md) and
+  [qualification record](docs/BETA_TESTING_CURRENT.md) for verification scope
+  and remaining limitations. The preceding
+  [local candidate record](docs/LOCAL_CANDIDATE_2026-10-23.md) remains historical.
+
 ## 0.3.0-beta.3 — 23 October 2026
 
 - Remove the experimental resize redraw patch and diagnostic labs. Normal WPF

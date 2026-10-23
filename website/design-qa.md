@@ -1,11 +1,42 @@
 # Forest landing design QA
 
-**Current status: visual recheck pending for the centered-mark design.**
-The local server and browser previews are intentionally off at the maintainer's request
-because the preview caused lag. Source/syntax/resource-path checks passed for
-that edit. Beta 3 download/documentation links and copy received source, syntax
-and resource-path checks on 23 October without computer use. The following
-visual evidence covers the preceding 20 October revision.
+**Release review: static checks passed for Beta 4, 23 October 2026.**
+All three JavaScript modules pass syntax checks and the main page's nine local
+resource references resolve. Version text and the download link identify Beta 4.
+This pass did not repeat browser interaction or visual inspection of the
+morphing headline; the earlier results below apply to the revision they describe.
+
+**Earlier status: passed for local design review, 23 October 2026.**
+The preview was relaunched at the maintainer's request. The current revision
+keeps the enlarged centered VM mark in its original colours, adds a soft shadow
+and subtle pointer response, restores continuous visible shader motion, and
+adds a delayed scroll prompt. See [REVIEW.md](REVIEW.md) for the current summary.
+
+## 23 October checks
+
+| Condition | Observed result |
+| --- | --- |
+| 1280 × 800 | Original-colour 192px mark centered within the page width and viewport height; separated from the shader by a shadow. No horizontal overflow. |
+| 390 × 844 | 150px mark and both links fit; supporting content remains in normal flow. No horizontal overflow. |
+| 320 × 440 | Compact button padding and a reduced vertical gap keep links within the page and clear of the bottom controls. No horizontal overflow. |
+| Shader motion | A temporary renderer diagnostic advanced from 0.071 to 14.036 and 31.571 seconds; unobstructed background pixels differed between captures. Diagnostic removed. The old five-second cutoff is absent. |
+| Scroll prompt | Hidden on initial load; visible after the five-second timer. Pointer activation reached the workspace. Scrolling dismissed it; it remained hidden after returning to the top. |
+| Motion controls | Pointer pause and Enter resume worked. At the exact workspace anchor, the shader pauses; returning to the top resumes it. |
+| Pointer response | Fine-pointer movement updated the logo's small translation/tilt. No autonomous logo animation loop runs while the pointer rests. |
+| Reduced motion | Starts paused, removes logo transformation and keeps product layout static. Restoring normal motion resumes animation. |
+| Resources and diagnostics | Nine local HTML resource references returned HTTP 200; three same-page targets resolve. Both modules pass syntax checks. No browser warnings or errors reported. |
+
+Review corrected cached assets through versioned URLs and added a small positive
+intersection threshold so the shader pauses even when the hero merely touches
+the workspace boundary. Rendering is limited to 30 draws per second, DPR 1.5
+and 900,000 pixels. This limits work per frame; it does not establish performance
+across hardware. The fragment-source digest and palette remain unchanged.
+Screenshots and backups are retained outside the checkout. Browser viewport,
+media and cache overrides were restored. No desktop audio engine or settings
+were changed. This pass did not repeat the historical JavaScript-disabled check
+or force a GPU context loss.
+
+## Historical 20 October review
 
 **20 October status: passed for local design review.** Checked 20 October 2026 in the
 Codex in-app Chromium browser at `http://127.0.0.1:4173/`.

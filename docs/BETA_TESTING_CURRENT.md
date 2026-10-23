@@ -1,39 +1,35 @@
 # Current beta qualification
 
-Target: **0.3.0-beta.3 / 0.3.0 · Beta 3**, Windows 11 x64.
-Updated 23 October 2026. Results below belong to the Beta 3 baseline.
-[Earlier beta evidence](BETA_IMPLEMENTATION.md) remains tied to its original files.
+Target: **0.3.0-beta.4 / 0.3.0 · Beta 4**, Windows 11 x64.
+Updated 23 October 2026. These results belong to the Beta 4 source review and
+isolated verification. [Beta 3's record](https://github.com/acoyeen/vine-mix/blob/v0.3.0-beta.3/docs/BETA_TESTING_CURRENT.md)
+and the [preceding local candidate](LOCAL_CANDIDATE_2026-10-23.md) describe their
+own source snapshots and executable bytes.
 
-| Gate | Beta 3 status |
+| Gate | Beta 4 status |
 | --- | --- |
-| Native offline suites | Seventeen suites covered. Sixteen passed together; AdvancedEffects exceeded its unchanged timing limit, then passed its isolated repeat (50,026 assertions). Configuration qualification passed 7,959 checks. See timing detail below. |
-| Detached desktop | 12,142 checks, 215 renders, zero binding errors; includes 15 autosave regression checks. Publish completed without compiler warnings/errors. |
-| Update-core, worker and release-preparation fixtures | 71 core checks, 97 worker checks and eight signing/preparation checks passed. These use ephemeral/private fixtures. The worker suite includes positive staging verification and explicit private-file ownership checks. |
-| Documentation renders | 58 checks, six images at 96/192 DPI, zero binding errors. All images visually reviewed; devices are generic examples. About is an illustrative verification build, not the delivered package identity. |
-| Installed/Standalone package smoke and payload audit | Both candidate formats passed with matching candidate-input hashes. Final-byte results and executable identities accompany `SOURCE-MANIFEST.json` in the release source ZIP. |
-| Runtime extraction and isolated Setup checks | 17 runtime and 189 Setup checks passed on the candidate. The release process repeats these gates on the committed-source packages. No driver installation or personal engine activation is part of these checks. |
-| Signed metadata, source archive and published checksum consistency | Required publication gate: pinned-key signature, matching build receipts, audited exact-source ZIP and every uploaded asset downloaded and rehashed before publication. Final identities are in the release source manifest and `SHA256SUMS.txt`. |
-| Real-device, clean-machine, sustained-use and delivered update/rollback exercises | Pending; earlier limited checks do not establish these outcomes. |
+| Native offline suites | All 17 passed in the full run, including engine lifecycle, endpoint selection, shared/exclusive output, timing and effects. No failed timing repeat or relaxed threshold was needed. |
+| Detached desktop | 12,826 checks, 229 renders, zero binding errors. Includes layout lock and feedback, failed quit saves and recovery copies, release highlights, footer timers and device selection. Publish completed without compiler warnings/errors. |
+| Update-core, worker and release preparation | 71 core, 97 worker and eight signing/preparation checks passed using isolated fixtures. |
+| Activation safeguards | 34 activation and 54 interface-only activation checks passed using temporary files, synthetic state and an inert shell child. No personal app or engine was stopped, replaced or launched. |
+| Documentation images | Existing generic-device images remain illustrative. They were not regenerated as Beta 4 screenshots. Detached render inspection is recorded in the audit. |
+| Installed/Standalone smoke, runtime extraction and isolated Setup | Mandatory checks on the committed-source packages before publication. Exact executable identities and the final results are retained in the source ZIP's SOURCE-MANIFEST.json; earlier candidate results are not substituted. |
+| Signature, source archive and published downloads | Publication requires the pinned-key signature, matching build receipts, an audited exact-source ZIP and every uploaded asset downloaded and rehashed. Final identities are in SOURCE-MANIFEST.json and SHA256SUMS.txt. |
+| Real-device, clean-machine, sustained-use and delivered update/rollback | Pending. Synthetic checks and package download verification do not establish these outcomes. |
 
-Record the exact source identity, executable hashes, result and scope for each
-completed gate. Keep unperformed cases pending and publish the remaining beta
-limitations with the release. A successful build alone is not qualification.
+The release review is recorded in [the Beta 4 audit](BETA4_AUDIT.md). Builds use
+one frozen source commit and preserve all earlier version tags and downloads.
+The numeric file version is **0.3.0.5**, above the earlier local candidate's
+0.3.0.4. The exact-source archive records the release commit, build-input
+inventory and hashes, package hashes and sanitized final verification results.
+Raw diagnostics, settings, recovery backups and signing keys stay outside the
+checkout and distributed assets.
 
-The final canonical production input set contains 275 files with snapshot SHA-256
-`72985307c1b855f1fefb04d6ffaedeb0c0d42e013fb80ad7d5e4e0c64338669f`.
-The final inputs include the elevated updater staging correction and canonical
-text line endings matching Git. Final packaging repeats the package gates using
-that source and committed-build metadata. The release
-source ZIP records the final commit,
-input inventory, exact executable identities and final package-check results;
-raw diagnostics remain outside source and release assets.
-
-The first AdvancedEffects run measured processing plus state-adoption p99 at
-3,592 + 3,596 microseconds, above its five-millisecond block budget while other
-verification work was active. The single repeat measured 2,171 + 631 microseconds
-and passed the original thresholds. Both reports are retained; no DSP algorithm
-or threshold was changed. This synthetic result does not establish sustained
-real-device performance.
+The historical unexpected-closure report remains unresolved. Actual streamed
+headset playback/reconnect, physical display behavior, sleep/resume, eight-hour
+real-audio use, clean-machine installation and complete delivered-app update,
+rollback and interruption exercises remain unqualified. Publication does not
+establish that these pending checks passed.
 
 ## Automated checks
 
@@ -151,7 +147,7 @@ decision. Publication does not establish that the pending checks passed.
 
 Beta 2 is the first delivered build with an updater. Beta 1 must be upgraded
 manually, and Beta 2 deliberately refuses to update to itself. A complete test
-therefore requires Beta 2 as the running client and the genuinely newer signed Beta 3
+therefore requires Beta 2 as the running client and the genuinely newer signed Beta 4
 release, with matching source and both distribution assets. Changing a version
 string or bypassing the newer-version check in a fixture does not qualify the
 delivered application. See [the release test procedure](UPDATE_RELEASES.md#qualify-a-delivered-update).

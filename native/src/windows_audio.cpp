@@ -235,10 +235,33 @@ std::optional<std::vector<Endpoint>> detail::collectEndpoints(IMMDeviceEnumerato
     return result;
 }
 
+std::optional<Endpoint> detail::resolveEndpoint(std::span<const Endpoint> devices,
+        const DeviceBinding& selection, bool capture) {
+    const std::string_view direction = capture ? "capture" : "render";
+    const auto exact = std::find_if(devices.begin(), devices.end(), [&](const auto& endpoint) {
+        return !selection.id.empty() && endpoint.id == selection.id && endpoint.direction == direction;
+    });
+    if (exact != devices.end() && exact->state == "Active") return *exact;
+    if (!selection.stableId.empty()) {
+        std::optional<Endpoint> stable;
+        for (const auto& endpoint : devices) {
+            if (endpoint.direction == direction && endpoint.stableId == selection.stableId && endpoint.state == "Active") {
+                if (stable) return std::nullopt; // Never guess between ambiguous identities.
+                stable = endpoint;
+            }
+        }
+        if (stable) return stable;
+    }
+    return exact == devices.end() ? std::nullopt : std::optional<Endpoint>(*exact);
+}
+
 std::string_view detail::streamEndpointRejection(const Endpoint& endpoint, bool capture,
         bool microphone, std::string_view requiredTransport) {
     if (endpoint.direction != (capture ? "capture" : "render"))
         return "The device has the wrong audio direction for this node";
+    if (requiredTransport == "listening")
+        return !capture && listeningEndpoint(endpoint) ? std::string_view{}
+            : "Choose a listening device here; use Virtual output for VAC";
     if (!requiredTransport.empty() && endpoint.transport != requiredTransport) {
         if (requiredTransport == "physical") return "Select a physical device in this slot";
         if (requiredTransport == "vbCable") return "Select the VB-CABLE receive endpoint in setup";
@@ -766,21 +789,7 @@ struct AudioWorker::Impl {
     DeviceBinding binding() const { std::lock_guard lock(mutex); return desired; }
 
     std::optional<Endpoint> resolve(const DeviceBinding& selection) {
-        const auto devices = catalog.enumerate();
-        const std::string_view direction = capture ? "capture" : "render";
-        auto exact = std::find_if(devices.begin(), devices.end(), [&](const auto& endpoint) { return endpoint.id == selection.id && endpoint.direction == direction; });
-        if (exact != devices.end() && exact->state == "Active") return *exact;
-        if (!selection.stableId.empty()) {
-            std::optional<Endpoint> stable;
-            for (const auto& endpoint : devices) {
-                if (endpoint.direction == direction && endpoint.stableId == selection.stableId && endpoint.state == "Active") {
-                    if (stable) return std::nullopt; // Never guess between ambiguous identities.
-                    stable = endpoint;
-                }
-            }
-            if (stable) return stable;
-        }
-        return exact == devices.end() ? std::nullopt : std::optional<Endpoint>(*exact);
+        return detail::resolveEndpoint(catalog.enumerate(), selection, capture);
     }
 
     // A catalog update does not reopen healthy unrelated paths. Invalidated

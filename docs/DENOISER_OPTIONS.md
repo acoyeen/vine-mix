@@ -2,7 +2,11 @@
 
 Implemented and verified 19 October 2026.
 
-Choose **SpeexDSP** or **RNNoise** in the Denoiser node's **Algorithm** dropdown.
+Choose **SpeexDSP · 20 ms** or **RNNoise · 30 ms** in the Denoiser node's
+**Algorithm** dropdown. The delay labels were added in the local candidate on
+23 October 2026 after confirming the current 960/1440-frame implementation at
+48 kHz and rerunning its offline signal checks. These are node delays including
+bypass, not algorithm minimums, CPU measurements or total system latency.
 Both algorithms are embedded and process locally. The node shows only the
 selected algorithm's control and retains the other algorithm's setting.
 

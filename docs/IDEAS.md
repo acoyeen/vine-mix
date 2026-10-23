@@ -21,29 +21,110 @@ Use IDs such as `IDEA-001` and statuses such as **Captured**, **Researched**,
 archive. Update related entries instead of adding duplicates. A status of Planned
 requires an explicit decision to pursue the idea.
 
-## Ideas
+## Priority and review order
 
-First ideas captured and initially researched on **19 October 2026**.
-Research below is a feasibility pass, not a prototype or hardware verification.
-Proposed examples and implementation choices are distinguished from the maintainer's
-requested behavior. Initial research did not approve implementation or a delivery
-order; subsequent implementation decisions are recorded in the individual entries.
+**Reviewed: 23 October 2026.** The maintainer requested this consolidated backlog
+after a review of all 31 earlier project chats. Prioritize ease of use and everyday
+quality of life before adding large audio or integration features. The order below
+is a proposed investigation/design sequence, not approval to implement or a release
+commitment. IDs remain stable regardless of priority or document placement.
 
-| ID | Idea | Status |
-| --- | --- | --- |
-| [IDEA-001](#idea-001-dedicated-visualization-nodes) | Dedicated visualization nodes | Researched |
-| [IDEA-002](#idea-002-distortion-and-related-creative-effects) | Distortion and related creative effects | Researched |
-| [IDEA-003](#idea-003-inline-switch-and-toggle-nodes) | Inline switch and toggle nodes | Researched |
-| [IDEA-004](#idea-004-user-created-tasks-for-multiple-changes) | User-created tasks for multiple changes | Researched |
-| [IDEA-005](#idea-005-pin-nodes-and-tasks-to-the-top-of-the-window) | Pin nodes and tasks to the top of the window | Researched |
-| [IDEA-006](#idea-006-external-parameters-and-conditional-task-triggers) | External parameters and conditional task triggers | Researched |
-| [IDEA-011](#idea-011-compact-bypass-control-and-clear-processing-semantics) | Compact bypass control and clear processing semantics | Captured |
-| [IDEA-012](#idea-012-silence-an-apps-direct-playback-while-monitoring-through-vinemix) | Silence an app's direct playback while monitoring through VineMix | Researched |
-| [IDEA-013](#idea-013-audio-file-inputs-and-soundboard-playback) | Audio-file inputs and soundboard playback | Researched |
-| [IDEA-014](#idea-014-dedicated-vinemix-virtual-audio-driver) | Dedicated VineMix virtual audio driver | Parked |
-| [IDEA-015](#idea-015-support-additional-virtual-audio-drivers) | Support additional virtual audio drivers | Captured |
-| [IDEA-016](#idea-016-guided-node-calibration-and-learn-settings) | Guided node calibration and Learn settings | Researched |
+- **P1 — First:** focused, frequently useful controls and clear feedback.
+- **P2 — Next:** workspace organization, learning and accessible interaction.
+- **P3 — After the core workflow:** deeper diagnostics and useful new capabilities.
+- **P4 — Later:** broad research candidates and advanced extensions.
+- **Parked:** retain the direction, but do not actively pursue it without a new decision.
 
+The table is the priority authority for both this file and
+[later ideas](IDEAS_LATER.md). Existing dated research is retained; it was not
+refreshed in this review. New entries use repository inspection on 2026-10-23;
+external feasibility research is pending unless an entry explicitly says otherwise.
+Earlier assistant suggestions are labelled separately from confirmed maintainer
+preferences. Completed work stays in [the archive](IDEAS_IMPLEMENTED.md).
+
+| Priority | ID | Idea | Status |
+| --- | --- | --- | --- |
+| P2 | [IDEA-022](#idea-022) | Save selected node sections as User Presets | Captured |
+| P2 | [IDEA-023](#idea-023) | Named organizational groups with automatic bounds | Captured |
+| P2 | [IDEA-024](#idea-024) | Guided introduction to nodes, noodles and navigation | Captured |
+| P2 | [IDEA-025](#idea-025) | Why no sound? with a highlighted blocking node | Needs decision |
+| P2 | [IDEA-026](#idea-026) | Complete graph keyboard and accessibility support | Captured |
+| P2 | [IDEA-027](#idea-027) | Pointer-friendly precise value editing | Captured |
+| P2 | [IDEA-028](#idea-028) | Navigation through crowded and oversized graphs | Captured |
+| P2 | [IDEA-005](#idea-005) | Pin nodes and tasks to the top of the window | Researched |
+| P2 | [IDEA-011](#idea-011) | Compact bypass and separate disable controls | Captured |
+| P2 | [IDEA-030](#idea-030) | Selected-node inspector at a readable size | Captured |
+| P3 | [IDEA-029](#idea-029) | Route inspection, diagnostics and useful activity history | Captured |
+| P3 | [IDEA-031](#idea-031) | Task templates and favorite or recent node types | Captured |
+| P3 | [IDEA-032](#idea-032) | More informative overload readings | Captured |
+| P3 | [IDEA-016](#idea-016) | Guided node calibration and Learn settings | Researched |
+| P3 | [IDEA-033](#idea-033) | New voice cleanup and leveling nodes | Captured |
+| P3 | [IDEA-001](#idea-001) | Dedicated visualization nodes | Researched |
+| P3 | [IDEA-003](#idea-003) | Inline switch and toggle nodes | Researched |
+| P3 | [IDEA-004](#idea-004) | User-created tasks for multiple changes | Researched |
+| P3 | [IDEA-048](#idea-048) | Developer API for third-party apps and automation | Captured |
+| P3 | [IDEA-012](#idea-012) | Silence an app's direct playback while monitoring through VineMix | Researched |
+| P3 | [IDEA-013](#idea-013) | Audio-file inputs and soundboard playback | Researched |
+| P3 | [IDEA-002](#idea-002) | Distortion and related creative effects | Researched |
+| P3 | [IDEA-015](#idea-015) | Support additional virtual audio drivers | Captured |
+| P3 | [IDEA-043](IDEAS_LATER.md#idea-043) | Sound recall across processing updates | Captured |
+| P3 | [IDEA-006](#idea-006) | External parameters and conditional task triggers | Researched |
+| P4 | [IDEA-034](IDEAS_LATER.md#idea-034) | Stereo and routing utilities | Captured |
+| P4 | [IDEA-035](IDEAS_LATER.md#idea-035) | Creative effect extensions | Captured |
+| P4 | [IDEA-036](IDEAS_LATER.md#idea-036) | Recording and replay | Captured |
+| P4 | [IDEA-037](IDEAS_LATER.md#idea-037) | Plugins and external audio | Captured |
+| P4 | [IDEA-038](IDEAS_LATER.md#idea-038) | Continuous parameter controllers | Captured |
+| P4 | [IDEA-039](IDEAS_LATER.md#idea-039) | Solo, audition and talkback | Captured |
+| P4 | [IDEA-040](IDEAS_LATER.md#idea-040) | Automatic parallel-path delay compensation | Captured |
+| P4 | [IDEA-041](IDEAS_LATER.md#idea-041) | True-peak limiting | Captured |
+| P4 | [IDEA-042](IDEAS_LATER.md#idea-042) | Test-signal generator | Captured |
+| P4 | [IDEA-044](IDEAS_LATER.md#idea-044) | Offline draft workspace editing | Captured |
+| P4 | [IDEA-046](IDEAS_LATER.md#idea-046) | Website and Windows mixer branding follow-ups | Captured |
+| Parked | [IDEA-014](#idea-014) | Dedicated VineMix virtual audio driver | Parked |
+| Parked | [IDEA-045](IDEAS_LATER.md#idea-045) | Scenes and A/B comparison — much later | Parked |
+| Parked | [IDEA-047](#idea-047) | System-latency investigation or separate helper | Parked |
+
+P1 entries IDEA-017 through IDEA-021 were implemented in the unpublished local
+candidate on 23 October 2026 and moved to [the implemented archive](IDEAS_IMPLEMENTED.md).
+The remaining priority rows retain their prior scope and status.
+
+## Maintainer decisions from 23 October 2026
+
+- The first usability priorities are the top-right padlock and a red **Quit
+  VineMix** action at the bottom of Settings. Closing should minimise, without
+  adding a close-behavior preference chooser; the tray/taskbar interpretation is
+  recorded in IDEA-018.
+- Preserve the precise preset, group and troubleshooting interactions below.
+  Their detailed designs still need review; priority does not imply readiness.
+- A guided introduction to node-and-noodle mixing replaces the proposed
+  virtual-route setup wizard. It does not reinstate every previously removed
+  Help lesson or duplicate driver installation flows.
+- **Declined:** additional inherited-controller explanations such as "Muted by
+  Main control". The maintainer considers the existing relationship simple
+  enough. Do not reintroduce a dedicated explanation feature through diagnostics.
+- **Deferred:** scenes and all A/B comparison workflows are for much later.
+  Selected-section User Presets are the useful nearer-term direction.
+- The maintainer's denoiser comparison is settled for product planning:
+  SpeexDSP offers lower delay with lesser perceived cleanup quality; RNNoise
+  offers the opposite tradeoff. Record that as a listening assessment, not a
+  universal benchmark. Expose current node delays in the dropdown (IDEA-019);
+  a broad comparison project is no longer an active backlog item.
+- Do not invest heavily in further engine-latency work. The belief that most
+  remaining delay is system-specific is not a calibrated measurement. A separate
+  helper is only a parked possibility (IDEA-047).
+- New voice cleanup/leveling nodes are welcomed as future candidates (IDEA-033).
+  No algorithm, dependency or complete set of nodes has been selected.
+- Prior choices remain: passive hover peak readings and fading overload caps,
+  simple source-to-destination cable hover, and removal of resize experiments.
+  Do not revive rejected features as unlogged improvements.
+
+## Detailed ideas
+
+Original entries below retain their dated research and meaningful changes in
+direction. The new entries and [later backlog](IDEAS_LATER.md) consolidate only
+the candidates reviewed with the maintainer, not every historical planning note.
+
+<a id="idea-001"></a>
 ## IDEA-001: Dedicated visualization nodes
 
 - **Captured:** 2026-10-19. **Status:** Researched.
@@ -56,6 +137,10 @@ order; subsequent implementation decisions are recorded in the individual entrie
   correlation or vectorscope. Parameter histories could later expose automation
   inputs and task progress (IDEA-006). The particular graph types are suggestions,
   not a confirmed list from the maintainer.
+- **Review extension (2026-10-23):** Retain LUFS loudness and true-peak meters
+  from the recovered feature research as candidate measurement types here,
+  rather than duplicating the visualizer proposal. Their standards, algorithms
+  and validation still need primary-source research; no meter is newly verified.
 - **Project fit and research:** The existing EQ already measures its actual
   post-processing stereo signal with a fixed-buffer handoff, doing FFT work away
   from the audio thread. Reuse that ownership pattern and spectrum computation;
@@ -73,6 +158,7 @@ order; subsequent implementation decisions are recorded in the individual entrie
 - **Next step:** Specify the first two useful displays and their measurement
   points, then sketch how users attach them to an existing route.
 
+<a id="idea-002"></a>
 ## IDEA-002: Distortion and related creative effects
 
 - **Captured:** 2026-10-19. **Status:** Researched.
@@ -99,6 +185,7 @@ order; subsequent implementation decisions are recorded in the individual entrie
 - **Next step:** Define representative sounds and quality/latency expectations
   before choosing an algorithm or dependency.
 
+<a id="idea-003"></a>
 ## IDEA-003: Inline switch and toggle nodes
 
 - **Captured:** 2026-10-19. **Status:** Researched.
@@ -108,6 +195,9 @@ order; subsequent implementation decisions are recorded in the individual entrie
   and an unmistakable On/Off control. Off silences that branch while preserving
   the connections. Tasks (IDEA-004) can set its state, and it can be pinned
   (IDEA-005). A multi-route selector is a possible extension, not a requirement.
+- **Review decision (2026-10-23):** A selector specifically for A/B source or
+  chain comparison belongs with parked [IDEA-045](IDEAS_LATER.md#idea-045).
+  Keep the simple On/Off switch independent; A/B work is explicitly much later.
 - **Project fit and research:** Cables already retain a mute/on-off state and
   expose it through their context menu. Graph nodes also have saved mute state.
   However, today's intermediate-node UI exposes Bypass, which passes audio
@@ -126,6 +216,7 @@ order; subsequent implementation decisions are recorded in the individual entrie
 - **Next step:** Define the compact switch appearance and on/off semantics,
   including its relationship to existing node bypass and cable mute.
 
+<a id="idea-004"></a>
 ## IDEA-004: User-created tasks for multiple changes
 
 - **Captured:** 2026-10-19. **Status:** Researched.
@@ -167,6 +258,7 @@ order; subsequent implementation decisions are recorded in the individual entrie
 - **Next step:** Specify the microphone-switching example as the first task,
   plus a fade action. Agree on rerun, cancellation, and undo behavior.
 
+<a id="idea-005"></a>
 ## IDEA-005: Pin nodes and tasks to the top of the window
 
 - **Captured:** 2026-10-19. **Status:** Researched.
@@ -195,7 +287,11 @@ order; subsequent implementation decisions are recorded in the individual entrie
   an operating-system overlay has not been requested.
 - **Next step:** Sketch the top strip with a microphone, a switch, and two task
   buttons at the minimum supported window size.
+- **Review relationship (2026-10-23):** Compare [IDEA-030](#idea-030)'s selected-node
+  inspector with this persistent pinned strip. They share readable controls
+  outside canvas zoom, but selection-following and pinning are distinct behaviors.
 
+<a id="idea-006"></a>
 ## IDEA-006: External parameters and conditional task triggers
 
 - **Captured:** 2026-10-19. **Status:** Researched.
@@ -261,6 +357,7 @@ order; subsequent implementation decisions are recorded in the individual entrie
   establish addresses, value directions, liveness, and coexistence with VRChat,
   then specify the closed-eyes-to-five-second-fade scenario end to end.
 
+<a id="idea-011"></a>
 ## IDEA-011: Compact bypass control and clear processing semantics
 
 - **Captured:** 2026-10-20 (UTC+10). **Status:** Captured.
@@ -344,6 +441,7 @@ order; subsequent implementation decisions are recorded in the individual entrie
 
 <a id="idea-012-silence-an-apps-direct-playback-while-monitoring-through-vine-mix"></a>
 
+<a id="idea-012"></a>
 ## IDEA-012: Silence an app's direct playback while monitoring through VineMix
 
 - **Captured:** 2026-10-20 (UTC+10). **Status:** Researched.
@@ -404,6 +502,7 @@ order; subsequent implementation decisions are recorded in the individual entrie
   multiple nodes, and restoration. If capture is silenced, investigate guided
   virtual-cable routing. This entry authorizes research notes only.
 
+<a id="idea-013"></a>
 ## IDEA-013: Audio-file inputs and soundboard playback
 
 - **Captured:** 2026-10-20 (UTC+10). **Status:** Researched.
@@ -467,7 +566,13 @@ order; subsequent implementation decisions are recorded in the individual entrie
 
 <a id="idea-014-dedicated-vine-mix-virtual-audio-driver"></a>
 
+<a id="idea-014"></a>
 ## IDEA-014: Dedicated VineMix virtual audio driver
+
+- **Review extension (2026-10-23):** Additional independently addressable Windows
+  endpoint pairs are a later possibility beyond the original two-cable proposal.
+  Keep this entire driver effort parked; extra endpoint count, naming and resource
+  limits are not approved requirements. Compare compatibility work in IDEA-015.
 
 - **Captured and researched:** 2026-10-20 (UTC+10).
   **Status:** Parked. The maintainer decided on 2026-10-20 to retain VB-CABLE for virtual
@@ -560,7 +665,22 @@ order; subsequent implementation decisions are recorded in the individual entrie
   uncertainty and an experienced driver engineer assumed. This entry does not
   authorize installing or developing the driver.
 
+<a id="idea-015"></a>
 ## IDEA-015: Support additional virtual audio drivers
+
+- **Related implemented fix (2026-10-23):** The authorized Virtual Desktop
+  headset-output fix now accepts ordinary streamed/software Windows playback
+  endpoints in Listening output, alongside the earlier input fix. Discovery,
+  selection, engine validation and worker policy were updated together; explicit
+  bindings, dedicated VAC/VB-CABLE restrictions and ownership protection remain.
+  This does not implement this broader alternative-cable proposal or add a driver.
+  See [device behavior](DEVICE_VISIBILITY.md#streamed-headset-output-support--23-october-2026)
+  and [verified scope and remaining limits](LOCAL_CANDIDATE_2026-10-23.md).
+
+- **Review extension (2026-10-23):** Distinguish supporting alternative drivers
+  from supporting more independent virtual routes/endpoints within a driver.
+  The latter is a later candidate requiring an explicit endpoint contract and
+  compatibility qualification, not an assumed consequence of adding a driver.
 
 - **Captured:** 2026-10-20 (UTC+10). **Status:** Captured for later;
   the maintainer explicitly chose to keep the current two drivers for now.
@@ -594,6 +714,7 @@ order; subsequent implementation decisions are recorded in the individual entrie
   audio paths while preserving existing saved bindings. Recording this idea does
   not authorize implementation, installation or changes to the running app.
 
+<a id="idea-016"></a>
 ## IDEA-016: Guided node calibration and Learn settings
 
 - **Captured:** 2026-10-21. **Status:** Researched.
@@ -622,7 +743,7 @@ order; subsequent implementation decisions are recorded in the individual entrie
   retry message rather than inventing a precise answer.
 - **Result presentation:** Show proposed values, a short explanation and sample
   quality/confidence, allow an explicit Apply/Cancel and Undo, and retain manual
-  controls. A/B or optional playback audition can help assess dullness or a lisp;
+  controls. Optional playback audition can help assess dullness or a lisp;
   avoid automatic monitoring or feedback. Keep samples in temporary local memory
   by default, discard them after use, and persist settings rather than raw voice
   recordings. No capture, audio playback, model training, or uploads were performed
@@ -663,14 +784,387 @@ order; subsequent implementation decisions are recorded in the individual entrie
   Threshold as separate experiments. Evaluate against varied non-personal test
   clips and listening review, including counterexamples where calibration should
   decline. Specify the guided flow before implementing or capturing user audio.
+- **Review decisions (2026-10-23):** The earlier optional A/B suggestion is now
+  deferred with [IDEA-045](IDEAS_LATER.md#idea-045), not a prerequisite for Learn.
+  Measured speaker/output-delay calibration is another possible P4 extension:
+  estimate alignment between listening devices, beyond today's manual Alignment
+  Delay. It needs a separate measurement/reference design and explicit audio-test
+  flow, and is distinct from automatic internal branch compensation (IDEA-040).
 
-## Relationships and possible investigation order
+<a id="idea-022"></a>
+## IDEA-022: Save selected node sections as User Presets
 
-Switches and visualizers can be explored independently. Pinning can begin with
-existing node controls, then add task buttons once tasks exist. A reusable task
-and timed-action system should precede external condition triggers, so manual
-and automatic actions use the same behavior. Distortion is an independent audio
-quality investigation. This is a dependency observation, not an agreed priority.
+- **Captured:** 2026-10-23. **Status:** Captured. **Priority:** P2.
+- **Maintainer request and rationale:** Reuse useful sections of a node setup.
+  **Drag a selection area → right-click → Save Preset → enter a name.** Add a
+  **User Presets** dropdown beside **Activity** for accessing saved sections.
+- **Proposed content:** Store selected nodes, their sound settings, relative
+  layout and internal audio/control/sidechain connections. Reuse the existing
+  box-selection and `GraphClipboard` remapping patterns. Loading a preset should
+  insert an identifiable new section with fresh IDs, as a single Undo operation.
+  This insertion behavior is a design assumption for review, not a confirmed
+  replacement/overwrite workflow.
+- **Project fit / research:** `GraphWorkspace.cs` has selection, clipboard and
+  Activity controls; `GraphClipboard.cs` handles selected groups. No named preset
+  library exists. Local review only; no external feasibility research performed.
+- **Scope, tradeoffs and dependencies:** Medium persistence and UI work. Decide
+  placement, name collisions, rename/delete, missing node versions and device/app
+  bindings. Connections crossing the selection boundary need a clear policy;
+  do not silently reconnect to unrelated existing nodes. Keep presets compatible
+  with layout locking (IDEA-017) and future sound recall (IDEA-043).
+- **Scope boundary:** Scenes and A/B comparison are explicitly much later
+  (IDEA-045). Canvas groups (IDEA-023) organize nodes; they are not automatically
+  saved presets. Reusable encapsulated subgraphs with exposed controls are a
+  possible P4 extension, not part of this first saved-section workflow.
+- **Next step:** Review saving and inserting one short effects chain, including
+  an external input/output boundary, then define the portable preset data contract.
+
+<a id="idea-023"></a>
+## IDEA-023: Named organizational groups with automatic bounds
+
+- **Captured:** 2026-10-23. **Status:** Captured. **Priority:** P2.
+- **Maintainer request and rationale:** With one or more nodes highlighted,
+  right-click to create an organizational group. Groups resize to encompass
+  their nodes, can be renamed, and offer a curated list of designed colors
+  instead of a color picker.
+- **Proposal:** A labelled background frame with automatic padding around member
+  bounds, updating as members move or change size. It must keep cables, sockets,
+  selected nodes and warning glows legible. Grouping itself does not alter sound,
+  routing or node identity.
+- **Project fit / research:** `GraphWorkspace.cs` already tracks node selection
+  and bounds; [workspace limitations](NODE_WORKSPACE.md) identify group frames as
+  future work. Local evidence only; no external research or prototype.
+- **Scope, tradeoffs and dependencies:** Medium graph-metadata, rendering and
+  Undo work. Decide membership edits, whole-group movement, copy/preset behavior,
+  overlapping frames and lock interaction (IDEA-017). Suggested first scope has
+  no nested groups; deleting a frame leaves its nodes unless explicitly requested.
+  These are assumptions for review, not settled controls.
+- **Later extensions:** Canvas notes and reusable subgraphs/exposed controls stay
+  P4 possibilities; neither is required for the requested organizational frames.
+- **Next step:** Sketch Create group, rename and the small color palette; test
+  automatic bounds conceptually with mixed-size nodes before deciding nesting.
+
+<a id="idea-024"></a>
+## IDEA-024: Guided introduction to nodes, noodles and navigation
+
+- **Captured:** 2026-10-23. **Status:** Captured. **Priority:** P2.
+- **Maintainer direction and need:** Keep the program explorable, but first teach
+  users how to navigate and how nodes link together. This replaces the proposed
+  guided virtual-route setup wizard as the preferred onboarding investment.
+- **Proposal:** A short optional walkthrough covering pan/zoom, selecting/moving
+  nodes, connecting sockets, following audio flow, and understanding listening
+  versus outgoing destinations. Use an isolated example that cannot alter the
+  live workspace or send practice audio to a call. Finish by letting users explore.
+- **Project fit / research:** [Current Help](USER_GUIDE.md)
+  already contains interactive control practice. Review its reusable components;
+  the exact tutorial sequence and hosting surface remain to be designed. No new
+  external research. The earlier removal of individual canvas/Voice Color Help
+  lessons is retained; this is a newly scoped guided mixing introduction.
+- **Scope, tradeoffs and dependencies:** Medium UI/content work. Prefer a few
+  clear steps, skip/restart/exit controls and pointer/keyboard parity. Do not make
+  driver installation a prerequisite for learning the graph. IDEA-031 templates
+  may follow later; the tutorial does not depend on new DSP nodes.
+- **Next step:** Review a storyboard with the maintainer and test whether a new
+  user can trace a simple split route without adding permanent interface clutter.
+
+<a id="idea-025"></a>
+## IDEA-025: Why no sound? with a highlighted blocking node
+
+- **Captured:** 2026-10-23. **Status:** Needs decision. **Priority:** P2.
+- **Maintainer request and rationale:** Right-click a node and choose **Why no
+  sound?** Highlight the node blocking that path until it is selected. Use a
+  **strong yellow outer glow**, substantially more prominent than today's faint
+  red missing-device glow. Development needs substantial guided UI review.
+- **Initial scope assumption:** Offer the action on processing/output nodes and
+  trace upstream within VineMix. Excluding input nodes was tentative; do not claim
+  to diagnose a microphone, another application's settings or an entire system.
+  An observed unavailable input can still be identified as an engine-visible
+  route boundary when tracing from a downstream node.
+- **Project fit / research:** `GraphNodeView.cs` has local availability states
+  and an outer-glow pattern; `GraphWorkspace.cs` has graph topology/selection.
+  Neither establishes a complete causal silence diagnosis. Local review only;
+  no prototype or fresh external research.
+- **Scope and unresolved behavior:** Medium to large diagnostic/UI work. Handle
+  multiple incoming branches, muted cables, muted nodes, unavailable devices,
+  closed gates and genuinely quiet sources. Do not flag a harmless muted branch
+  as the sole blocker when another path supplies audio. A cable blocker needs an
+  agreed node to highlight or a clear cable-specific result; do not invent a node
+  fault. If evidence is inconclusive, say so briefly rather than guess.
+- **Interaction assumptions:** Selection clears the diagnostic glow; Escape or
+  a new request can also dismiss it. If the condition clears first, remove the
+  stale highlight. Preserve red availability meaning, avoid rapid flashing and
+  provide a short accessible explanation. Do not automatically unmute or reroute.
+  A dedicated inherited-controller explanation remains declined.
+- **Next step:** Review examples for one definite blocker, a muted cable, two
+  upstream branches and no diagnosable blocker before committing to UI behavior.
+
+<a id="idea-026"></a>
+## IDEA-026: Complete graph keyboard and accessibility support
+
+- **Captured:** 2026-10-23. **Status:** Captured. **Priority:** P2.
+- **Origin and need:** Prior UI-review suggestion. Existing keyboard controls
+  should extend to navigating and understanding a complete graph without a mouse.
+- **Proposal:** Next/previous and connected-node traversal, keyboard positioning,
+  F2 rename, automatic reveal of focused nodes, and an optional node/connection
+  outline. Keep accessible node names current after rename; describe controls and
+  real toggle states in context.
+- **Project fit / research:** `GraphWorkspace.cs` and `GraphNodeView.cs` already
+  provide shortcuts, focusable controls and sockets; [the guide](USER_GUIDE.md)
+  records Find node, dial editing and high contrast. This completes remaining
+  interactions rather than replacing existing support. Local review only.
+- **Scope, tradeoffs and dependencies:** Medium; avoid shortcut conflicts and
+  unexpected parameter edits during navigation. Coordinate lock (IDEA-017),
+  groups and presets. Define traversal for branched graphs and editing fields.
+- **Next step:** Walk through create/select/connect/rename/inspect using only a
+  keyboard, then specify missing actions and assistive-technology expectations.
+
+<a id="idea-027"></a>
+## IDEA-027: Pointer-friendly precise value editing
+
+- **Captured:** 2026-10-23. **Status:** Captured. **Priority:** P2.
+- **Origin and need:** Prior UI-review suggestion for mouse/VR users who cannot
+  conveniently use Enter, Shift or double-click for precise edits.
+- **Proposal:** Explore compact pointer Apply/Cancel, visible pending text,
+  inline validation, a fine-adjustment option and a discoverable reset action.
+  Preserve today's keyboard commit/cancel and deliberate wheel behavior.
+- **Project fit / research:** `Controls/RotaryValueControl.cs` supports exact
+  fields and keyboard gestures; pending text can be discarded on focus loss.
+  Local review only. Controls and accepted compact styling already exist.
+- **Scope, tradeoffs and dependencies:** Small to medium; the extra affordances
+  must not overwhelm every node. Decide whether they appear only during editing
+  or in a contextual editor. Keep one undoable edit per completed gesture.
+- **Next step:** Compare one minimal contextual-edit design with the current
+  control, using pointer-only entry, invalid text, cancellation and focus changes.
+
+<a id="idea-028"></a>
+## IDEA-028: Navigation through crowded and oversized graphs
+
+- **Captured:** 2026-10-23. **Status:** Captured. **Priority:** P2.
+- **Origin and need:** Prior UI-review suggestion. Users need to pan even when
+  nodes fill the window, and understand a Fit action that cannot show everything.
+- **Proposal:** Explore a hand/pan mode or reserved navigation area, with an
+  optional overview navigator. Make the minimum-zoom fit limit understandable
+  rather than implying every graph will fit. Existing Find and Frame selection
+  remain available.
+- **Project fit / research:** `GraphWorkspace.cs` clamps zoom and initiates
+  right-drag panning on empty space; [workspace controls](NODE_WORKSPACE.md)
+  document existing navigation. Local inspection only; no external research.
+- **Scope and tradeoffs:** Medium UI work; avoid intercepting dials, cable edits
+  or selection. No decision to change supported zoom bounds or renderer. A hand
+  mode may solve the main problem without an always-visible overview panel.
+- **Next step:** Review a dense example at minimum zoom and select the smallest
+  navigation addition that works with lock mode and pointer-only use.
+
+<a id="idea-029"></a>
+## IDEA-029: Route inspection, diagnostics and useful activity history
+
+- **Captured:** 2026-10-23. **Status:** Captured. **Priority:** P3.
+- **Origin and need:** Prior UI/audio research suggestions. Understand what
+  reaches an output and obtain useful troubleshooting evidence without a wall
+  of technical controls in normal use.
+- **Proposal:** An explicit command highlights a whole connected path or lists
+  sources reaching the virtual microphone. Optional details show known processor
+  delay, measured device/buffer/queue values, dropouts/reconnections and affected
+  routes. Explain differently delayed copies combined at one output. Retain useful
+  activity outcomes and offer a reviewed, privacy-conscious diagnostic copy/export.
+- **Project fit / research:** [Audio timing](AUDIO_LATENCY.md) documents available
+  snapshots and their limits. About already copies version information; Activity
+  and node status already exist. No fresh external research. Sampled queue values
+  must not be presented as measured acoustic end-to-end latency.
+- **Scope, tradeoffs and dependencies:** Medium to large; reuse IDEA-025's route
+  analysis where useful. Keep cable hover as the approved simple source/destination
+  text. Do not revive declined inherited-controller explanation UI. Reports need
+  explicit handling of device names, identifiers, paths and bounded log history;
+  no automatic audio recording or upload is proposed.
+- **Next step:** Specify one output-inspection view and a minimal sanitized
+  report, separating known facts, estimates and unavailable measurements.
+
+<a id="idea-030"></a>
+## IDEA-030: Selected-node inspector at a readable size
+
+- **Captured:** 2026-10-23. **Status:** Captured. **Priority:** P2.
+- **Origin and need:** Prior UI-review suggestion. Operate a selected effect
+  while the canvas remains zoomed out to understand its route.
+- **Proposal:** An optional fixed-size inspector showing the selected node's
+  existing controls and live state. It references the same node and performs no
+  duplicate processing. Selection changes must handle pending edits predictably.
+- **Project fit / research:** Current controls are inside zoomed nodes. Compare
+  this design with [pinning](#idea-005), which keeps chosen nodes visible rather
+  than following selection. Repository review only; no prototype/research.
+- **Scope and tradeoffs:** Medium; additional screen space, focus and shared
+  control-binding ownership. Do not commit to both an inspector and a large
+  pinned strip without checking their combined effect at minimum window size.
+- **Next step:** Compare the selected-node view and pinning using an EQ and a
+  compact dynamics node; select the least cluttered interaction.
+
+<a id="idea-031"></a>
+## IDEA-031: Task templates and favorite or recent node types
+
+- **Captured:** 2026-10-23. **Status:** Captured. **Priority:** P3.
+- **Origin and need:** Prior UI-review suggestion. Reduce repeated setup after
+  users understand the graph, without limiting exploration.
+- **Proposal:** Optional examples for hearing a microphone, sending voice/music
+  to a call, routing an app and ducking music. Offer favorite/recent node choices
+  within creation UI. These are setup templates, not the multi-action tasks in
+  IDEA-004; a clearer product label should avoid that ambiguity.
+- **Project fit / research:** The three-node starter, Add search and purpose
+  descriptions already exist. Reuse User Presets (IDEA-022) and build on the
+  guided introduction (IDEA-024). Local inspection only; external research pending.
+- **Scope and tradeoffs:** Small for favorites, medium for well-explained reusable
+  examples. Templates need clear device placeholders and intentional output
+  activation; they must not replace an existing workspace by surprise.
+- **Next step:** Identify two frequently repeated setups and decide whether a
+  curated preset is sufficient before building a separate template system.
+
+<a id="idea-032"></a>
+## IDEA-032: More informative overload readings
+
+- **Captured:** 2026-10-23. **Status:** Captured. **Priority:** P3.
+- **Origin and need:** Prior UI-review suggestion. Determine which channel and
+  processing stage exceeded full scale, with a supported peak magnitude.
+- **Proposal:** Improve engine telemetry and optional inspection to identify the
+  first observed overloaded stage and channel, and report above-zero magnitude
+  if measured. Evaluate a longer moving-peak hold only as an optional refinement.
+- **Project fit / research:** [Existing meter behavior](NODE_WORKSPACE.md) reports
+  node-level overload and caps numerical readings at 0 dBFS; it is sampled
+  telemetry, not complete lifetime history. Local evidence only.
+- **Scope, tradeoffs and decisions:** Medium telemetry/UI work. Preserve passive
+  hover readings and the accepted fading red caps. Do not add the rejected
+  permanent clipping latch or click-to-reset interaction. LUFS/true-peak meters
+  belong to IDEA-001, not this sample-overload refinement.
+- **Next step:** Define the exact measurable fields and one compact hover/route
+  view before changing capture cadence, meter persistence or audio processing.
+
+<a id="idea-033"></a>
+## IDEA-033: New voice cleanup and leveling nodes
+
+- **Captured:** 2026-10-23. **Status:** Captured. **Priority:** P3.
+- **Maintainer direction and rationale:** The recovered voice-cleanup/leveling
+  family is worth pursuing as future nodes, after basic usability work. Reduce
+  manual correction for everyday voice use. This endorses the direction, not a
+  complete algorithm list or demonstrated feasibility/quality.
+- **Candidate behaviors:**
+  - Automatic voice leveler: bounded ongoing compensation for changing speaking
+    distance/level, with an explicit policy for silence and background noise.
+  - Dynamic EQ: reduce troublesome frequency regions only when needed.
+  - Hum removal: consider an existing-EQ preset before adding a redundant node.
+  - Mouth-click reduction and dereverberation: explore separately, with listening
+    checks for speech damage and actual processing delay.
+  - Acoustic echo cancellation: investigate a playback-reference input and its
+    routing/timing requirements before selecting an implementation.
+  - Automatic multi-microphone mixing: reduce unwanted spill from unused mics
+    while preserving simultaneous speakers and predictable transitions.
+- **Project fit / research:** `NodeCatalog.cs` and `native/include/am/graph.hpp`
+  lack these dedicated types. Existing EQ/dynamics provide reusable patterns;
+  this does not prove they solve the new tasks. No fresh external algorithm or
+  licensing research, benchmark or prototype has been performed.
+- **Scope, tradeoffs and dependencies:** Medium to large per candidate, especially
+  reference-based or model-based processing. Assess latency, CPU, quality, model
+  and license needs independently. Ongoing leveling is distinct from one-time
+  calibration (IDEA-016); avoid growing the catalogue with duplicate processors.
+- **Next step:** Compare an automatic leveler and dynamic EQ as the first two
+  candidates on paper, then choose one for primary-source feasibility research
+  and representative non-personal listening fixtures.
+
+<a id="idea-047"></a>
+## IDEA-047: System-latency investigation or separate helper
+
+- **Captured:** 2026-10-23. **Status / priority:** Parked, low investment.
+- **Maintainer direction:** Further heavy engine-latency work is not worthwhile
+  at present. The maintainer believes remaining delay is mainly specific to each
+  user's system; a separate general system helper might merit light investigation
+  much later. Keep that separate from VineMix feature development.
+- **Evidence and qualification:** The first shared-device period/queue/scheduling
+  improvements already landed ([audio latency](AUDIO_LATENCY.md)). Current
+  denoiser nodes still add 20/30 ms. Earlier investigations did not isolate every
+  upstream, engine and playback contribution with calibrated same-path hardware
+  measurements. Therefore neither negligible engine delay nor a universal
+  system patch is established. No new measurement or external research done.
+- **Possible scope and tradeoffs:** A standalone diagnostic/helper application
+  could identify specific system contributors and explain supported remedies.
+  This is an unresearched possibility, not a proposal for indiscriminate driver,
+  registry or device changes. Broad engine rewrites, smaller-block experiments
+  and new denoiser latency work are deferred; accurate delay labels were delivered
+  in the local candidate under [IDEA-019](IDEAS_IMPLEMENTED.md#idea-019).
+- **Dependencies / next step:** Revisit only if a reproducible multi-user problem
+  or an explicit new priority justifies it; first establish the affected path and
+  evidence before deciding whether a separate tool has a useful general role.
+
+<a id="idea-048"></a>
+## IDEA-048: Developer API for third-party apps and automation
+
+- **Captured:** 2026-10-23. **Status:** Captured. **Proposed priority:** P3;
+  enable community integrations after the core usability work. This placement
+  is a suggestion, not a maintainer commitment or authorization to implement.
+- **Maintainer intent / rationale:** Let users develop their own applications
+  that inspect and control VineMix, especially streaming tools and automation,
+  without waiting for each integration to be implemented in the main product.
+- **Proposed first scope:** A documented, versioned local control API. Discover
+  nodes and available parameters with stable IDs, types, units and limits; read
+  state; set volume, mute, bypass and supported effect parameters; subscribe to
+  state changes and bounded meter updates. An external button should reflect
+  changes made in VineMix as well as changes made by its own app. Publish small
+  example clients and a simple command-line wrapper, with a reusable client
+  library if useful. These are proposed interfaces, not existing commands.
+- **Examples:** A community-built streaming button that mutes a microphone; a
+  custom mixer dashboard; a script changing levels in response to another app;
+  an integration that applies a coordinated set of existing-control changes.
+  Support for named tasks/presets follows their implementation and is not a
+  prerequisite for basic control. Existing DSP capabilities bound what external
+  apps can do; this is not arbitrary audio-plugin execution inside the engine.
+- **Repository evidence (2026-10-23):** [The internal protocol](CONTROL_PROTOCOL.md),
+  `native/src/control_server.cpp` and
+  `desktop/VineMix.Desktop/EngineConnection.cs` show JSON requests over a local
+  current-user/SYSTEM named pipe, remote-client rejection, snapshots and full
+  configuration commits guarded by revision. The server currently creates one
+  pipe instance and serves that client until disconnection. It is therefore a
+  useful foundation, not a ready multi-client developer API. Internal snapshots
+  also include personal paths and process/device details that a public control
+  view need not disclose. No running-engine experiment was performed.
+- **Design direction and alternatives:** Consider JSON over a local WebSocket
+  gateway for requests and events, versus a native pipe client library or an
+  HTTP command interface with a separate event channel. The transport remains
+  undecided. A gateway must share a command coordinator with the desktop or
+  follow a deliberate engine multi-client change; simply attaching a second
+  client to the current pipe is not sufficient. Prefer targeted, validated
+  parameter operations over exposing full-settings replacement, recovery or
+  shutdown commands by default. Keep external control working while the window
+  is minimised; operation after the desktop process exits remains a lifecycle
+  decision.
+- **Research (2026-10-23):** [OBS's official WebSocket project](https://github.com/obsproject/obs-websocket)
+  documents third-party automation, remote-control clients and language client
+  libraries. This is evidence for the ecosystem pattern, not proof of VineMix
+  integration or a decision to reuse its code. VineMix-specific transport,
+  performance and compatibility prototyping remains pending.
+- **Scope, tradeoffs and dependencies:** Medium-to-large foundational work:
+  API compatibility, discovery, documentation, concurrent edits, reconnects,
+  bounded event delivery and error handling. Use explicit API opt-in and
+  revocable client credentials; start on the local machine, with network access
+  a separate decision. Keep read/control permissions distinct and expose only
+  needed data. A transport credential does not isolate all software running as
+  the same Windows user. Define manual override, revision/conflict handling and
+  undo behavior. Keep parsing off the audio thread and design continuous fader
+  updates without a settings write or full graph rebuild per event.
+- **Related ideas:** [Tasks](#idea-004), [external condition triggers](#idea-006)
+  and [parameter controllers](IDEAS_LATER.md#idea-038) can share stable parameter
+  identities and command semantics. This API is a separate developer-facing
+  foundation; users may implement their own conditions outside VineMix without
+  waiting for its built-in automation editor. Pinning (IDEA-005) remains an
+  in-app presentation feature, not a requirement for external controls.
+- **Next step:** Specify a minimal discovery/read/set/subscribe contract and a
+  sample microphone mute/volume app. Test simultaneous desktop and external
+  changes, reconnects, missing targets, rejected credentials and excessive
+  update rates in isolated fixtures before exposing the personal engine.
+
+## Dependencies within the priority order
+
+The priority index above supersedes the former unranked investigation order.
+Lock and quit affordances are implemented in the local candidate. Presets and organizational
+groups should agree on selection/identity handling; neither requires scenes or
+A/B. Review the tutorial and silence-diagnostic flows with the maintainer before
+large implementation work. Pinning may start with existing controls; task pins
+depend on IDEA-004. Manual tasks and timed actions should precede external triggers.
+Later DSP and integration entries require their own research and qualification.
 
 <!-- Entry guide: use only the detail warranted by the idea.
 ## IDEA-001: Short title

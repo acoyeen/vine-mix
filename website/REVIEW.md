@@ -1,5 +1,47 @@
 # Forest landing local review
 
+## 23 October Beta 4 release review
+
+The download button, accessible label and product version now identify
+`0.3.0-beta.4`. Static checks passed for all three JavaScript modules, and all
+nine local resource references in the main page resolve to repository files.
+The current Magic UI adaptation retains its MIT notice and visible credits;
+the pinned upstream source and license were checked again on 23 October 2026.
+
+This release review did not use computer-use tools or repeat the browser
+interaction and visual checks below. Those results belong to the recorded
+earlier design revisions, before the morphing headline was added. No desktop
+audio processes, settings or drivers were changed by this review.
+
+## 23 October logo and continuous motion
+
+The current local preview restores the VM mark's original green and light
+colours, increases its size and adds a soft shadow plus a small pointer response.
+The shader keeps moving while the opening is visible. A bottom-center “Scroll
+for more” link appears after five unscrolled seconds and stays dismissed after
+scrolling. A small icon-only pause button provides manual control.
+
+Browser review covered desktop (1280 × 800), phone (390 × 844), narrow/short
+(320 × 440) and the normal preview pane. The logo remains centered and tested
+layouts have no horizontal overflow. The hint reached the workspace, disappeared
+on scroll and stayed dismissed on return to the top. Pause and keyboard resume,
+pointer response and reduced-motion behavior worked. The shader pauses at the
+workspace boundary and resumes on return. Its renderer time advanced beyond
+31 seconds, and separate background-frame captures differed; the temporary
+timing diagnostic was removed after verification.
+
+Both modules pass syntax checks. Nine local HTML resource references return
+HTTP 200 and all three same-page targets resolve. No browser warnings or errors
+were reported. Versioned asset URLs prevent the preview from reusing its older
+style and animation code. Rendering is capped at 30 drawing frames per second,
+DPR 1.5 and 900,000 pixels; no device-wide performance measurement is claimed.
+The exact upstream fragment and palette are retained.
+
+The maintainer requested the preview relaunched for viewing; it remains at
+`http://127.0.0.1:4173/`. This supersedes the earlier preview-off instruction below.
+Review screenshots and recovery copies remain outside the source checkout.
+Desktop audio-engine processes and personal settings were not changed.
+
 ## 23 October release polish
 
 The opening links to the Beta 3 download and the current user guide. Product

@@ -2,6 +2,13 @@
  <Application.Resources>
   <FontFamily x:Key="NodeFontFamily">pack://application:,,,/Assets/Fonts/#IBM Plex Sans</FontFamily>
   <FontFamily x:Key="NodeNumericFontFamily">pack://application:,,,/Assets/Fonts/#IBM Plex Mono</FontFamily>
+  <!-- WPF shows FocusVisualStyle for keyboard navigation, without retaining a
+       focus decoration after a mouse click. Keep the cue inside small buttons. -->
+  <Style x:Key="ButtonKeyboardFocus" TargetType="Control">
+   <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Control">
+    <Border Margin="2" BorderThickness="1" BorderBrush="{DynamicResource ConsoleFocusBrush}" CornerRadius="2" IsHitTestVisible="False"/>
+   </ControlTemplate></Setter.Value></Setter>
+  </Style>
   <Style TargetType="UserControl"><Setter Property="FontFamily" Value="{DynamicResource NodeFontFamily}"/></Style>
   <Style x:Key="NodeDetailsExpander" TargetType="Expander">
    <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Expander">
@@ -35,19 +42,17 @@
    <Setter Property="Background" Value="{DynamicResource ConsoleButtonFaceBrush}"/><Setter Property="Foreground" Value="{DynamicResource ConsoleTextBrush}"/>
    <Setter Property="BorderBrush" Value="{DynamicResource ConsoleControlBorderBrush}"/><Setter Property="BorderThickness" Value="1"/>
    <Setter Property="HorizontalContentAlignment" Value="Center"/><Setter Property="VerticalContentAlignment" Value="Center"/>
-   <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+   <Setter Property="FocusVisualStyle" Value="{StaticResource ButtonKeyboardFocus}"/>
    <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button">
     <Grid SnapsToDevicePixels="True">
      <Border x:Name="Face" CornerRadius="3" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Background="{TemplateBinding Background}"/>
      <Border x:Name="UpperEdge" BorderThickness="0" IsHitTestVisible="False"/>
      <Border x:Name="LowerEdge" BorderThickness="0" IsHitTestVisible="False"/>
      <ContentPresenter Margin="{TemplateBinding Padding}" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="{TemplateBinding VerticalContentAlignment}" RecognizesAccessKey="True"/>
-     <Border x:Name="FocusEdge" CornerRadius="3" BorderBrush="Transparent" BorderThickness="1" IsHitTestVisible="False"/>
     </Grid>
     <ControlTemplate.Triggers>
      <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Face" Property="Background" Value="{DynamicResource ConsoleButtonHoverBrush}"/></Trigger>
      <Trigger Property="IsPressed" Value="True"><Setter TargetName="Face" Property="Background" Value="{DynamicResource ConsoleWellBrush}"/></Trigger>
-     <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="FocusEdge" Property="BorderBrush" Value="{DynamicResource ConsoleFocusBrush}"/></Trigger>
      <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.55"/></Trigger>
     </ControlTemplate.Triggers>
    </ControlTemplate></Setter.Value></Setter>
@@ -212,25 +217,19 @@
    <Setter Property="FontFamily" Value="{DynamicResource NodeFontFamily}"/>
    <Setter Property="Padding" Value="10,3"/><Setter Property="MinHeight" Value="26"/><Setter Property="FontSize" Value="13"/>
    <Setter Property="Background" Value="Transparent"/><Setter Property="Foreground" Value="{DynamicResource ConsoleTextBrush}"/>
-   <Setter Property="BorderThickness" Value="0"/><Setter Property="Cursor" Value="Hand"/><Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+   <Setter Property="BorderThickness" Value="0"/><Setter Property="Cursor" Value="Hand"/><Setter Property="FocusVisualStyle" Value="{StaticResource ButtonKeyboardFocus}"/>
    <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button">
-    <Border x:Name="Face" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}" BorderThickness="0,0,0,2" BorderBrush="Transparent">
+    <Border x:Name="Face" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
      <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
     </Border>
     <ControlTemplate.Triggers>
      <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Face" Property="Background" Value="{DynamicResource ConsoleButtonHoverBrush}"/></Trigger>
      <Trigger Property="IsPressed" Value="True"><Setter TargetName="Face" Property="Background" Value="{DynamicResource ConsoleControlBorderBrush}"/></Trigger>
-     <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Face" Property="BorderBrush" Value="{DynamicResource ConsoleFocusBrush}"/></Trigger>
      <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.4"/></Trigger>
     </ControlTemplate.Triggers>
    </ControlTemplate></Setter.Value></Setter>
   </Style>
   <Style x:Key="BrandWebsiteButton" TargetType="Button" BasedOn="{StaticResource WorkspaceToolbarButton}">
-   <Setter Property="FocusVisualStyle"><Setter.Value><Style TargetType="Control">
-    <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Control">
-     <Border Margin="-2" BorderThickness="1" BorderBrush="{DynamicResource ConsoleFocusBrush}" CornerRadius="2"/>
-    </ControlTemplate></Setter.Value></Setter>
-   </Style></Setter.Value></Setter>
    <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button">
     <Border x:Name="Face" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
      <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
@@ -250,7 +249,6 @@
     <ControlTemplate.Triggers>
      <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Face" Property="Background" Value="{DynamicResource BrandHoverBrush}"/></Trigger>
      <Trigger Property="IsPressed" Value="True"><Setter TargetName="Face" Property="Background" Value="{DynamicResource BrandActionBrush}"/><Setter TargetName="Face" Property="BorderBrush" Value="{DynamicResource BrandActionTextBrush}"/></Trigger>
-     <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Face" Property="BorderBrush" Value="{DynamicResource ConsoleFocusBrush}"/></Trigger>
      <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.4"/></Trigger>
     </ControlTemplate.Triggers>
    </ControlTemplate></Setter.Value></Setter>

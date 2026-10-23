@@ -28,8 +28,20 @@ internal static class DenoiserSelectionVerification
         RotaryValueControl Dial(string label) => Descendants<RotaryValueControl>(View()).Single(control =>
             AutomationProperties.GetName(Descendants<Slider>(control).Single()) == label);
         string Json() => JsonSerializer.Serialize(mixer.GraphConfig, Protocol.Json);
-        require(Choice().Items.OfType<ComboBoxItem>().Select(item => item.Content?.ToString()).SequenceEqual(new[] { "SpeexDSP", "RNNoise" }),
-            "Denoiser has one labelled algorithm dropdown containing SpeexDSP and RNNoise.");
+        require(Choice().Items.OfType<ComboBoxItem>().Select(item => item.Content?.ToString()).SequenceEqual(new[] { "SpeexDSP · 20 ms", "RNNoise · 30 ms" })
+            && AutomationProperties.GetHelpText(Choice()).Contains("node delay including bypass, not total system latency", StringComparison.Ordinal),
+            "Denoiser choices show both measured node delays with accessible scope and bypass wording, preserving saved algorithm tags.");
+        require(Choice().ToolTip is StackPanel tip && tip.Children.OfType<TextBlock>().Select(line => line.Text).SequenceEqual(new[]
+            { "Algorithm", "SpeexDSP: faster, lighter cleanup.", "RNNoise: more delay, usually cleaner speech.", "20/30 ms is added node delay." }),
+            "Denoiser help briefly compares speed, cleanup and added delay without guaranteeing cleaner speech for every voice.");
+        foreach (var item in Choice().Items.OfType<ComboBoxItem>())
+        {
+            var label = new FormattedText(item.Content.ToString(), System.Globalization.CultureInfo.CurrentUICulture,
+                FlowDirection.LeftToRight, new Typeface(Choice().FontFamily, Choice().FontStyle, Choice().FontWeight, Choice().FontStretch),
+                Choice().FontSize, Brushes.White, 1);
+            require(label.WidthIncludingTrailingWhitespace + 36 <= Choice().ActualWidth,
+                "The complete denoiser delay label fits beside the dropdown arrow: " + item.Content);
+        }
         require(Current().Denoiser.Algorithm == "rnnoise" && Current().Denoiser.RnnoiseMix == 1
             && Equals((Choice().SelectedItem as ComboBoxItem)?.Tag, "rnnoise")
             && Visible(Dial("Mix"), View()) && Dial("Mix").Value == 100 && !Visible(Dial("Reduction"), View()),

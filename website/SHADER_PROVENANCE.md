@@ -41,8 +41,14 @@ The React lifecycle wrapper and bundled application runtime were replaced with
 a small native ES module. This is a wrapper adaptation, not a change to the
 shader recipe. It renders one frame on mount, starts paused, and
 exposes `setPaused(boolean)` and `destroy()`. The parent controls animation
-policy. Motion uses at most 30 drawing frames per second, retains the original
-DPR ceiling of 2 and 2-million-pixel budget, and freezes time while paused.
+policy. Motion uses at most 30 drawing frames per second and freezes time while
+paused. On 23 October 2026, the wrapper's DPR ceiling was reduced from 2 to 1.5
+and its pixel budget from 2 million to 900,000 to reduce the cost of continuous
+background animation. This reduces the maximum fragment count per drawing
+frame by 55%; it is a workload limit, not a measured device performance claim.
+The soft waves are scaled to fill the viewport while the separate logo and
+page text retain their normal display resolution. The shader source, palette,
+and animation time scale remain unchanged.
 The final capped render dimensions are rounded down instead of the upstream
 wrapper's rounding to nearest, ensuring that the budget is never exceeded.
 CSS dimensions are cached at mount and refreshed on ResizeObserver/window
@@ -51,12 +57,13 @@ Shader compile/link failures, unavailable WebGL, context loss, resize, and
 resource cleanup are handled locally. No package, external request, embedded
 preview, remote script, or third-party runtime is required by this module.
 
-## Licence provenance
+Parent-page animation policy is owned by `hero.js`; the wrapper starts paused
+until that parent enables it. The 21 October five-second settling behavior is
+superseded by the maintainer's 23 October request for continuous animation.
+Reduced-motion and offscreen/hidden-tab pausing remain appropriate parent
+controls and do not change the shader recipe.
 
-Parent-page policy updated 21 October: the landing no longer displays a motion
-control and settles the animation after five seconds. Reduced-motion and
-offscreen/hidden-tab pausing remain. This changes `hero.js`, not the shader
-recipe or native rendering wrapper described above.
+## Licence provenance
 
 The component page explicitly declares MIT. Its public metadata supplies no
 separate licence URL or copyright notice. `dist/assets/licenses/frorest-green-MIT.txt`

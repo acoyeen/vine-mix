@@ -1,6 +1,6 @@
 # VineMix installation and updates
 
-Updated 23 October 2026 for **0.3.0 · Beta 3**. VineMix is an
+Updated 23 October 2026 for **0.3.0 · Beta 4**. VineMix is an
 MIT-licensed open-source beta for Windows 11 x64. Download versioned packages,
 checksums and matching source from [GitHub Releases](https://github.com/acoyeen/vine-mix/releases).
 See the [beta test guide](BETA_TESTER_GUIDE.md) for installation instructions and
@@ -46,7 +46,8 @@ complete original vendor packages and their notices; see
 
 ## Manual updates and removal
 
-Wait for **Saved**, then use **Quit VineMix** from the tray. Closing the main
+Use **Quit VineMix** at the bottom of Settings or from the tray. It saves first
+and offers retry/recovery/cancel choices if that save fails. Closing the main
 window only hides it and leaves audio running. Run the newer supplied Setup, or
 open the newer standalone EXE after the older copy quits. Do not combine payload
 files from separate versions or force replacement while a target is in use.

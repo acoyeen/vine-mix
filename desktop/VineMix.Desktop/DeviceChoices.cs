@@ -41,17 +41,17 @@ internal static class DeviceChoices
     };
 
     internal static bool Compatible(Endpoint endpoint, string direction)
-        // A Windows capture endpoint may come from a USB device, a network
-        // headset or another driver's microphone. Vendor hints select the
-        // dedicated cable defaults; they are not generic capture capabilities.
+        // Streamed headsets expose ordinary Windows capture/render endpoints.
+        // Vendor hints do not describe their ability to record or play sound.
+        // Keep known routing cables out of Listening output so VAC's dedicated
+        // direct-render path cannot be replaced with shared playback by mistake.
         => endpoint.Direction == direction && (direction == "capture"
-            || !endpoint.IsVirtual && endpoint.Transport == "physical");
+            || endpoint.Transport is not ("vbCable" or "vacLite"));
 
     internal static bool IsAdvanced(Endpoint endpoint)
-        // RemoteNetworkDevice describes how a microphone is reached, not an
-        // advanced routing mode. Keep streamed microphones visible by default.
-        => !(endpoint.Direction == "capture" && endpoint.FormFactor == 0)
-            && AdvancedPurpose(endpoint).Length > 0;
+        // RemoteNetworkDevice describes how audio is reached, not an advanced
+        // routing mode. Keep streamed microphones and headphones visible.
+        => endpoint.FormFactor != 0 && AdvancedPurpose(endpoint).Length > 0;
 
     internal static IReadOnlyList<EndpointChoice> Build(IReadOnlyList<Endpoint> inventory, string direction,
         DeviceBinding binding, DeviceVisibility visibility)
@@ -105,11 +105,11 @@ internal static class DeviceChoices
             string help = endpoint.Name;
             if (endpoint.InterfaceName.Length > 0) help += "\n" + endpoint.InterfaceName;
             if (AdvancedPurpose(endpoint) is { Length: > 0 } purpose) help += "\n" + purpose;
-            help += !compatible ? "\nThis device needs its compatible virtual node. Choose a physical device here."
+            help += !compatible ? "\nThis is a routing cable. Choose a listening device here; use Virtual output for VAC."
                 : endpoint.State == "Disabled" ? "\nDisabled in Windows. Enable it in Windows sound settings before use."
                 : endpoint.State != "Active" ? "\nUnavailable. Reconnect or enable the device in Windows; saved assignments are retained."
                 : direction == "capture" ? "\nAvailable Windows input, including streamed and virtual microphones."
-                : "\nAvailable";
+                : "\nAvailable Windows output, including streamed and virtual listening devices.";
             choices.Add(new() { Id = endpoint.Id, StableId = endpoint.StableId, Name = endpoint.Name,
                 State = endpoint.State, Channels = endpoint.Channels, DisplayName = display + state + (!compatible ? " · incompatible" : ""),
                 IsSelectable = compatible && endpoint.State == "Active", IsCurrent = ReferenceEquals(endpoint, current), Help = help });

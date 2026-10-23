@@ -29,6 +29,12 @@ public partial class MainWindow : Window
     internal bool IsHelpOpen => _helpOverlay.Visibility == Visibility.Visible;
     internal NodeSearchView SearchView { get; }
     internal bool IsNodeSearchOpen => _searchOverlay.Visibility == Visibility.Visible;
+    internal TextBlock SaveIndicator { get; } = new()
+    {
+        Name = "SaveIndicator", FontSize = 12, TextAlignment = TextAlignment.Center,
+        TextTrimming = TextTrimming.CharacterEllipsis, TextWrapping = TextWrapping.NoWrap,
+        HorizontalAlignment = HorizontalAlignment.Stretch, VerticalAlignment = VerticalAlignment.Center
+    };
     public GraphWorkspace Workspace { get; }
     public MainWindow(MixerViewModel mixer, Action<string>? openExternal = null)
     {
@@ -38,7 +44,10 @@ public partial class MainWindow : Window
         ConsoleTheme.Initialize();
         NativeCaption.Attach(this, TitleBarHeight + 1 + GraphWorkspace.ToolbarHeight - NativeCaption.ResizeBorderSize, resizable: true);
         _mixer = mixer; _openExternal = openExternal ?? App.OpenExternal; InitializeComponent(); DataContext = mixer;
+        SaveIndicator.SetResourceReference(TextBlock.ForegroundProperty, "ConsoleMutedBrush");
         SaveIndicator.SetBinding(TextBlock.TextProperty, new Binding(nameof(MixerViewModel.SaveStatus)) { Converter = CompactSaveStatus.Instance });
+        SaveIndicator.SetBinding(ToolTipProperty, new Binding(nameof(MixerViewModel.SaveStatus)));
+        SaveIndicator.SetBinding(AutomationProperties.NameProperty, new Binding(nameof(MixerViewModel.SaveStatus)));
         if (mixer.IsPreview) Title = "VineMix · UI Preview";
         var minimise = NativeCaption.WindowButton(this, close: false);
         minimise.Margin = new Thickness(0, 0, 6, 0);
@@ -50,7 +59,10 @@ public partial class MainWindow : Window
             caption: mixer.IsPreview ? "Close UI preview" : "Close to tray — audio keeps running"));
         foreach (Button button in WindowActions.Children) { button.SetResourceReference(StyleProperty, "WorkspaceToolbarButton"); button.Margin = new Thickness(0); }
         Workspace = new GraphWorkspace(mixer);
-        _settingsMenu = CreateSettingsMenu(mixer, Workspace.SetMessage, OpenHelp, OpenNodeSearch, OpenHelpEntry, OpenAbout, OpenUpdates);
+        Workspace.SetFooterStatus(SaveIndicator);
+        InitializeLayoutLock();
+        _settingsMenu = CreateSettingsMenu(mixer, Workspace.SetMessage, OpenHelp, OpenNodeSearch, OpenHelpEntry, OpenAbout, OpenUpdates,
+            quit: QuitFromSettingsAsync, showWhatsNew: () => OpenWhatsNew());
         SettingsButton.PreviewMouseDown += (_, args) => { if (!TryPrepareUpdateEditors()) args.Handled = true; };
         ConsoleGrid.Children.Add(Workspace);
         HelpView = new WorkspaceHelpView(CloseHelp) { MaxWidth = 960, MaxHeight = 680,
@@ -230,7 +242,8 @@ public partial class MainWindow : Window
         OpenNodeSearch(); return IsNodeSearchOpen;
     }
     internal static ContextMenu CreateSettingsMenu(MixerViewModel mixer, Action<string, bool>? feedback = null,
-        Action? showHelp = null, Action? findNode = null, Action<string>? showHelpEntry = null, Action? showAbout = null, Action? showUpdates = null)
+        Action? showHelp = null, Action? findNode = null, Action<string>? showHelpEntry = null, Action? showAbout = null, Action? showUpdates = null,
+        Func<System.Threading.Tasks.Task>? quit = null, Action? showWhatsNew = null)
     {
         var menu = new ContextMenu { Width = 380, MaxHeight = 560 };
         AutomationProperties.SetName(menu, "VineMix settings");
@@ -266,7 +279,7 @@ public partial class MainWindow : Window
         Preference("Show disconnected or missing devices", nameof(MixerViewModel.ShowDisconnectedAudioDevices),
             "Show unplugged or missing devices. This does not reconnect devices or change audio routing.", visibility.Items);
         Preference("Show advanced inputs and outputs", nameof(MixerViewModel.ShowAdvancedAudioDevices),
-            "Show line-level inputs, network outputs, telephone endpoints, and S/PDIF or digital passthrough devices. Ordinary and streamed microphones, speakers, headphones and HDMI outputs remain visible; unclassified active devices also remain visible. Availability controls still apply.", visibility.Items);
+            "Show line-level inputs, telephone endpoints, and S/PDIF or digital passthrough devices. Ordinary and streamed microphones, speakers, headphones and HDMI outputs remain visible; unclassified active devices also remain visible. Availability controls still apply.", visibility.Items);
         menu.Items.Add(visibility);
         var startup = Preference("Start VineMix when I sign in", nameof(MixerViewModel.StartAtLogin),
             "Automatically start the mixer when you sign in to Windows.");
@@ -296,9 +309,23 @@ public partial class MainWindow : Window
         updates.Click += (_, _) => showUpdates?.Invoke(); menu.Items.Add(updates);
         Preference("Automatically check for updates", nameof(MixerViewModel.AutomaticallyCheckForUpdates),
             "Check at most once a day after startup. Downloads and installation require your choice.");
+        const string whatsNewHelp = "Read the bundled release highlights.";
+        var whatsNew = new MenuItem { Header = "What's new?", ToolTip = whatsNewHelp };
+        AutomationProperties.SetName(whatsNew, "What's new?");
+        AutomationProperties.SetHelpText(whatsNew, whatsNewHelp);
+        whatsNew.Click += (_, _) => { menu.IsOpen = false; showWhatsNew?.Invoke(); };
+        menu.Items.Add(whatsNew);
         var about = new MenuItem { Header = "About VineMix", ToolTip = "Version and build information to include in a bug report." };
         about.Click += (_, _) => showAbout?.Invoke();
         menu.Items.Add(about);
+        menu.Items.Add(new Separator());
+        const string quitHelp = "Save your workspace and stop audio.";
+        var quitItem = new MenuItem { Header = "Quit VineMix", ToolTip = NodeToolTip.Create("Quit VineMix", quitHelp) };
+        quitItem.SetResourceReference(ForegroundProperty, "ConsoleMuteBrush");
+        AutomationProperties.SetName(quitItem, "Quit VineMix");
+        AutomationProperties.SetHelpText(quitItem, quitHelp);
+        quitItem.Click += async (_, _) => { menu.IsOpen = false; if (quit is not null) await quit(); };
+        menu.Items.Add(quitItem);
         Action<string>? openEntry = showHelpEntry;
         if (openEntry is null && showHelp is not null) openEntry = _ => showHelp();
         SettingsSearchView.Attach(menu, openEntry);

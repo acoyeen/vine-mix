@@ -24,7 +24,7 @@ remaining muted. Existing saved workspaces retain their graph and assignments.
 - **Processing:** interactive EQ with up to eight bands, High-pass, Low-pass,
   Low / Mid / High tone controls, Voice Color, Compressor, Limiter, Ducking,
   Expander, Gate, Alignment Delay, denoiser, de-esser, plosive remover and reverb.
-- **Outputs:** physical listening output and VAC Lite virtual microphone output.
+- **Outputs:** physical or streamed listening output and VAC Lite virtual microphone output.
 
 The creation menu contains **24 node types**. Mix acts as a volume control with
 one incoming connection and combines sound when several connections arrive.
@@ -157,8 +157,11 @@ preference; it does not change audio settings.
 The Add menu groups nodes into **Inputs, Outputs, Effects, Mixing and Controls**,
 using the same category colours as their headers. Search also accepts a category
 name. The upper toolbar holds creation, selection, Undo, Redo, Activity, Fit and
-zoom controls. Save and connection status stay in the header. The footer shows
-action results and errors immediately; Dismiss returns to the shared dial guide.
+zoom controls. Connection status stays in the header; save status is centred in
+the footer. Action results and errors temporarily replace it. A thin green bar
+shrinks from right to left over five seconds, then the save status returns.
+**Dismiss** returns to save status immediately. The latest message remains in
+**Activity**, and control instructions are available in **Help & shortcuts**.
 Drag the title, passive header text or unused toolbar space to move the window;
 buttons keep their normal actions and the canvas keeps its own gestures.
 **Undo / Redo** restore up to 100 graph edits in the current app session. One
@@ -325,9 +328,41 @@ capture and audible routing still require the deferred qualification session.
 
 ## Run and build
 
+Use the top-right padlock to protect the workspace layout. A red closed padlock
+means locked; a small grey open padlock means unlocked. The shackle opens and
+closes when toggled. An attempted locked node or cable edit briefly enlarges the
+padlock quickly, then returns it to normal size more gradually while keeping it red. Node selection
+outlines stay hidden while locked and return for the current selection on unlock.
+Selecting a node or cable stays quiet; missing-device warnings remain visible.
+Windows reduced-motion settings use immediate, temporary emphasis. High contrast uses system
+colors with the same distinct shapes and accessible state text. The lock blocks
+moving, adding, deleting, pasting and aligning nodes, structural cable edits and
+structural Undo/Redo. Volume, mute, bypass, device choices, renaming, cable level,
+parameter Undo/Redo, selection, copy, search, pan and zoom remain available.
+Hiding and reopening the window preserves the lock; a new app session starts
+unlocked. The lock does not change the saved graph.
+
+The denoiser dropdown shows **SpeexDSP · 20 ms** and **RNNoise · 30 ms**. These
+are VineMix's node delays, including bypass. They do not describe complete system
+latency or CPU cost; perceived cleanup quality depends on the voice and noise.
+
+**Settings → What's new?**, immediately above **About VineMix**, opens curated
+bundled highlights. After an update the notice waits for a healthy, visible, active workspace without an
+editor, gesture, pending save or another dialog. A fresh install establishes a
+baseline without an upgrade notice; an existing workspace from a version without
+this feature gets one transition notice. Skipped versions include their available
+bundled highlights. Dismissal is stored under `updates/whats-new.json`, separately
+from workspace settings and Undo. Closing the notice leaves audio unchanged.
+
 After building, launch **`artifacts/VineMix/VineMix.exe`**. The native engine
 is alongside it, and the package includes the .NET desktop runtime. Closing the
-window hides it to the tray; right-click its tray icon and choose **Quit VineMix** to stop audio. Start at
+window hides it to the tray; choose **Quit VineMix** at the bottom of Settings or
+from the tray menu to stop audio. Both actions save first. If the final save fails,
+VineMix stays open while you retry, save a recovery copy, cancel quitting or
+explicitly quit without saving. A recovery copy contains the full workspace and
+queued edits; it never overwrites an existing file. To inspect it separately,
+quit VineMix and open the app with `--settings "<recovery-copy.json>"`, retaining
+the original settings. Start at
 login is optional and off by default.
 
 ```powershell

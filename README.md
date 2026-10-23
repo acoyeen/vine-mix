@@ -4,11 +4,13 @@ VineMix is an audio mixer for **Windows 11 x64**. Connect a microphone or an app
 headphones and a virtual microphone by drawing cables between nodes. Add effects
 when you need them; each output has its own level and mute.
 
-**0.3.0 · Beta 3** is an MIT-licensed open-source beta.
-Download the [Windows installer](https://github.com/acoyeen/vine-mix/releases/download/v0.3.0-beta.3/VineMix-0.3.0-beta.3-Setup-x64.exe)
-or [standalone EXE](https://github.com/acoyeen/vine-mix/releases/download/v0.3.0-beta.3/VineMix-0.3.0-beta.3-Standalone-x64.exe).
-The [release page](https://github.com/acoyeen/vine-mix/releases/tag/v0.3.0-beta.3)
+**0.3.0 · Beta 4** is an MIT-licensed open-source beta.
+Download the [Windows installer](https://github.com/acoyeen/vine-mix/releases/download/v0.3.0-beta.4/VineMix-0.3.0-beta.4-Setup-x64.exe)
+or [standalone EXE](https://github.com/acoyeen/vine-mix/releases/download/v0.3.0-beta.4/VineMix-0.3.0-beta.4-Standalone-x64.exe).
+The [release page](https://github.com/acoyeen/vine-mix/releases/tag/v0.3.0-beta.4)
 includes checksums, matching source and release notes.
+Beta 4 adds streamed headset outputs, a layout lock, safer quitting and bundled
+update highlights; see the [release notes](docs/releases/0.3.0-beta.4.md).
 See [the current qualification results](docs/BETA_TESTING_CURRENT.md),
 [the beta test guide](docs/BETA_TESTER_GUIDE.md) and [testing status](TESTING.md)
 for current limitations.
@@ -57,6 +59,8 @@ passthrough, and check **Windows Settings → System → Sound → Input**. Sele
 Windows microphone in VineMix's **Physical input** node. Existing virtual or
 streamed microphones do not require the bundled cables. See
 [device troubleshooting](docs/DEVICE_VISIBILITY.md) if it is missing.
+For headset playback, choose its Windows playback device in **Listening output**.
+Streamed outputs, including Virtual Desktop, do not require a bundled cable.
 
 [VB-CABLE](https://vb-audio.com/Cable/) is used for a virtual input:
 apps play to **CABLE Input**, which VineMix receives from **CABLE Output**.
@@ -73,9 +77,15 @@ not change driver terms. Driver information was checked on 21 October 2026.
   are Ducking triggers.
 - The wheel zooms the workspace, middle-drag pans, and **Home** fits everything.
   **Ctrl+Z** undoes an edit; **Ctrl+F** finds a node. **F1** opens Help & shortcuts.
-- Changes save automatically. Wait for **Saved** before quitting. Closing the
-  window keeps audio running in the tray; **Quit VineMix** in the tray menu stops
-  the app and audio engine.
+- The top-right padlock protects node positions and connections: red and closed
+  means locked; muted grey and open means unlocked. Node selection outlines stay
+  hidden while locked. Sound controls still work.
+- Changes save automatically. Closing the window keeps audio running in the tray.
+  **Quit VineMix** at the bottom of Settings or in the tray menu saves and stops
+  the app and audio engine. If saving fails, retry, save a recovery copy, cancel
+  quitting or explicitly quit without saving.
+- **Settings → What's new?** reopens bundled release highlights. After an
+  update, they appear once when the workspace is ready and you are not editing.
 - Red device text means a selected device is unavailable. Reconnect it, check
   Windows sound settings, then use **Settings → Retry assigned devices**.
   **Restart audio engine** briefly interrupts audio and reconnects saved routes.

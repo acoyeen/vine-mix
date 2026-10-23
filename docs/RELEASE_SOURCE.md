@@ -3,6 +3,23 @@
 Every published version has its own source tag and retained executable downloads.
 The [release history](RELEASES.md) links each version's notes and assets.
 
+## 0.3.0-beta.4
+
+Beta 4's Setup and standalone packages share one frozen, committed build-input
+snapshot. The exact-source ZIP includes the committed files and
+`SOURCE-MANIFEST.json`, recording the release commit, input sizes and SHA-256
+hashes, exact executable identities and a sanitized final-package verification
+record. Both build receipts and the signed update preparation must identify the
+same source snapshot. `SHA256SUMS.txt` covers the two downloads, signed update
+metadata and source ZIP.
+
+See [Beta 4's notes](releases/0.3.0-beta.4.md) and
+[qualification record](BETA_TESTING_CURRENT.md) for the scope of verification.
+The [preceding local candidate record](LOCAL_CANDIDATE_2026-10-23.md) describes
+earlier unpublished bytes and does not identify the Beta 4 downloads. Earlier
+versions keep their original source tags and assets; this release does not
+finalize or replace provisional Beta 2.
+
 ## 0.3.0-beta.3
 
 The Beta 3 packages are built from one committed source revision, identified by

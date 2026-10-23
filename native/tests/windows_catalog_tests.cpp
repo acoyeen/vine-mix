@@ -236,6 +236,22 @@ int main() {
         require(!am::detail::streamEndpointRejection((*streamed)[0], true, false, "vbCable").empty()
             && !am::detail::streamEndpointRejection((*streamed)[0], false, false, "vacLite").empty(),
             "A streamed microphone cannot satisfy either dedicated cable transport");
+        auto& playbackMetadata = enumerator.renderMetadata;
+        playbackMetadata.available = true; playbackMetadata.name = L"Headphones (Virtual Desktop Audio)";
+        playbackMetadata.hasFormFactor = true; playbackMetadata.formFactor = RemoteNetworkDevice;
+        auto streamedPlayback = am::detail::collectEndpoints(&enumerator);
+        require(streamedPlayback && (*streamedPlayback)[1].direction == "render" && (*streamedPlayback)[1].isVirtual
+            && (*streamedPlayback)[1].transport == "otherVirtual" && (*streamedPlayback)[1].formFactor == RemoteNetworkDevice,
+            "An invented Virtual Desktop playback fixture is discovered as a render endpoint without impersonating a routing cable");
+        require(am::detail::streamEndpointRejection((*streamedPlayback)[1], false, false, "listening").empty()
+            && !am::detail::streamEndpointRejection((*streamedPlayback)[1], true, true, {}).empty()
+            && !am::detail::streamEndpointRejection((*streamedPlayback)[1], false, false, "vacLite").empty(),
+            "Streamed playback uses Listening output and remains distinct from both microphone capture and VAC direct output");
+        playbackMetadata.name = L"Example network headset";
+        const auto unknownPlayback = am::detail::collectEndpoints(&enumerator);
+        require(unknownPlayback && (*unknownPlayback)[1].transport == "physical"
+            && am::detail::streamEndpointRejection((*unknownPlayback)[1], false, false, "listening").empty(),
+            "A network listening endpoint with unknown driver provenance remains usable without a vendor-name allowlist");
         metadata.name = L"Example network headset microphone";
         auto unknownProvenance = am::detail::collectEndpoints(&enumerator);
         require(unknownProvenance && (*unknownProvenance)[0].description.empty() && (*unknownProvenance)[0].interfaceName.empty()
@@ -255,10 +271,39 @@ int main() {
             require(am::detail::streamEndpointRejection(endpoint, true, false, "vbCable").empty() == (endpoint.transport == "vbCable"),
                 "Dedicated cable capture remains restricted to its explicit transport family");
             endpoint.direction = "render";
+            require(am::detail::streamEndpointRejection(endpoint, false, false, "listening").empty()
+                == (endpoint.transport == "physical" || endpoint.transport == "otherVirtual"),
+                "Listening output accepts physical and software playback while preserving dedicated cable policy at worker open and refresh");
             require(!am::detail::streamEndpointRejection(endpoint, true, true, {}).empty(),
                 "Generic microphone capture still rejects render endpoints");
             require(am::detail::streamEndpointRejection(endpoint, false, false, "vacLite").empty() == (endpoint.transport == "vacLite"),
                 "Direct virtual microphone output remains restricted to the VAC transport");
+        }
+        {
+            auto original = (*streamedPlayback)[1]; original.stableId = "example-streamed-stable";
+            auto replacement = original; replacement.id = "example-returned-render";
+            const am::DeviceBinding saved{original.id, original.stableId, "Saved headset", -1};
+            auto resolve = [&](std::vector<am::Endpoint> endpoints) {
+                return am::detail::resolveEndpoint(endpoints, saved, false);
+            };
+            require(resolve({replacement, original})->id == original.id,
+                "The production output resolver prefers an active exact identity over stable aliases");
+            original.state = "Disabled";
+            require(resolve({original, replacement})->id == replacement.id,
+                "A disabled old streamed output reconnects to one active stable replacement");
+            for (const auto* state : {"Disabled", "Missing", "Unplugged"}) {
+                original.state = state;
+                require(resolve({original})->state == state,
+                    "Unavailable exact output assignments remain diagnosable through each device lifecycle state");
+            }
+            require(!resolve({}), "A missing output never substitutes the Windows default or an unrelated device");
+            auto ambiguous = replacement; ambiguous.id = "example-ambiguous-render";
+            require(!resolve({original, replacement, ambiguous}), "Ambiguous stable output identities never select an arbitrary replacement");
+            replacement.direction = "capture";
+            require(resolve({original, replacement})->id == original.id,
+                "A matching stable microphone identity cannot replace an unavailable playback endpoint");
+            require(saved.id == "fake-render" && saved.stableId == "example-streamed-stable" && saved.name == "Saved headset",
+                "Device resolution preserves saved exact/stable identifiers and the saved display name");
         }
         require(liveObjects == 0, "Metadata reads release every temporary COM property store and device");
         metadata = {};

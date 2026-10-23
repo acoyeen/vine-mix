@@ -16,9 +16,15 @@ namespace am::detail {
 std::optional<std::vector<Endpoint>> collectEndpoints(IMMDeviceEnumerator* enumerator,
     std::span<const Endpoint> previous = {});
 
+// Production worker resolver: active exact ID, then a unique active stable ID.
+// Unavailable exact assignments remain diagnosable; names never select a device.
+std::optional<Endpoint> resolveEndpoint(std::span<const Endpoint> devices,
+    const DeviceBinding& selection, bool capture);
+
 // Pure stream-selection policy, shared by initial opening and catalog refresh.
-// Generic microphone capture accepts any Windows capture endpoint. Dedicated
-// cable nodes continue to require their explicit transport family.
+// Generic microphone capture accepts any Windows capture endpoint. "listening"
+// allows ordinary/streamed/software playback but excludes known routing cables.
+// Dedicated cable nodes continue to require their explicit transport family.
 std::string_view streamEndpointRejection(const Endpoint& endpoint, bool capture,
     bool microphone, std::string_view requiredTransport);
 

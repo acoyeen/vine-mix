@@ -26,10 +26,10 @@
      <controls:BrandWordmark x:Name="ApplicationBrandMark" Width="106" Height="20" IsHitTestVisible="False"/>
    </Button>
    <Grid Grid.Column="2">
-    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-    <TextBlock x:Name="SaveIndicator" Margin="12,0,12,0" TextAlignment="Right" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" ToolTip="{Binding SaveStatus}" AutomationProperties.Name="{Binding SaveStatus}" Foreground="{DynamicResource ConsoleMutedBrush}" FontSize="12" VerticalAlignment="Center"/>
-    <Button Grid.Column="1" x:Name="SettingsButton" Content="Settings" Style="{StaticResource WorkspaceToolbarButton}" Width="78" Height="26" Margin="0,0,8,0" Click="Settings_Click" AutomationProperties.Name="Open settings" shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
-    <StackPanel Grid.Column="2" x:Name="WindowActions" Orientation="Horizontal" VerticalAlignment="Center"/>
+    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+    <Button Grid.Column="1" x:Name="LayoutLockButton" Style="{StaticResource WorkspaceToolbarButton}" Width="34" Height="28" Padding="6,3" Margin="0,0,6,0" Click="LayoutLock_Click" AutomationProperties.LiveSetting="Polite" shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
+    <Button Grid.Column="2" x:Name="SettingsButton" Content="Settings" Style="{StaticResource WorkspaceToolbarButton}" Width="78" Height="26" Margin="0,0,8,0" Click="Settings_Click" AutomationProperties.Name="Open settings" shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
+    <StackPanel Grid.Column="3" x:Name="WindowActions" Orientation="Horizontal" VerticalAlignment="Center"/>
    </Grid>
   </Grid>
   <Border Grid.Row="1" Background="{DynamicResource ConsoleBorderBrush}"/>

@@ -59,8 +59,8 @@ public sealed partial class MixerViewModel : Observable, IDisposable
     private MixerConfiguration _desired = new();
     private (double X, double Y, double Zoom)? _canvasView;
     public WorkspaceHistory EditHistory { get; } = new();
-    public bool CanUndo => CanEdit && EditHistory.CanUndo;
-    public bool CanRedo => CanEdit && EditHistory.CanRedo;
+    public bool CanUndo => CanEdit && EditHistory.CanUndo && (!IsLayoutLocked || !EditHistory.UndoChangesLayout);
+    public bool CanRedo => CanEdit && EditHistory.CanRedo && (!IsLayoutLocked || !EditHistory.RedoChangesLayout);
     public string UndoDescription => EditHistory.UndoDescription;
     public string RedoDescription => EditHistory.RedoDescription;
     // Detached verification can exercise the real pending/acknowledgement path
@@ -101,9 +101,9 @@ public sealed partial class MixerViewModel : Observable, IDisposable
     internal ulong MeterAudioFrames => _snapshot?.Status.AudioFrames ?? 0;
     internal GraphNode? AcknowledgedGraphNode(string id) => _snapshot?.Configuration.Graph.Nodes.FirstOrDefault(node => node.Id == id);
     internal long ConfigurationPresentationCount { get; private set; }
-    public bool CanEdit { get => _connected && !IsRestartingEngine && !IsPreparingUpdate && !IsUpdateHealthMode; private set { if (Set(ref _connected, value)) NotifyHistory(); } }
+    public bool CanEdit { get => _connected && !IsRestartingEngine && !IsPreparingUpdate && !IsPreparingQuit && !IsUpdateHealthMode; private set { if (Set(ref _connected, value)) NotifyHistory(); } }
     public bool IsRestartingEngine => _restartingEngine;
-    public bool CanRestartEngine => _restartOperations is not null && !IsRestartingEngine && !IsPreparingUpdate && !IsUpdateHealthMode && !_stop.IsCancellationRequested
+    public bool CanRestartEngine => _restartOperations is not null && !IsRestartingEngine && !IsPreparingUpdate && !IsPreparingQuit && !IsUpdateHealthMode && !_stop.IsCancellationRequested
         && !HasSettingsRecovery && (_preview || _snapshot is not null && _supervisor?.CanRestart == true);
     public bool IsVisible { get => _visible; set => _visible = value; }
     public string ConnectionStatus { get => _connectionStatus; private set => Set(ref _connectionStatus, value); }
@@ -248,7 +248,7 @@ public sealed partial class MixerViewModel : Observable, IDisposable
 
     public async Task RecoverSettingsAsync(string command)
     {
-        if (_preview && _restartOperations is null || !HasSettingsRecovery) return;
+        if (_preview && _restartOperations is null || !HasSettingsRecovery || IsPreparingQuit) return;
         bool entered = false;
         try
         {
@@ -302,8 +302,10 @@ public sealed partial class MixerViewModel : Observable, IDisposable
         var before = _desired.Copy();
         // A checked operation may refuse a changing destination. Publish its
         // result only after success, with no partial graph or history on failure.
-        var candidate = operation.CheckedChange is null ? _desired : _desired.Copy();
+        var candidate = operation.CheckedChange is null && !IsLayoutLocked ? _desired : _desired.Copy();
         if (!operation.TryApply(candidate, out error)) return false;
+        if (IsLayoutLocked && WorkspaceHistory.ChangesLayout(before.Graph, candidate.Graph))
+        { error = LayoutLockedMessage; NotifyLayoutEditBlocked(); return false; }
         _desired = candidate;
         var manualPolicies = new Dictionary<string, bool>();
         foreach (var node in _desired.Graph.Nodes.Where(n => VirtualDeviceBindings.IsVirtual(n.Kind)))
@@ -356,6 +358,7 @@ public sealed partial class MixerViewModel : Observable, IDisposable
     public void EndEditGesture() { EditHistory.EndGesture(); NotifyHistory(); }
     private void NotifyHistory()
     {
+        Changed(nameof(CanEditLayout));
         Changed(nameof(CanUndo)); Changed(nameof(CanRedo));
         Changed(nameof(UndoDescription)); Changed(nameof(RedoDescription));
     }
@@ -365,6 +368,8 @@ public sealed partial class MixerViewModel : Observable, IDisposable
     private bool RestoreHistory(bool undo)
     {
         if (Applying || !CanEdit) return false;
+        if (IsLayoutLocked && (undo ? EditHistory.UndoChangesLayout : EditHistory.RedoChangesLayout))
+        { NotifyLayoutEditBlocked(); return false; }
         GraphConfiguration restored; WorkspaceGraphRestore? restore; string error;
         bool changed = undo ? EditHistory.TryUndo(_desired.Graph, out restored, out restore, out error)
             : EditHistory.TryRedo(_desired.Graph, out restored, out restore, out error);
@@ -428,6 +433,7 @@ public sealed partial class MixerViewModel : Observable, IDisposable
     internal PendingBatch PreparePendingConfiguration(MixerConfiguration basis)
     {
         ReconcileUnconfirmedUpdate(basis);
+        ReconcileUnconfirmedQuit(basis);
         var configuration = ReplayPending(basis.Copy());
         if (_canvasView is { } view) { configuration.Graph.PanX = view.X; configuration.Graph.PanY = view.Y; configuration.Graph.Zoom = view.Zoom; }
         return new(configuration, _pending.ToArray());
@@ -512,6 +518,7 @@ public sealed partial class MixerViewModel : Observable, IDisposable
             snapshot.Configuration.Version = 2;
         }
         ReconcileUnconfirmedUpdate(snapshot.Configuration);
+        ReconcileUnconfirmedQuit(snapshot.Configuration);
         bool initial = _snapshot is null;
         bool recovery = snapshot.SettingsState is not ("loaded" or "new");
         if (recovery && !HasSettingsRecovery && _pending.Count > 0) _recoveryPending = _desired.Copy();
@@ -550,7 +557,7 @@ public sealed partial class MixerViewModel : Observable, IDisposable
             _saveError = "";
             SaveStatus = _preview ? "Preview · no settings are saved" : _editError.Length == 0 ? $"Saved · revision {snapshot.Configuration.Revision}" : "Change was not saved";
         }
-        if (!HasSettingsRecovery && !IsPreparingUpdate && !IsUpdateHealthMode && (configurationChanged || inventoryChanged))
+        if (!HasSettingsRecovery && !IsPreparingUpdate && !IsPreparingQuit && !IsUpdateHealthMode && (configurationChanged || inventoryChanged))
         {
             var assignments = AutomaticAssignments()
                 .Where(a => _preview || !_automaticAssignmentAttempts.Contains(a.AttemptKey)).ToArray();
@@ -622,6 +629,7 @@ public sealed partial class MixerViewModel : Observable, IDisposable
     private PendingBatch PrepareRestartConfiguration(MixerConfiguration basis)
     {
         ReconcileUnconfirmedUpdate(basis);
+        ReconcileUnconfirmedQuit(basis);
         var configuration = basis.Copy();
         foreach (var edit in _pending)
         {
@@ -765,7 +773,7 @@ public sealed partial class MixerViewModel : Observable, IDisposable
     {
         while (!_stop.IsCancellationRequested)
         {
-            if (IsPreparingUpdate)
+            if (IsPreparingUpdate || IsPreparingQuit)
             {
                 try { await Task.Delay(100, _stop.Token); }
                 catch (OperationCanceledException) { break; }
@@ -776,7 +784,7 @@ public sealed partial class MixerViewModel : Observable, IDisposable
             try
             {
                 await _engineGate.WaitAsync(_stop.Token); entered = true;
-                if (IsRestartingEngine || IsPreparingUpdate) continue;
+                if (IsRestartingEngine || IsPreparingUpdate || IsPreparingQuit) continue;
                 var response = await _connection!.RequestAsync("snapshot", null, null, _stop.Token);
                 if (!response.Ok || response.Snapshot is null) throw new InvalidOperationException(response.Error.Length > 0 ? response.Error : "The audio engine did not provide a snapshot.");
                 bool wasConnected = CanEdit;
@@ -825,7 +833,7 @@ public sealed partial class MixerViewModel : Observable, IDisposable
     public async Task RetryAsync()
     {
         if (_preview && _restartOperations is null) { Warning = "Preview only · no devices are retried."; return; }
-        if (IsRestartingEngine || IsPreparingUpdate || _stop.IsCancellationRequested) return;
+        if (IsRestartingEngine || IsPreparingUpdate || IsPreparingQuit || _stop.IsCancellationRequested) return;
         bool entered = false;
         try
         {
@@ -839,59 +847,5 @@ public sealed partial class MixerViewModel : Observable, IDisposable
         finally { if (entered) _engineGate.Release(); }
     }
 
-    public async Task<string> StopAsync()
-    {
-        if (_preview)
-        {
-            _stop.Cancel(); Changed(nameof(CanRestartEngine));
-            await _engineGate.WaitAsync();
-            try { CanEdit = false; InvalidatePresentation(); return ""; }
-            finally { _engineGate.Release(); }
-        }
-        string saveFailure = "";
-        _stop.Cancel();
-        Changed(nameof(CanRestartEngine));
-        if (_loop is not null) await _loop;
-        await _engineGate.WaitAsync();
-        try
-        {
-        CanEdit = false;
-        // Flush the last queued edits before an explicit Quit when the engine is available.
-        if (_pending.Count > 0)
-        {
-            using var saving = new CancellationTokenSource(TimeSpan.FromSeconds(4));
-            try
-            {
-                for (int attempt = 0; attempt < 2 && _pending.Count > 0; attempt++)
-                {
-                    var current = await _connection!.RequestAsync("snapshot", null, null, saving.Token);
-                    if (!current.Ok || current.Snapshot is null) { saveFailure = current.Error.Length > 0 ? current.Error : "The engine could not provide its saved settings."; break; }
-                    var batch = PreparePendingConfiguration(current.Snapshot.Configuration);
-                    if (batch.Edits.Count == 0) { saveFailure = _editError; break; }
-                    var saved = await _connection.RequestAsync("configure", batch.Configuration, current.Snapshot.Configuration.Revision, saving.Token);
-                    if (saved.Ok)
-                    {
-                        AcknowledgePending(batch, saved.Snapshot); CanEdit = false;
-                        saveFailure = "";
-                        break;
-                    }
-                    saveFailure = saved.Error;
-                    if (saved.ErrorCode == "settings_write_failed") break;
-                    if (!saved.Error.Contains("revision", StringComparison.OrdinalIgnoreCase)
-                        && !saved.Error.Contains("stale", StringComparison.OrdinalIgnoreCase))
-                    { RejectPending(batch, current.Snapshot, saved.Error); CanEdit = false; break; }
-                }
-            }
-            catch (Exception error) when (error is System.IO.IOException or TimeoutException or OperationCanceledException or InvalidOperationException or System.Text.Json.JsonException or UnauthorizedAccessException)
-            { saveFailure = error is OperationCanceledException ? "The engine did not finish saving before the shutdown deadline." : error.Message; }
-        }
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(4));
-        try { await _connection!.RequestAsync("shutdown", null, null, timeout.Token); }
-        catch (Exception error) when (error is System.IO.IOException or TimeoutException or OperationCanceledException or InvalidOperationException or System.Text.Json.JsonException or UnauthorizedAccessException) { }
-        await _supervisor!.StopForQuitAsync();
-        return _pending.Count > 0 || saveFailure.Length > 0 ? "The most recent settings changes could not be saved. VineMix has stopped.\n\n" + (saveFailure.Length > 0 ? saveFailure : "The settings changed repeatedly during shutdown.") : "";
-        }
-        finally { _engineGate.Release(); }
-    }
     public void Dispose() { _stop.Cancel(); _connection?.Dispose(); _supervisor?.Dispose(); _stop.Dispose(); }
 }

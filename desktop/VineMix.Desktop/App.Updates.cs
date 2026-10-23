@@ -40,7 +40,7 @@ public partial class App
     }
     internal async Task InstallUpdateAsync(DownloadedUpdate download)
     {
-        if (_quitting || _updating || _window is null || _mixer is null)
+        if (_quitting || _quitRequested || _updating || _window is null || _mixer is null)
             throw new InvalidOperationException("An update or shutdown is already in progress.");
         if (!_window.TryPrepareUpdateEditors()) return;
         _updating = true;
@@ -173,6 +173,7 @@ public partial class App
             if (stopped) { _quitting = true; Shutdown(1); }
             else
             {
+                _mixer.AllowQuitAfterFailedUpdateHealth();
                 _window.Show();
                 _window.IsEnabled = true;
                 _window.Workspace.SetMessage("The update needs recovery. Quit VineMix from its tray menu, then reopen it to recover. " + error.Message, true);

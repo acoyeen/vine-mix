@@ -23,6 +23,19 @@ public sealed class WorkspaceHistory
     public string UndoDescription => HasGestureEdit ? _gestureDescription ?? Describe(_gestureBefore!, _gestureAfter!).Description
         : _position > 0 ? _steps[_position - 1].Entry.Description : "";
     public string RedoDescription => CanRedo ? _steps[_position].Entry.Description : "";
+    public bool UndoChangesLayout => HasGestureEdit
+        ? ChangesLayout(_gestureBefore!, _gestureAfter!)
+        : _position > 0 && ChangesLayout(_steps[_position - 1].Before, _steps[_position - 1].After);
+    public bool RedoChangesLayout => CanRedo && ChangesLayout(_steps[_position].Before, _steps[_position].After);
+
+    // Compare topology and placement, never the activity description. Device
+    // assignment, names, sound controls and cable level/mute remain adjustable.
+    // A mixed structural/parameter edit is structural and cannot be half-undone.
+    internal static bool ChangesLayout(GraphConfiguration before, GraphConfiguration after)
+        => !SameValue(before.Nodes.OrderBy(node => node.Id).Select(node => new { node.Id, node.Kind, node.X, node.Y }),
+            after.Nodes.OrderBy(node => node.Id).Select(node => new { node.Id, node.Kind, node.X, node.Y }))
+        || !SameValue(before.Edges.OrderBy(edge => edge.Id).Select(edge => new { edge.Id, edge.From, edge.To, edge.Kind }),
+            after.Edges.OrderBy(edge => edge.Id).Select(edge => new { edge.Id, edge.From, edge.To, edge.Kind }));
 
     public void BeginGesture(string? description = null)
     {

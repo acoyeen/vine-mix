@@ -1,6 +1,6 @@
 # This guard is read-only. Activation must inspect the same physical settings
 # that the ordinary desktop app uses, before stopping or replacing any process.
-function Assert-DesktopDataContext([string]$SettingsPath) {
+function Initialize-DesktopDataContext {
     if (-not ('VineMix.DesktopDataContext' -as [type])) {
         Add-Type -TypeDefinition @'
 using System;
@@ -18,11 +18,31 @@ namespace VineMix {
                 throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
             return path.ToString();
         }
+        [DllImport("user32.dll")]
+        private static extern bool IsWindowVisible(IntPtr window);
+        [DllImport("user32.dll", CharSet=CharSet.Unicode)]
+        private static extern int GetWindowTextW(IntPtr window, StringBuilder text, int count);
+        [DllImport("user32.dll", CharSet=CharSet.Unicode)]
+        private static extern int GetClassNameW(IntPtr window, StringBuilder text, int count);
+        [DllImport("user32.dll")]
+        private static extern uint GetWindowThreadProcessId(IntPtr window, out uint processId);
+        public static bool MatchesWorkspaceIdentity(string title, string className, bool visible, uint actualProcess, uint expectedProcess)
+            => visible && actualProcess == expectedProcess && title == "VineMix · Patch workspace"
+                && className.StartsWith("HwndWrapper[", StringComparison.Ordinal);
+        public static bool IsWorkspaceWindow(IntPtr window, uint expectedProcess) {
+            var title = new StringBuilder(1024); var className = new StringBuilder(256);
+            GetWindowTextW(window, title, title.Capacity); GetClassNameW(window, className, className.Capacity);
+            GetWindowThreadProcessId(window, out uint actualProcess);
+            return MatchesWorkspaceIdentity(title.ToString(), className.ToString(), IsWindowVisible(window), actualProcess, expectedProcess);
+        }
     }
 }
 
 '@
     }
+}
+function Assert-DesktopDataContext([string]$SettingsPath) {
+    Initialize-DesktopDataContext
     $expected = [IO.Path]::GetFullPath($SettingsPath)
     $stream = [IO.File]::Open($expected, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete)
     try { $actual = [VineMix.DesktopDataContext]::Resolve($stream.SafeFileHandle) }
@@ -38,8 +58,11 @@ function Start-DesktopController {
     param(
         [Parameter(Mandatory)][string]$ExecutablePath,
         [Parameter(Mandatory)][string]$WorkingDirectory,
+        [string]$ShortcutPath = '',
+        [scriptblock]$OnVerifiedProcess,
         [ValidateRange(1, 60000)][int]$TimeoutMilliseconds = 20000
     )
+    Initialize-DesktopDataContext
     $expected = [IO.Path]::GetFullPath($ExecutablePath)
     $directory = [IO.Path]::GetFullPath($WorkingDirectory)
     $name = [IO.Path]::GetFileNameWithoutExtension($expected)
@@ -55,11 +78,22 @@ function Start-DesktopController {
     # The existing activation workflow explicitly reopens the interactive app.
     # Its first process now relaunches into the ordinary desktop data context;
     # only the final process owns the responsive workspace window.
-    $launcher = Start-Process -FilePath $expected -WorkingDirectory $directory -PassThru
+    if ($ShortcutPath) {
+        # Activation validates the link target before changing any process and
+        # again here. Explorer opens the actual shortcut used by the maintainer.
+        Assert-ActivationShortcut $ShortcutPath $expected
+        $shortcut = [IO.Path]::GetFullPath($ShortcutPath)
+        if ($shortcut.Contains('"')) { throw 'The shortcut path contains an invalid quote.' }
+        $launcher = Start-Process -FilePath (Join-Path $env:WINDIR 'explorer.exe') -ArgumentList ('"' + $shortcut + '"') -WindowStyle Hidden -PassThru
+    } else {
+        $launcher = Start-Process -FilePath $expected -WorkingDirectory $directory -PassThru
+    }
     try {
         do {
             $launcher.Refresh()
-            if ($launcher.HasExited -and $launcher.ExitCode -ne 0) {
+            # Explorer can exit after handing the shortcut to its existing shell.
+            # The verified workspace window below is the authority in that case.
+            if (-not $ShortcutPath -and $launcher.HasExited -and $launcher.ExitCode -ne 0) {
                 throw "The desktop controller launcher exited with code $($launcher.ExitCode)."
             }
             $candidates = @(Get-Process -Name $name -ErrorAction SilentlyContinue)
@@ -86,8 +120,12 @@ function Start-DesktopController {
                 }
                 if ($live.Count -eq 1) {
                     $process = $live[0]
+                    if ($OnVerifiedProcess) {
+                        & $OnVerifiedProcess ([pscustomobject]@{Id=$process.Id;StartTime=$process.StartTime;Path=$process.Path;SessionId=$process.SessionId})
+                    }
                     try {
-                        if ($process.MainWindowHandle -ne 0 -and $process.Responding -and $process.WaitForInputIdle(0)) {
+                        if ($process.MainWindowHandle -ne 0 -and $process.Responding -and $process.WaitForInputIdle(0) -and
+                            [VineMix.DesktopDataContext]::IsWorkspaceWindow($process.MainWindowHandle, $process.Id)) {
                             $selected = $process
                             return $process
                         }
