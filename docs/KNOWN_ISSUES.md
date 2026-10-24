@@ -19,15 +19,15 @@ remains undecided; record that distinction explicitly.
 | [ISSUE-004](#issue-004) | Precise edits discarded on focus loss | Confirmed in source |
 | [ISSUE-005](#issue-005) | Dense-graph navigation and Fit limits | Partly confirmed in source |
 | [ISSUE-006](#issue-006) | Website node route is hard to follow | Resolved in local website |
-| [ISSUE-007](#issue-007) | Automatic update checks can appear inactive and suppress failed retries | Fixed in Beta 5 source; release preparation |
-| [ISSUE-008](#issue-008) | Installed Beta 2 reopens after an attempted Beta 4 update | Confirmed metadata defect; Beta 5 correction in preparation |
-| [ISSUE-009](#issue-009) | Update window does not match the minimal application interface | Fixed in Beta 5 source; release preparation |
+| [ISSUE-007](#issue-007) | Automatic update checks can appear inactive and suppress failed retries | Resolved in Beta 5 |
+| [ISSUE-008](#issue-008) | Installed Beta 2 reopens after an attempted Beta 4 update | Metadata defect resolved in Beta 5; tester incident not independently confirmed |
+| [ISSUE-009](#issue-009) | Update window does not match the minimal application interface | Resolved in Beta 5 |
 
 <a id="issue-007"></a>
 ## ISSUE-007: Automatic update checks can appear inactive and suppress failed retries
 
-- **Reported and locally resolved:** 2026-10-24. **Status:** Fixed in Beta 5
-  source; release preparation and final package verification in progress.
+- **Reported and resolved:** 2026-10-24. **Status:** Resolved in published
+  Beta 5; source and final-package checks passed.
 - **Reported:** A remote tester found the automatic-check control ineffective,
   while a manual check found Beta 4.
 - **Verified in released source:** The checkbox only saves a preference. A
@@ -44,7 +44,7 @@ remains undecided; record that distinction explicitly.
 - **Verification:** Deterministic scheduler checks cover failure/retry, daily
   cadence, stored timestamps, busy manual operations and cancellation. The full
   detached desktop suite passes 12,905 checks with zero binding errors.
-- **Next step:** Complete Beta 5 release verification and qualify the delivered
+- **Next step:** Qualify the delivered
   correction on a separate test installation.
   The tester's exact automatic-check timing and network conditions remain unknown.
 - **Evidence:** [Update investigation](UPDATE_INVESTIGATION_2026-10-24.md).
@@ -53,8 +53,8 @@ remains undecided; record that distinction explicitly.
 ## ISSUE-008: Installed Beta 2 reopens after an attempted Beta 4 update
 
 - **Reported and locally corrected:** 2026-10-24. **Status:** Confirmed package
-  metadata defect; isolated rollback reproduced. Corrected in Beta 5 source,
-  with release preparation in progress. The tester's own journal has not been
+  metadata defect; isolated rollback reproduced. Corrected in published Beta 5
+  source and packages. The tester's own journal has not been
   inspected.
 - **Reported:** A remote tester using the installed distribution manually found
   Beta 4, downloaded and installed it, then saw Beta 2 after the application
@@ -75,6 +75,11 @@ remains undecided; record that distinction explicitly.
   the rebuilt engine. Real metadata and isolated rollback tests pass: 111 worker
   checks, five native metadata fixtures and nine release-preparation checks.
   New build and packaging gates verify actual delivered version metadata.
+  The exact original Beta 2 core/trust accepts the final signed Beta 5 envelope
+  and both package hashes; its unchanged version checker accepts the installed
+  and standalone-extracted engine at numeric version `0.3.0.6`. Both engines
+  have identical bytes. Final-package checks pass: both inert smoke checks,
+  18 standalone-runtime checks and 167 isolated Setup checks.
 - **Diagnostic improvement:** Local source preserves the Setup exit code and
   writes its log in the private transaction folder. This does not retrofit the
   tester's already installed Beta 2 worker; the native metadata correction is
@@ -87,7 +92,12 @@ remains undecided; record that distinction explicitly.
   installation without uninstalling; standalone users replace the old EXE after
   quitting. Keep settings and recovery evidence. Intermediate betas are not
   required. Manual Setup bypasses the older worker's metadata check.
-- **Next step:** Complete corrected-package release verification and qualify an
+- **Publication:** [Beta 5](https://github.com/acoyeen/vine-mix/releases/tag/v0.3.0-beta.5)
+  was published on 2026-10-24. All five uploaded assets were downloaded and
+  rehashed, and the pinned-key signature passed. The original tags and packages
+  remain unchanged. Beta 2/3/4's live release notes now include update notices
+  and recovery guidance, preserving their original bodies.
+- **Next step:** Qualify an
   actual delivered update on a separate test machine/account. Existing Beta 3/4
   packages remain affected. A sanitized tester journal can confirm the exact
   incident. Retain raw evidence outside the repository.
@@ -96,8 +106,8 @@ remains undecided; record that distinction explicitly.
 <a id="issue-009"></a>
 ## ISSUE-009: Update window does not match the minimal application interface
 
-- **Reported and locally resolved:** 2026-10-24. **Status:** Fixed in Beta 5
-  source; release preparation and final package verification in progress.
+- **Reported and resolved:** 2026-10-24. **Status:** Resolved in published
+  Beta 5; source and final-package checks passed.
 - **Reported / verified:** The maintainer requested a redesign. A detached render
   confirms the current window has a large blank area and a wrapped row of check,
   download, install, cancel and defer buttons, most disabled when idle.
@@ -111,7 +121,7 @@ remains undecided; record that distinction explicitly.
   width/DPI combinations and high contrast passed in detached WPF verification.
   The complete suite passed 12,905 checks and 236 renders with no binding errors;
   the production build passed with no warnings or errors.
-- **Next step:** Complete Beta 5 release verification and check native
+- **Next step:** Check native
   keyboard/pointer behavior on a separate test installation. No personal
   application or audio-engine process was changed during local verification.
 
@@ -129,8 +139,8 @@ remains undecided; record that distinction explicitly.
   socket directly from Physical input, and simplified the page and credits copy.
 - **Verification:** Desktop, tablet, phone and short-window layouts checked;
   no horizontal overflow. Static/reduced-motion routes and FAQ keyboard behavior
-  checked. See [website QA](../website-redesign/QA.md) and the
-  [updated preview](../website-redesign/nodes-preview.jpg).
+  checked. Local-only evidence: `website-redesign/QA.md` and
+  `website-redesign/nodes-preview.jpg`, outside the released source.
 - **Next step:** Review the local website revision. No public deployment or
   desktop application change is included.
 

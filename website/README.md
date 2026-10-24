@@ -109,12 +109,12 @@ adaptation details belong in
 
 ## Content status
 
-The product page links to the versioned Beta 4 release and the current user
+The product page links to the versioned Beta 5 release and the current user
 guide. Source, checksums and signed update metadata accompany each applicable
 GitHub release. The original application is MIT licensed; repository visibility
 is managed separately from release preparation.
 
-VineMix 0.3.0-beta.4 targets Windows 11 x64. VRChat is an
+VineMix 0.3.0-beta.5 targets Windows 11 x64. VRChat is an
 intended Windows desktop/PCVR use case with end-to-end receiver qualification
 still incomplete. Virtual audio drivers require separate installation and
 have their own license terms. The workspace image is an illustrative real

@@ -2,27 +2,29 @@
 
 Target: **0.3.0-beta.5 / 0.3.0 · Beta 5**, Windows 11 x64.
 
-Updated 24 October 2026. **Status: release preparation.** Beta 5 corrects the
+Updated 24 October 2026. **Status: published; final source and packages verified.** Beta 5 corrects the
 engine metadata responsible for update rollback, improves automatic checking
 and refreshes the update window. The numeric Windows file version is
 **0.3.0.6**. Earlier version tags and downloads remain intact; Beta 2 remains
 provisional. See the [release notes](releases/0.3.0-beta.5.md) and
 [confirmed investigation](UPDATE_INVESTIGATION_2026-10-24.md).
 
-The local verification below covers the correction before the final release
-snapshot. Final package identities and checks must be recorded from the actual
-Beta 5 files; earlier Beta 4 results do not qualify new bytes.
+The results below cover source commit
+`611a4d4c8708709a490cc4976b4ccc169fb9af42` and its actual Beta 5 packages.
+The 297 build inputs have snapshot SHA-256
+`3430ce20817bfef571578baf1a05f4f72d9289e05cfecf3b3b4df36fe1ce1e79`.
 
 | Gate | Beta 5 status |
 | --- | --- |
-| Native metadata | The corrected engine is accepted by the unchanged Beta 2 checker. Five compiled PE fixtures cover numeric text, semantic text, wrong numeric text, wrong fixed fields and wrong product identity. The corrected NativeOnly build passes the new metadata gate. |
-| Native offline suites | Final Beta 5 source run pending. Earlier Beta 4 results remain in its historical record. |
-| Detached desktop | Local correction: 12,905 checks, 236 renders, zero binding errors. Seven update-state renders reviewed, including high contrast, with 440/500-pixel widths at 96/144/192 DPI. Production desktop build completed without warnings/errors. Final versioned source run pending. |
-| Update-core, worker and release preparation | Local correction: 74 core, 111 worker and nine signing/preparation checks passed, including real Windows metadata checks and an isolated installed transaction that reproduces rejection and rollback. Final versioned source run pending. |
-| Activation safeguards | Final Beta 5 source run pending. Preparation preserves the personal running app and engine. |
+| Native metadata | The unchanged Beta 2 checker accepts numeric version 0.3.0.6 on the actual installed and standalone-extracted engine. Five compiled PE fixtures cover numeric text, semantic text, wrong numeric text, wrong fixed fields and wrong product identity. |
+| Native offline suites | All 17 passed for the final source. |
+| Detached desktop | 12,905 checks, 236 renders, zero binding errors. Seven update-state renders reviewed, including high contrast, with 440/500-pixel widths at 96/144/192 DPI. Production desktop build completed without warnings/errors. Update states and release highlights were visually reviewed. |
+| Update-core, worker and release preparation | 74 core, 111 worker and nine signing/preparation checks passed, including real Windows metadata checks and an isolated installed transaction that reproduces rejection and rollback. |
+| Activation safeguards | 34 activation and 54 interface-only activation checks passed using isolated fixtures. Preparation preserves the personal running app and engine. |
 | Documentation images | Existing generic-device images remain illustrative. They are not final Beta 5 screenshots. |
-| Installed/Standalone smoke, runtime extraction and isolated Setup | Final Beta 5 packages pending. Qualification must check both actual executable version strings and numeric fixed fields, including the extracted standalone engine. |
-| Signature, source archive and published downloads | Final Beta 5 assets pending. Require pinned-key signature verification, matching source receipts, an audited exact-source ZIP and download/hash verification. |
+| Installed/Standalone smoke, runtime extraction and isolated Setup | Both actual packages passed inert smoke checks; 18 standalone-runtime and 167 isolated Setup checks passed. Installed and extracted engines are byte-identical, with verified textual and fixed numeric versions. |
+| Signature and old-client compatibility | The exact original Beta 2 update core and trust key anonymously discover signed Beta 5, numeric version 0.3.0.6, from the public release feed. Both signed package hashes match the final files, and its unchanged version checker accepts both actual engine payloads. This is compatibility evidence, not a full delivered update. |
+| Source archive and publication | Audited source ZIP: 432 entries, comprising 431 committed files and SOURCE-MANIFEST.json; all 297 build inputs match. All five uploaded assets were downloaded from GitHub and rehashed before publication; the pinned-key signature passed. |
 | Real-device, clean-machine, sustained-use and delivered update/rollback | Pending. Synthetic checks and package download verification do not establish these outcomes. |
 
 For existing Beta 2, 3 or 4 users, the recommended recovery is to save, use
@@ -36,6 +38,14 @@ Builds use one frozen source commit. The exact-source archive records the
 release commit, build-input inventory and hashes, package hashes and sanitized
 final verification results. Raw diagnostics, settings, recovery backups and
 signing keys stay outside the checkout and distributed assets.
+
+[Beta 5](https://github.com/acoyeen/vine-mix/releases/tag/v0.3.0-beta.5) was
+published on 24 October 2026. GitHub's
+[source checks](https://github.com/acoyeen/vine-mix/actions/runs/40084102531)
+and independent [published-release checks](https://github.com/acoyeen/vine-mix/actions/runs/40084918736)
+passed for the exact release source commit and its assets. Beta 2, 3 and 4's
+live release notes now carry update notices and recovery guidance; their
+original bodies, asset IDs, sizes, digests and tag objects were preserved.
 
 [Beta 4's qualification record](https://github.com/acoyeen/vine-mix/blob/v0.3.0-beta.4/docs/BETA_TESTING_CURRENT.md),
 [Beta 3's record](https://github.com/acoyeen/vine-mix/blob/v0.3.0-beta.3/docs/BETA_TESTING_CURRENT.md)

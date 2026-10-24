@@ -2,7 +2,7 @@
 
 Use the [current beta qualification guide](docs/BETA_TESTING_CURRENT.md) for
 commands, test scope and manual release gates. The
-[Beta 4 release notes](docs/releases/0.3.0-beta.4.md) identify the delivered
+[Beta 5 release notes](docs/releases/0.3.0-beta.5.md) identify the current
 version and separate passed, failed and unperformed checks.
 
 The current native suites and detached desktop checks never substitute for

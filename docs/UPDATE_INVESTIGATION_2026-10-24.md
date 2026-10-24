@@ -1,6 +1,6 @@
 # Beta 2 to Beta 4 update investigation
 
-**Date:** 2026-10-24. **Status:** Confirmed package metadata defect; corrected in Beta 5 source and reproduced with isolated rollback fixtures. Beta 5 release preparation is in progress. The tester's own journal has not been inspected.
+**Date:** 2026-10-24. **Status:** Confirmed package metadata defect; corrected in published Beta 5 source and packages and reproduced with isolated rollback fixtures. The tester's own journal has not been inspected.
 
 ## Report and conclusion
 
@@ -233,10 +233,42 @@ checksums; add a prominent update notice and Beta 5 recovery guidance to their
 release notes. This keeps existing signatures and source identities meaningful,
 preserves the diagnostic evidence, and does not finalize provisional Beta 2.
 
-Final Beta 5 package qualification and publication remain in progress; the
-[current qualification record](BETA_TESTING_CURRENT.md) tracks the evidence.
+Final Beta 5 source and package checks are complete, and
+[Beta 5 is published](https://github.com/acoyeen/vine-mix/releases/tag/v0.3.0-beta.5).
+The [current qualification record](BETA_TESTING_CURRENT.md) tracks the evidence.
 The original Beta 3/4 packages remain affected. Old workers can accept corrected
 metadata without an intermediate beta, but that compatibility result alone
 does not qualify a full delivered upgrade. Manual Beta 5 Setup after quitting
 is the recommended recovery route; standalone users replace the old EXE after
 quitting and retain their settings.
+
+### Final Beta 5 package evidence
+
+The final packages were built from source commit
+`611a4d4c8708709a490cc4976b4ccc169fb9af42`, with 297 build inputs and snapshot
+SHA-256 `3430ce20817bfef571578baf1a05f4f72d9289e05cfecf3b3b4df36fe1ce1e79`.
+The exact original Beta 2 update core and trust key accept the signed Beta 5
+envelope and both package hashes. Its unchanged Windows version check accepts
+the actual installed and standalone-extracted engines at numeric `0.3.0.6`.
+The engine payloads are byte-identical across the two distributions.
+After publication, the original Beta 2 discovery code anonymously selects
+signed Beta 5 from the public release feed; both signed hashes match the final
+downloadable files.
+
+Both final packages pass inert smoke checks, all 18 standalone-runtime checks
+and all 167 isolated Setup checks. Final-source checks pass: 17 native suites;
+12,905 detached desktop checks, 236 renders and zero binding errors; 74 core,
+111 worker, five native metadata and nine release-preparation checks; and 34
+activation plus 54 interface-only activation safeguards. The source archive
+audit matches 431 committed files, SOURCE-MANIFEST.json and all 297 build inputs.
+All five uploaded release assets were downloaded from GitHub and rehashed before
+publication, and the pinned-key update signature passed. The exact release source
+also passed [GitHub source checks](https://github.com/acoyeen/vine-mix/actions/runs/40084102531).
+Independent [published-release checks](https://github.com/acoyeen/vine-mix/actions/runs/40084918736)
+passed for the same release commit and assets. Update notices were added to the
+live Beta 2/3/4 release notes while preserving their original bodies; asset IDs,
+sizes, digests and tag objects remain unchanged.
+
+These results directly cover the defective metadata and old-client acceptance
+boundary. They do not establish a full delivered update, live candidate-health
+handoff, interruption or recovery on a separate Windows account or machine.
