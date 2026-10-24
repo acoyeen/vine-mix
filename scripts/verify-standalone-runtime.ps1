@@ -36,3 +36,14 @@ $output = Join-Path $result 'harness'
 if ($LASTEXITCODE -ne 0) { throw 'Standalone runtime qualification harness did not build.' }
 & $dotnet (Join-Path $output 'VineMix.RuntimeVerification.dll') $result 2>&1 | Tee-Object -LiteralPath (Join-Path $result 'checks.log')
 if ($LASTEXITCODE -ne 0) { throw 'Standalone runtime integrity qualification failed.' }
+$runtimeManifest = Get-Content -LiteralPath $receipt.runtimeManifest -Raw | ConvertFrom-Json
+$engine = Join-Path $result ('cache\' + $runtimeManifest.archiveSha256.ToLowerInvariant() + '\VineMix.Engine.exe')
+$reportPath = Join-Path $result 'results.json'
+$report = Get-Content -LiteralPath $reportPath -Raw | ConvertFrom-Json
+try {
+    & (Join-Path $PSScriptRoot 'assert-release-file-version.ps1') -Path $engine -Version $receipt.version -NumericVersion $receipt.numericVersion
+    $report.checks = @($report.checks) + 'The delivered standalone engine has matching numeric FileVersion text and fixed fields, with the expected product version.'
+} catch {
+    $report.passed = $false; $report.error = $_.Exception.Message
+    throw
+} finally { $report | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $reportPath -Encoding utf8 }

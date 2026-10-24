@@ -308,7 +308,7 @@ public partial class MainWindow : Window
         AutomationProperties.SetHelpText(updates, "Check for a newer version. Installation only starts after you choose Install and restart; audio briefly stops then.");
         updates.Click += (_, _) => showUpdates?.Invoke(); menu.Items.Add(updates);
         Preference("Automatically check for updates", nameof(MixerViewModel.AutomaticallyCheckForUpdates),
-            "Check at most once a day after startup. Downloads and installation require your choice.");
+            "Check daily while VineMix is running, with automatic retries after failed checks. Turning this on checks shortly. Downloads and installation require your choice.");
         const string whatsNewHelp = "Read the bundled release highlights.";
         var whatsNew = new MenuItem { Header = "What's new?", ToolTip = whatsNewHelp };
         AutomationProperties.SetName(whatsNew, "What's new?");

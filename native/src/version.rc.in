@@ -13,7 +13,7 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "VineMix\0"
             VALUE "FileDescription", "VineMix audio engine\0"
-            VALUE "FileVersion", "@VINEMIX_VERSION@\0"
+            VALUE "FileVersion", "@VINEMIX_NUMERIC_VERSION@\0"
             VALUE "InternalName", "VineMix.Engine\0"
             VALUE "OriginalFilename", "VineMix.Engine.exe\0"
             VALUE "ProductName", "VineMix\0"

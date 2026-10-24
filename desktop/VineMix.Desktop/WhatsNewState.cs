@@ -21,7 +21,10 @@ internal static class WhatsNewContent
         new("0.3.0-beta.4", "Quit with your work protected", "Closing keeps audio running in the tray. Settings now has a red Quit VineMix action, with retry and recovery choices if the final save fails."),
         new("0.3.0-beta.4", "Choose denoising with delay in view", "The algorithm menu shows SpeexDSP at 20 ms and RNNoise at 30 ms. These are VineMix node delays, including bypass, rather than total system latency."),
         new("0.3.0-beta.4", "Clearer workspace feedback", "Save status sits in the centre of the footer. Action messages appear for five seconds with a countdown and a Dismiss option."),
-        new("0.3.0-beta.4", "Catch up after updates", "These highlights appear after an updated launch when your workspace is ready. To reopen them, choose Settings → What's new?")
+        new("0.3.0-beta.4", "Catch up after updates", "These highlights appear after an updated launch when your workspace is ready. To reopen them, choose Settings → What's new?"),
+        new("0.3.0-beta.5", "Updates that pass version checks", "Corrected package metadata prevents the update rejection that could restore your previous beta. You can skip intermediate betas."),
+        new("0.3.0-beta.5", "A simpler update window", "See your installed version, release notes and the next action in a compact window that follows your theme."),
+        new("0.3.0-beta.5", "Automatic checks keep trying", "Enabling automatic checks schedules a check shortly afterwards. Checks repeat daily and retry after temporary failures. Downloading and installing remain your choice.")
     ];
 
     internal static IReadOnlyList<ReleaseHighlight> Since(string? previous, string current)

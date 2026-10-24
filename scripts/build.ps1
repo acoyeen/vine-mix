@@ -59,6 +59,7 @@ try {
     $runtimeStage = Join-Path $metadataRoot ('runtime-' + [Guid]::NewGuid().ToString('N'))
     $null = New-Item -ItemType Directory -Path $runtimeStage
     Copy-Item -LiteralPath (Join-Path $buildRoot 'VineMix.Engine.exe') -Destination $runtimeStage
+    & (Join-Path $PSScriptRoot 'assert-release-file-version.ps1') -Path (Join-Path $runtimeStage 'VineMix.Engine.exe') -Version $release.version -NumericVersion $release.numericVersion
     foreach ($runtime in @('libc++.dll','libunwind.dll','libwinpthread-1.dll')) {
         $source = Join-Path $compilerRoot $runtime
         if (-not (Test-Path -LiteralPath $source -PathType Leaf)) { throw "Required native runtime missing: $runtime" }
@@ -106,6 +107,7 @@ try {
             $null = New-Item -ItemType Directory -Force -Path (Split-Path $destination -Parent)
             Copy-Item -LiteralPath $file.FullName -Destination $destination
         }
+        & (Join-Path $PSScriptRoot 'assert-release-file-version.ps1') -Path (Join-Path $packageRoot 'VineMix.Engine.exe') -Version $release.version -NumericVersion $release.numericVersion
     } else {
         $contents = @(Get-ChildItem -LiteralPath $packageRoot -File -Recurse)
         if ($contents.Count -ne 1 -or $contents[0].Name -ne 'VineMix.exe') { throw 'Standalone publish must contain exactly one VineMix.exe; all notices must be embedded.' }

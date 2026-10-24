@@ -112,6 +112,21 @@ internal static class Program
             Check((await source.CheckAsync("0.3.0", false, cancelled.Token)).Status == UpdateCheckStatus.Cancelled, "Manual check cancellation is explicit.");
         }
         var beta2 = Manifest("0.3.0-beta.2"); var beta10 = Manifest("0.3.0-beta.10"); var stable = Manifest("0.3.0");
+        var beta3 = Manifest("0.3.0-beta.3") with { NumericVersion = "0.3.0.3" };
+        var beta4 = Manifest("0.3.0-beta.4") with { NumericVersion = "0.3.0.5" };
+        using (var source = Source(beta2, beta4))
+        {
+            var result = await source.CheckAsync(beta2.Version, true, default);
+            Check(result.Status == UpdateCheckStatus.Available && result.Offer?.Version == beta4.Version
+                && result.Offer.Manifest.NumericVersion == beta4.NumericVersion,
+                "Beta 2 can discover signed Beta 4 directly without Beta 3; its Windows file revision need not equal the beta number.");
+        }
+        using (var source = Source(beta3, beta4, beta2))
+            Check((await source.CheckAsync(beta2.Version, true, default)).Offer?.Version == beta4.Version,
+                "Beta 2 selects Beta 4 when Beta 3 is also published, without requiring an intermediate installation.");
+        using (var source = Source(beta2, beta3, beta4))
+            Check((await source.CheckAsync(beta4.Version, true, default)).Status == UpdateCheckStatus.UpToDate,
+                "After updating to Beta 4, older Beta 2 and Beta 3 releases do not offer a downgrade or reinstall.");
         using (var source = Source(beta2, beta10))
             Check((await source.CheckAsync("0.3.0-beta.1", true, default)).Offer?.Version == beta10.Version, "Unsorted GitHub releases select the highest verified compatible semver.");
         using (var source = Source(beta10, stable))

@@ -214,8 +214,11 @@ public partial class App : Application
         _window.BeginWhatsNew(System.IO.File.Exists(WorkspacePaths.Settings));
         _mixer.Start();
         if (_updateHealthTransaction is not null) _ = ObserveUpdatedCandidateAsync(_updateHealthTransaction);
-        else if (ReadUpdateRollbackNotice(e.Args) is { } rollbackNotice) _window.Workspace.SetMessage(rollbackNotice, true);
-        else _ = _window.BeginAutomaticUpdateCheckAsync();
+        else
+        {
+            if (ReadUpdateRollbackNotice(e.Args) is { } rollbackNotice) _window.Workspace.SetMessage(rollbackNotice, true);
+            _ = _window.BeginAutomaticUpdateCheckAsync();
+        }
     }
 
     public void ShowMixer()

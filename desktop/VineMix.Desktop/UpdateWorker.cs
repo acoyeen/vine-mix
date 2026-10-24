@@ -133,7 +133,7 @@ internal static class UpdateWorker
                 var observed = ObserveCandidate(context, journal.Backup!, platform, requireValidPackage: false);
                 journal = journal with { Phase = UpdatePhase.CandidateInstalled, Candidate = observed };
                 UpdateTransaction.SaveJournal(context, journal);
-                if (code != 0) throw new IOException("Setup did not complete successfully. Restoring the prior owned application payload.");
+                if (code != 0) throw new IOException($"Setup did not complete successfully (exit code {code}). See setup.log in the update recovery folder. Restoring the prior owned application payload.");
             }
             else if (journal.Phase == UpdatePhase.Applying)
             {
@@ -610,6 +610,7 @@ internal sealed class WindowsUpdatePlatform : IUpdateWorkerPlatform
     public int RunSetup(VerifiedUpdate context, Action<UpdateProcessIdentity> started)
     {
         ReadOwnedRegistration(context.TargetDirectory);
+        UpdateFiles.NoReparse(Path.Combine(context.Directory, "setup.log"));
         var start = CreateSetupStart(context);
         using var process = Process.Start(start) ?? throw new IOException("The verified Setup could not start.");
         started(UpdateProcessIdentity.Capture(process.Id));
@@ -620,7 +621,8 @@ internal sealed class WindowsUpdatePlatform : IUpdateWorkerPlatform
     internal static ProcessStartInfo CreateSetupStart(VerifiedUpdate context)
     {
         var start = Start(context.AssetPath, context.Directory);
-        foreach (string argument in new[] { "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/ACCEPTTERMS=1", "/DRIVERS=none", "/DIR=" + context.TargetDirectory }) start.ArgumentList.Add(argument);
+        foreach (string argument in new[] { "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/ACCEPTTERMS=1", "/DRIVERS=none", "/DIR=" + context.TargetDirectory,
+            "/LOG=" + Path.Combine(context.Directory, "setup.log") }) start.ArgumentList.Add(argument);
         return start;
     }
     public bool RunSmoke(VerifiedUpdate context, string evidenceDirectory, Action<UpdateProcessIdentity> started)

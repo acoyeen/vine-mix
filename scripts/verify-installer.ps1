@@ -11,6 +11,7 @@ $ErrorActionPreference = 'Stop'
 $project = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $installer = [IO.Path]::GetFullPath($InstallerPath)
 $package = [IO.Path]::GetFullPath($PackageDirectory)
+$release = Get-Content -LiteralPath (Join-Path $project 'release.json') -Raw | ConvertFrom-Json
 if (-not $ResultDirectory) {
     $ResultDirectory = Join-Path $env:LOCALAPPDATA ('VineMix.BuildCache\installer-verification-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
 }
@@ -291,6 +292,10 @@ try {
         $payloadManifest.Add([ordered]@{ path = $relative; length = $source.Length; hash = $actualHash })
     }
     Write-Evidence 'installed-payload-manifest.json' $payloadManifest
+    foreach ($name in @('VineMix.exe','VineMix.Engine.exe')) {
+        & (Join-Path $PSScriptRoot 'assert-release-file-version.ps1') -Path (Join-Path $payloadDirectory $name) -Version $release.version -NumericVersion $release.numericVersion
+        Require $true "Installed $name has matching numeric FileVersion text and fixed fields, with the expected product version."
+    }
     $uninstallers = @(Get-ChildItem -LiteralPath $target -Filter 'unins*.exe' -File)
     Require ($uninstallers.Count -eq 1) 'A single uninstaller was created inside the isolated destination.'
     $registryInstalled = Get-UserUninstallEntries

@@ -15,7 +15,7 @@ internal static class WhatsNewVerification
     {
         string root = Path.Combine(Path.GetTempPath(), "VineMix-whats-new-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
-        const string old = "0.3.0-beta.1", current = "0.3.0-beta.4";
+        const string old = "0.3.0-beta.1", current = "0.3.0-beta.5";
         try
         {
             string path = Path.Combine(root, "updates", "whats-new.json");
@@ -37,7 +37,7 @@ internal static class WhatsNewVerification
             updated.Dismiss(old);
             require(updated.Progress.LastSeenReleaseVersion == current && !updated.Pending(old, true),
                 "Opening an older release never lowers the watermark or prompts on downgrade.");
-            require(updated.Pending("0.3.0-beta.5", true), "A subsequent Beta 5 compares newer than Beta 4.");
+            require(updated.Pending("0.3.0-beta.6", true), "A subsequent Beta 6 compares newer than Beta 5.");
             string legacy = Path.Combine(root, "legacy", "whats-new.json");
             require(new WhatsNewState(legacy).Pending(current, true) && !new WhatsNewState(legacy).Pending(current, false),
                 "An existing pre-feature workspace gets one transition notice; a fresh workspace does not.");

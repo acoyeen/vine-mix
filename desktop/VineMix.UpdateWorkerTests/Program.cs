@@ -31,7 +31,7 @@ internal static class Program
     {
         try
         {
-            SignedBoundaryTests(); PrivateCreationTests(); SuccessfulStandalone(); RollbackTests(); RecoveryTests(); WorkspaceTests(); ManifestTests(); InstalledAttemptTests(); PendingDiscoveryTests(); TerminalCleanupTests();
+            SignedBoundaryTests(); PrivateCreationTests(); SuccessfulStandalone(); RollbackTests(); RecoveryTests(); WorkspaceTests(); ManifestTests(); InstalledAttemptTests(); FileVersionResourceTests(); PendingDiscoveryTests(); TerminalCleanupTests();
             Console.WriteLine($"PASS: {_checks} updater worker checks; ephemeral signed fixtures, private temporary directories and fake process/registry/Setup operations only. No production app, audio endpoint, settings, driver or registry changes.");
             return 0;
         }
@@ -72,6 +72,64 @@ internal static class Program
         new DirectoryInfo(fixture.Context.Directory).SetAccessControl(broad);
         Reject(() => UpdateTransaction.Verify(fixture.Context.TransactionPath, fixture.Trust, fixture.Root), "Update transactions with access granted to another account must be rejected.");
         new DirectoryInfo(fixture.Context.Directory).SetAccessControl(acl);
+    }
+    private static void FileVersionResourceTests()
+    {
+        const string numeric = "1.1.0.0", prereleaseText = "1.1.0-x";
+        byte[] original = File.ReadAllBytes(typeof(Program).Assembly.Location);
+        byte[] malformed = (byte[])original.Clone();
+        using var pe = new System.Reflection.PortableExecutable.PEReader(new MemoryStream(original));
+        var resource = pe.PEHeaders.SectionHeaders.Single(section => section.Name == ".rsrc");
+        byte[] key = Encoding.Unicode.GetBytes("FileVersion\0");
+        var matches = new List<int>();
+        for (int offset = resource.PointerToRawData; offset <= resource.PointerToRawData + resource.SizeOfRawData - key.Length; offset++)
+            if (malformed.AsSpan(offset, key.Length).SequenceEqual(key)) matches.Add(offset);
+        Require(matches.Count == 1, "The inert test PE must have exactly one FileVersion resource entry before its synthetic mutation.");
+        int valueOffset = (matches.Single() + key.Length + 3) & ~3;
+        byte[] expected = Encoding.Unicode.GetBytes(numeric + "\0");
+        Require(valueOffset + expected.Length <= malformed.Length
+            && malformed.AsSpan(valueOffset, expected.Length).SequenceEqual(expected),
+            "The version resource must carry the explicit test numeric value at its aligned value position.");
+        byte[] replacement = Encoding.Unicode.GetBytes(prereleaseText + "\0");
+        Require(replacement.Length == expected.Length, "The synthetic prerelease replacement must retain all PE resource sizes and offsets.");
+        replacement.CopyTo(malformed, valueOffset);
+
+        using (var fixture = new Fixture(standalone: false))
+        {
+            string numericPath = Path.Combine(fixture.Base, "numeric-version-fixture.exe");
+            string prereleasePath = Path.Combine(fixture.Base, "prerelease-version-fixture.exe");
+            File.WriteAllBytes(numericPath, original); File.WriteAllBytes(prereleasePath, malformed);
+            var valid = System.Diagnostics.FileVersionInfo.GetVersionInfo(numericPath);
+            var invalid = System.Diagnostics.FileVersionInfo.GetVersionInfo(prereleasePath);
+            string Fixed(System.Diagnostics.FileVersionInfo value) =>
+                $"{value.FileMajorPart}.{value.FileMinorPart}.{value.FileBuildPart}.{value.FilePrivatePart}";
+            Require(valid.FileVersion == numeric && invalid.FileVersion == prereleaseText
+                && Fixed(valid) == numeric && Fixed(invalid) == numeric,
+                "Real Windows VERSIONINFO reading must reproduce semantic FileVersion text with otherwise correct fixed numeric parts.");
+            var real = new WindowsUpdatePlatform();
+            real.CheckFileVersion(numericPath, numeric);
+            Require(true, "The real version gate accepts the numeric FileVersion representation expected by already-shipped update workers.");
+            Reject(() => real.CheckFileVersion(prereleasePath, numeric),
+                "The original numeric-text version gate rejects semantic FileVersion text even when fixed numeric parts are correct.");
+            Reject(() => real.CheckFileVersion(numericPath, "1.1.0.1"),
+                "Correcting FileVersion formatting must not allow a different release's numeric version.");
+
+            var platform = new FakePlatform(fixture) { CandidateEngineBytes = malformed, ValidateCandidateEngineVersion = true };
+            Require(fixture.Run(platform) == 3 && fixture.OldTarget
+                && UpdateTransaction.ReadJournal(fixture.Context).Phase == UpdatePhase.RolledBack
+                && platform.Events.Contains("previous-reopened") && !platform.Events.Contains("smoke")
+                && !platform.Events.Contains("candidate-start"),
+                "An installed engine's semantic FileVersion causes rollback and prior-version reopening before smoke or candidate startup, matching the reported update symptom.");
+            Require(UpdateTransaction.ReadJournal(fixture.Context).Message.Contains("expected release file version", StringComparison.Ordinal),
+                "The rollback journal must preserve the actual version-resource validation failure.");
+        }
+        using (var fixture = new Fixture(standalone: false))
+        {
+            var platform = new FakePlatform(fixture) { CandidateEngineBytes = original, ValidateCandidateEngineVersion = true };
+            Require(fixture.Run(platform) == 0 && !fixture.OldTarget
+                && UpdateTransaction.ReadJournal(fixture.Context).Phase == UpdatePhase.Completed && platform.HealthWasRequired,
+                "The same installed transaction with numeric engine FileVersion passes the real gate and still requires candidate health before completion.");
+        }
     }
     private static void SuccessfulStandalone()
     {
@@ -272,14 +330,18 @@ internal static class Program
         using (var fixture = new Fixture(standalone: false))
         {
             var start = WindowsUpdatePlatform.CreateSetupStart(fixture.Context);
-            Require(!start.UseShellExecute && start.ArgumentList.SequenceEqual(new[] { "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/ACCEPTTERMS=1", "/DRIVERS=none", "/DIR=" + fixture.Install }),
-                "Setup launch must use exactly the fixed silent, no-restart, accepted-terms, no-driver and owned-target arguments.");
+            Require(!start.UseShellExecute && start.ArgumentList.SequenceEqual(new[] { "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/ACCEPTTERMS=1", "/DRIVERS=none", "/DIR=" + fixture.Install,
+                "/LOG=" + Path.Combine(fixture.Context.Directory, "setup.log") }),
+                "Setup launch retains the fixed install safeguards and keeps its diagnostic log inside the private transaction directory.");
             var platform = new FakePlatform(fixture) { SetupExitCode = 1 };
             Require(fixture.Run(platform) == 3 && fixture.OldTarget
                 && File.ReadAllText(Path.Combine(fixture.Install, "VineMix.Engine.exe")) == "example old engine",
                 "Failed Setup exit must restore the old owned desktop and engine payload from its preimage.");
             Require(File.ReadAllText(Path.Combine(fixture.Install, "unlisted-user-file.txt")) == "personal notes fixture",
                 "Setup-failure rollback must retain files outside the exact payload inventory.");
+            Require(UpdateTransaction.ReadJournal(fixture.Context).Message.Contains("exit code 1", StringComparison.Ordinal)
+                && UpdateTransaction.ReadJournal(fixture.Context).Message.Contains("setup.log", StringComparison.Ordinal),
+                "Rollback retains the Setup exit code and private log location instead of losing the installation failure detail.");
         }
         using (var fixture = new Fixture(standalone: false))
         {
@@ -462,6 +524,8 @@ internal static class Program
         internal bool Healthy = true, ParentAlive = true, ParentExits = true, CandidateEngineExits = true, SmokePasses = true,
             ChangeTargetAfterHealth, HealthWasRequired, ReopenFails, ClearRecoveryFails;
         internal int SetupExitCode;
+        internal byte[]? CandidateEngineBytes;
+        internal bool ValidateCandidateEngineVersion;
         private bool _candidateAlive;
         public IDisposable AcquireLock() { Events.Add("lock-held"); return new Lease(() => Events.Add("lock-released")); }
         private sealed class Lease(Action release) : IDisposable { public void Dispose() => release(); }
@@ -473,7 +537,12 @@ internal static class Program
             Events.Add("candidate-exit"); _candidateAlive = false; return true;
         }
         public void VerifyWorker(VerifiedUpdate context) { }
-        public void CheckFileVersion(string path, string numericVersion) { Events.Add("version-check"); }
+        public void CheckFileVersion(string path, string numericVersion)
+        {
+            Events.Add("version-check");
+            if (ValidateCandidateEngineVersion && Path.GetFileName(path) == "VineMix.Engine.exe")
+                new WindowsUpdatePlatform().CheckFileVersion(path, numericVersion);
+        }
         public UpdateRegistrySnapshot? ReadRegistration(VerifiedUpdate context) => context.Data.Standalone ? null
             : new("example-owned-key", context.TargetDirectory, []);
         public void RestoreRegistration(UpdateRegistrySnapshot original, UpdateRegistrySnapshot? current) => Events.Add("registry-restored");
@@ -488,7 +557,9 @@ internal static class Program
             Require(UpdateFiles.SamePath(context.TargetDirectory, fixture.Install), "Setup must retain the exact prior owned installation directory.");
             Events.Add("setup"); started(new(104, 1004, context.AssetPath, UpdateFiles.Hash(context.AssetPath)));
             File.WriteAllText(context.TargetPath, Fixture.NewBytes);
-            File.WriteAllText(Path.Combine(context.TargetDirectory, "VineMix.Engine.exe"), "example new engine");
+            string engine = Path.Combine(context.TargetDirectory, "VineMix.Engine.exe");
+            if (CandidateEngineBytes is not null) File.WriteAllBytes(engine, CandidateEngineBytes);
+            else File.WriteAllText(engine, "example new engine");
             if (SetupExitCode == 0)
             {
                 var entries = new[] { "VineMix.exe", "VineMix.Engine.exe" }.Select(path => new { path,

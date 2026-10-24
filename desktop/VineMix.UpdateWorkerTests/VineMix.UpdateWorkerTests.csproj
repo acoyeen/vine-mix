@@ -5,6 +5,8 @@
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <!-- The inert PE copied by version-resource tests matches their signed candidate. -->
+    <FileVersion>1.1.0.0</FileVersion>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../VineMix.UpdateCore/VineMix.UpdateCore.csproj" />

@@ -31,6 +31,15 @@ from a folder name. Setup receives fixed silent, no-restart, accepted-terms and
 no-driver flags and the existing directory. Startup and shortcut preferences
 remain the installer's responsibility to preserve.
 
+Beta 5 also passes a `setup.log` destination inside the
+private transaction folder and retains a nonzero Setup exit code in the journal.
+This distinguishes installer failures from later package or health failures;
+older delivered workers do not gain this logging retroactively. Keep raw logs
+private because installer output can contain personal paths. Inno Setup's
+[logging option](https://jrsoftware.org/ishelp/topic_setupcmdline.htm) and
+[exit codes](https://jrsoftware.org/ishelp/topic_setupexitcodes.htm) were checked
+on 24 October 2026. Logging does not change rollback or process ownership rules.
+
 For a standalone copy, the verified new executable is copied beside the exact
 original launcher and installed using `File.Replace`, retaining the old
 launcher. Private recovery storage can be on another volume. Replacement and

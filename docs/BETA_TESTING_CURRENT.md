@@ -1,39 +1,48 @@
 # Current beta qualification
 
-Target: **0.3.0-beta.4 / 0.3.0 · Beta 4**, Windows 11 x64.
-Updated 23 October 2026. These results belong to the Beta 4 source review and
-isolated verification. [Beta 3's record](https://github.com/acoyeen/vine-mix/blob/v0.3.0-beta.3/docs/BETA_TESTING_CURRENT.md)
-and the [preceding local candidate](LOCAL_CANDIDATE_2026-10-23.md) describe their
-own source snapshots and executable bytes.
+Target: **0.3.0-beta.5 / 0.3.0 · Beta 5**, Windows 11 x64.
 
-| Gate | Beta 4 status |
+Updated 24 October 2026. **Status: release preparation.** Beta 5 corrects the
+engine metadata responsible for update rollback, improves automatic checking
+and refreshes the update window. The numeric Windows file version is
+**0.3.0.6**. Earlier version tags and downloads remain intact; Beta 2 remains
+provisional. See the [release notes](releases/0.3.0-beta.5.md) and
+[confirmed investigation](UPDATE_INVESTIGATION_2026-10-24.md).
+
+The local verification below covers the correction before the final release
+snapshot. Final package identities and checks must be recorded from the actual
+Beta 5 files; earlier Beta 4 results do not qualify new bytes.
+
+| Gate | Beta 5 status |
 | --- | --- |
-| Native offline suites | All 17 passed in the full run, including engine lifecycle, endpoint selection, shared/exclusive output, timing and effects. No failed timing repeat or relaxed threshold was needed. |
-| Detached desktop | 12,826 checks, 229 renders, zero binding errors. Includes layout lock and feedback, failed quit saves and recovery copies, release highlights, footer timers and device selection. Publish completed without compiler warnings/errors. |
-| Update-core, worker and release preparation | 71 core, 97 worker and eight signing/preparation checks passed using isolated fixtures. |
-| Activation safeguards | 34 activation and 54 interface-only activation checks passed using temporary files, synthetic state and an inert shell child. No personal app or engine was stopped, replaced or launched. |
-| Documentation images | Existing generic-device images remain illustrative. They were not regenerated as Beta 4 screenshots. Detached render inspection is recorded in the audit. |
-| Installed/Standalone smoke, runtime extraction and isolated Setup | Both final package smoke checks passed; all 17 standalone runtime checks and 189 isolated Setup checks passed. The two packages contain identical engine bytes. Exact executable identities and final results are retained in the source ZIP's SOURCE-MANIFEST.json. |
-| Signature, source archive and published downloads | Passed: pinned-key signature, matching build receipts, audited exact-source ZIP and all five uploaded assets downloaded and rehashed before publication. The published tag and GitHub asset digests also match. Final identities are in SOURCE-MANIFEST.json and SHA256SUMS.txt. |
+| Native metadata | The corrected engine is accepted by the unchanged Beta 2 checker. Five compiled PE fixtures cover numeric text, semantic text, wrong numeric text, wrong fixed fields and wrong product identity. The corrected NativeOnly build passes the new metadata gate. |
+| Native offline suites | Final Beta 5 source run pending. Earlier Beta 4 results remain in its historical record. |
+| Detached desktop | Local correction: 12,905 checks, 236 renders, zero binding errors. Seven update-state renders reviewed, including high contrast, with 440/500-pixel widths at 96/144/192 DPI. Production desktop build completed without warnings/errors. Final versioned source run pending. |
+| Update-core, worker and release preparation | Local correction: 74 core, 111 worker and nine signing/preparation checks passed, including real Windows metadata checks and an isolated installed transaction that reproduces rejection and rollback. Final versioned source run pending. |
+| Activation safeguards | Final Beta 5 source run pending. Preparation preserves the personal running app and engine. |
+| Documentation images | Existing generic-device images remain illustrative. They are not final Beta 5 screenshots. |
+| Installed/Standalone smoke, runtime extraction and isolated Setup | Final Beta 5 packages pending. Qualification must check both actual executable version strings and numeric fixed fields, including the extracted standalone engine. |
+| Signature, source archive and published downloads | Final Beta 5 assets pending. Require pinned-key signature verification, matching source receipts, an audited exact-source ZIP and download/hash verification. |
 | Real-device, clean-machine, sustained-use and delivered update/rollback | Pending. Synthetic checks and package download verification do not establish these outcomes. |
 
-The release review is recorded in [the Beta 4 audit](BETA4_AUDIT.md). Builds use
-one frozen source commit and preserve all earlier version tags and downloads.
-The numeric file version is **0.3.0.5**, above the earlier local candidate's
-0.3.0.4. The exact-source archive records the release commit, build-input
-inventory and hashes, package hashes and sanitized final verification results.
-Raw diagnostics, settings, recovery backups and signing keys stay outside the
-checkout and distributed assets.
+For existing Beta 2, 3 or 4 users, the recommended recovery is to save, use
+**Quit VineMix**, and run Beta 5 Setup against the existing installation without
+uninstalling. Standalone users should replace the old EXE after quitting.
+Settings are preserved. Intermediate versions are unnecessary; a full upgrade
+through the older running client remains unqualified. The original Beta 3/4
+packages retain the incompatible engine metadata.
 
-Beta 4 was published on 23 October 2026 from source commit
-`459c2bb96ecf68f24e27f55dfd970346d2b82bc3`. The 292 build inputs have snapshot
-SHA-256 `0b1df54f340b56bc3ff028d5efd426deaa8cd6daac63838e56ff92a5a89394db`.
-An independent archive audit confirmed all 423 committed files and all build
-inputs match byte for byte, with neutral archive metadata and no private data.
-The final desktop and native packages were not activated over the running app.
-GitHub's [source checks](https://github.com/acoyeen/vine-mix/actions/runs/39962545477)
-and independent [published-release checks](https://github.com/acoyeen/vine-mix/actions/runs/39964789273)
-both passed for this exact release commit and its assets.
+Builds use one frozen source commit. The exact-source archive records the
+release commit, build-input inventory and hashes, package hashes and sanitized
+final verification results. Raw diagnostics, settings, recovery backups and
+signing keys stay outside the checkout and distributed assets.
+
+[Beta 4's qualification record](https://github.com/acoyeen/vine-mix/blob/v0.3.0-beta.4/docs/BETA_TESTING_CURRENT.md),
+[Beta 3's record](https://github.com/acoyeen/vine-mix/blob/v0.3.0-beta.3/docs/BETA_TESTING_CURRENT.md)
+and the [preceding local candidate](LOCAL_CANDIDATE_2026-10-23.md) describe their
+own source snapshots and bytes. Beta 4's original fixtures did not inspect the
+engine's textual Windows version and therefore missed the confirmed packaging
+defect. Historical passing results retain their original scope.
 
 The historical unexpected-closure report remains unresolved. Actual streamed
 headset playback/reconnect, physical display behavior, sleep/resume, eight-hour
@@ -157,7 +166,7 @@ decision. Publication does not establish that the pending checks passed.
 
 Beta 2 is the first delivered build with an updater. Beta 1 must be upgraded
 manually, and Beta 2 deliberately refuses to update to itself. A complete test
-therefore requires Beta 2 as the running client and the genuinely newer signed Beta 4
+therefore requires Beta 2 as the running client and the genuinely newer signed Beta 5
 release, with matching source and both distribution assets. Changing a version
 string or bypassing the newer-version check in a fixture does not qualify the
 delivered application. See [the release test procedure](UPDATE_RELEASES.md#qualify-a-delivered-update).

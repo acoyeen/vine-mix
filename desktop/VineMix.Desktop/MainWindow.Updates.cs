@@ -14,7 +14,12 @@ public partial class MainWindow
 {
     private UpdateController? _updates;
     private Window? _updateDialog;
-    internal void StopUpdateChecks() => _updates?.Dispose();
+    internal void StopUpdateChecks()
+    {
+        _mixer.AutomaticUpdatePreferenceChanged -= AutomaticUpdatePreferenceChanged;
+        _automaticUpdates?.Dispose();
+        _updates?.Dispose();
+    }
     internal bool TryPrepareUpdateEditors()
     {
         if (Workspace.HasActiveGesture)
@@ -30,7 +35,7 @@ public partial class MainWindow
         if (_updateDialog is not null) { _updateDialog.Activate(); return; }
         _updates ??= new UpdateController(_mixer.IsPreview);
         var controller = _updates;
-        var dialog = new Window { Owner = this, Title = "VineMix updates", Width = 540, MinWidth = 440,
+        var dialog = new Window { Owner = this, Title = "VineMix · Updates", Width = 500, MinWidth = 440,
             SizeToContent = SizeToContent.Height, ResizeMode = ResizeMode.NoResize, ShowInTaskbar = false,
             WindowStartupLocation = WindowStartupLocation.CenterOwner, FontFamily = FontFamily, FontSize = FontSize,
             DataContext = controller };
@@ -44,66 +49,133 @@ public partial class MainWindow
             try { await ((App)Application.Current).InstallUpdateAsync(controller.Download); }
             catch (Exception error) { controller.Report("The update did not finish. " + error.Message); }
             finally { controller.SetInstalling(false); }
-        });
+        }, _mixer);
         dialog.Closing += (_, args) => { if (controller.IsInstalling) args.Cancel = true; else controller.Cancel(); };
         dialog.Closed += (_, _) => _updateDialog = null;
         _updateDialog = dialog;
         dialog.Show();
         _ = controller.CheckAsync();
     }
-    internal static FrameworkElement CreateUpdateContent(UpdateController controller, Action close, Func<Task> install)
+    internal static FrameworkElement CreateUpdateContent(UpdateController controller, Action close, Func<Task> install,
+        MixerViewModel? preferences = null)
     {
         var content = new StackPanel { Margin = new Thickness(24), DataContext = controller };
-        content.Children.Add(new TextBlock { Text = "VineMix updates", FontSize = 22, FontWeight = FontWeights.SemiBold });
-        content.Children.Add(new TextBlock { Text = "Current version: " + controller.CurrentVersion, Margin = new Thickness(0, 6, 0, 14) });
-        var status = new TextBlock { TextWrapping = TextWrapping.Wrap, MinHeight = 48, Margin = new Thickness(0, 0, 0, 10) };
+        content.Children.Add(new TextBlock { Text = "Updates", FontSize = 22, FontWeight = FontWeights.SemiBold });
+        var installed = new TextBlock { Text = "Installed · " + controller.CurrentVersion,
+            FontSize = 12, Margin = new Thickness(0, 5, 0, 24) };
+        installed.SetResourceReference(TextBlock.ForegroundProperty, "ConsoleMutedBrush");
+        content.Children.Add(installed);
+
+        var status = new TextBlock { TextWrapping = TextWrapping.Wrap, FontSize = 14, LineHeight = 21 };
         status.SetBinding(TextBlock.TextProperty, new Binding(nameof(UpdateController.Message)));
         AutomationProperties.SetLiveSetting(status, AutomationLiveSetting.Polite);
-        AutomationProperties.SetName(status, "Update status"); content.Children.Add(status);
-        var progress = new ProgressBar { IsIndeterminate = true, Height = 4, Margin = new Thickness(0, 0, 0, 12) };
+        AutomationProperties.SetName(status, "Update status");
+        content.Children.Add(status);
+        var progress = new ProgressBar { IsIndeterminate = true, Height = 3, BorderThickness = new Thickness(0),
+            Margin = new Thickness(0, 14, 0, 0) };
+        progress.SetResourceReference(ForegroundProperty, "ConsoleABrush");
+        progress.SetResourceReference(BackgroundProperty, "ConsoleBorderBrush");
         progress.SetBinding(VisibilityProperty, new Binding(nameof(UpdateController.IsBusy)) { Converter = new BooleanToVisibilityConverter() });
         content.Children.Add(progress);
-        var notes = new TextBox { IsReadOnly = true, TextWrapping = TextWrapping.Wrap, MaxHeight = 180, BorderThickness = new Thickness(0),
-            Background = System.Windows.Media.Brushes.Transparent, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Margin = new Thickness(0, 0, 0, 16) };
+
+        var notesSection = new StackPanel { Margin = new Thickness(0, 22, 0, 0) };
+        AutomationProperties.SetName(notesSection, "Release details");
+        var notesLabel = new TextBlock { Text = "What's new", FontSize = 12, FontWeight = FontWeights.SemiBold,
+            Margin = new Thickness(0, 0, 0, 8) };
+        notesLabel.SetResourceReference(TextBlock.ForegroundProperty, "ConsoleMutedBrush");
+        notesSection.Children.Add(notesLabel);
+        var notes = new TextBox { IsReadOnly = true, TextWrapping = TextWrapping.Wrap, MaxHeight = 180,
+            BorderThickness = new Thickness(0), Padding = new Thickness(0), MinHeight = 0,
+            Background = System.Windows.Media.Brushes.Transparent, VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
         notes.SetResourceReference(ForegroundProperty, "ConsoleTextBrush");
         notes.SetBinding(TextBox.TextProperty, new Binding(nameof(UpdateController.Notes)) { Mode = BindingMode.OneWay });
-        AutomationProperties.SetName(notes, "Release notes"); content.Children.Add(notes);
-        var actions = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Right };
-        Button Action(string label, string enabled, Func<Task> action)
+        AutomationProperties.SetName(notes, "Release notes");
+        notesSection.Children.Add(notes);
+        var notesStyle = new Style(typeof(StackPanel));
+        var noNotes = new DataTrigger { Binding = new Binding(nameof(UpdateController.Notes)), Value = "" };
+        noNotes.Setters.Add(new Setter(VisibilityProperty, Visibility.Collapsed));
+        notesStyle.Triggers.Add(noNotes); notesSection.Style = notesStyle;
+        content.Children.Add(notesSection);
+
+        if (preferences is not null)
         {
-            var button = new Button { Content = label, Padding = new Thickness(10, 6, 10, 6), Margin = new Thickness(4, 3, 0, 0) };
+            var automatic = new CheckBox { Content = "Check automatically", HorizontalAlignment = HorizontalAlignment.Left };
+            automatic.SetBinding(System.Windows.Controls.Primitives.ToggleButton.IsCheckedProperty,
+                new Binding(nameof(MixerViewModel.AutomaticallyCheckForUpdates)) { Source = preferences, Mode = BindingMode.TwoWay });
+            const string automaticHelp = "Checks daily while VineMix is running. Failed checks retry automatically. You choose when to download and install.";
+            AutomationProperties.SetName(automatic, "Check for updates automatically");
+            AutomationProperties.SetHelpText(automatic, automaticHelp);
+            var explanation = new TextBlock { Text = "Checks daily. You choose when to download and install.",
+                FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(25, 2, 0, 0) };
+            explanation.SetResourceReference(TextBlock.ForegroundProperty, "ConsoleMutedBrush");
+            var preferencePanel = new StackPanel(); preferencePanel.Children.Add(automatic); preferencePanel.Children.Add(explanation);
+            var preferenceSection = new Border { BorderThickness = new Thickness(0, 1, 0, 0),
+                Margin = new Thickness(0, 22, 0, 0), Padding = new Thickness(0, 16, 0, 0), Child = preferencePanel };
+            preferenceSection.SetResourceReference(Border.BorderBrushProperty, "ConsoleBorderBrush");
+            content.Children.Add(preferenceSection);
+        }
+
+        var footer = new DockPanel { Margin = new Thickness(0, 22, 0, 0), LastChildFill = true };
+        var later = new Button { Content = "Close", Padding = new Thickness(10, 7, 10, 7), MinHeight = 34,
+            HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Bottom, IsCancel = true,
+            Background = System.Windows.Media.Brushes.Transparent, BorderThickness = new Thickness(0) };
+        later.SetResourceReference(ForegroundProperty, "ConsoleMutedBrush");
+        var closeStyle = new Style(typeof(Button), (Style)Application.Current.FindResource(typeof(Button)));
+        var installing = new DataTrigger { Binding = new Binding(nameof(UpdateController.IsInstalling)), Value = true };
+        installing.Setters.Add(new Setter(IsEnabledProperty, false)); closeStyle.Triggers.Add(installing); later.Style = closeStyle;
+        later.Click += (_, _) => { if (!controller.IsInstalling) close(); };
+        DockPanel.SetDock(later, Dock.Left); footer.Children.Add(later);
+        var actions = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Right };
+        footer.Children.Add(actions); content.Children.Add(footer);
+
+        Button Action(string label, string enabled, Func<Task> action, bool primary,
+            params (string Property, bool Value)[] visibleWhen)
+        {
+            var button = new Button { Content = label, Padding = new Thickness(13, 7, 13, 7),
+                MinHeight = 34, Margin = new Thickness(8, 0, 0, 0) };
+            var style = new Style(typeof(Button), (Style)Application.Current.FindResource(typeof(Button)));
+            style.Setters.Add(new Setter(VisibilityProperty, Visibility.Collapsed));
+            var show = new MultiDataTrigger();
+            foreach (var condition in visibleWhen) show.Conditions.Add(new System.Windows.Condition(new Binding(condition.Property), condition.Value));
+            show.Setters.Add(new Setter(VisibilityProperty, Visibility.Visible)); style.Triggers.Add(show);
+            if (primary)
+            {
+                style.Setters.Add(new Setter(BackgroundProperty, new DynamicResourceExtension("BrandActionBrush")));
+                style.Setters.Add(new Setter(ForegroundProperty, new DynamicResourceExtension("BrandActionTextBrush")));
+                style.Setters.Add(new Setter(BorderBrushProperty, new DynamicResourceExtension("BrandActionBrush")));
+            }
+            if (label == "Check for updates")
+            {
+                var offerAvailable = new DataTrigger { Binding = new Binding(nameof(UpdateController.HasOffer)), Value = true };
+                offerAvailable.Setters.Add(new Setter(BackgroundProperty, System.Windows.Media.Brushes.Transparent));
+                offerAvailable.Setters.Add(new Setter(ForegroundProperty, new DynamicResourceExtension("ConsoleMutedBrush")));
+                offerAvailable.Setters.Add(new Setter(BorderThicknessProperty, new Thickness(0)));
+                style.Triggers.Add(offerAvailable);
+            }
+            button.Style = style;
             button.SetBinding(IsEnabledProperty, new Binding(enabled));
+            AutomationProperties.SetName(button, label);
             button.Click += async (_, _) => await action();
             actions.Children.Add(button); return button;
         }
-        Action("Check for updates", nameof(UpdateController.CanCheck), controller.CheckAsync);
-        Action("Download update", nameof(UpdateController.CanDownload), controller.DownloadAsync);
-        var apply = Action("Install and restart", nameof(UpdateController.CanInstall), install);
+        Action("Check for updates", nameof(UpdateController.CanCheck), async () => await controller.CheckAsync(), true,
+            (nameof(UpdateController.IsBusy), false));
+        Action("Download update", nameof(UpdateController.CanDownload), controller.DownloadAsync, true,
+            (nameof(UpdateController.IsBusy), false), (nameof(UpdateController.HasOffer), true), (nameof(UpdateController.HasDownloadedUpdate), false));
+        var apply = Action("Install and restart", nameof(UpdateController.CanInstall), install, true,
+            (nameof(UpdateController.IsBusy), false), (nameof(UpdateController.HasDownloadedUpdate), true));
         apply.ToolTip = "Save your workspace, briefly stop audio, install the verified update and reopen VineMix.";
         AutomationProperties.SetHelpText(apply, (string)apply.ToolTip);
-        Action("Cancel download", nameof(UpdateController.CanCancel), () => { controller.Cancel(); return Task.CompletedTask; });
-        var later = new Button { Content = "Later", Padding = new Thickness(10, 6, 10, 6), Margin = new Thickness(4, 3, 0, 0), IsCancel = true };
-        later.Click += (_, _) => { if (!controller.IsInstalling) close(); };
-        actions.Children.Add(later); content.Children.Add(actions);
+        var cancel = Action("Cancel", nameof(UpdateController.CanCancel), () => { controller.Cancel(); return Task.CompletedTask; }, false,
+            (nameof(UpdateController.CanCancel), true));
+        AutomationProperties.SetHelpText(cancel, "Cancel the update check or download. Your current version keeps running.");
         return content;
     }
 
-    internal async Task BeginAutomaticUpdateCheckAsync()
+    internal Task BeginAutomaticUpdateCheckAsync()
     {
-        if (_mixer.IsPreview) return;
-        await Task.Delay(TimeSpan.FromSeconds(30));
-        if (!_mixer.AutomaticallyCheckForUpdates || ((App)Application.Current).IsQuitting) return;
-        string stamp = Path.Combine(UpdateTransaction.Root, "last-check.txt");
-        try
-        {
-            if (File.Exists(stamp) && DateTimeOffset.TryParse(File.ReadAllText(stamp), out var last)
-                && DateTimeOffset.UtcNow - last < TimeSpan.FromDays(1)) return;
-            UpdateFiles.CreatePrivateDirectory(UpdateTransaction.Root);
-            File.WriteAllText(stamp, DateTimeOffset.UtcNow.ToString("o"));
-        }
-        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { return; }
-        _updates ??= new UpdateController(false);
-        await _updates.CheckAsync();
-        if (_updates.CanDownload) Workspace.SetMessage("A VineMix update is available. Open Settings → Check for updates.", false);
+        InitializeAutomaticUpdates();
+        return Task.CompletedTask;
     }
 }

@@ -170,9 +170,10 @@ internal sealed class OffscreenDesignRenderer
             await EngineRestartVerification.RunAsync(Require);
             await SettingsRestartVerification.RunAsync(Require);
             await UpdatePreparationVerification.RunAsync(Require);
+            await AutomaticUpdateVerification.RunAsync(Require);
             await QuitRecoveryVerification.RunAsync(Require);
             Render(QuitRecoveryVerification.Preview(), "quit-recovery.png");
-            await UpdateUiVerification.RunAsync(Require);
+            await UpdateUiVerification.RunAsync(Require, (element, name) => Render(element, name));
             Render(WhatsNewVerification.Run(Require), "whats-new.png");
             await AddNodeHelpVerification.RunAsync(Require);
             DeviceVisibilitySettingsVerification.Run(Require);

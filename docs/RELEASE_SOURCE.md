@@ -3,6 +3,21 @@
 Every published version has its own source tag and retained executable downloads.
 The [release history](RELEASES.md) links each version's notes and assets.
 
+## 0.3.0-beta.5
+
+Beta 5 is a new release; Beta 2, 3 and 4 retain their original tags and asset
+bytes. Their release pages carry update notices directing users to Beta 5.
+Setup and standalone use one frozen, committed source snapshot. The source ZIP
+includes every committed file and a `SOURCE-MANIFEST.json` with exact build-input
+hashes, executable identities and sanitized verification results. The update
+envelope is signed by the existing pinned key, so older clients can authenticate
+the corrected package. Checksums cover both executables, that envelope and the
+source ZIP. Private keys, diagnostics and recovery files are excluded.
+
+See [Beta 5's notes](releases/0.3.0-beta.5.md) and
+[current qualification](BETA_TESTING_CURRENT.md). Full delivered update and
+rollback exercises on a separate account/machine remain a separate qualification.
+
 ## 0.3.0-beta.4
 
 Beta 4's Setup and standalone packages share one frozen, committed build-input

@@ -9,6 +9,7 @@ $tool = Join-Path $PSScriptRoot 'update-release-tools\VineMix.UpdateReleaseTools
 $tokens = $null; $errors = $null
 [Management.Automation.Language.Parser]::ParseFile((Join-Path $PSScriptRoot 'prepare-update-release.ps1'),[ref]$tokens,[ref]$errors) | Out-Null
 if ($errors.Count) { throw 'The preparation wrapper did not parse.' }
+& (Join-Path $PSScriptRoot 'test-release-file-version.ps1')
 & $dotnet run --project $tool -c Release -- --self-test
 if ($LASTEXITCODE) { throw 'The signing parser roundtrip fixture failed.' }
 $fixture = Join-Path ([IO.Path]::GetTempPath()) ('VineMix.ReleaseTool.Tests-' + [Guid]::NewGuid().ToString('N'))
@@ -16,6 +17,7 @@ $source = Join-Path $fixture 'source'; $private = Join-Path $fixture 'private'; 
 $null = New-Item -ItemType Directory -Path $source,$private,$candidate
 $checks = [Collections.Generic.List[string]]::new()
 $checks.Add('PowerShell preparation wrapper parses; exact UpdateCore signature roundtrip and tamper rejection pass.')
+$checks.Add('Actual native PE version fixtures reject semver FileVersion text, mismatched numeric text, fixed fields and product versions.')
 try {
     $version = '1.2.3-beta.2'; $numeric = '1.2.3.2'; $sourceHash = 'a' * 64; $head = 'b' * 40
     $fixtureProject = Join-Path $source 'Fixture.csproj'

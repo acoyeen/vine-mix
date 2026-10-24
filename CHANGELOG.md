@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.3.0-beta.5 — 24 October 2026
+
+- Correct the engine's Windows file-version text so existing update workers
+  accept the package instead of rolling back to the previous beta.
+- Check native executable metadata during builds and package qualification,
+  with regressions for the original rejection and safe rollback.
+- Check shortly after automatic checking is enabled, repeat daily while running,
+  retry temporary failures after 15 minutes and persist only successful checks.
+- Simplify the themed update window with installed-version information, release
+  notes, progress and actions appropriate to the current state.
+- Retain Setup exit codes and private installer logs for failed update diagnosis.
+- Publish a new version with matching source, checksums and signed metadata;
+  preserve Beta 2, 3 and 4 downloads and add notices directing users to Beta 5.
+
 ## 0.3.0-beta.4 — 23 October 2026
 
 - Allow streamed Windows playback devices, including Virtual Desktop headset

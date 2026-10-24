@@ -11,6 +11,16 @@ change visibility, install a candidate or restart the application/audio engine.
 Build Setup and standalone candidates from the same stable source snapshot and
 the authoritative `release.json`. Keep the existing installer `.exe.json` receipt
 and standalone directory `.build.json` receipt. Write concise UTF-8 release notes.
+
+The native engine's textual Windows `FileVersion` must be the four-part
+`numericVersion`, matching its fixed resource fields; `ProductVersion` retains
+the semantic release version. Already-shipped update workers parse that text.
+Build and qualification scripts enforce this contract on actual binaries through
+`assert-release-file-version.ps1`; regression fixtures run with
+`test-release-file-version.ps1`. A valid manifest/signature or matching `--version`
+output alone does not establish updater compatibility. See the
+[Beta 4 metadata defect](UPDATE_INVESTIGATION_2026-10-24.md).
+
 Use PowerShell 7.3 or later:
 
 ```powershell
@@ -56,7 +66,7 @@ the updater.
 
 The first updater-enabled release is `0.3.0-beta.2`. Beta 1 has no update control,
 and Beta 2 accepts only a strictly newer release. Qualify the actual Beta 2 client
-against the legitimate signed Beta 3 release; do not relabel existing files, bypass
+against the legitimate signed Beta 5 release; do not relabel existing files, bypass
 version checks or publish a dummy version merely to produce a passing result.
 Signed metadata verification and isolated worker tests remain separate evidence.
 

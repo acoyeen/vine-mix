@@ -45,6 +45,7 @@ public sealed partial class MixerViewModel
         finally { if (entered) _engineGate.Release(); }
     }
     public bool IsPreparingUpdate => _preparingUpdate;
+    internal event Action<bool>? AutomaticUpdatePreferenceChanged;
     public bool AutomaticallyCheckForUpdates
     {
         get => _automaticallyCheckForUpdates;
@@ -52,6 +53,7 @@ public sealed partial class MixerViewModel
         {
             if (Applying || !Set(ref _automaticallyCheckForUpdates, value)) return;
             SaveUiPreferences();
+            AutomaticUpdatePreferenceChanged?.Invoke(value);
         }
     }
 

@@ -6,12 +6,17 @@ replace an older version's downloads or checksums.
 
 | Version | Release notes and downloads | Highlights |
 | --- | --- | --- |
+| **0.3.0 · Beta 5** | [GitHub release](https://github.com/acoyeen/vine-mix/releases/tag/v0.3.0-beta.5) · [Detailed notes](releases/0.3.0-beta.5.md) | Corrected update-package metadata, reliable automatic-check scheduling and a simpler update window. |
 | **0.3.0 · Beta 4** | [GitHub release](https://github.com/acoyeen/vine-mix/releases/tag/v0.3.0-beta.4) · [Detailed notes](releases/0.3.0-beta.4.md) | Streamed headset output, layout lock, safer quitting, bundled update highlights and clearer workspace feedback. |
 | **0.3.0 · Beta 3** | [GitHub release](https://github.com/acoyeen/vine-mix/releases/tag/v0.3.0-beta.3) · [Detailed notes](releases/0.3.0-beta.3.md) | Clean development baseline, removal of experimental resize changes, correctness fixes and refreshed verification. |
 | **0.3.0 · Beta 2** | [GitHub release](https://github.com/acoyeen/vine-mix/releases/tag/v0.3.0-beta.2) · [Detailed notes](releases/0.3.0-beta.2.md) | Streamed microphone discovery, clearer Setup choices, complete Add Node explanations and signed in-app updates. Retained provisional release. |
 | **0.3.0 · Beta 1** | [GitHub release](https://github.com/acoyeen/vine-mix/releases/tag/v0.3.0-beta.1) · [Detailed notes](releases/0.3.0-beta.1.md) | Three-node starter, workspace recovery and migration, installed and standalone packages. |
 
-Beta 1 users should install Beta 4 manually to gain the in-app updater.
+Beta 1 users should install Beta 5 manually to gain the in-app updater.
+Beta 2–4 packages have a known updater compatibility defect. Quit VineMix and
+install Beta 5 over the existing installation, or replace the standalone EXE;
+there is no need to uninstall or install intermediate betas. Earlier downloads
+remain available for history, with notices linking to the corrected release.
 Later updates are available through **Settings → Check for updates**. Daily
 checks can be turned on or off; download and installation are explicit actions.
 See [installation and updates](INSTALLATION_AND_UPDATES.md).

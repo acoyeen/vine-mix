@@ -1,12 +1,20 @@
 # VineMix installation and updates
 
-Updated 23 October 2026 for **0.3.0 · Beta 4**. VineMix is an
+Updated 24 October 2026 for **0.3.0 · Beta 5**. VineMix is an
 MIT-licensed open-source beta for Windows 11 x64. Download versioned packages,
 checksums and matching source from [GitHub Releases](https://github.com/acoyeen/vine-mix/releases).
 See the [beta test guide](BETA_TESTER_GUIDE.md) for installation instructions and
 [current qualification](BETA_TESTING_CURRENT.md) for outstanding gates.
 
 ## Packages and files
+
+**Upgrading from Beta 2, 3 or 4:** updates to those older packages can roll back
+because of incorrect engine version metadata. Beta 5 corrects that metadata and
+automatic-check scheduling. For recovery, wait for Saved, choose **Quit VineMix**,
+then run Beta 5 Setup using the existing folder. Do not uninstall first.
+Standalone users should quit and replace their launcher with the Beta 5 download.
+Keep optional drivers unchanged if they already work. Intermediate betas are not
+required. See the [update investigation](UPDATE_INVESTIGATION_2026-10-24.md).
 
 The Windows 11 x64 Setup installs the matched desktop and engine together under
 `%LOCALAPPDATA%\Programs\VineMix`, creates shortcuts, and registers an uninstall

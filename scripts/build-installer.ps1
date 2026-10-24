@@ -53,8 +53,9 @@ foreach ($name in @('Assets\Fonts\IBM-Plex-LICENSE.txt')) {
         Copy-Item -LiteralPath (Join-Path $source $name) -Destination $destination
     }
 }
-$sourceInfo = [Diagnostics.FileVersionInfo]::GetVersionInfo((Join-Path $source 'VineMix.exe'))
-if ($sourceInfo.ProductVersion.Split('+')[0] -ne $version -or $sourceInfo.FileVersion -ne $release.numericVersion) { throw 'Staged desktop release metadata does not match release.json.' }
+foreach ($name in @('VineMix.exe','VineMix.Engine.exe')) {
+    & (Join-Path $PSScriptRoot 'assert-release-file-version.ps1') -Path (Join-Path $payload $name) -Version $version -NumericVersion $release.numericVersion
+}
 $nativeVersion = (& (Join-Path $source 'VineMix.Engine.exe') --version | Out-String).Trim()
 if ($LASTEXITCODE -ne 0 -or -not $nativeVersion.Contains($version)) { throw 'Staged engine release metadata does not match release.json.' }
 $support = Join-Path $payload 'SetupSupport'

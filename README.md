@@ -4,13 +4,13 @@ VineMix is an audio mixer for **Windows 11 x64**. Connect a microphone or an app
 headphones and a virtual microphone by drawing cables between nodes. Add effects
 when you need them; each output has its own level and mute.
 
-**0.3.0 · Beta 4** is an MIT-licensed open-source beta.
-Download the [Windows installer](https://github.com/acoyeen/vine-mix/releases/download/v0.3.0-beta.4/VineMix-0.3.0-beta.4-Setup-x64.exe)
-or [standalone EXE](https://github.com/acoyeen/vine-mix/releases/download/v0.3.0-beta.4/VineMix-0.3.0-beta.4-Standalone-x64.exe).
-The [release page](https://github.com/acoyeen/vine-mix/releases/tag/v0.3.0-beta.4)
+**0.3.0 · Beta 5** is an MIT-licensed open-source beta.
+Download the [Windows installer](https://github.com/acoyeen/vine-mix/releases/download/v0.3.0-beta.5/VineMix-0.3.0-beta.5-Setup-x64.exe)
+or [standalone EXE](https://github.com/acoyeen/vine-mix/releases/download/v0.3.0-beta.5/VineMix-0.3.0-beta.5-Standalone-x64.exe).
+The [release page](https://github.com/acoyeen/vine-mix/releases/tag/v0.3.0-beta.5)
 includes checksums, matching source and release notes.
-Beta 4 adds streamed headset outputs, a layout lock, safer quitting and bundled
-update highlights; see the [release notes](docs/releases/0.3.0-beta.4.md).
+Beta 5 corrects update-package metadata, improves automatic checks and simplifies
+the update window; see the [release notes](docs/releases/0.3.0-beta.5.md).
 See [the current qualification results](docs/BETA_TESTING_CURRENT.md),
 [the beta test guide](docs/BETA_TESTER_GUIDE.md) and [testing status](TESTING.md)
 for current limitations.
@@ -96,6 +96,12 @@ not change driver terms. Driver information was checked on 21 October 2026.
   Audio pauses for installation. Automatic checks can be switched off in Settings;
   they never install without your choice. If checking fails, retry later or use
   the GitHub release page for a manual update.
+  **Upgrading from Beta 2–4:** older packages have an update metadata defect.
+  For a dependable recovery, use **Quit VineMix**, then run Beta 5 Setup against
+  the existing installation without uninstalling. Standalone users should quit
+  and replace their launcher with the Beta 5 standalone EXE. Beta 3 and Beta 4
+  are not required intermediate steps. See the
+  [update investigation](docs/UPDATE_INVESTIGATION_2026-10-24.md).
 
 Settings, backups and logs live in `%LOCALAPPDATA%\VineMix`. An upgrade from the
 older AudioMixer name copies your existing workspace and preferences and keeps
@@ -112,6 +118,7 @@ backup or Start fresh while preserving originals. See
 - [Device visibility and recovery](docs/DEVICE_VISIBILITY.md)
 - [Effects and limitations](docs/EFFECTS_RESEARCH.md)
 - [Development ideas](docs/IDEAS.md)
+- [Known issues](docs/KNOWN_ISSUES.md)
 - [Changelog](CHANGELOG.md), [testing](TESTING.md) and [contributing](CONTRIBUTING.md)
 - [Third-party credits](THIRD_PARTY_NOTICES.md) and [distribution conditions](docs/DISTRIBUTION.md)
 
