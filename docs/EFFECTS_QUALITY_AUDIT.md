@@ -148,7 +148,7 @@ inputs. Both behaviors match the controls' current names and intended operation.
 
 ## Repeating the audit
 
-Build with `AUDIO_MIXER_OFFLINE_TESTS=ON` and run
+Build with `VINEMIX_OFFLINE_TESTS=ON` and run
 `AudioMixer.EffectsQualityTests.exe`. The independent quality suite passed
 **532 assertions** after the reverb correction. The graph/lifecycle and advanced
 effect suites additionally check state inheritance, bypass/mute behavior,

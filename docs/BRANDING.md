@@ -4,6 +4,15 @@ Implemented 20 October 2026. The approved direction is a minimal native audio
 workspace using the split VM mark, IBM Plex typography and forest-green actions.
 See the [implementation plan and evidence](BRANDING_IMPLEMENTATION_PLAN.md).
 
+## Naming
+
+Use **VineMix**, without a space, in product copy, accessibility text, release
+titles and documentation. Use `vine-mix` for the repository, Codex project and
+checkout folder. Language-specific names retain their normal syntax, including
+`VineMix.Desktop` and `VINEMIX_*`. The website remains `vinemix.app`.
+[Compatibility identifiers](REBRAND_COMPATIBILITY.md) and historical evidence
+retain their original spelling where it is required for accuracy.
+
 ## Mark and assets
 
 The symbol consists of a separate V above an M. Their long diagonals share a

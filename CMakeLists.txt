@@ -119,7 +119,7 @@ install(FILES LICENSE THIRD_PARTY_NOTICES.md DESTINATION .)
 install(DIRECTORY licenses/ DESTINATION licenses)
 install(FILES docs/DISTRIBUTION.md DESTINATION docs)
 
-function(audio_mixer_verification_target target)
+function(vinemix_verification_target target)
   target_include_directories(${target} PRIVATE native/include ${CMAKE_CURRENT_BINARY_DIR}/generated)
   target_compile_definitions(${target} PRIVATE
     UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN _WIN32_WINNT=0x0A00 WINVER=0x0A00)
@@ -134,8 +134,12 @@ endfunction()
 # Pure synthetic verification: no WASAPI devices or user settings are used.
 # The lifecycle target links stub I/O with the actual engine. Opt in separately
 # from the vendor library test suites.
-option(AUDIO_MIXER_OFFLINE_TESTS "Build silent graph, settings, lifecycle, drift and queue verification" OFF)
-if(AUDIO_MIXER_OFFLINE_TESTS)
+# Accept the legacy spelling only when the canonical option is not set.
+if(DEFINED AUDIO_MIXER_OFFLINE_TESTS AND NOT DEFINED VINEMIX_OFFLINE_TESTS)
+  set(VINEMIX_OFFLINE_TESTS "${AUDIO_MIXER_OFFLINE_TESTS}" CACHE BOOL "Legacy build-option compatibility")
+endif()
+option(VINEMIX_OFFLINE_TESTS "Build silent graph, settings, lifecycle, drift and queue verification" OFF)
+if(VINEMIX_OFFLINE_TESTS)
   add_executable(VineMix.GraphTests
     native/tests/graph_tests.cpp native/src/graph.cpp native/src/configuration.cpp native/src/dsp.cpp)
   target_include_directories(VineMix.GraphTests PRIVATE native/include)
@@ -164,49 +168,53 @@ if(AUDIO_MIXER_OFFLINE_TESTS)
   # in this test, and dsp.cpp/libsamplerate are not needed for this target.
   add_executable(VineMix.QualificationTests
     native/tests/qualification_tests.cpp native/src/graph.cpp native/src/configuration.cpp)
-  audio_mixer_verification_target(VineMix.QualificationTests)
+  vinemix_verification_target(VineMix.QualificationTests)
   target_link_libraries(VineMix.QualificationTests PRIVATE nlohmann_json::nlohmann_json advapi32)
 
   # Memory-only queues and resampling; no configuration or device APIs linked.
   add_executable(VineMix.DriftQueueTests native/tests/drift_queue_tests.cpp native/src/dsp.cpp)
-  audio_mixer_verification_target(VineMix.DriftQueueTests)
+  vinemix_verification_target(VineMix.DriftQueueTests)
   target_link_libraries(VineMix.DriftQueueTests PRIVATE samplerate)
 
   # Production inventory collector with fake COM objects only. Does not
   # construct live device catalogs/workers or open any real audio endpoint.
   add_executable(VineMix.WindowsCatalogTests
     native/tests/windows_catalog_tests.cpp native/src/windows_audio.cpp native/src/dsp.cpp)
-  audio_mixer_verification_target(VineMix.WindowsCatalogTests)
+  vinemix_verification_target(VineMix.WindowsCatalogTests)
   target_link_libraries(VineMix.WindowsCatalogTests PRIVATE samplerate nlohmann_json::nlohmann_json ole32 uuid avrt propsys)
 
   # Fake WASAPI clients exercise exclusive virtual-output initialization and
   # failure handling without opening endpoints or changing personal audio.
   add_executable(VineMix.ExclusiveRenderTests
     native/tests/exclusive_render_tests.cpp native/src/windows_audio.cpp native/src/dsp.cpp)
-  audio_mixer_verification_target(VineMix.ExclusiveRenderTests)
+  vinemix_verification_target(VineMix.ExclusiveRenderTests)
   target_link_libraries(VineMix.ExclusiveRenderTests PRIVATE samplerate ole32 uuid avrt propsys)
 
   add_executable(VineMix.SharedAudioTests
     native/tests/shared_audio_tests.cpp native/src/windows_audio.cpp native/src/dsp.cpp)
-  audio_mixer_verification_target(VineMix.SharedAudioTests)
+  vinemix_verification_target(VineMix.SharedAudioTests)
   target_link_libraries(VineMix.SharedAudioTests PRIVATE samplerate ole32 uuid avrt propsys)
 
   add_executable(VineMix.AudioTimingTests native/tests/audio_timing_tests.cpp native/src/dsp.cpp)
-  audio_mixer_verification_target(VineMix.AudioTimingTests)
+  vinemix_verification_target(VineMix.AudioTimingTests)
   target_link_libraries(VineMix.AudioTimingTests PRIVATE samplerate)
 
   add_executable(VineMix.MixClockTests native/tests/mix_clock_tests.cpp)
-  audio_mixer_verification_target(VineMix.MixClockTests)
+  vinemix_verification_target(VineMix.MixClockTests)
 endif()
 
 # These are diagnostics for real endpoints, deliberately separate from silent
 # offline verification. Building never executes them, installs drivers, alters
 # Windows defaults, or adds them to the personal application package.
-option(AUDIO_MIXER_HARDWARE_TESTS "Build explicit opt-in real-endpoint diagnostics (never run automatically)" OFF)
-if(AUDIO_MIXER_HARDWARE_TESTS)
+# Accept the legacy spelling only when the canonical option is not set.
+if(DEFINED AUDIO_MIXER_HARDWARE_TESTS AND NOT DEFINED VINEMIX_HARDWARE_TESTS)
+  set(VINEMIX_HARDWARE_TESTS "${AUDIO_MIXER_HARDWARE_TESTS}" CACHE BOOL "Legacy build-option compatibility")
+endif()
+option(VINEMIX_HARDWARE_TESTS "Build explicit opt-in real-endpoint diagnostics (never run automatically)" OFF)
+if(VINEMIX_HARDWARE_TESTS)
   # Read-only endpoint/default/session inventory; never initializes a stream.
   add_executable(VineMix.EndpointInventory native/tests/endpoint_inventory.cpp)
-  audio_mixer_verification_target(VineMix.EndpointInventory)
+  vinemix_verification_target(VineMix.EndpointInventory)
   target_link_libraries(VineMix.EndpointInventory PRIVATE nlohmann_json::nlohmann_json ole32 uuid propsys)
 
   # Requires --run-muted and explicit endpoint IDs. Uses private settings,
@@ -214,7 +222,7 @@ if(AUDIO_MIXER_HARDWARE_TESTS)
   add_executable(VineMix.HardwareTests
     native/tests/engine_hardware_tests.cpp native/src/engine.cpp native/src/windows_audio.cpp
     native/src/process_capture.cpp native/src/configuration.cpp native/src/graph.cpp native/src/dsp.cpp)
-  audio_mixer_verification_target(VineMix.HardwareTests)
+  vinemix_verification_target(VineMix.HardwareTests)
   target_link_libraries(VineMix.HardwareTests PRIVATE samplerate nlohmann_json::nlohmann_json
     ole32 uuid avrt propsys advapi32 winmm user32 psapi)
 
@@ -223,7 +231,7 @@ if(AUDIO_MIXER_HARDWARE_TESTS)
   # Does not link the engine/control server or configuration persistence.
   add_executable(VineMix.LiveAudioProbe
     native/tests/live_audio_probe.cpp native/src/windows_audio.cpp native/src/process_capture.cpp native/src/dsp.cpp)
-  audio_mixer_verification_target(VineMix.LiveAudioProbe)
+  vinemix_verification_target(VineMix.LiveAudioProbe)
   target_link_libraries(VineMix.LiveAudioProbe PRIVATE samplerate nlohmann_json::nlohmann_json
     ole32 uuid avrt propsys advapi32 winmm user32)
 
@@ -232,7 +240,7 @@ if(AUDIO_MIXER_HARDWARE_TESTS)
   # Existing application playback and Windows routing remain unchanged.
   add_executable(VineMix.ApplicationObserve
     native/tests/application_observe.cpp native/src/process_capture.cpp native/src/dsp.cpp)
-  audio_mixer_verification_target(VineMix.ApplicationObserve)
+  vinemix_verification_target(VineMix.ApplicationObserve)
   target_link_libraries(VineMix.ApplicationObserve PRIVATE samplerate nlohmann_json::nlohmann_json
     ole32 uuid avrt user32)
 
@@ -240,7 +248,7 @@ if(AUDIO_MIXER_HARDWARE_TESTS)
   # renderer and stores only aggregate levels, never microphone audio files.
   add_executable(VineMix.CaptureIsolationProbe
     native/tests/capture_isolation_probe.cpp native/src/windows_audio.cpp native/src/dsp.cpp)
-  audio_mixer_verification_target(VineMix.CaptureIsolationProbe)
+  vinemix_verification_target(VineMix.CaptureIsolationProbe)
   target_link_libraries(VineMix.CaptureIsolationProbe PRIVATE samplerate nlohmann_json::nlohmann_json
     ole32 uuid avrt propsys winmm user32)
   if(NOT MSVC)
@@ -252,26 +260,26 @@ endif()
 
 # Every target using graph.cpp needs the same effect implementation; linking
 # the library never executes it or creates an audio endpoint.
-if(AUDIO_MIXER_OFFLINE_TESTS)
+if(VINEMIX_OFFLINE_TESTS)
   add_executable(VineMix.AdvancedEffectsTests native/tests/advanced_effects_tests.cpp native/src/graph.cpp native/src/configuration.cpp)
-  audio_mixer_verification_target(VineMix.AdvancedEffectsTests)
+  vinemix_verification_target(VineMix.AdvancedEffectsTests)
   target_link_libraries(VineMix.AdvancedEffectsTests PRIVATE nlohmann_json::nlohmann_json advapi32)
   add_executable(VineMix.DenoiserTests native/tests/denoiser_tests.cpp native/src/graph.cpp native/src/configuration.cpp)
-  audio_mixer_verification_target(VineMix.DenoiserTests)
+  vinemix_verification_target(VineMix.DenoiserTests)
   target_link_libraries(VineMix.DenoiserTests PRIVATE nlohmann_json::nlohmann_json advapi32 VineMix.Effects)
   add_executable(VineMix.SpectrumTests native/tests/spectrum_tests.cpp native/src/graph.cpp)
-  audio_mixer_verification_target(VineMix.SpectrumTests)
+  vinemix_verification_target(VineMix.SpectrumTests)
   add_executable(VineMix.DeEsserQualityTests native/tests/deesser_quality_tests.cpp)
-  audio_mixer_verification_target(VineMix.DeEsserQualityTests)
+  vinemix_verification_target(VineMix.DeEsserQualityTests)
   add_executable(VineMix.EffectsQualityTests native/tests/effects_quality_tests.cpp native/src/graph.cpp)
-  audio_mixer_verification_target(VineMix.EffectsQualityTests)
+  vinemix_verification_target(VineMix.EffectsQualityTests)
   add_executable(VineMix.GraphPerformanceTests native/tests/graph_performance_tests.cpp native/src/graph.cpp)
-  audio_mixer_verification_target(VineMix.GraphPerformanceTests)
+  vinemix_verification_target(VineMix.GraphPerformanceTests)
   add_executable(VineMix.VoiceColorTests native/tests/voice_color_tests.cpp native/src/graph.cpp native/src/configuration.cpp)
-  audio_mixer_verification_target(VineMix.VoiceColorTests)
+  vinemix_verification_target(VineMix.VoiceColorTests)
   target_link_libraries(VineMix.VoiceColorTests PRIVATE nlohmann_json::nlohmann_json advapi32)
   add_executable(VineMix.CoreDynamicsTests native/tests/core_dynamics_tests.cpp native/src/graph.cpp native/src/configuration.cpp)
-  audio_mixer_verification_target(VineMix.CoreDynamicsTests)
+  vinemix_verification_target(VineMix.CoreDynamicsTests)
   target_link_libraries(VineMix.CoreDynamicsTests PRIVATE nlohmann_json::nlohmann_json advapi32)
 endif()
 foreach(graph_target VineMix.Engine VineMix.GraphTests VineMix.EngineLifecycleTests

@@ -1,3 +1,11 @@
+# Naming
+
+Use `vine-mix` for the repository, Codex project and checkout folder. Use
+**VineMix** for the product name in interfaces, documentation and releases.
+Keep language-appropriate identifiers such as `VineMix.Desktop` and `VINEMIX_*`.
+Preserve older identifiers only for compatibility and dated historical evidence;
+see `docs/REBRAND_COMPATIBILITY.md`.
+
 # Project idea notes
 
 Use `docs/IDEAS.md` as the durable log for future development ideas.
@@ -47,7 +55,7 @@ and metadata before exporting or uploading them.
 
 The Codex execution environment can redirect `%LOCALAPPDATA%\AudioMixer` to
 Codex's private `LocalCache` even when a process reports no package identity.
-An identical printed path can therefore name different settings files. Vine Mix
+An identical printed path can therefore name different settings files. VineMix
 normalizes ordinary desktop startup through the Windows shell before loading
 preferences or starting its engine. Keep this behavior intact.
 

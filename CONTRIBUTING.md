@@ -1,5 +1,12 @@
 # Contributing
 
+Use `vine-mix` for the repository and local checkout folder, and **VineMix** for
+the product name. Clone `https://github.com/acoyeen/vine-mix.git` into a folder
+named `vine-mix`. Keep C# project names such as `VineMix.Desktop` and CMake
+identifiers such as `VINEMIX_OFFLINE_TESTS` in their language-appropriate forms.
+See [name compatibility](docs/REBRAND_COMPATIBILITY.md) before changing legacy
+settings, process, clipboard or upgrade identifiers.
+
 Build on Windows 11 x64 with PowerShell 7 using `scripts/build.ps1`, then run
 `scripts/verify-offline.ps1`. See [README.md](README.md) and [TESTING.md](TESTING.md)
 for setup and the distinction between offline checks and hardware qualification.

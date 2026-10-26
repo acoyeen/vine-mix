@@ -1,4 +1,4 @@
-# AudioMirror assessment and Vine Mix driver requirements
+# AudioMirror assessment and VineMix driver requirements
 
 Research date: **20 October 2026 (UTC+10)**.
 Status: feasibility assessment; no driver implementation or installation approved.
@@ -25,7 +25,7 @@ device registration, pairing, stream lifecycle, formats and ring buffer. Read
 GitHub issue/PR metadata through the public GitHub API and relevant discussions.
 Dates, issue states and release counts below are observations on the research date.
 
-Reviewed the current Vine Mix virtual-device bindings, engine transport checks,
+Reviewed the current VineMix virtual-device bindings, engine transport checks,
 Windows audio workers, distribution guidance and proposed installer architecture.
 Existing unrelated local edits were retained.
 
@@ -131,7 +131,7 @@ not establish that removal and other crash paths are solved.
   [`SpeakerWaveProperties.h`](https://github.com/JannesP/AudioMirror/blob/a9618d1ab4114e3e35e8e50ae804a4205315d1f2/AudioMirror/SpeakerWaveProperties.h)
   and
   [`MicrophoneWaveProperties.h`](https://github.com/JannesP/AudioMirror/blob/a9618d1ab4114e3e35e8e50ae804a4205315d1f2/AudioMirror/MicrophoneWaveProperties.h)
-  expose stereo 16-bit PCM at **44.1 kHz**, while Vine Mix processes at 48 kHz.
+  expose stereo 16-bit PCM at **44.1 kHz**, while VineMix processes at 48 kHz.
 - `AdapterCommon::Create` enforces one adapter instance. Installation creates one
   microphone/speaker pair; the descriptor factory's name-indexing function is a
   TODO. Two independently installed copies are not an implemented capability.
@@ -149,11 +149,11 @@ not establish that removal and other crash paths are solved.
   an installation/device-visibility report mentioning Windows 11; its cause is
   not established and it is not proof of universal incompatibility.
 
-## Proposed driver design for Vine Mix
+## Proposed driver design for VineMix
 
 Assumption: Windows 11 x64 initially; two independent stereo paths, no mixer,
 effects, network audio, surround or arbitrary user-created cable counts in the
-driver. Users may use Vine Mix commercially and pay for it. Exact supported
+driver. Users may use VineMix commercially and pay for it. Exact supported
 Windows releases and PCM precision remain decisions.
 
 The smallest change to the existing engine is **one driver package containing
@@ -161,8 +161,8 @@ two isolated loopback cables**:
 
 | Cable | Playback endpoint | Recording endpoint |
 |---|---|---|
-| Receive | Vine Mix Input — other apps play here | Vine Mix Receive — engine captures here |
-| Send | Vine Mix Send — engine plays the finished mix here | Vine Mix Output — Discord/OBS record here |
+| Receive | VineMix Input — other apps play here | VineMix Receive — engine captures here |
+| Send | VineMix Send — engine plays the finished mix here | VineMix Output — Discord/OBS record here |
 
 This still creates four Windows audio endpoints. The two engine-facing partners
 are necessary for ordinary cable transport, even when first-run guidance only
@@ -180,18 +180,18 @@ Choose between these architectures before committing to endpoint identities.
 
 | Workstream | Required result before release |
 |---|---|
-| Provenance and ownership | Pin all source revisions; identify inherited files and licences; preserve notices; use Vine Mix branding and unique IDs; establish a maintained release repository. |
+| Provenance and ownership | Pin all source revisions; identify inherited files and licences; preserve notices; use VineMix branding and unique IDs; establish a maintained release repository. |
 | Reproducible build | Use a supported matching Visual Studio/MSVC, SDK and WDK combination. Produce clean x64 Release and diagnostic builds, valid INF/catalog and build evidence. The existing user-mode LLVM/.NET pipeline is not a driver build pipeline. |
 | Transport core | Replace or comprehensively repair the buffer implementation. Use bounded, frame-aligned operations, explicit overflow/underflow behavior, bounded callback work and a reviewed synchronization model. No stale audio replay after reconnect. |
 | Object lifetime | Define ownership of adapters, endpoints, streams, timers and notifications. Cancel/drain callbacks before freeing state; synchronize unpairing; handle allocation and partial-registration failures; pass repeated removal tests. |
 | Two cables | Register two unique pairs inside one adapter, with independent transport state and persistent endpoint identities. Handle either end opening first, missing peers and simultaneous active paths. |
 | Audio contract | Define stereo 48 kHz kernel transport and chosen PCM precision. Validate all format sizes and rates. Use Windows shared-mode conversion where appropriate; reject unsupported exclusive requests predictably. Keep DSP/resampling out of kernel code unless demonstrably necessary. |
-| Vine Mix integration | Add an explicit transport family/role mapping in native discovery, graph validation and desktop assignment. Remove the assumption that virtual input means VB-CABLE and virtual output means VAC Lite. Preserve saved assignments and offer deliberate migration. |
+| VineMix integration | Add an explicit transport family/role mapping in native discovery, graph validation and desktop assignment. Remove the assumption that virtual input means VB-CABLE and virtual output means VAC Lite. Preserve saved assignments and offer deliberate migration. |
 | Installation and serviceability | Detect by package/device identity; prompt for elevation; support update, cancellation, rollback and restart-required outcomes; preserve Windows defaults and app data. Driver updates need their own tested compatibility policy. |
 | Windows trust | Set up the required publisher account/certificate process and Microsoft signing route. Qualify with Secure Boot and Memory Integrity enabled on normal target systems. Test signing is for isolated development, not the end-user experience. |
 | Ongoing maintenance | Own crash triage, symbols, versioned packages, Windows compatibility checks and driver/app rollback compatibility. Upstream inactivity means we should plan to maintain the fork ourselves. |
 
-### Vine Mix changes identified in the current source
+### VineMix changes identified in the current source
 
 - `native/src/windows_audio.cpp`: transport classification is vendor-specific;
   the VAC path currently uses exclusive rendering. Do not copy that exception
@@ -227,7 +227,7 @@ Choose between these architectures before committing to endpoint identities.
 5. Run Driver Verifier and applicable HLK audio, installation and integrity tests
    in the lab. Install the final signed package on clean ordinary Windows 11
    systems with security features enabled. Test upgrade/uninstall/rollback with
-   Vine Mix active, stopped, crashed and previously installed.
+   VineMix active, stopped, crashed and previously installed.
 
 Use a test VM with kernel debugging for early failure investigation, then real
 test hardware for timing and security-feature qualification. Do not enable Driver
@@ -253,7 +253,7 @@ or the upstream project's signature cannot be reused for a modified driver.
 2. **One-cable gate:** implement a tested transport and lifecycle, then demonstrate
    correct 48 kHz audio and clean stop/removal in an isolated environment.
 3. **Two-cable gate:** demonstrate independent paths in one package; integrate a
-   staged Vine Mix build and deliberate settings migration using test profiles.
+   staged VineMix build and deliberate settings migration using test profiles.
 4. **Release gate:** complete app compatibility, endurance, installation recovery,
    Memory Integrity/Verifier/HLK work and production signing. Release only after
    those results, not just successful compilation.

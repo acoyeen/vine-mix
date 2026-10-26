@@ -17,7 +17,7 @@ $results = [Collections.Generic.List[object]]::new()
 try {
     $env:PATH = "$compilerRoot;$previousPath"
     if (-not $SkipBuild) {
-        & $cmake -S $projectRoot -B $buildRoot -G 'MinGW Makefiles' '-DCMAKE_BUILD_TYPE=Release' '-DCMAKE_C_COMPILER=clang.exe' '-DCMAKE_CXX_COMPILER=clang++.exe' '-DCMAKE_MAKE_PROGRAM=mingw32-make.exe' '-DCMAKE_POLICY_VERSION_MINIMUM=3.5' '-DBUILD_TESTING=OFF' '-DAUDIO_MIXER_OFFLINE_TESTS=ON'
+        & $cmake -S $projectRoot -B $buildRoot -G 'MinGW Makefiles' '-DCMAKE_BUILD_TYPE=Release' '-DCMAKE_C_COMPILER=clang.exe' '-DCMAKE_CXX_COMPILER=clang++.exe' '-DCMAKE_MAKE_PROGRAM=mingw32-make.exe' '-DCMAKE_POLICY_VERSION_MINIMUM=3.5' '-DBUILD_TESTING=OFF' '-DVINEMIX_OFFLINE_TESTS=ON'
         if ($LASTEXITCODE -ne 0) { throw 'Quality-test configuration failed.' }
         & $cmake --build $buildRoot --parallel 4 --target @targets
         if ($LASTEXITCODE -ne 0) { throw 'Quality-test build failed.' }

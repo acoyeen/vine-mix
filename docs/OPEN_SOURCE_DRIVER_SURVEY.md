@@ -8,7 +8,7 @@ only; no driver or application implementation selected or installed.
 **Deep-review update, 20 October 2026:** the subsequent
 [MicDeck and AudioRouter comparison](VIRTUAL_DRIVER_FOUNDATION_COMPARISON.md)
 supersedes the initial ranking below. The maintainer accepts four clearly labelled
-endpoints and requires both cables to work with Vine Mix closed. Prototype
+endpoints and requires both cables to work with VineMix closed. Prototype
 **AudioRouter's Windows driver framework with two new internal loopback paths**
 first. Its unchanged private bridge cannot satisfy that requirement. MicDeck's
 portable transport passed stronger stress tests, but its actual clock and cyclic
@@ -79,10 +79,10 @@ Its notices describe an original implementation using Microsoft's documented
 interfaces; source ancestry still needs checking before adoption. The overall
 application's other dependencies need not be imported to use just this driver.
 
-**Vine Mix work:** currently one static cable/clock in `adapter.cpp`. Refactor
+**VineMix work:** currently one static cable/clock in `adapter.cpp`. Refactor
 ownership into two independent cable instances, create unique endpoint identities,
 and verify teardown/failure handling, supported formats and shared-mode clients.
-Then integrate role-aware device discovery in Vine Mix. Successful host-side
+Then integrate role-aware device discovery in VineMix. Successful host-side
 atomic code does not validate the separate kernel atomic implementation.
 
 ## 2. AudioRouter's virtual driver component
@@ -100,7 +100,7 @@ The callbacks publish rendered audio to the engine and consume engine-supplied
 capture audio through the
 [bridge](https://github.com/MrDesjardins/audiorouter/blob/f63f491f6c12e5c7325e9a9dcd5666163caed371/drivers/audiorouter-virtual/Source/Inc/bridgeio.h).
 This is not a drop-in conventional cable. Using that unchanged architecture
-would require Vine Mix's own matching user-mode bridge implementation. A
+would require VineMix's own matching user-mode bridge implementation. A
 deliberately reduced device layout could support the two-public-endpoint
 architecture, subject to a separate design. The deeper review instead recommends
 internal driver loopback for the confirmed autonomous-cable requirement.
@@ -188,7 +188,7 @@ facts. Reserve as a source reference, below MicDeck/AudioRouter for a first spik
 
 **Fit:** real driver code with dynamic playback/recording endpoints, shared
 transport and synchronization to a physical ASIO interface. This is useful
-architecture, but Vine Mix currently uses WASAPI. Its normal topology would add
+architecture, but VineMix currently uses WASAPI. Its normal topology would add
 ASIO-host/physical-interface assumptions; extracting and replacing that clock and
 transport contract is substantial work.
 
@@ -196,7 +196,7 @@ transport contract is substantial work.
 software is allowed, with corresponding-source and other obligations when
 distributing it. Do not treat GPL as a commercial-use ban. The effect on closely
 integrated user-mode code needs a specific review, not an assumption that the
-whole of Vine Mix automatically changes licence.
+whole of VineMix automatically changes licence.
 
 Its repository has a newer unsigned build/package pipeline, while the README
 still describes Secure Boot limitations. Pipeline existence and proposed signing
@@ -232,7 +232,7 @@ Applications that only route into VB-CABLE, noncommercial-only source, macOS-onl
 drivers, and DirectShow-only inputs were not treated as replacements for a normal
 Windows recording/playback device pair.
 
-## What this changes for Vine Mix
+## What this changes for VineMix
 
 | Architecture | Best candidate to prototype | Application work | Principal unknown |
 |---|---|---|---|

@@ -92,7 +92,7 @@
   report form, and use silent three-node documentation fixtures with generic
   example devices. Beta 1 predates the in-app updater and needs a manual upgrade.
 
-- Start Vine Mix in the ordinary Windows desktop context before reading settings,
+- Start VineMix in the ordinary Windows desktop context before reading settings,
   so launches from packaged tools and Explorer use the same saved workspace.
   Preserve launch arguments and background mode, and add desktop exit diagnostics.
   Activation scripts reject redirected settings and track the final controller
@@ -129,7 +129,7 @@
   the brief empty box when crossing a separator. Remove the website logo's
   persistent underline while retaining a keyboard-only focus outline.
 
-- Apply the Vine Mix split VM identity and outlined VineMix caption wordmark,
+- Apply the VineMix split VM identity and outlined VineMix caption wordmark,
   IBM Plex Sans/Mono,
   forest-green actions and multi-size application/tray icons. Keep green audio
   cables, lavender Ducking sidechains, category colours and Windows high contrast.

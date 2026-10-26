@@ -68,7 +68,7 @@ Local evidence, excluded from Git:
 ## Distribution and limits
 
 See [DISTRIBUTION.md](DISTRIBUTION.md) and
-[THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md). Vine Mix's original application
+[THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md). VineMix's original application
 is licensed under MIT, as selected by the owner. Vendor driver installers
 are not distributed. Their licence restrictions remain separate from this app.
 

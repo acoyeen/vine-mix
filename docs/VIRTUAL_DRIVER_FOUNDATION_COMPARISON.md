@@ -1,15 +1,15 @@
-# MicDeck and AudioRouter foundations for Vine Mix virtual cables
+# MicDeck and AudioRouter foundations for VineMix virtual cables
 
 Research date: **20 October 2026, UTC+10**. Target: two independent
 Windows virtual audio cables that also work between other applications while
-Vine Mix is closed. Four clearly labelled Windows audio entries are acceptable.
+VineMix is closed. Four clearly labelled Windows audio entries are acceptable.
 
 ## Recommendation
 
 **Prototype AudioRouter's separately licensed Windows driver framework, replacing
 its private application bridge with two internal playback-to-recording paths.**
 Retain its endpoint registration, stream state, packet/position handling and
-device lifecycle code. Keep Vine Mix on ordinary WASAPI for these devices.
+device lifecycle code. Keep VineMix on ordinary WASAPI for these devices.
 
 This is a choice of development foundation. Neither inspected revision is ready
 to ship as our two autonomous cables. AudioRouter needs a new internal transport;
@@ -153,13 +153,13 @@ relevant tests even if the Windows framework is retained.
 
 The target is one package, two autonomous cables and four endpoints. Each cable
 connects its playback end to its recording end inside the driver, regardless of
-whether Vine Mix is running. Missing playback produces silence. Missing recording
+whether VineMix is running. Missing playback produces silence. Missing recording
 discards audio, so starting a recorder cannot replay old private audio.
 
 For the first prototype:
 
 1. Retain AudioRouter's two indexed endpoint pairs, stream bus mapping and
-   Windows stream/position framework. Assign Vine Mix its own hardware/service
+   Windows stream/position framework. Assign VineMix its own hardware/service
    identity, GUIDs and stable endpoint roles.
 2. Add one bounded, concurrent transport context per cable. Replace its mapped
    section publication/copy and lease-shape queries with that cable's internal
@@ -176,7 +176,7 @@ For the first prototype:
 5. Remove the obsolete private control/lease bridge after internal audio works.
    Re-run lifecycle and Verifier checks on the reduced fork.
 
-Vine Mix currently recognizes `vbCable` and `vacLite` by vendor-specific rules in
+VineMix currently recognizes `vbCable` and `vacLite` by vendor-specific rules in
 `native/src/windows_audio.cpp`, `native/src/engine.cpp` and
 `desktop/AudioMixer.Desktop/VirtualDeviceBindings.cs`. Replace those with explicit
 cable roles and deliberate saved-binding migration. The current VAC Lite output
@@ -186,7 +186,7 @@ Mix's two engine ends automatically and clearly label the two usual external
 selections. This remains compatible with the
 [installer proposal](INSTALLATION_AND_UPDATES.md).
 
-A private Vine Mix bridge would require less alteration of AudioRouter's
+A private VineMix bridge would require less alteration of AudioRouter's
 transport, but would fail the confirmed requirement that cables work with Vine
 Mix closed. A permanent relay service could provide that behavior, at the cost
 of an additional required process and audio hop. It is not the recommended design.
@@ -207,7 +207,7 @@ grants, without per-copy royalties:
   [MS-PL program](https://github.com/MrDesjardins/audiorouter/blob/f63f491f6c12e5c7325e9a9dcd5666163caed371/drivers/audiorouter-virtual/LICENSE-MS-PL.txt).
   Preserve copyright, patent, trademark and attribution notices. Published covered
   driver source stays under MS-PL; binary distribution does not by itself require
-  publishing Vine Mix's source. Use our own branding without implying endorsement.
+  publishing VineMix's source. Use our own branding without implying endorsement.
 
 AudioRouter's existing Rust `windows-audio` and `driver-helper` crates are outside
 the driver licence boundary and inherit **GPL-3.0-only**. They should not be
@@ -231,7 +231,7 @@ estimates, not measured delivery commitments.
 
 | Stage | Expected effort | Evidence required |
 | --- | --- | --- |
-| Feasibility gate | 1–2 weeks after the lab is ready | Reproducible driver/package build; two simultaneous internal cables work with Vine Mix closed; isolation, clean stop/restart and bounded queue behavior |
+| Feasibility gate | 1–2 weeks after the lab is ready | Reproducible driver/package build; two simultaneous internal cables work with VineMix closed; isolation, clean stop/restart and bounded queue behavior |
 | More complete prototype | Roughly 2–5 weeks total for driver adaptation | Recovery/reset policy, explicit endpoint roles, native binding and basic setup integration |
 | Public release | Several months, with substantial uncertainty | Supported Windows builds, real applications/hardware, prolonged load, Verifier, leak/teardown checks, signing and installer/upgrade/rollback qualification |
 

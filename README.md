@@ -130,6 +130,10 @@ true-peak detection. Audible recovery and long sessions still need qualification
 
 ## Build from source
 
+The development project and checkout folder are named `vine-mix`; the product
+name is **VineMix**. Clone `https://github.com/acoyeen/vine-mix.git` and run the
+commands below from the `vine-mix` folder.
+
 Developers need Windows 11 x64 and PowerShell 7. The first build downloads pinned
 project-local tools and dependencies:
 

@@ -790,7 +790,7 @@ void recovery(const std::filesystem::path& directory) {
 int main() {
     using namespace am;
     try {
-        const auto directory = std::filesystem::temp_directory_path() / (L"AudioMixer-OfflineEngine-" + std::to_wstring(GetCurrentProcessId()));
+        const auto directory = std::filesystem::temp_directory_path() / (L"VineMix-OfflineEngine-" + std::to_wstring(GetCurrentProcessId()));
         test::check(!std::filesystem::exists(directory), "Test directory already exists");
         std::filesystem::create_directories(directory);
         const auto path = directory / "settings.json";

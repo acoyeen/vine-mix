@@ -1,4 +1,4 @@
-/* Audio Mixer extension around the pinned, unmodified SpeexDSP 1.2.1 source.
+/* VineMix extension around the pinned, unmodified SpeexDSP 1.2.1 source.
  * Including the implementation keeps private layout access local to this one
  * bridge. Upstream's copyright/BSD notice remains in preprocess.c and COPYING.
  * The copy routine duplicates mutable arrays into already initialized states;

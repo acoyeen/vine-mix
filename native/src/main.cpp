@@ -50,7 +50,7 @@ int wmain(int argc, wchar_t** argv) {
             else if (option == L"--validate-settings" && i + 1 < argc) validation = argv[++i];
             else if (option == L"--version") version = true;
             else if (option == L"--help") {
-                std::cout << "Vine Mix Engine\n  --list-devices   Enumerate endpoints without opening audio streams\n"
+                std::cout << "VineMix Engine\n  --list-devices   Enumerate endpoints without opening audio streams\n"
                     "  --settings FILE Use a separate configuration file\n"
                     "  --validate-settings FILE Validate settings without starting audio or writing files\n"
                     "  --version       Print the release version without loading settings\n"; return 0;
@@ -80,6 +80,6 @@ int wmain(int argc, wchar_t** argv) {
         engine.stop();
         return 0;
     } catch (const std::exception& error) {
-        std::cerr << "Vine Mix: " << error.what() << '\n'; return 1;
+        std::cerr << "VineMix: " << error.what() << '\n'; return 1;
     }
 }

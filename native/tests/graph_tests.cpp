@@ -839,7 +839,7 @@ __declspec(noinline) void dynamicsTelemetry() {
         "Dynamics status serializes real measurements and frame freshness independently of configuration");
 }
 __declspec(noinline) void persistence() {
-    const auto root = std::filesystem::temp_directory_path() / (L"AudioMixer-OfflineGraph-" + std::to_wstring(GetCurrentProcessId()));
+    const auto root = std::filesystem::temp_directory_path() / (L"VineMix-OfflineGraph-" + std::to_wstring(GetCurrentProcessId()));
     expect(!std::filesystem::exists(root), "Isolated test directory does not preexist"); std::filesystem::create_directories(root);
     const auto path = root / "settings.json";
     Configuration legacyFixture; migrateLegacyGraph(legacyFixture);

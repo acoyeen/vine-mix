@@ -51,7 +51,7 @@ foreach ($relative in $noticePaths) {
 $oldPath = $env:PATH; $oldDotnet = $env:DOTNET_ROOT; $oldTelemetry = $env:DOTNET_CLI_TELEMETRY_OPTOUT
 try {
     $env:PATH = "$compilerRoot;$env:PATH"; $env:DOTNET_ROOT = Join-Path $toolsRoot 'dotnet'; $env:DOTNET_CLI_TELEMETRY_OPTOUT = '1'
-    & $cmake -S $projectRoot -B $buildRoot -G 'MinGW Makefiles' "-DCMAKE_BUILD_TYPE=$Configuration" '-DCMAKE_C_COMPILER=clang.exe' '-DCMAKE_CXX_COMPILER=clang++.exe' '-DCMAKE_MAKE_PROGRAM=mingw32-make.exe' '-DCMAKE_POLICY_VERSION_MINIMUM=3.5' '-DBUILD_TESTING=OFF' '-DAUDIO_MIXER_OFFLINE_TESTS=OFF' '-DAUDIO_MIXER_HARDWARE_TESTS=OFF'
+    & $cmake -S $projectRoot -B $buildRoot -G 'MinGW Makefiles' "-DCMAKE_BUILD_TYPE=$Configuration" '-DCMAKE_C_COMPILER=clang.exe' '-DCMAKE_CXX_COMPILER=clang++.exe' '-DCMAKE_MAKE_PROGRAM=mingw32-make.exe' '-DCMAKE_POLICY_VERSION_MINIMUM=3.5' '-DBUILD_TESTING=OFF' '-DVINEMIX_OFFLINE_TESTS=OFF' '-DVINEMIX_HARDWARE_TESTS=OFF'
     if ($LASTEXITCODE -ne 0) { throw 'Native build configuration failed.' }
     & $cmake --build $buildRoot --parallel 4 --target VineMix.Engine
     if ($LASTEXITCODE -ne 0) { throw 'Native compilation failed.' }
