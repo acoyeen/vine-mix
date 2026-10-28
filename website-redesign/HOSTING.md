@@ -41,6 +41,33 @@ Before enabling Git builds, commit the complete website source and required
 assets, and use `website-redesign` as the build root. Do not change repository
 visibility as part of hosting configuration.
 
+## Attribution publication — 28 October 2026
+
+The footer and Credits page link to `/attribution`, which summarises the root
+`ATTRIBUTION.md` policy. The website's project licence now includes VineMix and
+its website alongside the existing copyright holder. The current website
+source, checks and required public assets are maintained in `website-redesign/`
+on GitHub; automatic Git deployment remains disabled.
+
+- Published source commit: `1503c0411f5cd6ec32dafc08ae47f4120382db5b`.
+- Cloudflare upload deployment: `c2334e2b03a244a69ac6e237e532e09e`.
+- Previous Worker version retained for rollback:
+  `8a6e2a5f-e63f-45ed-b8dc-81387e20d331`.
+- Before editing, all 84 public files matched the live website byte for byte.
+  After deployment, all 85 public files matched the prepared output. The new
+  canonical attribution page returned HTTP 200 and retained all three security
+  headers. The `_headers` file was passed as configuration, not a public asset.
+- All ten offline check suites passed. Targeted browser checks passed at 320,
+  390 and 1440 pixels; the mobile page was visually reviewed. Live footer
+  navigation and page width checks passed at 320 and 1440 pixels.
+- The broader browser suite stopped at its no-JavaScript
+  `.pipeline-fallback` visibility assertion. The same assertion failed against
+  the unchanged live baseline before deployment. This publication does not
+  claim that suite passed or resolve that existing fallback/check discrepancy.
+- The public upload was limited to the attribution page, footer and Credits
+  links, sitemap and project licence. Desktop binaries, download selection,
+  DNS, redirect rules and repository visibility were not changed.
+
 ## Domains and redirects
 
 - `vinemix.app`: Worker custom domain, with Cloudflare-managed DNS and HTTPS.
