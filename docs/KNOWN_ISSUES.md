@@ -45,12 +45,13 @@ remains undecided; record that distinction explicitly.
 | [ISSUE-020](#issue-020) | Website Download and keyboard skip miss destination focus | Resolved and verified locally |
 | [ISSUE-021](#issue-021) | Refresh flashes the expanded logo and resizes the scrollbar | Published and verified live |
 | [ISSUE-022](#issue-022) | Selected nodes fall behind overlapping nodes | Resolved in 0.4.0 Beta |
-| [ISSUE-023](#issue-023) | Update rolls back after a successful package check | Confirmed; correction in progress |
+| [ISSUE-023](#issue-023) | Update rolls back after a successful package check | Resolved in corrected 0.4.0 Beta; old workers need direct Setup |
 
 <a id="issue-023"></a>
 ## ISSUE-023: Update rolls back after a successful package check
 
-- **Reported and verified:** 2026-10-28. **Status:** Confirmed; correction in progress.
+- **Reported and verified:** 2026-10-28. **Status:** Resolved in the corrected
+  0.4.0 Beta worker; older installed workers require direct Setup once.
 - **Reported behavior:** An installed Beta 6 downloads 0.4.0 Beta, restarts and
   still displays Beta 6.
 - **Expected behavior:** A successful installation and package check continue
@@ -62,17 +63,15 @@ remains undecided; record that distinction explicitly.
   payload. The journal confirms that personal settings were not replaced.
 - **Source-confirmed defect:** The worker reads `Process.MainModule` immediately
   after launching a short-lived child. The image can be unavailable during
-  startup or after exit. The evidence does not distinguish those two timings.
+  startup or after exit. The initial evidence did not distinguish those timings;
+  subsequent legacy-worker checks demonstrated an early startup failure.
   Existing fake-platform tests did not exercise this production process lookup.
-  The same pattern is present in the published 0.4.0 worker.
+  The same pattern was present in the original published 0.4.0 worker.
 - **Workaround:** Quit VineMix from its tray menu, run the published 0.4.0 Setup,
   then reopen VineMix normally. This briefly interrupts audio. Keep the current
   workspace and recovery backups; do not replace settings or alter update
   transaction records. Package checks and rollback safeguards remain enabled.
-- **Next step:** Use the retained child process and verified image path for live
-  children; accept a completed child only through its actual exit code and
-  required result checks. Cover immediate exit and live-child identity in real
-  process tests, including the old worker launching the corrected package. The
+- **Release decision:** The
   maintainer explicitly requested replacement 0.4.0 Beta assets and matching
   source on 2026-10-28 rather than a 0.4.1 release. The original assets and source
   identity are preserved in private release evidence. Existing 0.4.0 installs
@@ -86,11 +85,25 @@ remains undecided; record that distinction explicitly.
   handle and the native image-path query, including immediate health/recovery
   checks. A child proven to have exited keeps its real exit code and required
   result checks; a candidate that exits before health confirmation still fails.
-  The focused suite passes 319 checks with real live and completed children,
+  The focused suite passes **327 checks** with real live and completed children,
   image/PID/start-time/hash guards and rollback coverage. Successful inert package
   checks remain alive for at least two seconds for older workers; this bounded
-  compatibility window does not alter ordinary startup. Delivered-package and
-  legacy-worker checks are recorded in the corrected qualification evidence.
+  compatibility window does not alter ordinary startup.
+- **Published and installed:** The corrected same-version release uses source
+  `21516dcf827dc157fb154287c016f02a014fc3b2`. All five replacement assets and
+  signed metadata, matching tag, source CI and published-asset CI passed. Three
+  production-worker signed package smoke runs passed. Manual installation
+  verified all 37 payload hashes and an actual Explorer launch of the corrected
+  app and engine with unchanged settings hashes and physical file identity.
+- **Legacy limitation / next step:** The old worker passed 11 of 12 corrected
+  installed-package smoke attempts; the remaining failure occurred at 4.56 ms,
+  before child initialization. The two-second lifetime is a bounded mitigation,
+  not a complete fix for an already installed old worker. Use direct corrected
+  Setup once for Beta 5, Beta 6 and original 0.4.0 installations; the latter also
+  cannot discover a same-version correction as newer. Full delivered automatic
+  update, health, rollback and interruption scenarios on a separate Windows
+  account remain to be qualified. See the
+  [corrected qualification record](RELEASE_0.4.0_QUALIFICATION.md).
 
 <a id="issue-022"></a>
 ## ISSUE-022: Selected nodes fall behind overlapping nodes

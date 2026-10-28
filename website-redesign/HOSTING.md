@@ -48,7 +48,7 @@ The cutover followed publication and verification of all five GitHub release
 assets. Live release discovery and the saved fallback both use **0.4.0 · Beta**;
 download, checksum and documentation links point to `v0.4.0-beta`.
 
-- Published source: `4e7b31e36b24be435eb4283468eb1680d3a7617b`.
+- Website cutover source: `4e7b31e36b24be435eb4283468eb1680d3a7617b`.
 - Worker version: `89105feb-9f2a-4517-b780-a0c221881395`.
 - Deployment: `949e6860-e6b0-4214-a950-52f5688e8572`, serving 100% of traffic.
 - Previous version retained for rollback:
@@ -75,17 +75,26 @@ download, checksum and documentation links point to `v0.4.0-beta`.
 
 After the new release and this cutover were verified, **24 uploaded Beta 1–5
 attachments** were retired while retaining the five release posts and tags.
+All 24 former public asset links were subsequently confirmed to return HTTP 404.
 The original 0.4.0 Beta was subsequently installed manually and verified: all
 37 payload hashes matched, an actual Explorer launch ran the 0.4.0 app and
 engine, and physical settings identity and hashes were unchanged.
 
-An updater correction is now being prepared under explicit authorization to
-republish **the same 0.4.0 Beta**, retaining its release URL. The website evidence
-above describes the initial cutover; it does not claim the corrected application
-build has been published or installed. The [release record](../docs/RELEASE_0.4.0_BETA.md)
-tracks corrected source, packages and verification separately. No new version or
-website deployment has been made as part of that preparation. Retained historical
-tags continue to expose GitHub-generated source archives.
+An updater correction was subsequently published under explicit authorization
+to replace **the same 0.4.0 Beta**, retaining release ID `426653672` and its URL.
+The corrected application source/tag is
+`21516dcf827dc157fb154287c016f02a014fc3b2`; all five replacement assets, their
+signed metadata, both CI runs and anonymous download links passed verification.
+The corrected manual installation also verified all 37 payload hashes, an actual
+Explorer app/engine launch and unchanged settings hashes and physical identity.
+See the [release record](../docs/RELEASE_0.4.0_BETA.md) and
+[qualification record](../docs/RELEASE_0.4.0_QUALIFICATION.md).
+
+The website evidence above describes the initial static-file cutover. Its
+deployment and version remain unchanged; the existing release links now resolve
+to the corrected assets. Older installed update workers and original 0.4.0
+installations require direct Setup guidance. Retained historical tags continue
+to expose GitHub-generated source archives.
 
 ## Attribution publication — 28 October 2026
 

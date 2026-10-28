@@ -1,6 +1,6 @@
 # VineMix 0.4.0 Beta release record
 
-**28 October 2026 — initial release and live installation verified; an authorized correction to the same 0.4.0 Beta release is in progress.**
+**28 October 2026 — corrected 0.4.0 Beta published, verified and installed.**
 
 [VineMix 0.4.0 Beta](https://github.com/acoyeen/vine-mix/releases/tag/v0.4.0-beta)
 is the published successor to the development work called **Beta 6**. It brings
@@ -21,10 +21,13 @@ all **37 payload hashes** matched, an actual Explorer launch ran the 0.4.0 app
 and engine, and physical settings identity and hashes were unchanged.
 
 The maintainer then explicitly authorized replacing the **same 0.4.0 Beta**
-release with the updater correction. Corrected source, packages and publication
-are being prepared; the checks and hashes below identify the original published
-build until a separate corrected-build record is added. The corrected build has
-not yet been released or installed.
+release with the updater correction. The complete corrected asset set was
+republished on the existing release post at **13:36 UTC on 28 October 2026**.
+Its matching source tag, both CI runs, public downloads and signed update
+discovery passed verification. Manual installation of the corrected build also
+passed all **37 payload hashes**, followed by an actual Explorer launch of the
+matching 0.4.0 app and engine with unchanged settings hashes and physical file
+identity. Original publication evidence below is historical.
 
 ## Release identity
 
@@ -48,8 +51,10 @@ This exception does not authorize replacing unrelated releases.
 The `-beta` suffix agrees with GitHub's prerelease flag. Existing development
 receipts retain their actual `0.3.0-beta.6` / `0.3.0.7` identity; they are not
 relabelled as the new release. Existing original 0.4.0 installations will not
-discover a same-version correction as a newer release; once the corrected files
-are published, they require a manual Setup reinstall or standalone replacement.
+discover a same-version correction as a newer release; they require a manual
+Setup reinstall or standalone replacement. Beta 5 and Beta 6 users should also
+install the corrected Setup directly once, because their existing workers retain
+the process-identity race until replaced.
 Keep version comparison and release-identity checks intact.
 
 ## Scope and evidence
@@ -101,7 +106,42 @@ requested visible acknowledgement inside forks remain distinct. This release
 does not make a fork's About-screen credit compulsory or revoke earlier copies'
 permissions. Required third-party notices retain their own terms.
 
-## Original published source and qualification
+## Corrected published source and qualification
+
+- Frozen source and tag target: [`21516dcf827dc157fb154287c016f02a014fc3b2`](https://github.com/acoyeen/vine-mix/commit/21516dcf827dc157fb154287c016f02a014fc3b2).
+- Build-input SHA-256: `c653d265d0694311e8ccfe47c228ef2f29c8667c534334b0e6a0565a6b68b4a3`.
+- All **17 native offline suites**, including **289,903 graph assertions**, passed.
+- The corrected updater passed **327 focused checks** and **three production-worker signed package smoke runs**.
+- Combined detached desktop verification passed **14,253 checks**, produced **297 renders** and reported **zero binding errors**.
+- Delivered Setup passed **225 checks**; standalone extraction/integrity passed **21 checks**. Embedded and extracted notices matched the authoritative source.
+- The source ZIP contains **602 entries**, covering all **323 build inputs** and sanitized provenance. Every entry and archive metadata were audited.
+- Corrected exact-source [build checks](https://github.com/acoyeen/vine-mix/actions/runs/40695412627) and independent [published-asset checks](https://github.com/acoyeen/vine-mix/actions/runs/40697928142) passed.
+
+The existing release ID **426653672**, title, URL and prerelease status were
+retained. All five original assets and release metadata were backed up privately.
+The release was staged as a draft while the complete five-file replacement was
+uploaded, downloaded, rehashed and signature-verified. The tag was moved from
+the original source to the exact corrected source before publication. Final
+verification confirmed the five expected asset digests, matching remote tag,
+published state and HTTP 200 responses for all five anonymous download links.
+Exact asset hashes are in the [qualification record](RELEASE_0.4.0_QUALIFICATION.md).
+The update signature is not Windows Authenticode signing.
+
+Anonymous discovery through the exact archived Beta 5 updater and the unchanged
+Beta 6 update core verified the corrected signed envelope and package hashes.
+The current 0.4.0 identity correctly reports up to date. Discovery does not fix
+the older workers: direct Setup remains the upgrade route for them. The corrected
+worker retains a process handle for identity checks; its successful inert smoke
+also stays alive for at least two seconds as a bounded compatibility mitigation.
+The old worker passed 11 of 12 corrected installed-package smoke attempts; its
+remaining failure occurred during startup. This is not a complete legacy fix or
+proof of a full automatic installation transaction. See
+[ISSUE-023](KNOWN_ISSUES.md#issue-023).
+
+## Original publication evidence — historical
+
+The following describes the superseded original build, whose assets and metadata
+are preserved privately; it does not identify the current downloads.
 
 - Frozen source: [`4e7b31e36b24be435eb4283468eb1680d3a7617b`](https://github.com/acoyeen/vine-mix/commit/4e7b31e36b24be435eb4283468eb1680d3a7617b).
 - Build-input SHA-256: `add276d50b99bcdff6cd2b5208008d145029dbbc53c8207ffc41a83bfd9e08bb`.
@@ -111,17 +151,12 @@ permissions. Required third-party notices retain their own terms.
 - The source ZIP contains **601 entries**, covering all **322 build inputs** and sanitized provenance. Entry bytes and archive metadata were audited.
 - Exact-source [build checks](https://github.com/acoyeen/vine-mix/actions/runs/40688774615) and independent [published-asset checks](https://github.com/acoyeen/vine-mix/actions/runs/40690410311) passed.
 
-Both packages came from the same clean committed source. All five uploaded
-assets were downloaded and rehashed before publication. Signed update metadata
-passed verification against the production-pinned key. Package hashes and the
-full scope of checks are recorded in the [qualification record](RELEASE_0.4.0_QUALIFICATION.md).
-The update signature is not Windows Authenticode signing.
-
-Anonymous discovery through the exact archived Beta 5 updater offers 0.4.0 Beta.
-The current updater offers it from the Beta 6 identity and reports 0.4.0 Beta up
-to date. This proves discovery and signed package compatibility, not completion
-of a personal installation transaction. Beta 1–4 retain the documented direct
-manual upgrade path, without requiring any retired intermediate download.
+Both original packages came from that clean committed source. Their five assets
+were downloaded and rehashed before initial publication, and their update
+metadata passed production-pinned signature verification. The failed automatic
+update and successful manual recovery described above prompted the explicitly
+authorized correction. Beta 1–4 retain a direct manual upgrade path without any
+retired intermediate download.
 
 ## Initial publication and website cutover
 
@@ -150,7 +185,8 @@ record is in [HOSTING.md](../website-redesign/HOSTING.md#040-beta-release-cutove
 **Completed 28 October 2026:** all **24 manually uploaded attachments** were
 removed after the new release and website were verified. The five release posts,
 tags, titles and historical change notes remain, with removal notices and links
-to 0.4.0 Beta. Provisional Beta 2 was not finalized or replaced.
+to 0.4.0 Beta. All **24 former public asset links return HTTP 404**. Provisional
+Beta 2 was not finalized or replaced.
 
 | Retained release | Attachments removed | Attached assets remaining |
 | --- | ---: | ---: |
@@ -162,45 +198,41 @@ to 0.4.0 Beta. Provisional Beta 2 was not finalized or replaced.
 
 Removal covered Setup, standalone, manually uploaded source ZIPs, checksums and,
 where present, signed update metadata. Recovery copies and original release-note
-text are retained outside the checkout. No release page or tag was deleted and
-Git history was not rewritten.
+text are retained outside the checkout. None of these five release pages or
+tags was deleted or moved.
 
 GitHub-generated **Source code (zip)** and **Source code (tar.gz)** archives
 remain available through retained tags. Download retirement changes distribution;
 it does not revoke existing licence permissions or prevent reuse of historical
-source. The explicitly authorized 0.4.0 correction described above must still
-keep source, packages, checksums and signed metadata together; it does not alter
-the completed Beta 1–5 retirement.
+source. The explicitly authorized 0.4.0 correction kept source, packages,
+checksums and signed metadata together; it did not alter the completed Beta 1–5
+retirement.
 
 ## Completion record and remaining work
 
 | Milestone | Status |
 | --- | --- |
-| Original combined source and cleanup | Frozen at `4e7b31e36b24be435eb4283468eb1680d3a7617b` |
+| Corrected combined source and cleanup | Frozen at `21516dcf827dc157fb154287c016f02a014fc3b2` |
 | Offline attribution and package notices | Implemented and verified |
 | 0.4.0 identity in source and released binaries | Verified |
 | Automated qualification and published-asset checks | Passed within the documented scope |
 | Initial GitHub prerelease and website cutover | Published and verified |
-| Beta 1–5 attachments and historical notices | 24 attachments removed; five posts/tags retained |
+| Beta 1–5 attachments and historical notices | 24 attachments removed and former links return 404; five posts/tags retained |
 | Original 0.4.0 live installation | Manual installation verified: 37 payload hashes, Explorer app/engine launch and preserved physical settings |
-| Corrected 0.4.0 source, packages and republish | Explicitly authorized; preparation and qualification in progress |
-| Corrected 0.4.0 live installation | Pending corrected package qualification |
+| Corrected 0.4.0 source, packages and republish | Same release post retained; all five replacements and matching tag verified; source and asset CI passed |
+| Corrected 0.4.0 live installation | Manual installation verified: 37 payload hashes, Explorer app/engine launch and preserved physical settings |
 
 Real pointer/VR use, fresh-machine vendor driver installation/consent/cancel/
 elevation/reboot, sustained real-device audio and complete interrupted-update/
 rollback scenarios on a separate Windows account remain unperformed. Synthetic
 checks and successful downloads do not establish those outcomes.
 
-**Next action:** qualify the updater correction, freeze matching corrected
-source and both package formats, and replace the same 0.4.0 Beta release as
-explicitly authorized. Back up all five original assets and release metadata,
-keep the release post, and verify the complete replacement asset set and moved
-source tag before making it available. Run exact-source and published-asset CI
-checks against the correction. Record its final source and hashes separately
-from the original record, then qualify the corrected live installation with the
-existing physical-settings, inventory and Windows-shell launch safeguards.
-Preserve repository visibility and keep raw diagnostics, settings and recovery
-files outside project documentation and downloadable artifacts.
+**Remaining qualification:** exercise complete delivered update, health-check,
+rollback and interruption scenarios on a separate Windows account. The corrected
+manual installation and focused process tests do not establish those full
+transactions. Keep direct Setup guidance for older workers and original 0.4.0
+installations. Repository visibility is unchanged; raw diagnostics, settings and
+recovery files remain outside project documentation and downloadable artifacts.
 
 The [Beta 6 development record](BETA6_DEVELOPMENT.md) and
 [earlier release draft](releases/0.3.0-beta.6.md) preserve dated development
