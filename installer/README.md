@@ -23,13 +23,16 @@ fail preparation. No build step installs or runs the audio drivers.
 
 Outputs under `artifacts/installers/`:
 
-- `VineMix-0.3.0-beta.3-Setup-x64.exe` — the installer.
+- `VineMix-0.4.0-beta-Setup-x64.exe` — the installer.
 - The `.exe.sha256` file — checksum.
 - The `.exe.json` file — source payload location, version, hash and driver pins.
 
 To package a separately staged app, use
 `-ApplicationPackageDirectory <directory>`. `-Offline` requires cached compiler
 and driver downloads; .NET/application dependencies must also already be cached.
+Use `-DriverCacheDirectory <physical-cache>` to reuse verified archives from
+another checkout. Driver preparation still rejects reparse points and verifies
+the pinned hashes, archive contents and vendor signatures.
 The script checks desktop/native source versions and the staged desktop version.
 Private staging and compiler evidence default to `%LOCALAPPDATA%\VineMix.BuildCache`;
 use a new `-StageDirectory` to choose another location outside the checkout.
@@ -73,7 +76,7 @@ owned startup value. It preserves saved data, unknown files and both drivers.
 Application-only unattended setup requires explicit terms acknowledgement:
 
 ```powershell
-.\VineMix-0.3.0-beta.3-Setup-x64.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /ACCEPTTERMS=1 /DRIVERS=none
+.\VineMix-0.4.0-beta-Setup-x64.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /ACCEPTTERMS=1 /DRIVERS=none
 ```
 
 Selected drivers install in the order **VAC Lite, then VB-CABLE**. Setup explains
@@ -103,7 +106,8 @@ no driver execution, no startup changes and no normal app launch. It checks:
   replacement; it exits cooperatively without audio, shared settings or engine IPC.
 - Install and same-version repair preserve exact packaged bytes and user files.
 - A newer marked version prevents downgrade.
-- The installed desktop passes its detached rendering/verification branch.
+- The installed production desktop passes its inert `--release-smoke` checks,
+  including offline notices. Full rendering verification uses a separate build.
 - A harmless fixture below the installed folder prevents uninstall; setup keeps
   the app files and registration until that fixture exits cooperatively.
 - Uninstall removes owned files and registration while preserving unknown files.

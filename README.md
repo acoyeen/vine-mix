@@ -126,9 +126,9 @@ backup or Start fresh while preserving originals. See
 - [Changelog](CHANGELOG.md), [testing](TESTING.md) and [contributing](CONTRIBUTING.md)
 - [Third-party credits](THIRD_PARTY_NOTICES.md) and [distribution conditions](docs/DISTRIBUTION.md)
 
-VineMix supports up to 32 nodes and 96 connections. The local Beta 6 development
-build offers 30 node types, including six new mixing utilities; the published
-Beta 5 offers 24. Processing stays local. Per-app capture copies an app's
+VineMix supports up to 32 nodes and 96 connections. The 0.4.0 Beta creation menu
+offers 30 node types, including six new mixing utilities. Processing stays local.
+Per-app capture copies an app's
 playback; its original playback remains audible. Parallel paths have no automatic
 latency compensation. The limiter handles sample peaks without lookahead or
 true-peak detection. Audible recovery and long sessions still need qualification.

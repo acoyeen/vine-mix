@@ -27,7 +27,7 @@ remaining muted. Existing saved workspaces retain their graph and assignments.
   Expander, Gate, Alignment Delay, denoiser, de-esser, plosive remover and reverb.
 - **Outputs:** physical or streamed listening output and VAC Lite virtual microphone output.
 
-The local Beta 6 creation menu contains **30 node types**. Mix acts as a volume control with
+The 0.4.0 Beta creation menu contains **30 node types**. Mix acts as a volume control with
 one incoming connection and combines sound when several connections arrive.
 Gain / Multiply and Reroute are no longer offered for creation; existing saved
 nodes still work, bringing the compatible engine library to 32 types.
@@ -440,13 +440,16 @@ the app, press Escape or choose Close to dismiss them; an update installation
 already in progress stays protected. **About VineMix** follows **What's new?**
 in the help section, above the separately grouped **Quit VineMix**.
 
-After building, launch **`artifacts/VineMix/VineMix.exe`**. The native engine
+After building, open **`artifacts/VineMix-0.4.0-beta-Installed/VineMix.exe`** through
+File Explorer. The native engine
 is alongside it, and the package includes the .NET desktop runtime. Closing the
 window hides it to the tray; choose **Quit VineMix** at the bottom of Settings or
 from the tray menu to stop audio. Both actions save first. If the final save fails,
 VineMix stays open while you retry, save a recovery copy, cancel quitting or
-explicitly quit without saving. A recovery copy contains the full workspace and
-queued edits; it never overwrites an existing file. To inspect it separately,
+explicitly quit without saving. A recovery copy contains the audio workspace and
+queued engine edits; it never overwrites an existing file. Group presentation and
+other interface preferences must save successfully before this recovery option
+allows quitting, because they live in a separate file. To inspect it separately,
 quit VineMix and open the app with `--settings "<recovery-copy.json>"`, retaining
 the original settings. Start at
 login is optional and off by default.

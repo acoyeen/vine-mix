@@ -1,6 +1,6 @@
 #requires -Version 7.3
 [CmdletBinding()]
-param([string]$ApplicationPackageDirectory = '', [string]$OutputDirectory = '', [switch]$Offline, [string]$StageDirectory = '')
+param([string]$ApplicationPackageDirectory = '', [string]$OutputDirectory = '', [switch]$Offline, [string]$StageDirectory = '', [string]$DriverCacheDirectory = '')
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $project = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
@@ -75,7 +75,7 @@ Copy-Item -LiteralPath (Join-Path $helperPublish 'VineMix.SetupHelper.exe') -Des
 & (Join-Path $support 'VineMix.SetupHelper.exe') --self-test
 if ($LASTEXITCODE -ne 0) { throw 'Installer helper policy tests failed.' }
 $dependencies = Join-Path $stage 'dependencies'
-$cache = Join-Path $project '.tools\downloads'
+$cache = if ($DriverCacheDirectory) { [IO.Path]::GetFullPath($DriverCacheDirectory) } else { Join-Path $project '.tools\downloads' }
 & (Join-Path $PSScriptRoot 'prepare-installer-drivers.ps1') -DestinationDirectory $dependencies -CacheDirectory $cache -Offline:$Offline
 if (-not $?) { throw 'Driver preparation failed.' }
 $drivers = Get-Content -LiteralPath (Join-Path $project 'installer\drivers.json') -Raw | ConvertFrom-Json

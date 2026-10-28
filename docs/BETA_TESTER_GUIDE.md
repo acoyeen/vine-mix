@@ -1,24 +1,24 @@
 # VineMix beta test guide
 
-For **0.3.0-beta.5**, displayed as **0.3.0 · Beta 5**. Updated 24 October 2026.
+For **0.4.0-beta**, displayed as **0.4.0 · Beta**. Updated 28 October 2026.
 VineMix is an MIT-licensed open-source beta for **Windows 11 x64**.
 Download a version from [GitHub Releases](https://github.com/acoyeen/vine-mix/releases).
-The [current qualification record](BETA_TESTING_CURRENT.md) separates completed
+The [current qualification record](RELEASE_0.4.0_QUALIFICATION.md) separates completed
 checks from pending scenarios. Use the files and checksums attached to the
 matching published release.
 
 ## Choose a package
 
-**Existing Beta 2–4 users:** use **Quit VineMix**, then install Beta 5 over the
+**Existing Beta 1–4 users:** use **Quit VineMix**, then install 0.4.0 Beta over the
 existing folder, or replace the standalone launcher. Do not uninstall or delete
 your workspace. Updates to older packages can roll back because of a metadata
-defect; Beta 5 corrects it. Skipping intermediate betas is supported. See the
+defect; 0.4.0 Beta retains its correction. No intermediate beta is needed. See the
 [upgrade guidance](INSTALLATION_AND_UPDATES.md).
 
 | Download | How to use it |
 | --- | --- |
-| `VineMix-0.3.0-beta.5-Setup-x64.exe` | Installs the app and shortcuts for your account; can offer missing optional drivers. |
-| `VineMix-0.3.0-beta.5-Standalone-x64.exe` | Open the supplied EXE in File Explorer. Its bundled app files are prepared automatically; drivers are installed separately. |
+| `VineMix-0.4.0-beta-Setup-x64.exe` | Installs the app and shortcuts for your account; can offer missing optional drivers. |
+| `VineMix-0.4.0-beta-Standalone-x64.exe` | Open the supplied EXE in File Explorer. Its bundled app files are prepared automatically; drivers are installed separately. |
 
 You do not need to install .NET. The standalone EXE includes the app and runtime;
 it does not register an app installation. Setup installs under
