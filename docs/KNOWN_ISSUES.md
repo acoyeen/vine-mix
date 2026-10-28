@@ -4,6 +4,11 @@ A durable log of reported bugs, interface defects and existing usability limitat
 belong in [development ideas](IDEAS.md). Recording an issue does not authorize
 implementation or imply that it has been independently reproduced.
 Optional refinements to working controls and layout belong in [tweaks](TWEAKS.md).
+
+**Release update — 28 October 2026:** ISSUE-001, ISSUE-004 and ISSUE-022 are
+included in published [0.4.0 Beta](releases/0.4.0-beta.md). Their dated local
+integration evidence below remains historical; final combined qualification is
+recorded [separately](RELEASE_0.4.0_QUALIFICATION.md). Real pointer/VR limits remain.
 The 2026-10-25 classification review moved website layout/copy polish (ISSUE-006)
 and update-window styling (ISSUE-009) there, retaining redirects below. Optional
 fine-adjust/reset affordances were split from ISSUE-004. Broken behavior remains
@@ -18,10 +23,10 @@ remains undecided; record that distinction explicitly.
 
 | ID | Issue | Status |
 | --- | --- | --- |
-| [ISSUE-001](#issue-001) | Settings search caret overlaps placeholder | Resolved; live Beta 6 testing build, not published |
+| [ISSUE-001](#issue-001) | Settings search caret overlaps placeholder | Resolved in 0.4.0 Beta |
 | [ISSUE-002](#issue-002) | Duplicate application monitoring | Reported limitation |
 | [ISSUE-003](#issue-003) | Graph keyboard/accessibility gaps | Audit pending |
-| [ISSUE-004](#issue-004) | Precise edits discarded on focus loss | Resolved; live Beta 6 testing build, not published |
+| [ISSUE-004](#issue-004) | Precise edits discarded on focus loss | Resolved in 0.4.0 Beta |
 | [ISSUE-005](#issue-005) | Dense-graph navigation and Fit limits | Partly confirmed in source |
 | [ISSUE-006](#issue-006) | Website node route is hard to follow | Moved to [TWEAK-009](TWEAKS.md#tweak-009) |
 | [ISSUE-007](#issue-007) | Automatic update checks can appear inactive and suppress failed retries | Resolved in Beta 5 |
@@ -39,7 +44,53 @@ remains undecided; record that distinction explicitly.
 | [ISSUE-019](#issue-019) | Pipeline loading can outlive a disconnected component | Resolved and verified locally |
 | [ISSUE-020](#issue-020) | Website Download and keyboard skip miss destination focus | Resolved and verified locally |
 | [ISSUE-021](#issue-021) | Refresh flashes the expanded logo and resizes the scrollbar | Published and verified live |
-| [ISSUE-022](#issue-022) | Selected nodes fall behind overlapping nodes | Resolved locally; live Beta 6 testing build, not published |
+| [ISSUE-022](#issue-022) | Selected nodes fall behind overlapping nodes | Resolved in 0.4.0 Beta |
+| [ISSUE-023](#issue-023) | Update rolls back after a successful package check | Confirmed; correction in progress |
+
+<a id="issue-023"></a>
+## ISSUE-023: Update rolls back after a successful package check
+
+- **Reported and verified:** 2026-10-28. **Status:** Confirmed; correction in progress.
+- **Reported behavior:** An installed Beta 6 downloads 0.4.0 Beta, restarts and
+  still displays Beta 6.
+- **Expected behavior:** A successful installation and package check continue
+  through the candidate health check and retain the new release.
+- **Verified evidence:** The installer completed successfully and the inert
+  package check reported `passed: true`, version `0.4.0-beta` and Installed mode.
+  The old update worker then reported “The process image cannot be identified”
+  before recording the check process, and restored the previous application
+  payload. The journal confirms that personal settings were not replaced.
+- **Source-confirmed defect:** The worker reads `Process.MainModule` immediately
+  after launching a short-lived child. The image can be unavailable during
+  startup or after exit. The evidence does not distinguish those two timings.
+  Existing fake-platform tests did not exercise this production process lookup.
+  The same pattern is present in the published 0.4.0 worker.
+- **Workaround:** Quit VineMix from its tray menu, run the published 0.4.0 Setup,
+  then reopen VineMix normally. This briefly interrupts audio. Keep the current
+  workspace and recovery backups; do not replace settings or alter update
+  transaction records. Package checks and rollback safeguards remain enabled.
+- **Next step:** Use the retained child process and verified image path for live
+  children; accept a completed child only through its actual exit code and
+  required result checks. Cover immediate exit and live-child identity in real
+  process tests, including the old worker launching the corrected package. The
+  maintainer explicitly requested replacement 0.4.0 Beta assets and matching
+  source on 2026-10-28 rather than a 0.4.1 release. The original assets and source
+  identity are preserved in private release evidence. Existing 0.4.0 installs
+  require a manual reinstall because their semantic version remains unchanged.
+- **Local recovery:** The original published Setup subsequently installed all
+  37 expected payload files successfully after a graceful Quit. A real Explorer
+  shortcut launch reopened app and engine version `0.4.0-beta` / `0.4.0.0`;
+  saved settings retained their hash and physical file identity. This confirms
+  manual recovery, not a successful automatic update or delivery of the fix.
+- **Source correction:** Process identity now comes from the retained process
+  handle and the native image-path query, including immediate health/recovery
+  checks. A child proven to have exited keeps its real exit code and required
+  result checks; a candidate that exits before health confirmation still fails.
+  The focused suite passes 319 checks with real live and completed children,
+  image/PID/start-time/hash guards and rollback coverage. Successful inert package
+  checks remain alive for at least two seconds for older workers; this bounded
+  compatibility window does not alter ordinary startup. Delivered-package and
+  legacy-worker checks are recorded in the corrected qualification evidence.
 
 <a id="issue-022"></a>
 ## ISSUE-022: Selected nodes fall behind overlapping nodes

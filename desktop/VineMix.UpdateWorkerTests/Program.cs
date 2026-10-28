@@ -27,12 +27,14 @@ internal static class Program
         try { action(); } catch (Exception error) when (error is IOException or UpdateValidationException or JsonException) { rejected = true; }
         Require(rejected, message);
     }
-    private static int Main()
+    private static int Main(string[] args)
     {
+        if (LaunchedProcessVerification.TryRunChild(args, out int childResult)) return childResult;
         try
         {
+            LaunchedProcessVerification.Run((value, message) => Require(value, message), args);
             SignedBoundaryTests(); PrivateCreationTests(); SuccessfulStandalone(); RollbackTests(); RecoveryTests(); WorkspaceTests(); ManifestTests(); InstalledAttemptTests(); FileVersionResourceTests(); PendingDiscoveryTests(); TerminalCleanupTests();
-            Console.WriteLine($"PASS: {_checks} updater worker checks; ephemeral signed fixtures, private temporary directories and fake process/registry/Setup operations only. No production app, audio endpoint, settings, driver or registry changes.");
+            Console.WriteLine($"PASS: {_checks} updater worker checks; inert child processes, ephemeral signed fixtures, private temporary directories and fake registry/Setup operations. Optional published-package checks run only inert release smoke. No ordinary app startup, audio endpoint, personal settings, driver or registry changes.");
             return 0;
         }
         catch (Exception error) { Console.Error.WriteLine("FAIL: " + error.Message); return 1; }
@@ -185,6 +187,18 @@ internal static class Program
     }
     private static void RollbackTests()
     {
+        using (var fixture = new Fixture(settings: true))
+        {
+            var platform = new FakePlatform(fixture) { CandidateStartFails = true };
+            string settingsBefore = File.ReadAllText(fixture.Context.Data.SettingsPath!);
+            Require(fixture.Run(platform) == 3 && fixture.OldTarget
+                && UpdateTransaction.ReadJournal(fixture.Context).Phase == UpdatePhase.RolledBack,
+                "A candidate that exits during launch must fail the update and restore the prior owned payload.");
+            Require(!File.Exists(Path.Combine(fixture.Context.Directory, "health.json"))
+                && File.ReadAllText(fixture.Context.Data.SettingsPath!) == settingsBefore
+                && platform.Events.Contains("candidate-audio-exit") && platform.Events.Contains("previous-reopened"),
+                "An already-exited candidate cannot imply health success or replace personal settings; audio exit still gates rollback.");
+        }
         using (var fixture = new Fixture())
         {
             var platform = new FakePlatform(fixture) { Healthy = false };
@@ -522,7 +536,7 @@ internal static class Program
     {
         internal List<string> Events { get; } = [];
         internal bool Healthy = true, ParentAlive = true, ParentExits = true, CandidateEngineExits = true, SmokePasses = true,
-            ChangeTargetAfterHealth, HealthWasRequired, ReopenFails, ClearRecoveryFails;
+            ChangeTargetAfterHealth, HealthWasRequired, ReopenFails, ClearRecoveryFails, CandidateStartFails;
         internal int SetupExitCode;
         internal byte[]? CandidateEngineBytes;
         internal bool ValidateCandidateEngineVersion;
@@ -573,6 +587,7 @@ internal static class Program
         public string CandidateEngineHash(VerifiedUpdate context, string evidence) => context.Data.Parent.Sha256;
         public UpdateProcessIdentity StartCandidate(VerifiedUpdate context)
         {
+            if (CandidateStartFails) { Events.Add("candidate-start-failed"); throw new IOException("The candidate exited during launch."); }
             Events.Add("candidate-start"); _candidateAlive = true; HealthWasRequired = true;
             var identity = new UpdateProcessIdentity(103, 1003, context.TargetPath, UpdateFiles.Hash(context.TargetPath));
             UpdateFiles.WriteJson(Path.Combine(context.Directory, "health.json"), new UpdateSignal(context.Data.Token, context.Data.EnvelopeSha256,

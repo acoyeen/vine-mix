@@ -1,7 +1,9 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Threading;
 using System.Windows;
 
 namespace VineMix.Desktop;
@@ -11,6 +13,7 @@ internal static class BetaReleaseSmoke
 {
     internal static int Run(string directory)
     {
+        var lifetime = Stopwatch.StartNew();
         string target = Path.GetFullPath(directory);
         if (Directory.Exists(target) || File.Exists(target)) throw new IOException("Choose a new smoke-test evidence directory.");
         Directory.CreateDirectory(target);
@@ -37,6 +40,16 @@ internal static class BetaReleaseSmoke
                 mode = EmbeddedRuntime.BuildMode, payload, extractedEngine, notices,
                 scope = "Delivered executable, metadata, runtime package integrity, embedded distribution notices, detached WPF starter and offline Credits layouts. No engine, personal settings, device enumeration or shown window."
             }, new JsonSerializerOptions { WriteIndented = true }));
+            // Older released update workers identify this child by enumerating
+            // its modules immediately after launch. Keep a successful inert check
+            // alive briefly so a fast check does not disappear before that read.
+            // This bounded compatibility window affects only --release-smoke;
+            // ordinary startup and failed checks do not wait.
+            if (passed)
+            {
+                TimeSpan remaining = TimeSpan.FromSeconds(2) - lifetime.Elapsed;
+                if (remaining > TimeSpan.Zero) Thread.Sleep(remaining);
+            }
             return passed ? 0 : 1;
         }
         catch (Exception error)

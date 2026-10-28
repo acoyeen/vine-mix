@@ -1,15 +1,19 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Security.AccessControl;
 using System.Security.Cryptography;
 using System.Security.Principal;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Win32.SafeHandles;
 using VineMix.UpdateCore;
 
 namespace VineMix.Desktop;
@@ -19,9 +23,46 @@ internal sealed record UpdateProcessIdentity(int ProcessId, long StartTimeUtcTic
     internal static UpdateProcessIdentity Capture(int processId)
     {
         using var process = Process.GetProcessById(processId);
-        string path = Path.GetFullPath(process.MainModule?.FileName ?? throw new IOException("The process image cannot be identified."));
+        string path = TryReadImagePath(process) ?? throw new InvalidOperationException("The process exited before its identity could be captured.");
         return new(processId, process.StartTime.ToUniversalTime().Ticks, path, UpdateFiles.Hash(path));
     }
+
+    // Keep the handle returned by Process.Start: a fast child can exit before
+    // module enumeration is possible, and reopening its PID can name a reuse.
+    // An exited child needs no recovery wait; its exit code/results still decide
+    // whether Setup or the inert check succeeded.
+    internal static UpdateProcessIdentity? TryCaptureStarted(Process process, string expectedImagePath)
+    {
+        string expected = Path.GetFullPath(expectedImagePath);
+        UpdateFiles.NoReparse(expected);
+        if (process.StartInfo.UseShellExecute || !Path.IsPathFullyQualified(process.StartInfo.FileName)
+            || !UpdateFiles.SamePath(process.StartInfo.FileName, expected))
+            throw new IOException("Update process identity requires the directly started verified executable.");
+        string? actual = TryReadImagePath(process);
+        if (actual is null) return null;
+        if (!UpdateFiles.SamePath(actual, expected))
+            throw new IOException("The started update process does not use the verified executable.");
+        return new(process.Id, process.StartTime.ToUniversalTime().Ticks, actual, UpdateFiles.Hash(actual));
+    }
+
+    internal static string? TryReadImagePath(Process process)
+    {
+        var handle = process.SafeHandle;
+        if (process.HasExited) return null;
+        var buffer = new StringBuilder(32768);
+        int length = buffer.Capacity;
+        if (!QueryFullProcessImageName(handle, 0, buffer, ref length))
+        {
+            int error = Marshal.GetLastWin32Error();
+            if (process.HasExited) return null;
+            throw new Win32Exception(error, "The update process image cannot be identified.");
+        }
+        return Path.GetFullPath(buffer.ToString());
+    }
+
+    [DllImport("kernel32.dll", EntryPoint = "QueryFullProcessImageNameW", CharSet = CharSet.Unicode, SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool QueryFullProcessImageName(SafeProcessHandle process, uint flags, StringBuilder name, ref int size);
 }
 
 internal enum UpdatePhase

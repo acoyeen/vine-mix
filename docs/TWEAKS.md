@@ -10,6 +10,13 @@ change, reason, status and next step. Use **Captured**, **Planned**, **In progre
 **Implemented locally**, or **Released**, with verification and the release when
 available. Recording a tweak alone does not authorize implementation.
 
+**Release update — 28 October 2026:** TWEAK-001–004 and TWEAK-013–020 are included
+in published [0.4.0 Beta](releases/0.4.0-beta.md), using the latest corrections
+recorded in each entry. Earlier local evidence is retained below; the
+[combined release qualification](RELEASE_0.4.0_QUALIFICATION.md) records final
+package results and remaining hardware/interaction limits. Other captured tweaks
+are unchanged.
+
 **Classification review — 2026-10-25:** Small presentation refinements were
 separated from the ideas and known-issues logs. Original IDs, dates, prior
 priorities, decisions and verification limits are retained below; old entries
@@ -18,10 +25,10 @@ proposals, and previously local or released work keeps its recorded status.
 
 | ID | Tweak | Status |
 | --- | --- | --- |
-| [TWEAK-001](#tweak-001) | Reorder What's New and About in Settings | Implemented locally |
-| [TWEAK-002](#tweak-002) | Centre the node count beneath the logo | Implemented locally |
-| [TWEAK-003](#tweak-003) | Move Activity into Settings | Implemented locally |
-| [TWEAK-004](#tweak-004) | Consistent lightweight information windows | Implemented locally |
+| [TWEAK-001](#tweak-001) | Reorder What's New and About in Settings | Released in 0.4.0 Beta |
+| [TWEAK-002](#tweak-002) | Centre the node count beneath the logo | Released in 0.4.0 Beta |
+| [TWEAK-003](#tweak-003) | Move Activity into Settings | Released in 0.4.0 Beta |
+| [TWEAK-004](#tweak-004) | Consistent lightweight information windows | Released in 0.4.0 Beta |
 | [TWEAK-005](#tweak-005) | Animated homepage wordmark | Implemented locally |
 | [TWEAK-006](#tweak-006) | Compact Bypass control and clearer state cues | Captured |
 | [TWEAK-007](#tweak-007) | Discoverable fine adjustment and reset | Captured |
@@ -30,14 +37,14 @@ proposals, and previously local or released work keeps its recorded status.
 | [TWEAK-010](#tweak-010) | Preferred website domains | Captured |
 | [TWEAK-011](#tweak-011) | Windows Volume Mixer branding consistency | Captured |
 | [TWEAK-012](#tweak-012) | Landing actions and removed pause control | Implemented locally |
-| [TWEAK-013](#tweak-013) | Monochrome app branding to match the website | Implemented locally |
-| [TWEAK-014](#tweak-014) | Clearer driver setup, checked defaults and VAC-first order | Implemented locally |
-| [TWEAK-015](#tweak-015) | Optional action notifications in the footer | Implemented locally, including concise tooltip |
-| [TWEAK-016](#tweak-016) | Group Settings by purpose | Implemented locally |
-| [TWEAK-017](#tweak-017) | Stronger group colors and direct background interaction | Implemented and locally integrated; not published |
-| [TWEAK-018](#tweak-018) | Focused Level control sockets and percentage Linked control | Implemented and locally integrated; not published |
-| [TWEAK-019](#tweak-019) | Short Ducking Trigger label | Implemented and locally integrated; not published |
-| [TWEAK-020](#tweak-020) | Centered text-only group heading | Implemented and locally integrated; not published |
+| [TWEAK-013](#tweak-013) | Monochrome app branding to match the website | Released in 0.4.0 Beta |
+| [TWEAK-014](#tweak-014) | Clearer driver setup, checked defaults and VAC-first order | Released in 0.4.0 Beta |
+| [TWEAK-015](#tweak-015) | Optional action notifications in the footer | Released in 0.4.0 Beta |
+| [TWEAK-016](#tweak-016) | Group Settings by purpose | Released in 0.4.0 Beta |
+| [TWEAK-017](#tweak-017) | Stronger group colors and direct background interaction | Released in 0.4.0 Beta |
+| [TWEAK-018](#tweak-018) | Focused Level control sockets and percentage Linked control | Released in 0.4.0 Beta |
+| [TWEAK-019](#tweak-019) | Short Ducking Trigger label | Released in 0.4.0 Beta |
+| [TWEAK-020](#tweak-020) | Centered text-only group heading | Released in 0.4.0 Beta |
 
 <a id="tweak-001"></a>
 ## TWEAK-001 Settings release links

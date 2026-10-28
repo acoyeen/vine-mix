@@ -26,6 +26,10 @@ Return to the [active ideas log](IDEAS.md).
 <a id="idea-023"></a>
 ## IDEA-023: Named organizational groups with automatic bounds
 
+- **Release update, 2026-10-28:** Included in published
+  [0.4.0 Beta](releases/0.4.0-beta.md), with the later group/color/heading
+  refinements. See [final qualification](RELEASE_0.4.0_QUALIFICATION.md).
+
 - **Captured:** 2026-10-23. **Clarified and implementation authorized:**
   2026-10-28. **Original priority:** P2. **Status:** Implemented and locally
   integrated into the installed Beta 6 app on 2026-10-28. Beta 6 remains in

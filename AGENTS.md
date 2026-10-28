@@ -162,3 +162,13 @@ Preserve the current repository visibility. The full release and attribution
 plan is in `docs/RELEASE_0.4.0_BETA.md`. Live installation still requires explicit
 permission for its brief engine/audio restart, with the physical-settings,
 Windows-shell, backup and matching-release safeguards intact.
+
+## Corrected 0.4.0 Beta publication — 28 October 2026
+
+After the first 0.4.0 update rolled back, the maintainer explicitly requested
+republishing 0.4.0 Beta with the updater correction rather than advancing to
+0.4.1. Replace its packages, matching source tag/archive, checksums, signed update
+metadata and notes together after qualification. Preserve the original source
+identity and assets in private release evidence, and document that existing
+0.4.0 installations need the corrected Setup manually because the semantic
+version is unchanged. This is a specific exception for this corrected release.

@@ -41,6 +41,52 @@ Before enabling Git builds, commit the complete website source and required
 assets, and use `website-redesign` as the build root. Do not change repository
 visibility as part of hosting configuration.
 
+## 0.4.0 Beta release cutover — 28 October 2026
+
+The website now offers [VineMix 0.4.0 Beta](https://github.com/acoyeen/vine-mix/releases/tag/v0.4.0-beta).
+The cutover followed publication and verification of all five GitHub release
+assets. Live release discovery and the saved fallback both use **0.4.0 · Beta**;
+download, checksum and documentation links point to `v0.4.0-beta`.
+
+- Published source: `4e7b31e36b24be435eb4283468eb1680d3a7617b`.
+- Worker version: `89105feb-9f2a-4517-b780-a0c221881395`.
+- Deployment: `949e6860-e6b0-4214-a950-52f5688e8572`, serving 100% of traffic.
+- Previous version retained for rollback:
+  `c2334e2b-03a2-44a6-9ac6-e237e532e09e`.
+- All **85 public files** were retrieved after deployment and matched the
+  prepared source bytes. The changed release content is in `index.html`,
+  `credits.html` and `releases.js`. The homepage's staged line endings were
+  reconciled with the committed source before upload.
+- Every retrieved file retained `X-Content-Type-Options: nosniff`,
+  `Referrer-Policy: strict-origin-when-cross-origin` and `X-Frame-Options: DENY`.
+  `_headers` was supplied as configuration, not as a public file.
+- **Six isolated browser cases** passed: 320, 390 and 1440 pixels, each with
+  normal GitHub discovery and with the API blocked. Online discovery displayed
+  **Latest Release**; blocked discovery displayed **Saved release**. All six
+  retained 0.4.0 Beta links, with no horizontal overflow or captured browser
+  errors. These targeted checks do not claim the broader historical browser
+  suite passed or resolve its previously recorded no-JavaScript assertion.
+- The assets-only Worker, empty bindings, compatibility date `2026-10-27`,
+  usage model, HTML handling, not-found handling and existing settings were
+  preserved. DNS, redirect rules and Git auto-deployment were not changed.
+- Public-file inventories, before/after hashes, browser results and captures,
+  and the completion receipt are retained outside the checkout. Short-lived
+  upload credentials were removed after deployment.
+
+After the new release and this cutover were verified, **24 uploaded Beta 1–5
+attachments** were retired while retaining the five release posts and tags.
+The original 0.4.0 Beta was subsequently installed manually and verified: all
+37 payload hashes matched, an actual Explorer launch ran the 0.4.0 app and
+engine, and physical settings identity and hashes were unchanged.
+
+An updater correction is now being prepared under explicit authorization to
+republish **the same 0.4.0 Beta**, retaining its release URL. The website evidence
+above describes the initial cutover; it does not claim the corrected application
+build has been published or installed. The [release record](../docs/RELEASE_0.4.0_BETA.md)
+tracks corrected source, packages and verification separately. No new version or
+website deployment has been made as part of that preparation. Retained historical
+tags continue to expose GitHub-generated source archives.
+
 ## Attribution publication — 28 October 2026
 
 The footer and Credits page link to `/attribution`, which summarises the root

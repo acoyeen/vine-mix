@@ -498,7 +498,9 @@ internal sealed class WindowsUpdatePlatform : IUpdateWorkerPlatform
             using var process = Process.GetProcessById(identity.ProcessId);
             // A reused PID is a different process, never a target to stop/wait.
             if (process.StartTime.ToUniversalTime().Ticks != identity.StartTimeUtcTicks) return true;
-            if (!UpdateFiles.SamePath(process.MainModule?.FileName ?? "", identity.ImagePath)) throw new IOException("A process identity changed unexpectedly.");
+            string? image = UpdateProcessIdentity.TryReadImagePath(process);
+            if (image is null) return true;
+            if (!UpdateFiles.SamePath(image, identity.ImagePath)) throw new IOException("A process identity changed unexpectedly.");
             return process.WaitForExit(checked((int)timeout.TotalMilliseconds));
         }
         catch (ArgumentException) { return true; }
@@ -613,7 +615,7 @@ internal sealed class WindowsUpdatePlatform : IUpdateWorkerPlatform
         UpdateFiles.NoReparse(Path.Combine(context.Directory, "setup.log"));
         var start = CreateSetupStart(context);
         using var process = Process.Start(start) ?? throw new IOException("The verified Setup could not start.");
-        started(UpdateProcessIdentity.Capture(process.Id));
+        if (UpdateProcessIdentity.TryCaptureStarted(process, context.AssetPath) is { } identity) started(identity);
         // Setup is never killed. A timeout leaves its exact identity journaled.
         if (!process.WaitForExit(10 * 60 * 1000)) throw new IOException("Setup is still running. Its recovery journal was retained; no process was killed.");
         return process.ExitCode;
@@ -630,7 +632,7 @@ internal sealed class WindowsUpdatePlatform : IUpdateWorkerPlatform
         var start = Start(context.TargetPath, context.TargetDirectory);
         start.ArgumentList.Add("--release-smoke"); start.ArgumentList.Add(evidenceDirectory);
         using var process = Process.Start(start) ?? throw new IOException("The candidate package check could not start.");
-        started(UpdateProcessIdentity.Capture(process.Id));
+        if (UpdateProcessIdentity.TryCaptureStarted(process, context.TargetPath) is { } identity) started(identity);
         if (!process.WaitForExit(60 * 1000)) throw new IOException("The inert candidate check is still running. It was not stopped; recovery was retained.");
         if (process.ExitCode != 0) return false;
         using var report = JsonDocument.Parse(UpdateFiles.ReadBytes(Path.Combine(evidenceDirectory, "results.json"), 128 * 1024));
@@ -654,7 +656,8 @@ internal sealed class WindowsUpdatePlatform : IUpdateWorkerPlatform
         start.ArgumentList.Add("--update-health"); start.ArgumentList.Add(context.TransactionPath); start.ArgumentList.Add("--standalone-context");
         if (context.Data.SettingsPath is { } settings) { start.ArgumentList.Add("--settings"); start.ArgumentList.Add(settings); }
         using var process = Process.Start(start) ?? throw new IOException("The updated application could not start.");
-        return UpdateProcessIdentity.Capture(process.Id);
+        return UpdateProcessIdentity.TryCaptureStarted(process, context.TargetPath)
+            ?? throw new IOException("The updated application exited before it could confirm startup health.");
     }
     public void ReopenPrevious(VerifiedUpdate context)
     {

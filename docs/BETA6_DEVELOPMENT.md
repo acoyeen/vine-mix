@@ -1,5 +1,12 @@
 # Beta 6 live development
 
+**Published successor — 28 October 2026:** The work below is included in
+[VineMix 0.4.0 Beta](releases/0.4.0-beta.md). Its
+[qualification record](RELEASE_0.4.0_QUALIFICATION.md) identifies the final source
+and packages. The earlier local identities and results remain historical.
+Personal installation is separate from publication and requires the normal
+guarded update and approval for its audio interruption.
+
 **Release planning update — 28 October 2026:** This development work now targets
 **0.4.0 · Beta**. Use the [0.4.0 Beta release hub](RELEASE_0.4.0_BETA.md) for scope,
 remaining work, attribution embedding and planned retirement of Beta 1–5
