@@ -878,11 +878,295 @@ __declspec(noinline) void fanoutQueues() {
     disconnected.requestClear(); disconnected.pop(received); expect(disconnected.size() == 0, "Recovery discards stale audio");
     input.fill({.25f, .5f}); disconnected.push(input); disconnected.pop(received); expectNear(received[0].left, .25, 0, "Reconnected output consumes current audio");
 }
+__declspec(noinline) void mixingUtilities() {
+    auto processor = std::make_unique<GraphProcessor>();
+    for (const auto* kind : {"channelSwap", "stereoWidth", "stereoPan"}) {
+        auto graph = chain(kind); auto plan = compileGraph(graph); processor->reset();
+        auto value = constant(*processor, plan, {.6f, -.2f});
+        if (graph.nodes[1].kind == "channelSwap") {
+            expectNear(value.left, -.2, 1e-6, "Channel Swap routes right to left");
+            expectNear(value.right, .6, 1e-6, "Channel Swap routes left to right");
+        } else if (graph.nodes[1].kind == "stereoWidth") {
+            expectNear(value.left, .6, 1e-6, "Width 100 percent is transparent");
+            graph.nodes[1].stereoWidth = 0; plan = compileGraph(graph); value = constant(*processor, plan, {.6f, -.2f});
+            expectNear(value.left, .2, 1e-6, "Width zero retains mid");
+            expectNear(value.right, .2, 1e-6, "Width zero removes side");
+            graph.nodes[1].stereoWidth = 2; plan = compileGraph(graph); value = constant(*processor, plan, {.3f, -.1f});
+            expectNear(value.left, .5, 1e-6, "Width 200 percent doubles side");
+            expectNear(value.right, -.3, 1e-6, "Width 200 percent preserves centre");
+            value = constant(*processor, plan, {.3f, .3f});
+            expectNear(value.left, .3, 1e-6, "Width cannot invent stereo from mono");
+            expectNear(value.right, .3, 1e-6, "Width keeps mono identical");
+        } else {
+            expectNear(value.left, .2 / std::sqrt(2.), 1e-6, "Pan centre uses constant-power law after mono fold");
+            expectNear(value.right, value.left, 0, "Pan centre is dual mono");
+            graph.nodes[1].panPosition = -1; plan = compileGraph(graph); value = constant(*processor, plan, {.6f, -.2f});
+            expectNear(value.left, .2, 1e-6, "Pan left positions the whole mono signal");
+            expectNear(value.right, 0, 0, "Pan left has exact right-channel silence");
+            graph.nodes[1].panPosition = 1; plan = compileGraph(graph); value = constant(*processor, plan, {.6f, -.2f});
+            expectNear(value.left, 0, 0, "Pan right has exact left-channel silence");
+            expectNear(value.right, .2, 1e-6, "Pan right positions the whole mono signal");
+        }
+        graph.nodes[1].bypass = true; value = constant(*processor, compileGraph(graph), {.6f, -.2f});
+        expectNear(value.left, .6, 1e-6, std::string(kind) + " bypass preserves stereo left");
+        expectNear(value.right, -.2, 1e-6, std::string(kind) + " bypass preserves stereo right");
+    }
+
+    AudioGraph split;
+    split.nodes = {node("source", "microphone"), node("split", "stereoSplit"), node("combine", "stereoCombine"), node("out", "output"), node("left", "mix"), node("right", "mix")};
+    split.edges = {{"input", "source", "split"}, {"l", "split", "combine", "audio", 0, false, "left", "left"},
+        {"r", "split", "combine", "audio", 0, false, "right", "right"}, {"output", "combine", "out"},
+        {"listen-l", "split", "left", "audio", 0, false, "left", "audio"},
+        {"listen-r", "split", "right", "audio", 0, false, "right", "audio"}};
+    auto plan = compileGraph(split); processor->reset();
+    auto value = constant(*processor, plan, {.6f, -.2f});
+    expectNear(value.left, .6, 1e-6, "Split and combine reconstruct original left");
+    expectNear(value.right, -.2, 1e-6, "Split and combine reconstruct original right");
+    expectNear(processor->output(4).back().left, .6, 1e-6, "Split left is isolated");
+    expectNear(processor->output(4).back().right, .6, 1e-6, "Split left is centred mono");
+    expectNear(processor->output(5).back().left, -.2, 1e-6, "Split right is centred mono");
+    expectNear(processor->output(5).back().right, -.2, 1e-6, "Split right is isolated");
+    std::array<Frame, quantumFrames> distinct{}; GraphProcessor::Inputs splitViews{}; splitViews[0] = distinct;
+    for (std::size_t frame = 0; frame < quantumFrames; ++frame)
+        distinct[frame] = {static_cast<float>(frame) / 1000, -static_cast<float>(quantumFrames - frame) / 1000};
+    processor->process(plan, splitViews);
+    for (std::size_t frame = 0; frame < quantumFrames; ++frame) {
+        expectNear(processor->output(3)[frame].left, distinct[frame].left, 1e-7, "Split/combine preserves each left frame without a block delay");
+        expectNear(processor->output(3)[frame].right, distinct[frame].right, 1e-7, "Split/combine preserves each right frame without a block delay");
+    }
+    split.nodes[1].bypass = split.nodes[2].bypass = true;
+    value = constant(*processor, compileGraph(split), {.6f, -.2f});
+    expectNear(value.left, .6, 1e-6, "Structural nodes retain routing even with legacy bypass fields");
+    expectNear(value.right, -.2, 1e-6, "Structural routing remains isolated");
+    GraphChannels capture{}; capture[0] = 2; auto channels = graphSignalChannels(plan, capture);
+    expect(channels[1] == 2 && channels[2] == 2 && channels[4] == 1 && channels[5] == 1,
+        "Split meters retain stereo while individual output paths report mono");
+    split.edges[2].fromPort = "left";
+    auto changed = compileGraph(split);
+    expect(!sameGraphTopology(plan, changed), "Changing output socket is a topology change");
+    value = constant(*processor, changed, {.6f, -.2f});
+    expectNear(value.right, .6, 1e-6, "One split output can connect to both combine inputs");
+    split.edges.erase(split.edges.begin() + 2);
+    value = constant(*processor, compileGraph(split), {.6f, -.2f});
+    expectNear(value.right, 0, 0, "An unconnected combine side stays silent");
+    auto invalid = split; invalid.edges[1].fromPort = "audio";
+    rejects([&] { compileGraph(invalid); }, "Split has no ambiguous whole-stereo output socket");
+    invalid = split; invalid.edges[1].toPort = "audio";
+    rejects([&] { compileGraph(invalid); }, "Combine requires a named destination side");
+    invalid = split; invalid.edges.push_back(invalid.edges[1]); invalid.edges.back().id = "duplicate";
+    rejects([&] { compileGraph(invalid); }, "Duplicate same-socket connection is rejected");
+
+    AudioGraph blend;
+    blend.nodes = {node("source", "microphone"), node("second", "microphone"), node("fade", "crossfade"), node("out", "output")};
+    blend.edges = {{"a", "source", "fade", "audio", 0, false, "audio", "a"},
+        {"b", "second", "fade", "audio", 0, false, "audio", "b"}, {"out", "fade", "out"}};
+    std::array<Frame, quantumFrames> a, b; a.fill({.4f, .2f}); b.fill({-.2f, .6f});
+    GraphProcessor::Inputs views{}; views[0] = a; views[1] = b;
+    const auto settle = [&] { plan = compileGraph(blend); for (int i = 0; i < 6; ++i) processor->process(plan, views); return processor->output(3).back(); };
+    processor->reset(); value = settle();
+    expectNear(value.left, .4, 1e-6, "Crossfade defaults to A only");
+    expectNear(value.right, .2, 1e-6, "Crossfade A preserves stereo");
+    capture = {}; capture[0] = 1; capture[1] = 2;
+    channels = graphSignalChannels(plan, capture);
+    expect(channels[2] == 1, "Crossfade A endpoint excludes inactive B from channel metadata");
+    blend.nodes[2].crossfadePosition = 1; value = settle();
+    expectNear(value.left, -.2, 1e-6, "Crossfade B endpoint excludes A");
+    expectNear(value.right, .6, 1e-6, "Crossfade B preserves stereo");
+    expect(graphSignalChannels(plan, capture)[2] == 2, "Crossfade B endpoint exposes stereo channel metadata");
+    blend.nodes[2].crossfadePosition = .5; value = settle();
+    expectNear(value.left, .2 / std::sqrt(2.), 1e-6, "Equal power crossfade midpoint left");
+    expectNear(value.right, .8 / std::sqrt(2.), 1e-6, "Equal power crossfade midpoint right");
+    blend.nodes[2].crossfadeCurve = "linear"; value = settle();
+    expectNear(value.left, .1, 1e-6, "Linear crossfade midpoint left");
+    expectNear(value.right, .4, 1e-6, "Linear crossfade midpoint right");
+    blend.nodes[2].bypass = true; value = settle();
+    expectNear(value.left, .4, 1e-6, "Crossfade bypass passes A instead of summing A and B");
+    expectNear(value.right, .2, 1e-6, "Crossfade bypass preserves A stereo");
+    blend.nodes[2].bypass = false; blend.nodes[2].crossfadePosition = 0; value = settle();
+    blend.nodes[2].crossfadePosition = 1; plan = compileGraph(blend);
+    float previous = value.left;
+    for (int block = 0; block < 2; ++block) {
+        processor->process(plan, views);
+        for (const auto sample : processor->output(3)) {
+            expect(sample.left <= previous + 1e-6 && std::abs(sample.left - previous) < .002,
+                "Crossfade edits follow a bounded monotonic ten-millisecond ramp"); previous = sample.left;
+        }
+    }
+    expectNear(previous, -.2, 1e-6, "Crossfade ramp reaches its exact endpoint");
+    auto combine = blend; combine.nodes[2].kind = "stereoCombine";
+    combine.edges[0].toPort = "left"; combine.edges[1].toPort = "right";
+    plan = compileGraph(combine); processor->reset();
+    for (int i = 0; i < 6; ++i) processor->process(plan, views);
+    expectNear(processor->output(3).back().left, .3, 1e-6, "Combine folds the left input's stereo pair independently");
+    expectNear(processor->output(3).back().right, .2, 1e-6, "Combine folds the right input's stereo pair independently");
+    combine.edges[0].muted = true; plan = compileGraph(combine);
+    for (int i = 0; i < 6; ++i) processor->process(plan, views);
+    expectNear(processor->output(3).back().left, 0, 0, "Muting a combine input only silences its selected side");
+    expectNear(processor->output(3).back().right, .2, 1e-6, "Other combine input remains audible");
+    for (const char* field : {"stereoWidth", "panPosition", "crossfadePosition"}) {
+        auto json = Json(blend); json["nodes"][2][field] = 9;
+        rejects([&] { compileGraph(json.get<AudioGraph>()); }, "Mixing parameter range is validated");
+    }
+    auto encoded = Json(blend); auto decoded = encoded.get<AudioGraph>();
+    expect(Json(decoded) == encoded, "Named sockets and mixing settings survive JSON roundtrip");
+    auto old = Json(chain());
+    for (auto& item : old["nodes"]) for (auto name : {"stereoWidth", "panPosition", "crossfadePosition", "crossfadeCurve"}) item.erase(name);
+    for (auto& item : old["edges"]) { item.erase("fromPort"); item.erase("toPort"); }
+    auto legacy = old.get<AudioGraph>(); compileGraph(legacy);
+    expect(legacy.edges[0].fromPort == "audio" && legacy.edges[0].toPort == "audio" && legacy.nodes[1].stereoWidth == 1,
+        "Old workspaces keep ordinary audio sockets and transparent mixing defaults");
+
+    AudioGraph trigger;
+    trigger.nodes = {node("source", "microphone"), node("split", "stereoSplit"), node("programme", "microphone"), node("duck", "ducking"), node("out", "output")};
+    trigger.edges = {{"s", "source", "split"}, {"p", "programme", "duck"},
+        {"trigger", "split", "duck", "sidechain", 0, false, "left", "audio"}, {"o", "duck", "out"}};
+    a.fill({0, .8f}); b.fill({.3f, .3f}); views = {}; views[0] = a; views[2] = b; processor->reset();
+    plan = compileGraph(trigger); for (int i = 0; i < 100; ++i) processor->process(plan, views);
+    expectNear(processor->output(4).back().left, .3, 1e-6, "Split left trigger cannot hear right channel");
+    trigger.edges[2].fromPort = "right"; plan = compileGraph(trigger);
+    for (int i = 0; i < 100; ++i) processor->process(plan, views);
+    expect(processor->output(4).back().left < .1, "Split right output can drive a sidechain detector");
+}
+__declspec(noinline) void mixingWeightTransitions() {
+    auto graph = chain("stereoPan"); graph.nodes[1].panPosition = -1;
+    auto plan = compileGraph(graph); auto current = std::make_unique<GraphProcessor>();
+    constant(*current, plan, {.2f, .2f});
+    std::array<Frame, quantumFrames> samples; samples.fill({.2f, .2f});
+    GraphProcessor::Inputs inputs{}; inputs[0] = samples;
+    for (double position : {1., -.4, 0.}) {
+        graph.nodes[1].panPosition = position; auto nextPlan = compileGraph(graph);
+        auto next = std::make_unique<GraphProcessor>(); next->inherit(*current, plan, nextPlan);
+        Frame previous = current->output(2).back();
+        for (int block = 0; block < 4; ++block) {
+            next->process(nextPlan, inputs);
+            for (const auto sample : next->output(2)) {
+                expectNear(sample.left * sample.left + sample.right * sample.right, .04, 1e-8,
+                    "Pan conserves constant-power energy while moving and after settling");
+                expect(std::abs(sample.left - previous.left) < .001 && std::abs(sample.right - previous.right) < .001,
+                    "Pan position edits keep their smooth per-sample transition");
+                previous = sample;
+            }
+        }
+        const double angle = (position + 1) * std::numbers::pi / 4;
+        expectNear(previous.left, .2 * std::cos(angle), 1e-7, "Settled Pan uses the final position's left gain");
+        expectNear(previous.right, .2 * std::sin(angle), 1e-7, "Settled Pan uses the final position's right gain");
+        current = std::move(next); plan = nextPlan;
+    }
+
+    AudioGraph blend;
+    blend.nodes = {node("a", "microphone"), node("b", "microphone"), node("fade", "crossfade"), node("out", "output")};
+    blend.edges = {{"a", "a", "fade", "audio", 0, false, "audio", "a"},
+        {"b", "b", "fade", "audio", 0, false, "audio", "b"}, {"out", "fade", "out"}};
+    std::array<Frame, quantumFrames> first, second; first.fill({.2f, 0}); second.fill({0, .2f});
+    inputs = {}; inputs[0] = first; inputs[1] = second;
+    plan = compileGraph(blend); current->reset();
+    for (int block = 0; block < 6; ++block) current->process(plan, inputs);
+    for (double position : {1., .5, 0.}) {
+        blend.nodes[2].crossfadePosition = position; auto nextPlan = compileGraph(blend);
+        auto next = std::make_unique<GraphProcessor>(); next->inherit(*current, plan, nextPlan);
+        for (int block = 0; block < 4; ++block) {
+            next->process(nextPlan, inputs);
+            for (const auto sample : next->output(3))
+                expectNear(sample.left * sample.left + sample.right * sample.right, .04, 1e-8,
+                    "Crossfade preserves equal-power weights through moving and settled portions of the control");
+        }
+        const auto value = next->output(3).back();
+        expectNear(value.left, .2 * std::cos(position * std::numbers::pi / 2), 1e-7, "Settled Crossfade reaches the final A weight");
+        expectNear(value.right, .2 * std::sin(position * std::numbers::pi / 2), 1e-7, "Settled Crossfade reaches the final B weight");
+        current = std::move(next); plan = nextPlan;
+    }
+}
+__declspec(noinline) void linkedMultiplier() {
+    const auto linear = [](double db) { return std::pow(10., db / 20.); };
+    auto graph = chain("mix");
+    graph.nodes.push_back(node("shared", "control"));
+    graph.edges.push_back({"shared-level", "shared", "effect", "control"});
+    auto dsp = std::make_unique<GraphProcessor>();
+    const Frame signal{.2f, -.1f};
+    graph.nodes[1].gainDb = -6;
+    graph.nodes[3].gainDb = 12; // New multiplier must replace, not compound, old dB.
+    for (double multiplier : {0., .001, .5, 1., 2.}) {
+        graph.nodes[3].controlMultiplier = multiplier;
+        const auto value = constant(*dsp, compileGraph(graph), signal);
+        expectNear(value.left, signal.left * linear(-6) * multiplier, 1e-7,
+            "Linked Multiplier scales the retained target level directly");
+        expectNear(value.right, signal.right * linear(-6) * multiplier, 1e-7,
+            "Linked Multiplier preserves independent stereo polarity");
+        if (multiplier == 0) expect(value.left == 0 && value.right == 0, "Zero percent is exact silence");
+    }
+    graph.nodes[3].controlMultiplier = .5; graph.edges[2].gainDb = -3;
+    expectNear(constant(*dsp, compileGraph(graph), signal).left, signal.left * linear(-9) * .5, 1e-7,
+        "Saved control cable gain remains active alongside the multiplier");
+    graph.nodes[3].controlMultiplier = 0; graph.nodes[3].bypass = true;
+    expectNear(constant(*dsp, compileGraph(graph), signal).left, signal.left * linear(-6), 1e-7,
+        "Bypass removes a zero multiplier and control cable gain");
+    graph.nodes[3].muted = true;
+    expectNear(constant(*dsp, compileGraph(graph), signal).left, 0, 0,
+        "Explicit saved controller mute remains authoritative even when bypassed");
+    graph.edges[2].muted = true;
+    expectNear(constant(*dsp, compileGraph(graph), signal).left, signal.left * linear(-6), 1e-7,
+        "Disconnecting the control cable removes its multiplier and saved mute");
+    graph.edges[2].muted = false; graph.nodes[3].muted = false; graph.nodes[3].bypass = false;
+    graph.nodes[1].bypass = true;
+    expectNear(constant(*dsp, compileGraph(graph), signal).left, signal.left, 1e-7,
+        "Existing bypassed target semantics ignore local and linked level together");
+    graph.nodes[1].bypass = false; graph.nodes[1].gainDb = 0; graph.edges[2].gainDb = 0;
+    graph.nodes[3].controlMultiplier = 1;
+    auto plan = compileGraph(graph); constant(*dsp, plan, signal);
+    std::array<Frame, quantumFrames> samples; samples.fill(signal);
+    GraphProcessor::Inputs inputs{}; inputs[0] = samples;
+    float previous = signal.left;
+    for (double target : {0., 2., 1.}) {
+        graph.nodes[3].controlMultiplier = target;
+        const auto nextPlan = compileGraph(graph);
+        auto next = std::make_unique<GraphProcessor>(); next->inherit(*dsp, plan, nextPlan);
+        // The shared float ramp snaps to its exact target on frame 480; allow
+        // its accumulated rounding correction as well as the nominal step.
+        const float maximumStep = static_cast<float>(std::abs(signal.left * target - previous) / 480 + 5e-6);
+        for (int block = 0; block < 2; ++block) {
+            next->process(nextPlan, inputs);
+            for (auto value : next->output(2)) {
+                expect(std::abs(value.left - previous) <= maximumStep,
+                    "Multiplier edits preserve a bounded ten-millisecond ramp through zero (previous=" + std::to_string(previous)
+                    + ", current=" + std::to_string(value.left) + ", maximum=" + std::to_string(maximumStep) + ")");
+                previous = value.left;
+            }
+        }
+        expectNear(previous, signal.left * target, 1e-7, "Multiplier ramp reaches the requested endpoint");
+        plan = nextPlan; dsp = std::move(next);
+    }
+    for (const char* target : {"source", "out"}) {
+        auto endpoint = graph; endpoint.edges[2].to = target;
+        endpoint.nodes[3].controlMultiplier = .5;
+        expectNear(constant(*dsp, compileGraph(endpoint), signal).left, signal.left * .5, 1e-7,
+            "Multiplier works on either a source or an output endpoint");
+    }
+    auto old = Json(graph);
+    for (auto& item : old["nodes"]) item.erase("controlMultiplier");
+    old["nodes"][3]["gainDb"] = -12;
+    auto restored = old.get<AudioGraph>();
+    expect(restored.nodes[3].controlMultiplier == -1, "Missing multiplier retains legacy dB semantics");
+    expectNear(constant(*dsp, compileGraph(restored), signal).left, signal.left * linear(-12), 1e-7,
+        "Legacy controller dB values retain their exact audible meaning");
+    restored.nodes[3].gainDb = 12;
+    expectNear(constant(*dsp, compileGraph(restored), signal).left, signal.left * linear(12), 1e-7,
+        "Legacy controller boost above two times is not clamped during loading");
+    auto serialized = Json(graph); auto roundtrip = serialized.get<AudioGraph>();
+    expect(Json(roundtrip) == serialized && roundtrip.nodes[3].controlMultiplier == 1,
+        "Explicit multiplier values roundtrip without rewriting legacy gain fields");
+    for (double bad : {-2., -.5, 2.01, std::numeric_limits<double>::infinity(), std::numeric_limits<double>::quiet_NaN()}) {
+        auto invalid = graph; invalid.nodes[3].controlMultiplier = bad;
+        rejects([&] { compileGraph(invalid); }, "Invalid multiplier is rejected before entering the audio callback");
+    }
+    auto unaffected = chain("mix"); unaffected.nodes[1].controlMultiplier = 0;
+    expectNear(constant(*dsp, compileGraph(unaffected), signal).left, signal.left, 1e-7,
+        "Multiplier field on an ordinary audio node has no processing effect");
+}
 }
 int main() {
     try {
         SetPriorityClass(GetCurrentProcess(), BELOW_NORMAL_PRIORITY_CLASS);
-        migration(); controls(); physicalAndVirtualOutputMuteIsolation(); transparentBypass(); bypassLevelTransitions(); effects(); validation(); extendedEqualizerAndTone(); transparentFilterCompilation(); standaloneFiltersAndNotch(); finiteAndTransitions(); stereoMetersAndMicrophoneMono(); dynamicsTelemetry(); persistence(); fanoutQueues();
+        migration(); controls(); physicalAndVirtualOutputMuteIsolation(); transparentBypass(); bypassLevelTransitions(); effects(); validation(); extendedEqualizerAndTone(); transparentFilterCompilation(); standaloneFiltersAndNotch(); finiteAndTransitions(); stereoMetersAndMicrophoneMono(); dynamicsTelemetry(); persistence(); fanoutQueues(); mixingUtilities(); mixingWeightTransitions(); linkedMultiplier();
         std::cout << "PASS: " << assertions << " offline assertions; 64 routing migrations, controls, independent physical/virtual output mutes, transparent intermediate/control bypass, 0..8-band EQ, Low/Mid/High tone, high/low-pass nodes, notch, compressor, stereo meters, microphone Mono, signal channels, validation, transitions, persistence, and bounded fanout. No audio devices were opened.\n";
         return 0;
     } catch (const std::exception& error) { std::cerr << "FAIL after " << assertions << " assertions: " << error.what() << '\n'; return 1; }

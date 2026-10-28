@@ -77,8 +77,9 @@ internal static class CaptionHitTestVerification
                                 || Classify(point) != "CLIENT") failures.Add($"{button.Content}: {point} hit {hit?.GetType().Name ?? "none"}");
                         }
                     }
-                    require(buttons.Length == 15 && buttons.Contains(window.LayoutLockButton) && failures.Count == 0,
-                        $"All fifteen caption/toolbar buttons, including the padlock, website symbol and disabled history controls, remain client targets at their centres and inner edges ({scope}). {string.Join("; ", failures.Take(4))}");
+                    require(buttons.Length == 14 && buttons.Contains(window.LayoutLockButton)
+                        && !buttons.Any(button => Equals(button.Content, "Activity")) && failures.Count == 0,
+                        $"All fourteen caption/toolbar buttons, including the padlock, website symbol and disabled history controls, remain client targets at their centres and inner edges; Activity belongs in Settings ({scope}). {string.Join("; ", failures.Take(4))}");
 
                     failures.Clear();
                     var passive = Descendants<TextBlock>(root).Where(text => HasVisibleAncestors(text) && Bounds(text).Bottom <= canvas.Top
@@ -107,6 +108,13 @@ internal static class CaptionHitTestVerification
                     Rect lockBounds = Bounds(window.LayoutLockButton), settingsBounds = Bounds(window.SettingsButton), actionBounds = Bounds(window.WindowActions);
                     double pixelTolerance = 96 / dpi + .001;
                     Point headerCenter = Center(headerBounds), brandCenter = Center(brandBounds), websiteCenter = Center(websiteBounds);
+                    var nodeCount = Descendants<TextBlock>(workspace).Single(text => text.Name == "WorkspaceNodeCount");
+                    Rect countBounds = Bounds(nodeCount);
+                    require(Math.Abs(Center(countBounds).X - brandCenter.X) <= pixelTolerance
+                        && Math.Abs(Center(countBounds).Y - (canvas.Top - GraphWorkspace.ToolbarHeight / 2)) <= pixelTolerance
+                        && nodeCount.Text == $"{mixer.GraphConfig.Nodes.Count} nodes · 1 selected"
+                        && buttonBounds.Values.All(bounds => !Overlaps(bounds, countBounds, pixelTolerance)),
+                        $"The live node and selection count stays centred beneath the logo on its existing toolbar row without overlapping any controls ({scope}); count={countBounds}, logo={brandBounds}.");
                     require(Math.Abs(headerCenter.X - root.Width / 2) <= pixelTolerance
                         && Math.Abs(brandCenter.X - headerCenter.X) <= pixelTolerance
                         && Math.Abs(brandCenter.Y - headerCenter.Y) <= pixelTolerance

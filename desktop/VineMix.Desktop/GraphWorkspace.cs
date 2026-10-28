@@ -20,7 +20,7 @@ using VineMix.Desktop.Controls;
 namespace VineMix.Desktop;
 
 /// <summary>The editor sends settings only. All audio work remains in the native engine.</summary>
-public sealed class GraphWorkspace : UserControl
+public sealed partial class GraphWorkspace : UserControl
 {
     public const double ToolbarHeight = 34;
     private readonly MixerViewModel _mixer;
@@ -33,6 +33,7 @@ public sealed class GraphWorkspace : UserControl
     private readonly Dictionary<string, WireVisual> _wires = [];
     private string _lastMessage = "";
     private bool _feedbackIsModelWarning;
+    private bool _feedbackIsError;
     private readonly TextBlock _feedback = new() { FontSize = 12, TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center };
     private readonly Button _dismissFeedback = new() { Content = "Dismiss", MinHeight = 26, Padding = new Thickness(8, 1, 8, 1), Margin = new Thickness(12, 0, 0, 0), Visibility = Visibility.Collapsed };
     private readonly DockPanel _feedbackContent = new() { LastChildFill = true, Margin = new Thickness(12, 4, 12, 4), Visibility = Visibility.Collapsed };
@@ -46,9 +47,9 @@ public sealed class GraphWorkspace : UserControl
     private static double FeedbackNow => Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
     private readonly Button _undo = new() { Content = "Undo", ToolTip = "Reverts the last workspace edit." };
     private readonly Button _redo = new() { Content = "Redo", ToolTip = "Restores the last undone workspace edit." };
-    private readonly Button _history = new() { Content = "Activity", ToolTip = "Recent workspace edits and messages" };
     private readonly Button _zoomReset = new() { Width = 62, Height = 26, MinHeight = 26, Padding = new Thickness(4, 1, 4, 1), Margin = new Thickness(4, 0, 4, 0), FontSize = 13, ToolTip = NodeToolTip.Create("Reset zoom", "Restores 100% canvas zoom") };
-    private readonly TextBlock _countText = new() { VerticalAlignment = VerticalAlignment.Center, FontSize = 13, Margin = new Thickness(16, 0, 0, 0) };
+    private readonly TextBlock _countText = new() { Name = "WorkspaceNodeCount", HorizontalAlignment = HorizontalAlignment.Center,
+        VerticalAlignment = VerticalAlignment.Center, TextAlignment = TextAlignment.Center, FontSize = 13 };
     private static readonly double[] ZoomStops = [.3, .4, .5, .6, .75, .9, 1, 1.1, 1.25, 1.5, 1.75, 2];
     private readonly Border _empty;
     private readonly Button _add;
@@ -165,9 +166,12 @@ public sealed class GraphWorkspace : UserControl
         TextOptions.SetTextHintingMode(this, TextHintingMode.Fixed);
         var root = new Grid(); root.RowDefinitions.Add(new() { Height = new GridLength(ToolbarHeight) }); root.RowDefinitions.Add(new());
         root.RowDefinitions.Add(new() { Height = GridLength.Auto, MinHeight = 28 });
-        var toolbar = new DockPanel { Margin = new Thickness(8, 4, 8, 4), LastChildFill = false };
-        _add = Button("Add", "Opens the node library."); _add.Click += (_, _) => ShowAddMenu(_add, VisibleCenter()); toolbar.Children.Add(_add);
-        _delete = Button("Remove", "Removes the selected nodes or cable."); _delete.Margin = new Thickness(7, 0, 0, 0); _delete.Click += (_, _) => DeleteSelection(); toolbar.Children.Add(_delete);
+        var toolbar = new Grid { Margin = new Thickness(8, 4, 8, 4) };
+        toolbar.ColumnDefinitions.Add(new()); toolbar.ColumnDefinitions.Add(new() { Width = GridLength.Auto }); toolbar.ColumnDefinitions.Add(new());
+        var editTools = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Left };
+        toolbar.Children.Add(editTools);
+        _add = Button("Add", "Opens the node library."); _add.Click += (_, _) => ShowAddMenu(_add, VisibleCenter()); editTools.Children.Add(_add);
+        _delete = Button("Remove", "Removes the selected nodes or cable."); _delete.Margin = new Thickness(7, 0, 0, 0); _delete.Click += (_, _) => DeleteSelection(); editTools.Children.Add(_delete);
         void AddHistoryButton(Button button)
         {
             // A disabled history button must remain client area rather than
@@ -175,19 +179,18 @@ public sealed class GraphWorkspace : UserControl
             var hitSurface = new Border { Child = button, Background = Brushes.Transparent };
             hitSurface.SetBinding(ToolTipProperty, new System.Windows.Data.Binding(nameof(ToolTip)) { Source = button });
             System.Windows.Shell.WindowChrome.SetIsHitTestVisibleInChrome(hitSurface, true);
-            toolbar.Children.Add(hitSurface);
+            editTools.Children.Add(hitSurface);
         }
         _undo.Click += (_, _) => RestoreHistory(redo: false); AddHistoryButton(_undo);
         _redo.Click += (_, _) => RestoreHistory(redo: true); AddHistoryButton(_redo);
-        _history.Click += (_, _) => ShowHistoryMenu(); toolbar.Children.Add(_history);
-        _countText.Margin = new Thickness(16, 0, 0, 0); _countText.SetResourceReference(TextBlock.ForegroundProperty, "ConsoleMutedBrush"); toolbar.Children.Add(_countText);
-        var zoomTools = new StackPanel { Orientation = Orientation.Horizontal }; DockPanel.SetDock(zoomTools, Dock.Right);
+        _countText.SetResourceReference(TextBlock.ForegroundProperty, "ConsoleMutedBrush"); Grid.SetColumn(_countText, 1); toolbar.Children.Add(_countText);
+        var zoomTools = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right }; Grid.SetColumn(zoomTools, 2);
         var fit = Button("Fit", "Brings every node into view."); fit.Click += (_, _) => FitAll(); zoomTools.Children.Add(fit);
         var minus = Button("−", "Zoom out"); minus.Width = 32; minus.Margin = new Thickness(8, 0, 0, 0); minus.Click += (_, _) => StepZoom(new Point(_viewport.ActualWidth / 2, _viewport.ActualHeight / 2), -1); zoomTools.Children.Add(minus);
         _zoomReset.Click += (_, _) => ResetZoom(); AutomationProperties.SetName(_zoomReset, "Reset canvas zoom to 100 percent"); zoomTools.Children.Add(_zoomReset);
         var plus = Button("+", "Zoom in"); plus.Width = 32; plus.Click += (_, _) => StepZoom(new Point(_viewport.ActualWidth / 2, _viewport.ActualHeight / 2), 1); zoomTools.Children.Add(plus);
         toolbar.Children.Add(zoomTools); root.Children.Add(toolbar);
-        foreach (var button in new[] { _add, _delete, _undo, _redo, _history, fit, minus, _zoomReset, plus })
+        foreach (var button in new[] { _add, _delete, _undo, _redo, fit, minus, _zoomReset, plus })
         {
             button.SetResourceReference(StyleProperty, "WorkspaceToolbarButton");
             System.Windows.Shell.WindowChrome.SetIsHitTestVisibleInChrome(button, true);
@@ -247,6 +250,8 @@ public sealed class GraphWorkspace : UserControl
     private void GraphChanged(object? sender, EventArgs args) => Refresh();
     private void ModelPropertyChanged(object? sender, PropertyChangedEventArgs args)
     {
+        if (args.PropertyName == nameof(MixerViewModel.ShowActionNotifications)
+            && !_mixer.ShowActionNotifications && !_feedbackIsError) DismissMessage();
         if (args.PropertyName == nameof(MixerViewModel.IsLayoutLocked))
         {
             if (_mixer.IsLayoutLocked || _lockedLayoutGestureStart is not null) CancelActiveGesture();
@@ -290,6 +295,7 @@ public sealed class GraphWorkspace : UserControl
                     if (Canvas.GetTop(view) != node.Y) { Canvas.SetTop(view, node.Y); wireAnchorsChanged = true; }
                 }
             }
+            ApplyNodeStacking();
             foreach (var missing in _wires.Keys.Where(id => graph.Edges.All(e => e.Id != id)).ToArray()) { _cables.Children.Remove(_wires[missing].Visible); _cables.Children.Remove(_wires[missing].Hit); _cables.Children.Remove(_wires[missing].Outline); _wires.Remove(missing); if (_selectedEdge == missing) _selectedEdge = null; }
             foreach (var edge in graph.Edges)
             {
@@ -304,13 +310,15 @@ public sealed class GraphWorkspace : UserControl
                     wireAnchorsChanged = true;
                 }
                 var wire = _wires[edge.Id];
-                if (wire.SourceId != edge.From || wire.TargetId != edge.To || wire.Kind != edge.Kind)
-                { wire.SourceId = edge.From; wire.TargetId = edge.To; wire.Kind = edge.Kind; wireAnchorsChanged = true; }
+                if (wire.SourceId != edge.From || wire.TargetId != edge.To || wire.Kind != edge.Kind || wire.SourcePort != edge.FromPort || wire.TargetPort != edge.ToPort)
+                { wire.SourceId = edge.From; wire.TargetId = edge.To; wire.Kind = edge.Kind; wire.SourcePort = edge.FromPort; wire.TargetPort = edge.ToPort; wireAnchorsChanged = true; }
                 UpdateConnectionDetails(edge, wire);
                 UpdateWireAppearance(edge, wire);
             }
+            RefreshFrames();
             _emptyAdd.IsEnabled = _add.IsEnabled = _mixer.CanEditLayout && graph.Nodes.Count < 32;
             _delete.IsEnabled = _mixer.CanEditLayout && (_selectedNodes.Count > 0 || _selectedEdge is not null);
+            _delete.ToolTip = _selectedFrame is not null ? "Ungroups the selected frame and keeps its nodes and connections." : "Removes the selected nodes or cable.";
             UpdateHistoryButtons();
             _empty.Visibility = graph.Nodes.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
             _countText.Text = $"{graph.Nodes.Count} nodes" + (_selectedNodes.Count > 0 ? $" · {_selectedNodes.Count} selected" : "");
@@ -348,6 +356,7 @@ public sealed class GraphWorkspace : UserControl
             AutomationProperties.SetHelpText(_zoomReset, $"Current zoom {_zoom * 100:0} percent. Activate to return to 100 percent.");
             foreach (var view in _nodes.Values) view.SetViewScale(_zoom);
             foreach (var pair in _wires) SetWireWidth(pair.Key, pair.Value);
+            RefreshFrames();
         }
         if (_snapSocket is not null) SetSnapSocket(IsCurrentSocket(_snapSocket) ? _snapSocket : null);
     }
@@ -401,7 +410,12 @@ public sealed class GraphWorkspace : UserControl
             view.Measure(new Size(view.Width, double.PositiveInfinity));
             bounds.Union(new Rect(Canvas.GetLeft(view), Canvas.GetTop(view), view.Width, view.DesiredSize.Height));
         }
-        _zoom = Math.Clamp(Math.Min(availableWidth / bounds.Width, availableHeight / bounds.Height), .3, 1);
+        var nodeBounds = bounds;
+        for (int pass = 0; pass < 4; pass++)
+        {
+            _zoom = Math.Clamp(Math.Min(availableWidth / bounds.Width, availableHeight / bounds.Height), .3, 1);
+            bounds = IncludeFrameBounds(nodeBounds, _zoom, _nodes.Keys);
+        }
         _panX = (_viewport.ActualWidth - bounds.Width * _zoom) / 2 - bounds.Left * _zoom;
         _panY = (_viewport.ActualHeight - bounds.Height * _zoom) / 2 - bounds.Top * _zoom;
         ApplyTransform(); PersistView();
@@ -441,7 +455,12 @@ public sealed class GraphWorkspace : UserControl
         if (bounds.IsEmpty) return false;
         _wheelRemainder = 0;
         double availableWidth = Math.Max(0, _viewport.ActualWidth - 64), availableHeight = Math.Max(0, _viewport.ActualHeight - 54);
-        _zoom = Math.Clamp(Math.Min(availableWidth / bounds.Width, availableHeight / bounds.Height), .3, 1);
+        var nodeBounds = bounds;
+        for (int pass = 0; pass < 4; pass++)
+        {
+            _zoom = Math.Clamp(Math.Min(availableWidth / bounds.Width, availableHeight / bounds.Height), .3, 1);
+            bounds = IncludeFrameBounds(nodeBounds, _zoom, _selectedNodes);
+        }
         _panX = (_viewport.ActualWidth - bounds.Width * _zoom) / 2 - bounds.Left * _zoom;
         _panY = (_viewport.ActualHeight - bounds.Height * _zoom) / 2 - bounds.Top * _zoom;
         ApplyTransform(); PersistView();
@@ -451,7 +470,8 @@ public sealed class GraphWorkspace : UserControl
     {
         // A plain F belongs to the canvas only. Focused editors, node controls,
         // menus and toolbar buttons keep their own keyboard behavior.
-        if (key != Key.F || modifiers != ModifierKeys.None || !ReferenceEquals(focused, this) || !CanFrameSelection) return false;
+        if (key != Key.F || modifiers != ModifierKeys.None || IsTextEditor(focused)
+            || !ReferenceEquals(focused, this) && FindParent<GraphFrameView>(focused) is null || !CanFrameSelection) return false;
         FrameSelection(); return true;
     }
     internal MenuItem CreateFrameSelectionMenuItem()
@@ -520,8 +540,10 @@ public sealed class GraphWorkspace : UserControl
     internal void SetMessage(string text, bool isError = false)
     {
         if (string.IsNullOrWhiteSpace(text)) { DismissMessage(); return; }
-        _feedbackIsModelWarning = false;
         _lastMessage = text;
+        if (!isError && !_mixer.ShowActionNotifications) return;
+        _feedbackIsModelWarning = false;
+        _feedbackIsError = isError;
         string display = isError ? "Attention: " + text : text;
         bool changed = _feedback.Text != display || !HasFeedback;
         _feedback.Text = display;
@@ -544,6 +566,7 @@ public sealed class GraphWorkspace : UserControl
         _feedbackCountdownScale.ScaleX = 0;
         _feedbackCountdown.Visibility = Visibility.Hidden;
         _feedbackIsModelWarning = false;
+        _feedbackIsError = false;
         _feedback.Text = "";
         _feedback.SetResourceReference(TextBlock.ForegroundProperty, "ConsoleMutedBrush");
         _dismissFeedback.Visibility = Visibility.Collapsed;
@@ -571,6 +594,7 @@ public sealed class GraphWorkspace : UserControl
     }
     private void ResumeFeedbackCountdown()
     {
+        if (!_mixer.ShowActionNotifications && !_feedbackIsError) { DismissMessage(); return; }
         if (!HasFeedback || !_loaded) return;
         double remainingSeconds = _feedbackDeadline - FeedbackNow;
         if (remainingSeconds <= 0) DismissMessage();
@@ -626,27 +650,40 @@ public sealed class GraphWorkspace : UserControl
         MenuHoverHelp.Attach(menu);
         return menu;
     }
-    private void ShowHistoryMenu() { var menu = CreateHistoryMenu(); menu.PlacementTarget = _history; menu.IsOpen = true; }
+    internal void ShowHistoryMenu(FrameworkElement placementTarget)
+    {
+        var menu = CreateHistoryMenu();
+        menu.PlacementTarget = placementTarget; menu.Placement = PlacementMode.Bottom;
+        menu.HorizontalOffset = placementTarget.ActualWidth - menu.Width;
+        menu.IsOpen = true;
+    }
     internal void SelectNode(string id)
     {
         SetNodeSelection([id]);
+        BringNodesToFront([id]);
     }
-    private void SetNodeSelection(IEnumerable<string> ids)
+    private void SetNodeSelection(IEnumerable<string> ids, bool raiseNewlySelected = true, bool promoteWholeSelection = false)
     {
+        bool hadFrame = _selectedFrame is not null;
+        _selectedFrame = null;
         var next = ids.Where(id => Graph.Nodes.Any(node => node.Id == id)).ToHashSet();
-        if (_selectedEdge is null && _selectedNodes.SetEquals(next)) return;
+        if (!hadFrame && _selectedEdge is null && _selectedNodes.SetEquals(next)) return;
+        if (raiseNewlySelected) BringNodesToFront(promoteWholeSelection ? next : next.Except(_selectedNodes).ToArray());
         _selectedNodes.Clear(); _selectedNodes.UnionWith(next); _selectedEdge = null;
         Refresh();
     }
     internal void SelectNodeForPointer(string id, ModifierKeys modifiers)
     {
+        if (_selectedFrame is not null) { _selectedFrame = null; Refresh(); }
         if ((modifiers & (ModifierKeys.Shift | ModifierKeys.Control)) != 0)
         {
             var next = _selectedNodes.ToHashSet();
             if (!next.Remove(id)) next.Add(id);
             SetNodeSelection(next);
+            if (next.Contains(id)) BringNodesToFront([id]);
         }
         else if (!_selectedNodes.Contains(id)) SelectNode(id);
+        else BringNodesToFront([id]);
     }
     private IEnumerable<string> NodesInRectangle(Point start, Point end)
     {
@@ -655,11 +692,12 @@ public sealed class GraphWorkspace : UserControl
     }
     internal void SelectRectangle(Point viewportStart, Point viewportEnd, bool additive)
     {
-        SetNodeSelection((additive ? _selectedNodes : []).Concat(NodesInRectangle(viewportStart, viewportEnd)).ToArray());
+        SetNodeSelection((additive ? _selectedNodes : []).Concat(NodesInRectangle(viewportStart, viewportEnd)).ToArray(), promoteWholeSelection: !additive);
     }
     internal void BeginBoxSelection(Point start, bool additive)
     {
         CancelCable(); _boxOriginalSelection = _selectedNodes.ToHashSet();
+        RememberBoxStacking();
         if (!additive) SetNodeSelection([]);
         _boxSelecting = true; _gestureStart = start; _moved = false;
         _boxBaseSelection = additive ? _boxOriginalSelection.ToHashSet() : [];
@@ -675,10 +713,12 @@ public sealed class GraphWorkspace : UserControl
         var bounds = new Rect(_gestureStart, point);
         Canvas.SetLeft(_selectionBox, bounds.X); Canvas.SetTop(_selectionBox, bounds.Y);
         _selectionBox.Width = bounds.Width; _selectionBox.Height = bounds.Height; _selectionBox.Visibility = Visibility.Visible;
-        SetNodeSelection(_boxBaseSelection.Concat(NodesInRectangle(_gestureStart, point)).ToArray());
+        SetNodeSelection(_boxBaseSelection.Concat(NodesInRectangle(_gestureStart, point)).ToArray(), raiseNewlySelected: false);
+        UpdateBoxStacking();
     }
     internal void SelectEdge(string id)
     {
+        _selectedFrame = null;
         _selectedEdge = id; _selectedNodes.Clear();
         if (PresentationSource.FromVisual(this) is not null) Focus();
         Refresh();
@@ -690,11 +730,13 @@ public sealed class GraphWorkspace : UserControl
     {
         string from = graph.Nodes.FirstOrDefault(node => node.Id == edge.From)?.Name ?? "Missing source";
         string to = graph.Nodes.FirstOrDefault(node => node.Id == edge.To)?.Name ?? "Missing destination";
+        if (edge.FromPort != "audio") from += " · " + GraphDefaults.PortLabel(edge.FromPort);
+        if (edge.ToPort != "audio") to += " · " + GraphDefaults.PortLabel(edge.ToPort);
         string gain = (edge.GainDb > 0 ? "+" : "") + edge.GainDb.ToString("G", CultureInfo.InvariantCulture) + " dB";
         return edge.Kind switch
         {
             "control" => ("Linked control connection", $"{from} → {to}",
-                $"Linked control {(edge.Muted ? "off" : "on")} · Saved offset {gain}", "Links level and mute; carries no audio"),
+                $"Linked control {(edge.Muted ? "off" : "on")} · Saved offset {gain}", "Scales the linked level; carries no audio"),
             "sidechain" => ("Sidechain / trigger connection", $"{from} → {to}",
                 $"Detector {(edge.Muted ? "off" : "on")} · Saved level {gain}", "Detector only; adds no audible audio"),
             _ => ("Audio connection", $"{from} → {to}",
@@ -706,9 +748,10 @@ public sealed class GraphWorkspace : UserControl
         var key = new ConnectionDetailKey(edge.From, edge.To,
             Graph.Nodes.FirstOrDefault(node => node.Id == edge.From)?.Name ?? "Missing source",
             Graph.Nodes.FirstOrDefault(node => node.Id == edge.To)?.Name ?? "Missing destination",
-            edge.Kind, edge.GainDb, edge.Muted);
+            edge.Kind, edge.GainDb, edge.Muted, edge.FromPort, edge.ToPort);
         if (wire.DetailKey == key) return;
-        bool routeChanged = wire.DetailKey?.SourceName != key.SourceName || wire.DetailKey?.TargetName != key.TargetName;
+        bool routeChanged = wire.DetailKey?.SourceName != key.SourceName || wire.DetailKey?.TargetName != key.TargetName
+            || wire.DetailKey?.FromPort != key.FromPort || wire.DetailKey?.ToPort != key.ToPort;
         wire.DetailKey = key;
         var details = DescribeConnection(Graph, edge);
         if (routeChanged) wire.Hit.ToolTip = NodeToolTip.Create(details.Route);
@@ -749,17 +792,18 @@ public sealed class GraphWorkspace : UserControl
         }
         return true;
     }
-    internal void BeginNodeMove(string id, Point viewportStart, bool detach = false)
+    internal void BeginNodeMove(string id, Point viewportStart, bool detach = false, bool bringAnchorToFront = true)
     {
         if (!_nodes.TryGetValue(id, out var node) || !RequireLayoutEdit()) return;
         if (!_selectedNodes.Contains(id)) SelectNode(id);
+        BringNodesToFront(_selectedNodes, bringAnchorToFront ? id : null);
         CancelCable(); _dragged = node; _gestureStart = viewportStart; _moved = false; _viewport.Cursor = Cursors.SizeAll;
         _detachOnDrop = detach; SetInsertionEdge(null);
         if (detach) SetMessage(_selectedNodes.Count == 1 ? "Release to detach this node and keep its audio path connected. Escape cancels." : "Move the group normally. Detach works on one node at a time.");
         _dragOrigins.Clear();
         foreach (string selected in _selectedNodes)
             if (_nodes.TryGetValue(selected, out var view))
-            { _dragOrigins.Add(selected, new Point(Canvas.GetLeft(view), Canvas.GetTop(view))); Panel.SetZIndex(view, 2); }
+            { _dragOrigins.Add(selected, new Point(Canvas.GetLeft(view), Canvas.GetTop(view))); }
     }
     private Vector ClampGroupDelta(Vector delta)
     {
@@ -777,12 +821,12 @@ public sealed class GraphWorkspace : UserControl
         foreach (var (id, origin) in _dragOrigins)
             if (_nodes.TryGetValue(id, out var view)) { Canvas.SetLeft(view, origin.X + delta.X); Canvas.SetTop(view, origin.Y + delta.Y); }
         UpdateWires();
-        SetInsertionEdge(!_detachOnDrop && _dragOrigins.Count == 1 ? FindInsertionCandidate(_dragged.Id) : null);
+        SetInsertionEdge(!_movingFrame && !_detachOnDrop && _dragOrigins.Count == 1 ? FindInsertionCandidate(_dragged.Id) : null);
     }
     internal void FinishNodeMove(bool cancel = false)
     {
         cancel |= !_mixer.CanEditLayout;
-        var dragged = _dragged; _dragged = null;
+        var dragged = _dragged; _dragged = null; _movingFrame = false;
         if (dragged is null) return;
         _viewport.Cursor = null;
         // Commit exactly the cable shown while dragging. Grid rounding may
@@ -794,7 +838,7 @@ public sealed class GraphWorkspace : UserControl
         foreach (var (id, origin) in _dragOrigins)
         {
             positions[id] = origin + delta;
-            if (_nodes.TryGetValue(id, out var view)) { Panel.SetZIndex(view, 0); Canvas.SetLeft(view, positions[id].X); Canvas.SetTop(view, positions[id].Y); }
+            if (_nodes.TryGetValue(id, out var view)) { Canvas.SetLeft(view, positions[id].X); Canvas.SetTop(view, positions[id].Y); }
         }
         GraphConnectionEditing.Plan? connectionPlan = null;
         string connectionMessage = "";
@@ -856,7 +900,7 @@ public sealed class GraphWorkspace : UserControl
         SelectEdge(id); args.Handled = true;
         if (!_mixer.CanEdit || args.ChangedButton != MouseButton.Left) return;
         var edge = Graph.Edges.FirstOrDefault(e => e.Id == id);
-        if (edge is null || !_nodes.TryGetValue(edge.To, out var node) || node.FindSocket(edge.Kind, false) is not Socket input) return;
+        if (edge is null || !_nodes.TryGetValue(edge.To, out var node) || node.FindSocket(edge.Kind, false, edge.ToPort) is not Socket input) return;
         Point endpoint = SocketPosition(input), pointer = args.GetPosition(_viewport);
         if (_mixer.IsLayoutLocked)
         {
@@ -870,7 +914,7 @@ public sealed class GraphWorkspace : UserControl
     internal bool BeginInputLinkDrag(Socket input, Point viewportStart, string? edgeId = null)
     {
         if (input.Output || !IsCurrentSocket(input) || !RequireLayoutEdit()) return false;
-        var incoming = Graph.Edges.Where(e => e.To == input.NodeId && e.Kind == input.Kind).ToArray();
+        var incoming = Graph.Edges.Where(e => e.To == input.NodeId && e.Kind == input.Kind && e.ToPort == input.Port).ToArray();
         string? selected = edgeId ?? _selectedEdge;
         GraphEdge? edge = incoming.FirstOrDefault(e => e.Id == selected);
         CancelCable();
@@ -891,7 +935,7 @@ public sealed class GraphWorkspace : UserControl
     }
     private bool BeginExistingLinkPreview(GraphEdge edge, Socket input)
     {
-        if (!_nodes.TryGetValue(edge.From, out var source) || source.FindSocket(edge.Kind == "sidechain" ? "audio" : edge.Kind, true) is not Socket output) { CancelCable(); return false; }
+        if (!_nodes.TryGetValue(edge.From, out var source) || source.FindSocket(edge.Kind == "sidechain" ? "audio" : edge.Kind, true, edge.FromPort) is not Socket output) { CancelCable(); return false; }
         _rewireOriginal = edge.Copy(); _pendingSocket = output; _inputLinkSocket = null; _inputLinkCandidates = [];
         SetInputLinkCandidate(null); _selectedEdge = edge.Id; _selectedNodes.Clear(); SetSnapSocket(input); Refresh();
         SetMessage("Move this cable to another input, or release on empty canvas to remove it. Escape cancels.");
@@ -916,11 +960,11 @@ public sealed class GraphWorkspace : UserControl
     }
     private void Connect(Socket first, Socket second)
     {
-        if (!CompatibleSockets(first, second)) { SetMessage("Connect an audio output to Audio or Sidechain, or link matching control sockets.", isError: true); return; }
+        if (!CompatibleSockets(first, second)) { SetMessage("Connect an audio output to Audio or Trigger, or link matching control sockets.", isError: true); return; }
         Socket from = first.Output ? first : second, to = first.Output ? second : first;
-        string error = ConnectNodes(from.NodeId, to.NodeId, to.Kind);
+        string error = ConnectNodes(from.NodeId, to.NodeId, to.Kind, from.Port, to.Port);
         if (error.Length > 0) { SetMessage(error, isError: true); CancelCable(); return; }
-        CancelCable(); SetMessage(to.Kind == "control" ? "Linked control connected. Its level now applies to that node." : to.Kind == "sidechain" ? "Ducking trigger connected. This cable controls reduction and adds no audible audio." : "Audio connected.");
+        CancelCable(); SetMessage(to.Kind == "control" ? "Level control connected." : to.Kind == "sidechain" ? "Ducking trigger connected." : "Audio connected.");
     }
     private static bool CompatibleSockets(Socket first, Socket second)
     {
@@ -928,13 +972,13 @@ public sealed class GraphWorkspace : UserControl
         var from = first.Output ? first : second; var to = first.Output ? second : first;
         return from.Kind == "control" ? to.Kind == "control" : from.Kind == "audio" && to.Kind is "audio" or "sidechain";
     }
-    public string ConnectNodes(string from, string to, string kind = "audio")
+    public string ConnectNodes(string from, string to, string kind = "audio", string fromPort = "audio", string toPort = "audio")
     {
         if (_mixer.IsLayoutLocked) { RequireLayoutEdit(); return MixerViewModel.LayoutLockedMessage; }
         if (!_mixer.CanEdit) return "Wait for the audio engine before editing connections.";
-        var edge = new GraphEdge { Id = Guid.NewGuid().ToString("N"), From = from, To = to, Kind = kind };
-        string error = GraphDefaults.ConnectionError(Graph, edge); if (error.Length > 0) return error;
-        _mixer.Edit(c => { if (GraphDefaults.ConnectionError(c.Graph, edge).Length == 0) c.Graph.Edges.Add(edge.Copy()); }); return "";
+        var edge = new GraphEdge { Id = Guid.NewGuid().ToString("N"), From = from, To = to, Kind = kind, FromPort = fromPort, ToPort = toPort };
+        string error = GraphDefaults.NewConnectionError(Graph, edge); if (error.Length > 0) return error;
+        _mixer.Edit(c => { if (GraphDefaults.NewConnectionError(c.Graph, edge).Length == 0) c.Graph.Edges.Add(edge.Copy()); }); return "";
     }
     public void RemoveNode(string id)
     {
@@ -957,6 +1001,7 @@ public sealed class GraphWorkspace : UserControl
         if (args.Handled || !_mixer.CanEdit || Keyboard.IsKeyDown(Key.Space) || _dragged is not null || _boxSelecting || _cutting) return;
         var source = args.OriginalSource as DependencyObject;
         if (FindParent<Socket>(source) is not null) return; // The socket's own handler remains authoritative.
+        if (FindParent<GraphFrameView>(source) is not null) return;
         if (_pendingSocket is null && (Keyboard.Modifiers != ModifierKeys.None || IsEditingControl(source) || FindParent<ButtonBase>(source) is not null)) return;
         var target = FindSnapSocket(args.GetPosition(_viewport), _pendingSocket);
         if (target is not null) SocketPressed(target, args);
@@ -1036,7 +1081,7 @@ public sealed class GraphWorkspace : UserControl
     {
         if (!_mixer.RightClickDragToPan || modifiers.HasFlag(ModifierKeys.Control) || HasCanvasPanGesture
             || _dragged is not null || _socketDragging || _boxSelecting || _cutting
-            || FindParent<GraphNodeView>(source) is not null || FindParent<System.Windows.Shapes.Path>(source) is not null
+            || FindParent<GraphNodeView>(source) is not null || FindParent<GraphFrameView>(source) is not null || FindParent<System.Windows.Shapes.Path>(source) is not null
             || IsEditingControl(source) || FindParent<ButtonBase>(source) is not null) return false;
         BeginCanvasPan(MouseButton.Right, point);
         return true;
@@ -1098,7 +1143,7 @@ public sealed class GraphWorkspace : UserControl
             var target = FindSnapSocket(viewportPoint, _pendingSocket);
             GraphConnectionEditing.EdgePlan? plan = null; string error = "";
             bool prepared = target is not null
-                ? target.NodeId != original.To && GraphConnectionEditing.TryPrepareRewire(Graph, original, target.NodeId, out plan, out error)
+                ? (target.NodeId != original.To || target.Port != original.ToPort) && GraphConnectionEditing.TryPrepareRewire(Graph, original, target.NodeId, out plan, out error, target.Port)
                 : blankCanvas && GraphConnectionEditing.TryPrepareRemoval(Graph, [original], out plan, out error);
             CancelCable();
             if (prepared)
@@ -1133,7 +1178,7 @@ public sealed class GraphWorkspace : UserControl
         _lockedLayoutGestureStart = null; _lockedLayoutGestureNotified = false;
         bool panned = _panning; _panning = false; _panButton = null; _viewport.Cursor = null;
         FinishNodeMove(cancel);
-        if (_boxSelecting) { _boxSelecting = false; _selectionBox.Visibility = Visibility.Collapsed; if (cancel) SetNodeSelection(_boxOriginalSelection); }
+        if (_boxSelecting) { _boxSelecting = false; _selectionBox.Visibility = Visibility.Collapsed; if (cancel) SetNodeSelection(_boxOriginalSelection, raiseNewlySelected: false); FinishBoxStacking(cancel); }
         if (panned) { if (cancel) { _panX = _originalPosition.X; _panY = _originalPosition.Y; ApplyTransform(); } else PersistView(); }
         if (Mouse.Captured == _viewport && !_socketDragging) _viewport.ReleaseMouseCapture();
     }
@@ -1209,9 +1254,11 @@ public sealed class GraphWorkspace : UserControl
         if (args.Key == Key.Escape) { CancelActiveGesture(); SetMessage("Gesture cancelled."); args.Handled = true; return; }
         if (_dragged is not null || _lockedLayoutGestureStart is not null || HasCanvasPanGesture || _boxSelecting || _cutting || _socketDragging) return;
         if (args.Key is Key.Delete or Key.Back) { DeleteSelection(); args.Handled = true; }
+        else if (args.Key == Key.G && Keyboard.Modifiers == ModifierKeys.Control) { CreateFrameFromSelection(); args.Handled = true; }
+        else if (args.Key == Key.F2 && _selectedFrame is string frameId) { BeginFrameRename(frameId); args.Handled = true; }
         else if (args.Key == Key.C && Keyboard.Modifiers == ModifierKeys.Control) { CopyToClipboard(); args.Handled = true; }
         else if (args.Key == Key.V && Keyboard.Modifiers == ModifierKeys.Control) { PasteFromClipboard(); args.Handled = true; }
-        else if (args.Key == Key.A && Keyboard.Modifiers == ModifierKeys.Control) { SetNodeSelection(Graph.Nodes.Select(n => n.Id)); args.Handled = true; }
+        else if (args.Key == Key.A && Keyboard.Modifiers == ModifierKeys.Control) { SetNodeSelection(Graph.Nodes.Select(n => n.Id), promoteWholeSelection: true); args.Handled = true; }
         else if (args.Key == Key.Home) { FitAll(); args.Handled = true; }
         else if ((args.Key is Key.D0 or Key.NumPad0) && Keyboard.Modifiers == ModifierKeys.Control) { ResetZoom(); args.Handled = true; }
         else if (args.Key == Key.N && Keyboard.Modifiers == ModifierKeys.Control) { ShowAddMenu(_add, VisibleCenter()); args.Handled = true; }
@@ -1238,6 +1285,7 @@ public sealed class GraphWorkspace : UserControl
         || FindParent<VoiceColorPad>(element) is not null;
     internal void DeleteSelection()
     {
+        if (_selectedFrame is string frameId) { RemoveFrame(frameId); return; }
         if (_selectedEdge is null && _selectedNodes.Count == 0) return;
         if (!RequireLayoutEdit()) return;
         FinishGesture(cancel: true);
@@ -1344,9 +1392,10 @@ public sealed class GraphWorkspace : UserControl
         copy.Click += (_, _) => CopyToClipboard(); menu.Items.Add(copy);
         var paste = new MenuItem { Header = "Paste", InputGestureText = "Ctrl+V", IsEnabled = _mixer.CanEditLayout && ClipboardHasNodes() };
         paste.Click += (_, _) => PasteFromClipboard(position); menu.Items.Add(paste);
-        var remove = new MenuItem { Header = _selectedNodes.Count > 1 ? $"Delete {_selectedNodes.Count} nodes" : "Delete node", InputGestureText = "Delete", IsEnabled = _mixer.CanEditLayout && _selectedNodes.Count > 0 };
+        var remove = new MenuItem { Header = _selectedFrame is not null ? "Ungroup (keep nodes)" : _selectedNodes.Count > 1 ? $"Delete {_selectedNodes.Count} nodes" : "Delete node", InputGestureText = "Delete", IsEnabled = _mixer.CanEditLayout && _selectedNodes.Count > 0 };
         remove.Click += (_, _) => DeleteSelection(); menu.Items.Add(remove);
         if (CreateNodeAlignmentMenuItem() is { } align) menu.Items.Add(align);
+        AddFrameSelectionMenuItems(menu);
     }
     internal MenuItem? CreateNodeAlignmentMenuItem()
     {
@@ -1431,8 +1480,10 @@ public sealed class GraphWorkspace : UserControl
     }
     internal void PopulateNodeMenu(ContextMenu menu, string id, Action rename)
     {
+        if (_selectedFrame is not null) { _selectedFrame = null; Refresh(); }
         Focus();
         if (!_selectedNodes.Contains(id)) SelectNode(id);
+        BringNodesToFront([id]);
         menu.Items.Clear(); AddSelectionMenuItems(menu, ToWorld(Mouse.GetPosition(_viewport)));
         menu.Items.Add(CreateFrameSelectionMenuItem());
         var node = Graph.Nodes.FirstOrDefault(n => n.Id == id);
@@ -1455,7 +1506,7 @@ public sealed class GraphWorkspace : UserControl
         reset.Click += (_, _) => ResetNode(id); menu.Items.Add(reset);
         if (node is not null && VirtualDeviceBindings.IsVirtual(node.Kind))
             menu.Items.Add(CreateVirtualDeviceMenu(node));
-        if (node is not null && !NodeCatalog.HasLevelControl(node.Kind) && node.GainDb != 0)
+        if (node is not null && node.Kind != "control" && !NodeCatalog.HasLevelControl(node.Kind) && node.GainDb != 0)
         {
             var legacy = new MenuItem { Header = $"Saved level: {node.GainDb:0.#} dB", ToolTip = NodeToolTip.Create("Saved level", "Applies an additional level retained from an older version") };
             var clear = new MenuItem { Header = "Reset saved level to 0 dB", IsEnabled = _mixer.CanEdit };
@@ -1625,7 +1676,7 @@ public sealed class GraphWorkspace : UserControl
         return menu;
     }
     private static bool SameConnection(GraphEdge current, GraphEdge expected)
-        => current.Id == expected.Id && current.From == expected.From && current.To == expected.To && current.Kind == expected.Kind;
+        => current.Id == expected.Id && current.From == expected.From && current.To == expected.To && current.Kind == expected.Kind && current.FromPort == expected.FromPort && current.ToPort == expected.ToPort;
     private void ChangeConnectionFromMenu(GraphEdge expected, Action<GraphConfiguration, GraphEdge> change, string message, bool allowMissing = false)
     {
         if (!_mixer.CanEdit) return;
@@ -1641,11 +1692,12 @@ public sealed class GraphWorkspace : UserControl
     }
     internal void UpdateWires()
     {
+        RefreshFrames();
         WireGeometryPasses++;
         foreach (var edge in Graph.Edges)
         {
             if (!_wires.TryGetValue(edge.Id, out var paths) || !_nodes.TryGetValue(edge.From, out var from) || !_nodes.TryGetValue(edge.To, out var to)) continue;
-            var first = from.FindSocket(edge.Kind == "sidechain" ? "audio" : edge.Kind, true); var second = to.FindSocket(edge.Kind, false); if (first is null || second is null) continue;
+            var first = from.FindSocket(edge.Kind == "sidechain" ? "audio" : edge.Kind, true, edge.FromPort); var second = to.FindSocket(edge.Kind, false, edge.ToPort); if (first is null || second is null) continue;
             Point start = SocketPosition(first), end = SocketPosition(second);
             if (SameAnchor(paths.From, start) && SameAnchor(paths.To, end)) continue;
             var geometry = Cable(start, end); paths.Visible.Data = geometry; paths.Outline.Data = geometry;
@@ -1679,8 +1731,9 @@ public sealed class GraphWorkspace : UserControl
         foreach (var node in _nodes.Values)
             foreach (string kind in new[] { "audio", "control", "sidechain" })
                 foreach (bool output in new[] { false, true })
+                foreach (string port in new[] { "audio", "left", "right", "a", "b" })
                 {
-                    var socket = node.FindSocket(kind, output);
+                    var socket = node.FindSocket(kind, output, port);
                     if (socket is null || socket == pending || socket.Visibility != Visibility.Visible || pending is not null && !CompatibleSockets(pending, socket)) continue;
                     Point world = SocketPosition(socket);
                     double distance = (new Point(world.X * _zoom + _panX, world.Y * _zoom + _panY) - viewportPoint).LengthSquared;
@@ -1689,9 +1742,14 @@ public sealed class GraphWorkspace : UserControl
                     {
                         string connectionKind = pending.Output ? socket.Kind : pending.Kind;
                         if (_rewireOriginal is not null && _rewireOriginal.Kind != connectionKind) continue;
-                        var candidate = new GraphEdge { From = pending.Output ? pending.NodeId : socket.NodeId, To = pending.Output ? socket.NodeId : pending.NodeId, Kind = connectionKind };
+                        var candidate = new GraphEdge { From = pending.Output ? pending.NodeId : socket.NodeId, To = pending.Output ? socket.NodeId : pending.NodeId, Kind = connectionKind,
+                            FromPort = pending.Output ? pending.Port : socket.Port, ToPort = pending.Output ? socket.Port : pending.Port };
                         var validation = _rewireOriginal is null ? Graph : new GraphConfiguration { Nodes = Graph.Nodes, Edges = Graph.Edges.Where(e => e.Id != _rewireOriginal.Id).ToList() };
-                        if (GraphDefaults.ConnectionError(validation, candidate).Length > 0) continue;
+                        bool originalEndpoint = _rewireOriginal is { } original
+                            && candidate.From == original.From && candidate.To == original.To
+                            && candidate.FromPort == original.FromPort && candidate.ToPort == original.ToPort;
+                        if ((originalEndpoint ? GraphDefaults.ConnectionError(validation, candidate)
+                            : GraphDefaults.NewConnectionError(validation, candidate)).Length > 0) continue;
                     }
                     closest = distance; nearest = socket;
                 }
@@ -1772,7 +1830,7 @@ public sealed class GraphWorkspace : UserControl
     private void ClearPreview() { if (_previewWire.Data is not null) _previewWire.Data = null; _previewFrom = _previewTo = null; }
     private void UpdatePreview()
     {
-        if (_rewireOriginal is { } original && !Graph.Edges.Any(e => e.Id == original.Id && e.From == original.From && e.To == original.To && e.Kind == original.Kind && e.GainDb == original.GainDb && e.Muted == original.Muted))
+        if (_rewireOriginal is { } original && !Graph.Edges.Any(e => e.Id == original.Id && e.From == original.From && e.To == original.To && e.Kind == original.Kind && e.FromPort == original.FromPort && e.ToPort == original.ToPort && e.GainDb == original.GainDb && e.Muted == original.Muted))
         { CancelCable(); return; }
         if (_inputLinkSocket is not null) { ClearPreview(); return; }
         if (_snapSocket is not null && !IsCurrentSocket(_snapSocket)) SetSnapSocket(null);
@@ -1791,7 +1849,7 @@ public sealed class GraphWorkspace : UserControl
         _previewWire.Data = Cable(start, end); _previewFrom = start; _previewTo = end;
     }
     private bool IsCurrentSocket(Socket socket) => _nodes.TryGetValue(socket.NodeId, out var node)
-        && ReferenceEquals(node.FindSocket(socket.Kind, socket.Output), socket);
+        && ReferenceEquals(node.FindSocket(socket.Kind, socket.Output, socket.Port), socket);
     private static Geometry Cable(Point from, Point to)
     {
         double reach = Math.Max(70, Math.Abs(to.X - from.X) * .48);
@@ -1842,7 +1900,7 @@ public sealed class GraphWorkspace : UserControl
         wire.Hit.RenderTransform = placement;
     }
     private static DoubleCollection CreateMutedWireDashes() { var dashes = new DoubleCollection([2, 3]); dashes.Freeze(); return dashes; }
-    private readonly record struct ConnectionDetailKey(string From, string To, string SourceName, string TargetName, string Kind, double GainDb, bool Muted);
+    private readonly record struct ConnectionDetailKey(string From, string To, string SourceName, string TargetName, string Kind, double GainDb, bool Muted, string FromPort, string ToPort);
     private sealed class WireVisual(System.Windows.Shapes.Path visible, System.Windows.Shapes.Path hit, System.Windows.Shapes.Path outline)
     {
         public System.Windows.Shapes.Path Visible { get; } = visible;
@@ -1850,7 +1908,7 @@ public sealed class GraphWorkspace : UserControl
         public System.Windows.Shapes.Path Outline { get; } = outline;
         public Point? From, To;
         public IReadOnlyList<Point> Points = [];
-        public string SourceId = "", TargetId = "", Kind = "", BrushKey = "";
+        public string SourceId = "", TargetId = "", Kind = "", SourcePort = "audio", TargetPort = "audio", BrushKey = "";
         public ConnectionDetailKey? DetailKey;
     }
     private static T? FindParent<T>(DependencyObject? current) where T : DependencyObject
@@ -1878,6 +1936,7 @@ public sealed class GraphWorkspace : UserControl
         internal bool IsConnected { get; private set; }
         public string NodeId { get; }
         public string Kind { get; }
+        public string Port { get; }
         public bool Output { get; }
         internal void SetCollapsed(bool collapsed)
         {
@@ -1886,9 +1945,9 @@ public sealed class GraphWorkspace : UserControl
             Width = collapsed ? 12 : 24;
             Height = collapsed ? 12 : 20;
         }
-        public Socket(GraphWorkspace owner, string id, string kind, bool output)
+        public Socket(GraphWorkspace owner, string id, string kind, bool output, string port = "audio")
         {
-            NodeId = id; Kind = kind; Output = output; Width = 24; Height = 20; MinHeight = 0; Padding = new Thickness(0); Background = Brushes.Transparent; BorderThickness = new Thickness(0);
+            NodeId = id; Kind = kind; Port = port; Output = output; Width = 24; Height = 20; MinHeight = 0; Padding = new Thickness(0); Background = Brushes.Transparent; BorderThickness = new Thickness(0);
             // The border's centre can fall between layout pixels. Keep the
             // glyph and cable anchored to that same point at every zoom.
             UseLayoutRounding = false; SnapsToDevicePixels = false;
@@ -1903,13 +1962,19 @@ public sealed class GraphWorkspace : UserControl
             GotKeyboardFocus += (_, _) => UpdateHighlight();
             LostKeyboardFocus += (_, _) => UpdateHighlight();
             Content = shape; Cursor = Cursors.Cross; ToolTip = kind == "control"
-                ? NodeToolTip.Create(output ? "Linked level output" : "Linked level input", output
-                    ? "Shares this controller's level adjustment with connected nodes"
-                    : "Applies a connected controller's level adjustment to this node")
-                : kind == "sidechain" ? NodeToolTip.Create("Trigger / Sidechain detector", "Uses one audio source to control Static or Dynamic ducking", "Trigger audio stays out of the audible output")
-                : output ? NodeToolTip.Create("Audio output", "Carries this node's audio to connected audio or trigger inputs")
-                    : NodeToolTip.Create("Audio input", "Combines audio from connected outputs");
-            AutomationProperties.SetName(this, (output ? "Output" : "Input") + " " + kind + " socket");
+                ? NodeToolTip.Create(output ? "Level control output" : "Level control", output
+                    ? "Scales connected Level knobs."
+                    : owner.Graph.Nodes.FirstOrDefault(node => node.Id == id) is { } targetNode
+                        && LinkedLevelControl.HasLegacyConnection(owner.Graph, targetNode)
+                        ? "Existing link retained; use Mix for new level control."
+                        : "Connect a Linked control to scale this node's level.")
+                : kind == "sidechain" ? NodeToolTip.Create("Trigger", "Uses incoming audio to trigger ducking.")
+                : output ? NodeToolTip.Create(port == "audio" ? "Audio output" : GraphDefaults.PortLabel(port) + " output", port == "audio"
+                    ? "Carries this node's audio to connected audio or trigger inputs" : "Carries this channel as an independent mono signal")
+                    : NodeToolTip.Create(port == "audio" ? "Audio input" : GraphDefaults.PortLabel(port) + " input", port is "left" or "right"
+                        ? "Combines incoming channels to mono and places them on this stereo side"
+                        : port is "a" or "b" ? "Carries this stereo source into the crossfade" : "Combines audio from connected outputs");
+            AutomationProperties.SetName(this, (output ? "Output" : "Input") + " " + (kind == "sidechain" ? "Trigger" : port == "audio" ? kind : GraphDefaults.PortLabel(port)) + " socket");
             AutomationProperties.SetItemStatus(this, "Not connected");
             PreviewMouseLeftButtonDown += (_, e) => owner.SocketPressed(this, e);
             Click += (_, _) => { if (!owner.RequireLayoutEdit()) return; if (owner._pendingSocket is null) { owner._pendingSocket = this; owner.SetMessage("Choose a matching socket to complete the connection."); } else if (owner._pendingSocket != this) owner.Connect(owner._pendingSocket, this); };

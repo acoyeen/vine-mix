@@ -146,7 +146,7 @@ internal static class HelpControlLessons
             Root.Children.Add(HelpLessonUi.Section("", "", SelectorRow("Control", VariantSelector), demo));
             Root.Children.Add(HelpLessonUi.Section("Adjustments", "",
                 Instruction("Drag up / down", "Change the value. Hold Shift for finer movement."),
-                Instruction("Click the value", "Type an exact number. Enter applies; Escape cancels the draft."),
+                Instruction("Click the value", "Type an exact number. Enter or clicking away applies; Escape cancels. Right-click for Apply value or Cancel edit."),
                 Instruction("Tab / Shift+Tab", "Apply and move to the next / previous control. Correct an invalid value before moving on."),
                 Instruction("Arrow keys", "Make small adjustments to a focused dial."),
                 Instruction("Page Up / Down", "Make larger adjustments."),

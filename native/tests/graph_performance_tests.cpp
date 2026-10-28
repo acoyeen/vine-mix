@@ -20,11 +20,13 @@ void measure(const char* label, const char* kind, int bands) {
     std::string previous = source.id;
     for (int i = 0; i < 30; ++i) {
         GraphNode effect; effect.id = "effect-" + std::to_string(i); effect.kind = kind;
+        effect.panPosition = .35; effect.crossfadePosition = .5;
         effect.eqBands.clear();
         if (effect.kind == "highPass") effect.eqBands.push_back({"highPass", true, 80, 0, .70710678});
         else for (int band = 0; band < bands; ++band)
             effect.eqBands.push_back({"peak", true, 100. * (band + 1), bands == 1 ? 0. : -.2, 1});
         graph.edges.push_back({"edge-" + std::to_string(i), previous, effect.id});
+        if (effect.kind == "crossfade") graph.edges.back().toPort = "a";
         previous = effect.id; graph.nodes.push_back(std::move(effect));
     }
     GraphNode sink; sink.id = "sink"; sink.kind = "output";
@@ -61,6 +63,9 @@ int main() {
         measure("30 flat-band EQ nodes", "eq", 1);
         measure("30 high-pass nodes", "highPass", 1);
         measure("30 fully occupied EQ nodes", "eq", 8);
+        measure("30 Pan nodes", "stereoPan", 0);
+        measure("30 Stereo Width nodes", "stereoWidth", 0);
+        measure("30 equal-power Crossfade nodes", "crossfade", 0);
         std::cout << "PASS: offline graph processing benchmark; no acoustic or device latency claim.\n";
         return 0;
     } catch (const std::exception& error) { std::cerr << "FAIL: " << error.what() << '\n'; return 1; }

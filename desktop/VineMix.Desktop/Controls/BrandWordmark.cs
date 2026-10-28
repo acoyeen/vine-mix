@@ -8,24 +8,21 @@ using System.Xml.Linq;
 
 namespace VineMix.Desktop.Controls;
 
-/// <summary>The approved wide identity, drawn from its packaged vector artwork.</summary>
+/// <summary>The monochrome wide identity, drawn from its packaged vector artwork.</summary>
 public sealed class BrandWordmark : FrameworkElement
 {
-    public static readonly DependencyProperty AccentProperty = BrandMark.AccentProperty.AddOwner(typeof(BrandWordmark));
     public static readonly DependencyProperty InkProperty = BrandMark.InkProperty.AddOwner(typeof(BrandWordmark));
     private static readonly XDocument Artwork = ReadArtwork();
-    internal static Geometry AccentGeometry { get; } = Build("vine", BrandMark.UpperGeometry);
-    internal static Geometry InkGeometry { get; } = Build("mix", BrandMark.LowerGeometry);
-    internal static Rect ArtworkBounds { get; } = Rect.Union(AccentGeometry.Bounds, InkGeometry.Bounds);
+    internal static Geometry VineGeometry { get; } = Build("vine", BrandMark.UpperGeometry);
+    internal static Geometry MixGeometry { get; } = Build("mix", BrandMark.LowerGeometry);
+    internal static Rect ArtworkBounds { get; } = Rect.Union(VineGeometry.Bounds, MixGeometry.Bounds);
 
-    public Brush Accent { get => (Brush)GetValue(AccentProperty); set => SetValue(AccentProperty, value); }
     public Brush Ink { get => (Brush)GetValue(InkProperty); set => SetValue(InkProperty, value); }
 
     public BrandWordmark()
     {
         Width = 106; Height = 20; Focusable = false;
         SnapsToDevicePixels = UseLayoutRounding = true;
-        SetResourceReference(AccentProperty, "BrandAccentBrush");
         SetResourceReference(InkProperty, "ConsoleTextBrush");
         AutomationProperties.SetName(this, "VineMix");
     }
@@ -73,8 +70,8 @@ public sealed class BrandWordmark : FrameworkElement
         drawing.PushTransform(new TranslateTransform((ActualWidth - bounds.Width * scale) / 2 - bounds.X * scale,
             (ActualHeight - bounds.Height * scale) / 2 - bounds.Y * scale));
         drawing.PushTransform(new ScaleTransform(scale, scale));
-        drawing.DrawGeometry(Accent, null, AccentGeometry);
-        drawing.DrawGeometry(Ink, null, InkGeometry);
+        drawing.DrawGeometry(Ink, null, VineGeometry);
+        drawing.DrawGeometry(Ink, null, MixGeometry);
         drawing.Pop(); drawing.Pop();
     }
 }

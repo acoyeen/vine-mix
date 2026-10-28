@@ -52,13 +52,19 @@ internal static class NodePresentationVerification
             var buttons = Descendants<Button>(view).ToArray();
             bool deviceNode = node.Kind is "microphone" or "virtualInput" or "appInput" or "output" or "virtualOutput";
             require(buttons.Count(button => AutomationProperties.GetName(button) == "Mute") == (deviceNode ? 1 : 0)
-                && buttons.Count(button => AutomationProperties.GetName(button) == "Bypass") == (deviceNode ? 0 : 1)
+                && buttons.Count(button => AutomationProperties.GetName(button) == "Bypass") == (deviceNode || node.Kind is "stereoSplit" or "stereoCombine" ? 0 : 1)
                 && !buttons.Any(button => AutomationProperties.GetName(button) == "Effect"),
-                NodeCatalog.Title(node.Kind) + (deviceNode ? " has only Mute for its signal state." : " has only Bypass for its signal state, without a duplicate mute or effect button."));
+                NodeCatalog.Title(node.Kind) + (deviceNode ? " has only Mute for its signal state." : node.Kind is "stereoSplit" or "stereoCombine"
+                    ? " exposes structural channel routing without an ambiguous bypass or mute button." : " has only Bypass for its signal state, without a duplicate mute or effect button."));
             var levelDials = Descendants<RotaryValueControl>(view).Where(dial =>
                 Descendants<Slider>(dial).Any(slider => AutomationProperties.GetName(slider) == "Level")).ToArray();
             require(levelDials.Length == (NodeCatalog.HasLevelControl(node.Kind) ? 1 : 0),
                 NodeCatalog.Title(node.Kind) + " exposes one rotary Level control only when volume is part of that node's purpose, with no remaining Level slider row.");
+            require((view.FindSocket("control", false) is not null) == LinkedLevelControl.SupportsInput(node.Kind),
+                NodeCatalog.Title(node.Kind) + " has a new Level control input only when it has its own Level knob.");
+            if (node.Kind == "control")
+                require(Descendants<Slider>(view).Single(slider => AutomationProperties.GetName(slider) == "Multiplier") is { Minimum: 0, Maximum: 200, Value: 100 },
+                    "Linked control starts at the midpoint of its 0–200% Multiplier dial, without a decibel Level dial.");
             if (node.Kind == "eq")
                 require(Descendants<RotaryValueControl>(view).Count() == 3
                     && Descendants<RotaryValueControl>(view).SelectMany(dial => Descendants<Slider>(dial))

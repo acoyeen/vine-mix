@@ -12,6 +12,8 @@ reviewed on 2026-10-23. New external feasibility research was **not performed**;
 algorithm, integration, licence, cost and performance questions remain open.
 Scope estimates below are qualitative, not delivery estimates. Ease of use and
 everyday quality-of-life work in the main log takes priority over this backlog.
+The presentation and branding follow-ups formerly in IDEA-046 moved to
+[tweaks](TWEAKS.md) on 2026-10-25; their original anchor remains below.
 
 | ID | Idea | Priority | Status |
 | --- | --- | --- | --- |
@@ -26,7 +28,6 @@ everyday quality-of-life work in the main log takes priority over this backlog.
 | [IDEA-041](#idea-041-true-peak-limiting) | True-peak limiting | P4 — Later | Captured |
 | [IDEA-042](#idea-042-test-signal-generator) | Test-signal generator | P4 — Later | Captured |
 | [IDEA-044](#idea-044-offline-draft-workspace-editing) | Offline draft workspace editing | P4 — Later | Captured |
-| [IDEA-046](#idea-046-website-and-windows-mixer-branding-follow-ups) | Website and Windows mixer branding follow-ups | P4 — Later | Captured |
 | [IDEA-045](#idea-045-scenes-and-ab-comparison) | Scenes and A/B comparison | Parked — Way later | Parked |
 
 <a id="idea-034"></a>
@@ -34,6 +35,12 @@ everyday quality-of-life work in the main log takes priority over this backlog.
 ## IDEA-034: Stereo and routing utilities
 
 - **Captured:** 2026-10-23. **Status:** Captured. **Priority:** P4 — Later.
+- **Selected scope, 2026-10-28:** The maintainer authorized Channel Swap,
+  Stereo Width, Pan, Crossfade, Stereo Combine and Stereo Split for local
+  implementation and an installed-app restart for testing. These six are now
+  tracked in [Beta 6 development](BETA6_DEVELOPMENT.md); this authorization does
+  not extend to polarity inversion, mid/side, crossovers or mix-minus. Retain
+  those remaining proposals here. This is not release finalization.
 - **Need and proposal:** Offer focused tools for channel and route arrangements:
   polarity inversion; channel selection, swapping and copying; stereo width;
   mid/side processing; true panning; a crossfader; frequency crossover; and guided
@@ -278,19 +285,12 @@ everyday quality-of-life work in the main log takes priority over this backlog.
 
 ## IDEA-046: Website and Windows mixer branding follow-ups
 
-- **Captured:** 2026-10-23. **Status:** Captured. **Priority:** P4 — Later.
-- **Need and direction:** Retain the maintainer's preference for **vinemix.app**
-  as the primary website and **vinemix.dev** redirecting there. Separately inspect
-  VineMix's displayed name and icon in Windows Volume Mixer for consistency.
-- **Current evidence:** [Branding](BRANDING.md) documents the in-app `.app` link
-  and application/tray artwork. The [website dossier](WEBSITE_DESIGN_DOSSIER.md)
-  records previously unverified domain destinations; it does not establish their
-  present status. Application icons alone do not verify the live audio-session UI.
-- **Scope, tradeoffs and dependencies:** Two bounded follow-ups, not one feature.
-  Domain work depends on verified ownership/hosting and separately authorized
-  configuration changes. Mixer branding requires an appropriate desktop session
-  inspection preserving audio/settings; no live inspection was done for this log.
-- **Assumptions/questions:** The domain preference is confirmed intent; neither
-  a broken redirect nor an audio-session branding defect is confirmed.
-- **Next step:** Check the live domain destinations when website work is resumed;
-  inspect Windows mixer branding in a later authorized verification session.
+Moved on 2026-10-25 to the tweaks log:
+
+- [TWEAK-005](TWEAKS.md#tweak-005): homepage animation and retained prototype history.
+- [TWEAK-010](TWEAKS.md#tweak-010): preferred website domains.
+- [TWEAK-011](TWEAKS.md#tweak-011): Windows Volume Mixer name/icon consistency.
+
+These refine existing presentation and branding. Their original dates, decisions,
+unverified assumptions and current statuses are retained there. This ID remains
+reserved so existing links continue to work.

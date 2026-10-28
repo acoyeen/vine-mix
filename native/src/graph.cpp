@@ -28,6 +28,12 @@ GraphKind parseKind(const std::string& kind) {
     if (kind == "ducking") return GraphKind::ducking;
     if (kind == "pan") return GraphKind::pan;
     if (kind == "mono") return GraphKind::mono;
+    if (kind == "channelSwap") return GraphKind::channelSwap;
+    if (kind == "stereoWidth") return GraphKind::stereoWidth;
+    if (kind == "stereoPan") return GraphKind::stereoPan;
+    if (kind == "crossfade") return GraphKind::crossfade;
+    if (kind == "stereoCombine") return GraphKind::stereoCombine;
+    if (kind == "stereoSplit") return GraphKind::stereoSplit;
     if (kind == "reroute") return GraphKind::reroute;
     if (kind == "denoiser") return GraphKind::denoiser;
     if (kind == "deEsser") return GraphKind::deEsser;
@@ -62,7 +68,34 @@ bool compressorProcessor(GraphKind kind) noexcept {
 bool processor(GraphKind kind) noexcept {
     return kind == GraphKind::mix || kind == GraphKind::gain || filterProcessor(kind)
         || compressorProcessor(kind) || kind == GraphKind::ducking || kind == GraphKind::pan || kind == GraphKind::mono || kind == GraphKind::reroute
+        || kind == GraphKind::channelSwap || kind == GraphKind::stereoWidth || kind == GraphKind::stereoPan
+        || kind == GraphKind::crossfade || kind == GraphKind::stereoCombine || kind == GraphKind::stereoSplit
         || AdvancedEffect::supports(kind);
+}
+GraphPort audioPort(GraphKind kind, const std::string& port, bool output) {
+    if ((output && kind == GraphKind::stereoSplit) || (!output && kind == GraphKind::stereoCombine)) {
+        if (port == "left") return GraphPort::left;
+        if (port == "right") return GraphPort::right;
+    } else if (!output && kind == GraphKind::crossfade) {
+        if (port == "a") return GraphPort::a;
+        if (port == "b") return GraphPort::b;
+    } else if (port == "audio") return GraphPort::audio;
+    throw std::runtime_error("A cable refers to an unavailable audio socket.");
+}
+Frame selectedOutput(Frame sample, GraphPort port) noexcept {
+    if (port == GraphPort::left) return {sample.left, sample.left};
+    if (port == GraphPort::right) return {sample.right, sample.right};
+    return sample;
+}
+std::array<double, 2> panWeights(double position) noexcept {
+    position = std::clamp(position, -1., 1.);
+    const double angle = (position + 1) * std::numbers::pi / 4;
+    return {position == 1 ? 0 : std::cos(angle), position == -1 ? 0 : std::sin(angle)};
+}
+std::array<double, 2> crossfadeWeights(double position, double curve) noexcept {
+    position = std::clamp(position, 0., 1.);
+    return {position == 1 ? 0 : (1 - position) * (1 - curve) + std::cos(position * std::numbers::pi / 2) * curve,
+        position == 0 ? 0 : position * (1 - curve) + std::sin(position * std::numbers::pi / 2) * curve};
 }
 void range(double value, double low, double high, const char* message) {
     if (!std::isfinite(value) || value < low || value > high) throw std::runtime_error(message);
@@ -133,10 +166,14 @@ GraphPlan compileGraph(const AudioGraph& graph) {
         plan.nodes[i].id = source.id;
         plan.nodes[i].kind = parseKind(source.kind);
         plan.nodes[i].gainDb = source.gainDb;
+        if (!std::isfinite(source.controlMultiplier) || (source.controlMultiplier != -1 && (source.controlMultiplier < 0 || source.controlMultiplier > 2)))
+            throw std::runtime_error("Linked control multiplier must be between 0 and 200 percent.");
+        plan.nodes[i].controlMultiplier = static_cast<float>(source.controlMultiplier);
         plan.nodes[i].muted = source.muted;
         plan.nodes[i].mono = source.mono;
         plan.nodes[i].selectedMicrophoneChannel = source.kind == "microphone" && source.device.channel >= 0;
-        plan.nodes[i].bypass = source.bypass;
+        // Structural channel routing has no transparent alternative.
+        plan.nodes[i].bypass = source.bypass && source.kind != "stereoSplit" && source.kind != "stereoCombine";
         if (source.dynamicsUiVersion < 0 || source.dynamicsUiVersion > 1)
             throw std::runtime_error("Unknown dynamics interface version.");
         range(source.denoiser.suppressionDb, -40, 0, "Denoiser suppression must be between -40 and 0 dB.");
@@ -263,6 +300,15 @@ GraphPlan compileGraph(const AudioGraph& graph) {
         range(source.balance, -1, 1, "Balance must be between left and right.");
         plan.nodes[i].panLeft = static_cast<float>(source.balance > 0 ? 1 - source.balance : 1);
         plan.nodes[i].panRight = static_cast<float>(source.balance < 0 ? 1 + source.balance : 1);
+        range(source.stereoWidth, 0, 2, "Stereo Width must be between 0 and 200 percent.");
+        range(source.panPosition, -1, 1, "Pan must be between left and right.");
+        range(source.crossfadePosition, 0, 1, "Crossfade must be between A and B.");
+        if (source.crossfadeCurve != "equalPower" && source.crossfadeCurve != "linear")
+            throw std::runtime_error("Unknown crossfade curve.");
+        plan.nodes[i].stereoWidth = static_cast<float>(source.stereoWidth);
+        plan.nodes[i].position = static_cast<float>(source.panPosition);
+        plan.nodes[i].fadePosition = static_cast<float>(source.crossfadePosition);
+        plan.nodes[i].equalPower = source.crossfadeCurve == "equalPower";
     }
     for (std::size_t i = 0; i < graph.edges.size(); ++i) {
         const auto& source = graph.edges[i];
@@ -275,28 +321,35 @@ GraphPlan compileGraph(const AudioGraph& graph) {
         const bool control = source.kind == "control";
         const bool sidechain = source.kind == "sidechain";
         const auto fromKind = plan.nodes[from->second].kind, toKind = plan.nodes[to->second].kind;
+        GraphPort fromPort = GraphPort::audio, toPort = GraphPort::audio;
         if (control) {
+            if (source.fromPort != "audio" || source.toPort != "audio")
+                throw std::runtime_error("A control cable cannot select an audio channel.");
             if (fromKind != GraphKind::control || toKind == GraphKind::control)
                 throw std::runtime_error("A control cable must connect a control node to an audio node.");
             auto& controlEdge = plan.nodes[to->second].controlEdge;
             if (controlEdge >= 0) throw std::runtime_error("An audio node can have one shared control connection.");
             controlEdge = static_cast<int>(i);
         } else if (sidechain) {
+            fromPort = audioPort(fromKind, source.fromPort, true);
+            if (source.toPort != "audio") throw std::runtime_error("A trigger cable cannot select a programme input.");
             if ((!isSource(fromKind) && !processor(fromKind)) || toKind != GraphKind::ducking)
                 throw std::runtime_error("A sidechain connects an audio source or effect to a Ducking trigger.");
             auto& detector = plan.nodes[to->second].sidechainEdge;
             if (detector >= 0) throw std::runtime_error("A Ducking node can have one trigger cable.");
             detector = static_cast<int>(i);
         } else {
+            fromPort = audioPort(fromKind, source.fromPort, true);
+            toPort = audioPort(toKind, source.toPort, false);
             if ((!isSource(fromKind) && !processor(fromKind)) || (!processor(toKind) && !isSink(toKind)))
                 throw std::runtime_error("Connect audio from an input or processor to a processor or output.");
             auto& target = plan.nodes[to->second];
             target.incoming[target.incomingCount++] = i;
         }
         // Explicit separators prevent collisions even when an ID contains a dash.
-        const auto connection = source.kind + '\0' + source.from + '\0' + source.to;
+        const auto connection = source.kind + '\0' + source.from + '\0' + source.fromPort + '\0' + source.to + '\0' + source.toPort;
         if (!connections.insert(connection).second) throw std::runtime_error("These nodes are already connected.");
-        plan.edges[i] = {source.id, from->second, to->second, control, sidechain, source.gainDb, source.muted};
+        plan.edges[i] = {source.id, from->second, to->second, control, sidechain, source.gainDb, source.muted, fromPort, toPort};
         ++indegrees[to->second];
     }
     std::array<std::size_t, maximumGraphNodes> ready{};
@@ -323,7 +376,13 @@ GraphChannels graphSignalChannels(const GraphPlan& plan, const GraphChannels& ca
         }
         bool unknown = node.incomingCount == 0;
         for (std::size_t n = 0; n < node.incomingCount; ++n) {
-            const auto upstream = channels[plan.edges[node.incoming[n]].from];
+            const auto& edge = plan.edges[node.incoming[n]];
+            if (node.kind == GraphKind::crossfade) {
+                if ((node.bypass || node.fadePosition == 0) && edge.toPort == GraphPort::b) continue;
+                if (!node.bypass && node.fadePosition == 1 && edge.toPort == GraphPort::a) continue;
+            }
+            auto upstream = channels[edge.from];
+            if (upstream != 0 && edge.fromPort != GraphPort::audio) upstream = 1;
             unknown = unknown || upstream == 0;
             channels[i] = std::max(channels[i], upstream);
         }
@@ -331,6 +390,9 @@ GraphChannels graphSignalChannels(const GraphPlan& plan, const GraphChannels& ca
         // absent. Mono plus an unknown source cannot yet promise mono output.
         if (unknown && channels[i] < 2) channels[i] = 0;
         if (!node.bypass && node.kind == GraphKind::mono) channels[i] = 1;
+        if (node.kind == GraphKind::stereoCombine) channels[i] = 2;
+        if (!node.bypass && node.kind == GraphKind::stereoWidth && node.stereoWidth == 0) channels[i] = 1;
+        if (!node.bypass && node.kind == GraphKind::stereoPan) channels[i] = node.position == 0 ? 1 : 2;
         if (!node.bypass && node.kind == GraphKind::pan && node.panLeft != node.panRight && channels[i] != 0) channels[i] = 2;
         if (!node.bypass && (node.kind == GraphKind::reverb || node.kind == GraphKind::voiceColor)
             && node.reverb.mix > 0 && channels[i] != 0) channels[i] = 2;
@@ -351,7 +413,8 @@ bool sameGraphTopology(const GraphPlan& a, const GraphPlan& b) noexcept {
         const auto& edge = a.edges[i];
         for (std::size_t j = 0; j < b.edgeCount; ++j) {
             const auto& other = b.edges[j];
-            if (edge.id == other.id && edge.control == other.control && edge.sidechain == other.sidechain && a.nodes[edge.from].id == b.nodes[other.from].id
+            if (edge.id == other.id && edge.control == other.control && edge.sidechain == other.sidechain
+                && edge.fromPort == other.fromPort && edge.toPort == other.toPort && a.nodes[edge.from].id == b.nodes[other.from].id
                 && a.nodes[edge.to].id == b.nodes[other.to].id) { found = true; break; }
         }
         if (!found) return false;
@@ -386,21 +449,28 @@ void GraphProcessor::process(const GraphPlan& plan, const Inputs& inputs) noexce
         // Saved mute flags stay authoritative until an explicit user edit;
         // reinterpreting an older muted node as bypass could expose live audio.
         const bool bypass = processor(node.kind) && node.bypass;
-        float gain = bypass ? 0.f : node.gainDb; bool muted = node.muted;
+        float gain = bypass ? 0.f : node.gainDb, multiplier = 1; bool muted = node.muted;
         if (node.controlEdge >= 0) {
             const auto& edge = plan.edges[static_cast<std::size_t>(node.controlEdge)];
             const auto& control = plan.nodes[edge.from];
             if (!edge.muted) {
-                if (!bypass && !control.bypass) gain += control.gainDb + edge.gainDb;
+                if (!bypass && !control.bypass) {
+                    if (control.controlMultiplier < 0) gain += control.gainDb + edge.gainDb;
+                    else { gain += edge.gainDb; multiplier = control.controlMultiplier; }
+                }
                 muted = muted || control.muted;
             }
         }
-        nodeRamps_[i].set(muted ? 0.f : linear(gain));
+        nodeRamps_[i].set(muted ? 0.f : linear(gain) * multiplier);
         effects_[i].wet.set(node.bypass ? 0.f : 1.f);
         effects_[i].panLeft.set(node.panLeft); effects_[i].panRight.set(node.panRight);
         effects_[i].makeup.set(static_cast<float>(node.makeup));
         effects_[i].mono.set(node.kind == GraphKind::microphone && node.mono ? 1.f : 0.f);
         effects_[i].limitMix.set(node.limit ? 1.f : 0.f);
+        effects_[i].width.set(node.stereoWidth);
+        effects_[i].position.set(node.position);
+        effects_[i].fadePosition.set(node.fadePosition);
+        effects_[i].fadeCurve.set(node.equalPower ? 1.f : 0.f);
         if (advanced_[i]) advanced_[i]->configure(node);
     }
     for (std::size_t i = 0; i < plan.edgeCount; ++i)
@@ -412,22 +482,40 @@ void GraphProcessor::process(const GraphPlan& plan, const Inputs& inputs) noexce
         bool dynamicsAudible = dynamics && !node.bypass && !node.muted;
         if (node.controlEdge >= 0) {
             const auto& controlEdge = plan.edges[static_cast<std::size_t>(node.controlEdge)];
-            if (!controlEdge.muted && plan.nodes[controlEdge.from].muted) dynamicsAudible = false;
+            const auto& control = plan.nodes[controlEdge.from];
+            if (!controlEdge.muted && (control.muted || (!control.bypass && control.controlMultiplier == 0))) dynamicsAudible = false;
         }
         double minimumCompressionGain = 1, detectorPeak{};
+        auto& effect = effects_[i];
+        // Settled controls use the same weights throughout this quantum.
+        // Keep sample-accurate ramps while editing, without repeating sine and
+        // cosine for every sample once Pan or Crossfade stops moving.
+        const bool settledPan = node.kind == GraphKind::stereoPan && effect.position.remaining == 0;
+        const bool settledFade = node.kind == GraphKind::crossfade && effect.fadePosition.remaining == 0 && effect.fadeCurve.remaining == 0;
+        const auto settledWeights = settledPan ? panWeights(effect.position.current)
+            : settledFade ? crossfadeWeights(effect.fadePosition.current, effect.fadeCurve.current) : std::array<double, 2>{};
         for (std::size_t frame = 0; frame < quantumFrames; ++frame) {
-            double left{}, right{};
+            double left{}, right{}, bLeft{}, bRight{};
             if (source && frame < inputs[i].size()) {
                 left = clean(inputs[i][frame].left); right = clean(inputs[i][frame].right);
             }
             for (std::size_t n = 0; n < node.incomingCount; ++n) {
                 const auto edge = node.incoming[n];
                 const auto gain = edgeRamps_[edge].next();
-                const auto sample = buffers_[plan.edges[edge].from][frame];
-                left += static_cast<double>(sample.left) * gain;
-                right += static_cast<double>(sample.right) * gain;
+                const auto& route = plan.edges[edge];
+                const auto sample = selectedOutput(buffers_[route.from][frame], route.fromPort);
+                if (node.kind == GraphKind::stereoCombine) {
+                    const double channel = (static_cast<double>(sample.left) + sample.right) * .5 * gain;
+                    if (route.toPort == GraphPort::left) left += channel;
+                    else right += channel;
+                } else if (node.kind == GraphKind::crossfade && route.toPort == GraphPort::b) {
+                    bLeft += static_cast<double>(sample.left) * gain;
+                    bRight += static_cast<double>(sample.right) * gain;
+                } else {
+                    left += static_cast<double>(sample.left) * gain;
+                    right += static_cast<double>(sample.right) * gain;
+                }
             }
-            auto& effect = effects_[i];
             const double limitMix = effect.limitMix.next();
             // This is a source control, independent of the device's legacy
             // channel selector. Keeping it in DSP avoids reopening the stream.
@@ -477,7 +565,7 @@ void GraphProcessor::process(const GraphPlan& plan, const Inputs& inputs) noexce
                 if (node.sidechainEdge >= 0) {
                     const auto edge = static_cast<std::size_t>(node.sidechainEdge);
                     const auto detectorGain = edgeRamps_[edge].next();
-                    const auto detector = buffers_[plan.edges[edge].from][frame];
+                    const auto detector = selectedOutput(buffers_[plan.edges[edge].from][frame], plan.edges[edge].fromPort);
                     triggerPeak = std::max(std::abs(static_cast<double>(detector.left)), std::abs(static_cast<double>(detector.right))) * detectorGain;
                 }
                 // Detector-only audio never joins the programme. Fixed 5 ms
@@ -507,6 +595,18 @@ void GraphProcessor::process(const GraphPlan& plan, const Inputs& inputs) noexce
                 left *= effect.panLeft.next(); right *= effect.panRight.next();
             } else if (node.kind == GraphKind::mono) {
                 left = right = (left + right) * .5;
+            } else if (node.kind == GraphKind::channelSwap) {
+                std::swap(left, right);
+            } else if (node.kind == GraphKind::stereoWidth) {
+                const double mid = (left + right) * .5, side = (left - right) * .5 * effect.width.next();
+                left = mid + side; right = mid - side;
+            } else if (node.kind == GraphKind::stereoPan) {
+                const auto weights = settledPan ? settledWeights : panWeights(effect.position.next());
+                const double signal = (left + right) * .5;
+                left = signal * weights[0]; right = signal * weights[1];
+            } else if (node.kind == GraphKind::crossfade) {
+                const auto weights = settledFade ? settledWeights : crossfadeWeights(effect.fadePosition.next(), effect.fadeCurve.next());
+                left = left * weights[0] + bLeft * weights[1]; right = right * weights[0] + bRight * weights[1];
             } else if (advanced_[i]) {
                 const auto processed = advanced_[i]->process({bounded(left, false), bounded(right, false)});
                 left = processed.wet.left; right = processed.wet.right;
@@ -591,6 +691,7 @@ void GraphProcessor::inherit(const GraphProcessor& old, const GraphPlan& before,
         for (std::size_t j = 0; j < before.edgeCount; ++j) {
             const auto& previous = before.edges[j];
             if (edge.id == previous.id && edge.control == previous.control && edge.sidechain == previous.sidechain
+                && edge.fromPort == previous.fromPort && edge.toPort == previous.toPort
                 && after.nodes[edge.from].id == before.nodes[previous.from].id
                 && after.nodes[edge.to].id == before.nodes[previous.to].id) {
                 edgeRamps_[i] = old.edgeRamps_[j]; break;

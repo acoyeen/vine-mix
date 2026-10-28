@@ -5,9 +5,12 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Threading;
+using VineMix.Desktop.Controls;
 
 namespace VineMix.Desktop;
 
@@ -15,7 +18,7 @@ namespace VineMix.Desktop;
 internal static class SettingsSearchVerification
 {
     internal static async Task RunAsync(MainWindow window, MixerViewModel mixer, FrameworkElement root,
-        Func<Task> layout, Action<bool, string> require, Action<ContextMenu, string>? render = null)
+        Func<Task> layout, Action<bool, string> require, Action<ContextMenu, string, double>? render = null)
     {
         string initialState = MixerState(mixer);
         IInputElement? initialFocus = Keyboard.FocusedElement;
@@ -39,6 +42,7 @@ internal static class SettingsSearchVerification
             require(search.SearchBox.Text.Length == 0 && search.Matches.Count == 0
                 && originalRows.All(row => row.Visibility == Visibility.Visible),
                 "An empty Settings query leaves the normal menu available without an unrelated list of help results.");
+            await VerifyFieldGeometryAsync(mixer, require, render);
 
             search.SearchBox.Text = "Zoom";
             await layout();
@@ -51,7 +55,7 @@ internal static class SettingsSearchVerification
                 "Searching Zoom shows the actual wheel gesture and the separate shortcut for returning to 100 percent.");
             require(search.Results.Items.Count == search.Matches.Count && helpLinks == 0 && settingsClicks == 0,
                 "Typing a control query displays instructions without choosing a Help link or running a settings command.");
-            render?.Invoke(menu, "settings-search-zoom.png");
+            render?.Invoke(menu, "settings-search-zoom.png", 96);
 
             search.SearchBox.Text = "  ReSeT   ZOOM  ";
             require(search.Matches.Any(entry => entry.Id == "reset-zoom"),
@@ -82,7 +86,7 @@ internal static class SettingsSearchVerification
                 && settingsClicks == 0 && helpLinks == 0 && MixerState(mixer) == initialState,
                 "Searching an engine action filters to that setting without activating it or changing the mixer.");
             await layout();
-            render?.Invoke(menu, "settings-search-setting.png");
+            render?.Invoke(menu, "settings-search-setting.png", 96);
 
             search.SearchBox.Text = "no-such-setting-or-control-7811";
             require(search.Matches.Count == 0 && search.MatchingSettings.Count == 0
@@ -91,7 +95,7 @@ internal static class SettingsSearchVerification
             require(MenuText(menu).Any(text => text.Contains("No matching settings or controls", StringComparison.Ordinal)),
                 "No matches produces readable guidance instead of an empty, unexplained Settings surface.");
             await layout();
-            render?.Invoke(menu, "settings-search-no-results.png");
+            render?.Invoke(menu, "settings-search-no-results.png", 96);
             if (render is not null)
             {
                 var message = VisualChildren(menu).OfType<TextBlock>()
@@ -168,6 +172,142 @@ internal static class SettingsSearchVerification
             window.CloseHelp();
             await layout();
         }
+    }
+
+    private static async Task VerifyFieldGeometryAsync(MixerViewModel mixer,
+        Action<bool, string> require, Action<ContextMenu, string, double>? render)
+    {
+        bool? previousContrast = ConsoleTheme.PreviewHighContrast;
+        IInputElement? previousFocus = Keyboard.FocusedElement;
+        var menus = new List<ContextMenu>();
+        try
+        {
+            foreach (bool contrast in new[] { false, true })
+            foreach (double dpi in new[] { 96d, 120d, 144d, 168d, 192d })
+            {
+                ConsoleTheme.SetPreviewHighContrast(contrast);
+                // ContextMenu forbids logical or visual parenting. Build the
+                // real menu after selecting each palette so detached resource
+                // caches cannot disguise a stale palette as a contrast check.
+                var menu = MainWindow.CreateSettingsMenu(mixer);
+                menus.Add(menu);
+                var search = SettingsSearchView.Get(menu)
+                    ?? throw new InvalidOperationException("Settings must contain its search field.");
+                menu.Width = 340;
+                menu.Visibility = Visibility.Visible;
+                menu.ApplyTemplate();
+                double scale = dpi / 96;
+                // Real menu item presenters are created lazily during measure.
+                // Instantiate that tree before propagating a detached root DPI.
+                await LayoutMenuAsync(menu);
+                VisualTreeHelper.SetRootDpi(menu, new DpiScale(scale, scale));
+                string context = $"{dpi:0} DPI ({scale:P0}), {(contrast ? "high contrast" : "normal palette")}";
+                string image = $"settings-search-{(contrast ? "contrast" : "normal")}-{dpi:0}dpi";
+                search.SearchBox.Clear();
+                await LayoutMenuAsync(menu);
+                var placeholder = VisualChildren(search).OfType<TextBlock>()
+                    .Single(text => text.Text == "Search settings and help");
+                RequireFieldPalette(menu, search.SearchBox, placeholder, contrast, context + ", empty", require);
+                require(Math.Abs(VisualTreeHelper.GetDpi(search.SearchBox).PixelsPerInchX - dpi) < .01
+                    && Math.Abs(VisualTreeHelper.GetDpi(placeholder).PixelsPerInchX - dpi) < .01,
+                    $"At {context}, actual WPF DPI reaches both text elements rather than scaling a previously rendered image.");
+                Rect emptyCaret = search.SearchBox.GetRectFromCharacterIndex(0);
+                Rect placeholderStart = placeholder.TransformToVisual(search.SearchBox)
+                    .TransformBounds(placeholder.ContentStart.GetCharacterRect(LogicalDirection.Forward));
+                require(!emptyCaret.IsEmpty && !placeholderStart.IsEmpty
+                    && NearOrigin(emptyCaret, placeholderStart, scale)
+                    && Math.Abs(emptyCaret.Height - placeholderStart.Height) * scale <= 1,
+                    $"At {context}, the actual empty caret and placeholder text share their origin and line height; " +
+                    $"caret {emptyCaret}, placeholder {placeholderStart}.");
+                require(placeholder.Visibility == Visibility.Visible && HasVisibleArea(placeholder, menu)
+                    && new Rect(search.SearchBox.RenderSize).Contains(placeholderStart)
+                    && !placeholder.IsHitTestVisible,
+                    $"At {context}, the empty prompt has visible, unclipped text inside the field and cannot intercept typing or pointer input.");
+                render?.Invoke(menu, image + "-empty.png", dpi);
+
+                search.SearchBox.Select(0, 0);
+                search.SearchBox.SelectedText = "Search";
+                await LayoutMenuAsync(menu);
+                RequireFieldPalette(menu, search.SearchBox, placeholder, contrast, context + ", typed", require);
+                Rect typedStart = search.SearchBox.GetRectFromCharacterIndex(0);
+                Rect typedEnd = search.SearchBox.GetRectFromCharacterIndex(search.SearchBox.Text.Length);
+                require(search.SearchBox.Text == "Search" && placeholder.Visibility == Visibility.Collapsed
+                    && NearOrigin(emptyCaret, typedStart, scale) && typedEnd.Left > typedStart.Left,
+                    $"At {context}, replacing the empty selection types at the same origin, advances the text caret and hides the prompt.");
+                render?.Invoke(menu, image + "-typed.png", dpi);
+
+                search.SearchBox.Text = new string('w', 150);
+                search.SearchBox.CaretIndex = search.SearchBox.Text.Length;
+                await LayoutMenuAsync(menu);
+                search.SearchBox.ScrollToHorizontalOffset(double.MaxValue);
+                await LayoutMenuAsync(menu);
+                require(search.TrySearchKey(Key.Escape, ModifierKeys.None),
+                    $"At {context}, Escape clears a long scrolled query through the real search key handler.");
+                await LayoutMenuAsync(menu);
+                RequireFieldPalette(menu, search.SearchBox, placeholder, contrast, context + ", cleared", require);
+                Rect clearedCaret = search.SearchBox.GetRectFromCharacterIndex(0);
+                Rect restoredPrompt = placeholder.TransformToVisual(search.SearchBox)
+                    .TransformBounds(placeholder.ContentStart.GetCharacterRect(LogicalDirection.Forward));
+                require(search.SearchBox.Text.Length == 0 && search.Matches.Count == 0
+                    && placeholder.Visibility == Visibility.Visible && search.SearchBox.HorizontalOffset == 0
+                    && NearOrigin(emptyCaret, clearedCaret, scale) && NearOrigin(clearedCaret, restoredPrompt, scale),
+                    $"At {context}, clearing a scrolled query restores the aligned prompt and caret without retaining a horizontal offset.");
+                render?.Invoke(menu, image + "-cleared.png", dpi);
+            }
+            require(menus.All(menu => !menu.IsOpen && PresentationSource.FromVisual(menu) is null
+                    && LogicalTreeHelper.GetParent(menu) is null && VisualTreeHelper.GetParent(menu) is null)
+                && ReferenceEquals(Keyboard.FocusedElement, previousFocus),
+                "Search text geometry and palette checks use fresh, unparented real Settings menus without opening popups or requesting native focus.");
+        }
+        finally
+        {
+            foreach (var menu in menus)
+            {
+                SettingsSearchView.Get(menu)?.SearchBox.Clear();
+                menu.IsOpen = false;
+            }
+            ConsoleTheme.SetPreviewHighContrast(previousContrast);
+            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+        }
+    }
+
+    private static void RequireFieldPalette(ContextMenu menu, TextBox field, TextBlock placeholder,
+        bool contrast, string context, Action<bool, string> require)
+    {
+        Brush text = contrast ? SystemColors.WindowTextBrush : ConsoleTheme.Get("ConsoleTextBrush");
+        Brush prompt = contrast ? SystemColors.WindowTextBrush : ConsoleTheme.Get("ConsoleMutedBrush");
+        Brush well = contrast ? SystemColors.WindowBrush : ConsoleTheme.Get("ConsoleWellBrush");
+        Brush panel = contrast ? SystemColors.WindowBrush : ConsoleTheme.Get("ConsolePanelBrush");
+        var fieldFace = VisualChildren(field).OfType<Border>()
+            .FirstOrDefault(border => ReferenceEquals(border.TemplatedParent, field) && border.Background is not null);
+        var menuFace = VisualChildren(menu).OfType<Border>()
+            .FirstOrDefault(border => ReferenceEquals(border.TemplatedParent, menu));
+        require(SameBrush(field.Foreground, text) && SameBrush(placeholder.Foreground, prompt)
+            && SameBrush(field.Background, well) && SameBrush(fieldFace?.Background, well)
+            && SameBrush(menu.Background, panel) && SameBrush(menuFace?.Background, panel),
+            $"At {context}, the actual search foreground/prompt and instantiated field/menu border fills match the expected palette; " +
+            $"text {field.Foreground}/{text}, prompt {placeholder.Foreground}/{prompt}, " +
+            $"field {fieldFace?.Background}/{well}, menu {menuFace?.Background}/{panel}.");
+    }
+
+    private static bool SameBrush(Brush? actual, Brush expected)
+        => actual is SolidColorBrush first && expected is SolidColorBrush second
+            && first.Color == second.Color && first.Opacity == second.Opacity;
+
+    private static bool NearOrigin(Rect first, Rect second, double scale)
+        => !first.IsEmpty && !second.IsEmpty && Math.Abs(first.Left - second.Left) * scale <= 1
+            && Math.Abs(first.Top - second.Top) * scale <= 1;
+
+    private static async Task LayoutMenuAsync(ContextMenu menu)
+    {
+        menu.Height = double.NaN;
+        menu.InvalidateMeasure(); menu.InvalidateArrange();
+        menu.Measure(new Size(menu.Width, 520));
+        menu.Height = Math.Max(80, Math.Min(menu.MaxHeight, menu.DesiredSize.Height + 4));
+        menu.Arrange(new Rect(0, 0, menu.Width, menu.Height));
+        menu.UpdateLayout();
+        await menu.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+        menu.UpdateLayout();
     }
 
     private static string Header(MenuItem item) => item.Header?.ToString() ?? "";

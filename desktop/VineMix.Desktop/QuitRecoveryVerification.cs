@@ -20,6 +20,7 @@ internal static class QuitRecoveryVerification
     {
         await SaveBeforeTeardown(require);
         await FailedSaveRetryCancelAndCopy(require);
+        await FailedPreferencesSave(require);
         await LostReplyAndCancelledReply(require);
         await ReplayConflict(require);
         await FailedUpdateHealthQuit(require);
@@ -121,6 +122,78 @@ internal static class QuitRecoveryVerification
         var retry = await mixer.PrepareForQuitAsync(CancellationToken.None);
         require(retry.Saved && mixer.PendingEditCount == 0 && engine.Saved.Graph.Nodes.Count(n => n.Id == addition.Id) == 1,
             "A later retry saves the retained graph once after the underlying settings failure is repaired.");
+    }
+
+    private static async Task FailedPreferencesSave(Action<bool, string> require)
+    {
+        var engine = new Engine();
+        using var mixer = Connected(engine);
+        bool failWrite = true;
+        string savedPreferences = "";
+        mixer.PreviewUiPreferencesWriter = json =>
+        {
+            if (failWrite) throw new IOException("Example preference folder is read-only");
+            savedPreferences = json;
+        };
+        mixer.Edit(configuration => configuration.Graph.Frames.Add(new GraphFrame
+        {
+            Id = "example-unsaved-group", Name = "Unsaved voice group", NodeIds = [configuration.Graph.Nodes[0].Id]
+        }));
+        var failed = await mixer.PrepareForQuitAsync(CancellationToken.None);
+        require(!failed.Saved && mixer.IsPreparingQuit && mixer.PendingEditCount == 0
+            && failed.Error.Contains("node groups", StringComparison.Ordinal) && engine.Calls.Count == 0
+            && mixer.GraphConfig.Frames.Single().Name == "Unsaved voice group",
+            "A failed group-preference write pauses Quit even without an engine edit, retaining the group and audio session.");
+        bool refusedRecovery = false;
+        try { mixer.SerializeQuitRecovery(); } catch (IOException) { refusedRecovery = true; }
+        require(refusedRecovery && mixer.IsPreparingQuit && engine.Calls.Count == 0,
+            "An engine-only recovery copy cannot authorize quitting while unsaved group preferences would be omitted.");
+        mixer.CancelQuitPreparation();
+        require(mixer.CanEdit && mixer.SaveStatus == "Workspace preferences need attention",
+            "Cancelling after a preference failure restores editing without falsely reporting the group as saved.");
+        Exception? updateError = null;
+        try { await mixer.PrepareForUpdateAsync(CancellationToken.None); }
+        catch (IOException error) { updateError = error; }
+        require(updateError is not null && !mixer.IsPreparingUpdate && mixer.CanEdit && engine.Calls.Count == 0,
+            "Update preparation also refuses an unsaved group before any configure or shutdown operation, retaining an editable session.");
+        failWrite = false;
+        var retry = await mixer.PrepareForQuitAsync(CancellationToken.None);
+        require(retry.Saved && savedPreferences.Contains("Unsaved voice group", StringComparison.Ordinal)
+            && engine.Calls.Count == 0 && mixer.PendingEditCount == 0,
+            "A later successful preference retry preserves the group and permits ordinary Quit without an unnecessary engine edit.");
+        mixer.CancelQuitPreparation();
+        failWrite = true;
+        mixer.ShowActionNotifications = false;
+        failed = await mixer.PrepareForQuitAsync(CancellationToken.None);
+        require(!failed.Saved && !mixer.ShowActionNotifications && engine.Calls.Count == 0,
+            "The same save barrier retains ordinary unsaved desktop preferences, including the action-notification toggle.");
+        failWrite = false;
+        require((await mixer.PrepareForQuitAsync(CancellationToken.None)).Saved
+            && savedPreferences.Contains("\"showActionNotifications\":false", StringComparison.Ordinal),
+            "Retry persists the latest desktop preference values rather than an earlier group-only snapshot.");
+
+        var changedEngine = new Engine();
+        using var changed = Connected(changedEngine);
+        bool failReconciliation = false;
+        changed.PreviewUiPreferencesWriter = _ =>
+        {
+            if (failReconciliation) throw new IOException("Example preference failure after engine reconciliation");
+        };
+        changed.Edit(configuration => configuration.Graph.Frames.Add(new GraphFrame
+        { Id = "example-pruned-group", Name = "Old group", NodeIds = [configuration.Graph.Nodes[0].Id] }));
+        changedEngine.Saved.Graph.Nodes.Clear(); changedEngine.Saved.Revision++;
+        failReconciliation = true;
+        updateError = null;
+        try { await changed.PrepareForUpdateAsync(CancellationToken.None); }
+        catch (IOException error) { updateError = error; }
+        require(updateError is not null && !changed.IsPreparingUpdate && changed.CanEdit
+            && changedEngine.ConfigureCalls == 1 && changedEngine.Calls.All(command => command != "shutdown"),
+            "An acknowledgement that removes obsolete group membership must also save those preferences before update preparation succeeds.");
+        failReconciliation = false;
+        await changed.PrepareForUpdateAsync(CancellationToken.None);
+        changed.ResumeAfterUpdatePreparation();
+        require(changed.GraphConfig.Frames.Count == 0 && changed.CanEdit,
+            "Retry after a late preference failure persists the reconciled group removal and restores a usable session.");
     }
 
     private static async Task LostReplyAndCancelledReply(Action<bool, string> require)

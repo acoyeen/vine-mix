@@ -59,6 +59,23 @@ internal static class NumericTabCommitVerification
         require(dial.HandleEntryKey(Key.Escape, ModifierKeys.None) && Graph() == committed
             && mixer.EditHistory.Entries.Count == history && AutomationProperties.GetItemStatus(entry).Length == 0,
             "Cancelling the rejected draft clears its error without creating an audio or history edit.");
+
+        entry.Text = (-13.375).ToString("G", CultureInfo.CurrentCulture) + " dB";
+        entry.RaiseEvent(new KeyboardFocusChangedEventArgs(Keyboard.PrimaryDevice, 0, entry, null)
+            { RoutedEvent = Keyboard.LostKeyboardFocusEvent });
+        await layout();
+        require(mixer.GraphConfig.Nodes.Single().GainDb == -13.375
+            && mixer.EditHistory.Entries.Count == history + 1
+            && mixer.ConfigurationPresentationCount == presentations + 1,
+            "ISSUE-004: leaving a valid numeric draft applies its exact value in one graph edit and one Undo step.");
+        string blurred = Graph();
+        entry.RaiseEvent(new KeyboardFocusChangedEventArgs(Keyboard.PrimaryDevice, 0, entry, null)
+            { RoutedEvent = Keyboard.LostKeyboardFocusEvent });
+        require(Graph() == blurred && mixer.EditHistory.Entries.Count == history + 1
+            && mixer.ConfigurationPresentationCount == presentations + 1,
+            "A second blur preserves the exact value without reapplying the rounded display or adding history.");
+        require(mixer.Undo() && Graph() == committed && mixer.Redo() && Graph() == blurred,
+            "One Undo and Redo exactly round-trip the focus-loss edit through the real graph model.");
     }
 
     private static IEnumerable<T> Descendants<T>(DependencyObject root) where T : DependencyObject

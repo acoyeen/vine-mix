@@ -34,8 +34,9 @@ public sealed class WorkspaceHistory
     internal static bool ChangesLayout(GraphConfiguration before, GraphConfiguration after)
         => !SameValue(before.Nodes.OrderBy(node => node.Id).Select(node => new { node.Id, node.Kind, node.X, node.Y }),
             after.Nodes.OrderBy(node => node.Id).Select(node => new { node.Id, node.Kind, node.X, node.Y }))
-        || !SameValue(before.Edges.OrderBy(edge => edge.Id).Select(edge => new { edge.Id, edge.From, edge.To, edge.Kind }),
-            after.Edges.OrderBy(edge => edge.Id).Select(edge => new { edge.Id, edge.From, edge.To, edge.Kind }));
+        || !SameValue(before.Edges.OrderBy(edge => edge.Id).Select(edge => new { edge.Id, edge.From, edge.To, edge.Kind, edge.FromPort, edge.ToPort }),
+            after.Edges.OrderBy(edge => edge.Id).Select(edge => new { edge.Id, edge.From, edge.To, edge.Kind, edge.FromPort, edge.ToPort }))
+        || !SameValue(before.Frames.OrderBy(frame => frame.Id), after.Frames.OrderBy(frame => frame.Id));
 
     public void BeginGesture(string? description = null)
     {
@@ -125,7 +126,7 @@ public sealed class WorkspaceHistory
     }
 
     internal static bool SameContents(GraphConfiguration left, GraphConfiguration right)
-        => SameValue(new { left.Nodes, left.Edges }, new { right.Nodes, right.Edges });
+        => SameValue(new { left.Nodes, left.Edges, left.Frames }, new { right.Nodes, right.Edges, right.Frames });
     internal static bool SameValue<T>(T left, T right)
         // Preserve the existing serialized-value comparison, including member
         // and collection order, without allocating two UTF-16 JSON strings.
@@ -142,6 +143,20 @@ public sealed class WorkspaceHistory
         if (added.Length > 0) { description = added.Length == 1 ? "Added " + added[0].Name : $"Added {added.Length} nodes"; key = "add:" + added[0].Id; }
         else if (removed.Length > 0) { description = removed.Length == 1 ? "Removed " + removed[0].Name : $"Removed {removed.Length} nodes"; key = "remove:" + removed[0].Id; }
         else if (cables) { description = after.Edges.Count < before.Edges.Count ? "Removed connections" : after.Edges.Count > before.Edges.Count ? "Connected nodes" : "Changed connections"; key = Guid.NewGuid().ToString(); }
+        else if (!GraphFrames.Same(before.Frames, after.Frames))
+        {
+            var addedFrame = after.Frames.FirstOrDefault(frame => before.Frames.All(old => old.Id != frame.Id));
+            var removedFrame = before.Frames.FirstOrDefault(frame => after.Frames.All(next => next.Id != frame.Id));
+            var changedFrame = after.Frames.FirstOrDefault(frame => before.Frames.Any(old => old.Id == frame.Id && !SameValue(old, frame)));
+            var oldFrame = changedFrame is null ? null : before.Frames.Single(frame => frame.Id == changedFrame.Id);
+            description = addedFrame is not null ? "Created group “" + addedFrame.Name + "”"
+                : removedFrame is not null ? "Ungrouped “" + removedFrame.Name + "”"
+                : changedFrame is null ? "Reordered groups"
+                : oldFrame!.Name != changedFrame.Name ? "Renamed group “" + changedFrame.Name + "”"
+                : oldFrame.ColorKey != changedFrame.ColorKey ? "Recolored group “" + changedFrame.Name + "”"
+                : "Changed members of “" + changedFrame.Name + "”";
+            key = "frame:" + (addedFrame ?? removedFrame ?? changedFrame)?.Id;
+        }
         else
         {
             bool moved = changed.All(n => { var old = before.Nodes.Single(o => o.Id == n.Id).Copy(); old.X = n.X; old.Y = n.Y; return SameValue(old, n); });
@@ -175,7 +190,7 @@ internal sealed class WorkspaceGraphRestore
     internal WorkspaceGraphRestore(GraphConfiguration expected, GraphConfiguration target)
     { _expected = expected.Copy(); _target = target.Copy(); }
 
-    internal bool TryApply(GraphConfiguration current, out GraphConfiguration restored, out string error)
+    internal bool TryApply(GraphConfiguration current, out GraphConfiguration restored, out string error, bool restoreFrames = true)
     {
         restored = current; error = "";
         var next = current.Copy();
@@ -206,6 +221,28 @@ internal sealed class WorkspaceGraphRestore
             if (after is null) next.Edges.RemoveAt(index);
             else if (index >= 0) next.Edges[index] = after.Copy();
             else next.Edges.Insert(Math.Min(_target.Edges.FindIndex(e => e.Id == id), next.Edges.Count), after.Copy());
+        }
+        if (restoreFrames)
+        {
+            foreach (string id in _expected.Frames.Select(frame => frame.Id).Union(_target.Frames.Select(frame => frame.Id)))
+            {
+                var before = _expected.Frames.FirstOrDefault(frame => frame.Id == id);
+                var after = _target.Frames.FirstOrDefault(frame => frame.Id == id);
+                if (WorkspaceHistory.SameValue(before, after)) continue;
+                var actual = next.Frames.FirstOrDefault(frame => frame.Id == id);
+                if (WorkspaceHistory.SameValue(actual, after)) continue;
+                if (!WorkspaceHistory.SameValue(actual, before))
+                { error = $"The group “{before?.Name ?? after?.Name ?? id}” changed since this edit."; return false; }
+                int index = next.Frames.FindIndex(frame => frame.Id == id);
+                if (after is null) next.Frames.RemoveAt(index);
+                else if (index >= 0) next.Frames[index] = after.Copy();
+                else next.Frames.Insert(Math.Min(_target.Frames.FindIndex(frame => frame.Id == id), next.Frames.Count), after.Copy());
+            }
+            // A restored membership cannot silently steal a node from a newer
+            // frame or reference a node that no longer exists.
+            var normalized = GraphFrames.Normalize(next.Frames, next.Nodes.Select(node => node.Id));
+            if (!GraphFrames.Same(next.Frames, normalized))
+            { error = "A group membership changed since this edit."; return false; }
         }
         error = GraphDefaults.Validate(next);
         if (error.Length > 0) return false;

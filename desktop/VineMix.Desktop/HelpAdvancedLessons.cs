@@ -74,6 +74,7 @@ internal static class HelpAdvancedLessons
         private void BandsEdited(IReadOnlyList<EqBand> bands)
         {
             if (_updating || _disposed) return;
+            if (_bands.Count != bands.Count || _selected != Plot.SelectedBandIndex) CancelBandEntries();
             _bands = bands.Select(band => band.Copy()).ToList();
             _selected = Plot.SelectedBandIndex;
             Refresh(applyPlot: false);
@@ -82,8 +83,14 @@ internal static class HelpAdvancedLessons
         private void BandSelected(int index)
         {
             if (_updating || _disposed) return;
+            if (_selected != index) CancelBandEntries();
             _selected = index;
             Refresh(applyPlot: false);
+        }
+
+        private void CancelBandEntries()
+        {
+            Frequency.CancelPendingEntry(); Gain.CancelPendingEntry(); Width.CancelPendingEntry();
         }
 
         private void EditBand(Action<EqBand> edit)

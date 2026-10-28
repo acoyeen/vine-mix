@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json.Serialization;
 
 namespace VineMix.Desktop;
 
@@ -22,6 +23,10 @@ public sealed class GraphConfiguration
 {
     public List<GraphNode> Nodes { get; set; } = [];
     public List<GraphEdge> Edges { get; set; } = [];
+    // Organizational frames belong to the desktop workspace preferences. They
+    // never enter the engine protocol or audio configuration JSON.
+    [JsonIgnore]
+    public List<GraphFrame> Frames { get; set; } = [];
     public double PanX { get; set; } = 20;
     public double PanY { get; set; } = 20;
     public double Zoom { get; set; } = 1;
@@ -30,6 +35,7 @@ public sealed class GraphConfiguration
         var copy = (GraphConfiguration)MemberwiseClone();
         copy.Nodes = Nodes.Select(node => node.Copy()).ToList();
         copy.Edges = Edges.Select(edge => edge.Copy()).ToList();
+        copy.Frames = Frames.Select(frame => frame.Copy()).ToList();
         return copy;
     }
 }
@@ -41,6 +47,8 @@ public sealed class GraphNode
     public double X { get; set; }
     public double Y { get; set; }
     public double GainDb { get; set; }
+    // -1 preserves the exact dB setting of an older Linked control.
+    public double ControlMultiplier { get; set; } = -1;
     public bool Muted { get; set; }
     public bool Mono { get; set; }
     public bool AutoAssignDevice { get; set; } = true;
@@ -49,6 +57,10 @@ public sealed class GraphNode
     public bool Bypass { get; set; }
     public bool Collapsed { get; set; }
     public double Balance { get; set; }
+    public double StereoWidth { get; set; } = 1;
+    public double PanPosition { get; set; }
+    public double CrossfadePosition { get; set; }
+    public string CrossfadeCurve { get; set; } = "equalPower";
     public List<EqBand> EqBands { get; set; } = EqBand.Defaults();
     public CompressorSettings Compressor { get; set; } = new();
     // Absent in existing workspaces: retain their full legacy compressor UI.
@@ -178,9 +190,11 @@ public sealed class GraphEdge
     public string From { get; set; } = "";
     public string To { get; set; } = "";
     public string Kind { get; set; } = "audio";
+    public string FromPort { get; set; } = "audio";
+    public string ToPort { get; set; } = "audio";
     public double GainDb { get; set; }
     public bool Muted { get; set; }
-    public GraphEdge Copy() => new() { Id = Id, From = From, To = To, Kind = Kind, GainDb = GainDb, Muted = Muted };
+    public GraphEdge Copy() => (GraphEdge)MemberwiseClone();
 }
 public sealed class GraphNodeStatus
 {
@@ -217,16 +231,23 @@ public static class GraphDefaults
         };
     }
     public const int MaximumEqBands = 8;
-    public static readonly string[] Kinds = ["microphone", "virtualInput", "appInput", "mix", "gain", "eq", "tone", "highPass", "lowPass", "compressor", "limiter", "ducking", "pan", "mono", "reroute", "output", "virtualOutput", "control", "denoiser", "deEsser", "plosive", "reverb", "voiceColor", "expander", "gate", "alignmentDelay"];
-    public static bool HasAudioInput(string kind) => kind is "mix" or "gain" or "output" or "virtualOutput" or "eq" or "tone" or "highPass" or "lowPass" or "compressor" or "limiter" or "ducking" or "pan" or "mono" or "reroute" or "denoiser" or "deEsser" or "plosive" or "reverb" or "voiceColor" or "expander" or "gate" or "alignmentDelay";
-    public static bool HasAudioOutput(string kind) => kind is "microphone" or "virtualInput" or "appInput" or "mix" or "gain" or "eq" or "tone" or "highPass" or "lowPass" or "compressor" or "limiter" or "ducking" or "pan" or "mono" or "reroute" or "denoiser" or "deEsser" or "plosive" or "reverb" or "voiceColor" or "expander" or "gate" or "alignmentDelay";
+    public static readonly string[] Kinds = ["microphone", "virtualInput", "appInput", "mix", "gain", "eq", "tone", "highPass", "lowPass", "compressor", "limiter", "ducking", "pan", "mono", "reroute", "output", "virtualOutput", "control", "denoiser", "deEsser", "plosive", "reverb", "voiceColor", "expander", "gate", "alignmentDelay", "channelSwap", "stereoWidth", "stereoPan", "crossfade", "stereoCombine", "stereoSplit"];
+    public static bool HasAudioInput(string kind) => kind is "mix" or "gain" or "output" or "virtualOutput" or "eq" or "tone" or "highPass" or "lowPass" or "compressor" or "limiter" or "ducking" or "pan" or "mono" or "reroute" or "denoiser" or "deEsser" or "plosive" or "reverb" or "voiceColor" or "expander" or "gate" or "alignmentDelay" or "channelSwap" or "stereoWidth" or "stereoPan" or "crossfade" or "stereoCombine" or "stereoSplit";
+    public static bool HasAudioOutput(string kind) => kind is "microphone" or "virtualInput" or "appInput" or "mix" or "gain" or "eq" or "tone" or "highPass" or "lowPass" or "compressor" or "limiter" or "ducking" or "pan" or "mono" or "reroute" or "denoiser" or "deEsser" or "plosive" or "reverb" or "voiceColor" or "expander" or "gate" or "alignmentDelay" or "channelSwap" or "stereoWidth" or "stereoPan" or "crossfade" or "stereoCombine" or "stereoSplit";
     public static bool HasSidechainInput(string kind) => kind == "ducking";
     public static bool HasSidechainInput(GraphNode node) => HasSidechainInput(node.Kind);
+    public static string[] AudioInputPorts(string kind) => kind switch
+    {
+        "stereoCombine" => ["left", "right"], "crossfade" => ["a", "b"],
+        _ => HasAudioInput(kind) ? ["audio"] : []
+    };
+    public static string[] AudioOutputPorts(string kind) => kind == "stereoSplit" ? ["left", "right"] : HasAudioOutput(kind) ? ["audio"] : [];
+    public static string PortLabel(string port) => port switch { "left" => "Left", "right" => "Right", "a" => "A", "b" => "B", _ => "Audio" };
     public static string KindLabel(string kind) => kind switch
     {
         "microphone" => "Microphone", "virtualInput" => "Virtual input", "appInput" => "Running app", "expander" => "Expander", "gate" => "Gate", "alignmentDelay" => "Alignment Delay",
         "mix" => "Mix", "gain" => "Gain", "output" => "Listening output", "virtualOutput" => "Virtual output", "control" => "Linked control",
-        "eq" => "Equalizer", "tone" => "Low / Mid / High", "highPass" => "High-pass filter", "lowPass" => "Low-pass filter", "compressor" => "Compressor", "limiter" => "Limiter", "ducking" => "Ducking", "pan" => "Balance", "mono" => "Mono", "reroute" => "Reroute", "denoiser" => "Denoiser", "deEsser" => "De-esser", "plosive" => "Plosive remover", "reverb" => "Reverb", "voiceColor" => "Voice Color", _ => kind
+        "eq" => "Equalizer", "tone" => "Low / Mid / High", "highPass" => "High-pass filter", "lowPass" => "Low-pass filter", "compressor" => "Compressor", "limiter" => "Limiter", "ducking" => "Ducking", "pan" => "Balance", "mono" => "Mono", "reroute" => "Reroute", "denoiser" => "Denoiser", "deEsser" => "De-esser", "plosive" => "Plosive remover", "reverb" => "Reverb", "voiceColor" => "Voice Color", "channelSwap" => "Channel Swap", "stereoWidth" => "Stereo Width", "stereoPan" => "Pan", "crossfade" => "Crossfade", "stereoCombine" => "Stereo Combine", "stereoSplit" => "Stereo Split", _ => kind
     };
     public static GraphNode NewNode(string kind, double x, double y) => new()
     {
@@ -236,6 +257,7 @@ public static class GraphDefaults
         DynamicsUiVersion = kind == "compressor" ? 1 : 0,
         Expander = new() { Mode = kind == "gate" ? "gate" : "expander" },
         GainDb = kind == "output" ? -24 : 0,
+        ControlMultiplier = kind == "control" ? 1 : -1,
         Muted = kind is "output" or "virtualOutput",
         // Keep GraphNode's initializer for older saved nodes that omit EqBands;
         // newly created or explicitly reset EQs start empty.
@@ -252,8 +274,11 @@ public static class GraphDefaults
         if (node.Kind == "expander" && node.Expander.Mode == "gate") defaults.Expander.Mode = "gate";
         // Reset sound controls, never identity, routing, placement or assignment.
         node.GainDb = defaults.GainDb; node.Muted = defaults.Muted;
+        node.ControlMultiplier = defaults.ControlMultiplier;
         node.Mono = defaults.Mono; node.Device.Channel = -1;
         node.Bypass = defaults.Bypass; node.Balance = defaults.Balance; node.Collapsed = false;
+        node.StereoWidth = defaults.StereoWidth; node.PanPosition = defaults.PanPosition;
+        node.CrossfadePosition = defaults.CrossfadePosition; node.CrossfadeCurve = defaults.CrossfadeCurve;
         node.EqBands = defaults.EqBands; node.Compressor = defaults.Compressor; node.Ducking = defaults.Ducking;
         node.Denoiser = defaults.Denoiser; node.DeEsser = defaults.DeEsser;
         node.Plosive = defaults.Plosive; node.Reverb = defaults.Reverb;
@@ -283,6 +308,15 @@ public static class GraphDefaults
         }
         return graph;
     }
+    public static string NewConnectionError(GraphConfiguration graph, GraphEdge candidate)
+    {
+        if (candidate.Kind == "control" && graph.Nodes.FirstOrDefault(n => n.Id == candidate.To) is { } target
+            && !LinkedLevelControl.SupportsInput(target.Kind))
+            return "Connect Level control to a node with a Level knob.";
+        return ConnectionError(graph, candidate);
+    }
+    // Saved graphs, copied groups and history may retain older control routes.
+    // New interactive links use NewConnectionError instead.
     public static string ConnectionError(GraphConfiguration graph, GraphEdge candidate)
     {
         if (graph.Edges.Count >= 96) return "This workspace can contain up to 96 connections.";
@@ -290,19 +324,21 @@ public static class GraphDefaults
         var to = graph.Nodes.FirstOrDefault(n => n.Id == candidate.To);
         if (from is null || to is null) return "Choose two nodes in this workspace.";
         if (from.Id == to.Id) return "A node cannot connect to itself.";
-        if (graph.Edges.Any(e => e.From == from.Id && e.To == to.Id && e.Kind == candidate.Kind)) return "Those nodes are already connected.";
+        if (graph.Edges.Any(e => e.From == from.Id && e.To == to.Id && e.Kind == candidate.Kind
+            && e.FromPort == candidate.FromPort && e.ToPort == candidate.ToPort)) return "Those sockets are already connected.";
         if (candidate.Kind == "control")
         {
-            if (from.Kind != "control" || to.Kind == "control") return "Connect a linked control to the small square control socket.";
+            if (from.Kind != "control" || to.Kind == "control" || candidate.FromPort != "audio" || candidate.ToPort != "audio") return "Connect a linked control to the small square control socket.";
             if (graph.Edges.Any(e => e.Kind == "control" && e.To == to.Id)) return "This node already has a linked control. Remove that connection first.";
             return "";
         }
         if (candidate.Kind == "sidechain")
         {
+            if (!AudioOutputPorts(from.Kind).Contains(candidate.FromPort) || candidate.ToPort != "audio") return "Choose a valid audio output and trigger socket.";
             if (!HasAudioOutput(from.Kind) || !HasSidechainInput(to.Kind)) return "Connect an audio output to a Ducking trigger input.";
             if (graph.Edges.Any(e => e.Kind == "sidechain" && e.To == to.Id)) return "This node already has a detector cable. Remove that connection first.";
         }
-        else if (candidate.Kind != "audio" || !HasAudioOutput(from.Kind) || !HasAudioInput(to.Kind)) return "Connect an audio output on the right to an audio input on the left.";
+        else if (candidate.Kind != "audio" || !AudioOutputPorts(from.Kind).Contains(candidate.FromPort) || !AudioInputPorts(to.Kind).Contains(candidate.ToPort)) return "Connect an audio output on the right to an audio input on the left.";
         var seen = new HashSet<string>();
         var pending = new Stack<string>(); pending.Push(to.Id);
         while (pending.TryPop(out string? id))
@@ -325,6 +361,9 @@ public static class GraphDefaults
             if (!Kinds.Contains(node.Kind) || !double.IsFinite(node.X) || !double.IsFinite(node.Y) || !AudioLevel.IsValidGain(node.GainDb)
                 || node.DynamicsUiVersion is < 0 or > 1) return "A node contains an invalid setting.";
             static bool InRange(double value, double low, double high) => double.IsFinite(value) && value >= low && value <= high;
+            if (node.ControlMultiplier != -1 && !InRange(node.ControlMultiplier, 0, 2)) return "A linked multiplier must be between 0 and 200%.";
+            if (!InRange(node.StereoWidth, 0, 2) || !InRange(node.PanPosition, -1, 1) || !InRange(node.CrossfadePosition, 0, 1)
+                || node.CrossfadeCurve is not ("equalPower" or "linear")) return "A mixing node contains an invalid setting.";
             if (node.Denoiser is null || !InRange(node.Denoiser.SuppressionDb, -40, 0)
                 || node.Denoiser.Algorithm is not ("speex" or "rnnoise") || !InRange(node.Denoiser.RnnoiseMix, 0, 1)
                 || node.DeEsser is null || !InRange(node.DeEsser.FrequencyHz, 2000, 12000) || !InRange(node.DeEsser.ThresholdDb, -60, 0) || !InRange(node.DeEsser.ReductionDb, 0, 24)

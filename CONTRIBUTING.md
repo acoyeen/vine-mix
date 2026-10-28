@@ -1,5 +1,10 @@
 # Contributing
 
+Forks and modified versions are welcome. Follow [Crediting VineMix](ATTRIBUTION.md):
+preserve the full MIT notice and please include a short acknowledgement of
+VineMix with its website or repository link in your program's credits. The
+policy distinguishes required licence notices from requested visible credit.
+
 Use `vine-mix` for the repository and local checkout folder, and **VineMix** for
 the product name. Clone `https://github.com/acoyeen/vine-mix.git` into a folder
 named `vine-mix`. Keep C# project names such as `VineMix.Desktop` and CMake

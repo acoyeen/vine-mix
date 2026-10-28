@@ -1,0 +1,130 @@
+{
+  "kind": "detached-native-meter",
+  "noWindow": true,
+  "noEngine": true,
+  "noSettings": true,
+  "virtualOutputMuted": false,
+  "listeningOutputMuted": true,
+  "records": [
+    {
+      "id": "mic",
+      "file": "meter-mic-full.png",
+      "nodeWidth": 784,
+      "nodeHeight": 786,
+      "x": 62,
+      "y": 172,
+      "width": 56,
+      "height": 480,
+      "lanes": [
+        {
+          "x": 16,
+          "y": 14,
+          "width": 24,
+          "height": 462
+        }
+      ],
+      "floorDb": -60,
+      "peakDb": 0,
+      "yellowDb": -12,
+      "redDb": -3,
+      "clipCapLit": false,
+      "synthetic": true
+    },
+    {
+      "id": "music",
+      "file": "meter-music-full.png",
+      "nodeWidth": 784,
+      "nodeHeight": 714,
+      "x": 62,
+      "y": 172,
+      "width": 56,
+      "height": 408,
+      "lanes": [
+        {
+          "x": 16,
+          "y": 14,
+          "width": 24,
+          "height": 390
+        }
+      ],
+      "floorDb": -60,
+      "peakDb": 0,
+      "yellowDb": -12,
+      "redDb": -3,
+      "clipCapLit": false,
+      "synthetic": true
+    },
+    {
+      "id": "share",
+      "file": "meter-share-full.png",
+      "nodeWidth": 784,
+      "nodeHeight": 714,
+      "x": 62,
+      "y": 172,
+      "width": 56,
+      "height": 352,
+      "lanes": [
+        {
+          "x": 16,
+          "y": 14,
+          "width": 24,
+          "height": 334
+        }
+      ],
+      "floorDb": -60,
+      "peakDb": 0,
+      "yellowDb": -12,
+      "redDb": -3,
+      "clipCapLit": false,
+      "synthetic": true
+    },
+    {
+      "id": "tone",
+      "file": "meter-tone-full.png",
+      "nodeWidth": 824,
+      "nodeHeight": 1118,
+      "x": 62,
+      "y": 172,
+      "width": 56,
+      "height": 660,
+      "lanes": [
+        {
+          "x": 16,
+          "y": 14,
+          "width": 24,
+          "height": 642
+        }
+      ],
+      "floorDb": -60,
+      "peakDb": 0,
+      "yellowDb": -12,
+      "redDb": -3,
+      "clipCapLit": false,
+      "synthetic": true
+    },
+    {
+      "id": "duck",
+      "file": "meter-duck-full.png",
+      "nodeWidth": 784,
+      "nodeHeight": 1184,
+      "x": 62,
+      "y": 172,
+      "width": 56,
+      "height": 670,
+      "lanes": [
+        {
+          "x": 16,
+          "y": 14,
+          "width": 24,
+          "height": 652
+        }
+      ],
+      "floorDb": -60,
+      "peakDb": 0,
+      "yellowDb": -12,
+      "redDb": -3,
+      "clipCapLit": false,
+      "synthetic": true
+    }
+  ]
+}

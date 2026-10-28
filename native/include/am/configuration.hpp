@@ -48,8 +48,8 @@ inline void from_json(const Json& value, VoiceColorSettings& settings) {
     if (!value.is_object()) throw std::runtime_error("Voice Color settings must be an object.");
     settings.tone = value.value("tone", 0.); settings.ambience = value.value("ambience", 0.);
 }
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(GraphNode, id, kind, name, x, y, gainDb, muted, mono, device, app, eqBands, compressor, ducking, dynamicsUiVersion, expander, alignmentDelay, denoiser, deEsser, plosive, reverb, voiceColor, balance, bypass, collapsed, autoAssignDevice)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(GraphEdge, id, from, to, kind, gainDb, muted)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(GraphNode, id, kind, name, x, y, gainDb, muted, mono, device, app, eqBands, compressor, ducking, dynamicsUiVersion, expander, alignmentDelay, denoiser, deEsser, plosive, reverb, voiceColor, balance, bypass, collapsed, autoAssignDevice, stereoWidth, panPosition, crossfadePosition, crossfadeCurve, controlMultiplier)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(GraphEdge, id, from, to, kind, gainDb, muted, fromPort, toPort)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(AudioGraph, nodes, edges, panX, panY, zoom)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_ONLY_SERIALIZE(Configuration, version, revision, microphones,
     virtualInputCapture, virtualInputPlayback, mainOutputs, virtualOutputRender,

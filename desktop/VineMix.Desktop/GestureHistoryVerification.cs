@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using System.Text.Json;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -22,6 +23,9 @@ internal static class GestureHistoryVerification
         CheckEqualizer(require);
         CheckEqualizerGroup(require);
         CheckEqualizerGroupDials(require);
+        CheckEqualizerDraftSelection(require);
+        CheckHiddenModeDrafts(require);
+        PendingNumericEntryVerification.Run(require);
         CheckInterruptions(require);
     }
 
@@ -198,6 +202,79 @@ internal static class GestureHistoryVerification
             "Choosing another member as primary refreshes all EQ dials without moving the group, editing audio settings or adding history.");
     }
 
+    private static void CheckEqualizerDraftSelection(Action<bool, string> require)
+    {
+        using var fixture = new Fixture("eq");
+        var editor = Descendants<EqualizerEditor>(fixture.View).Single();
+        var dials = Descendants<RotaryValueControl>(fixture.View).ToArray();
+        var gainEntry = Descendants<TextBox>(dials[1]).Single();
+        var widthEntry = Descendants<TextBox>(dials[2]).Single();
+        fixture.Mixer.GraphChanged += (_, _) => fixture.View.Apply(fixture.Mixer.GraphConfig.Nodes[0], null, false);
+        editor.SelectBand(1);
+        string original = fixture.Graph;
+        double gain = dials[1].Value, width = dials[2].Value;
+        gainEntry.Text = "invalid gain";
+        dials[1].HandleEntryKey(Key.Tab, ModifierKeys.None);
+        widthEntry.Text = 1.875.ToString(CultureInfo.CurrentCulture);
+        require(dials[1].HasPendingEntry && dials[2].HasPendingEntry,
+            "The real EQ prepares both a rejected gain draft and a valid uncommitted width draft.");
+        editor.SelectBand(2);
+        require(dials[1].Value == gain && dials[2].Value == width
+            && !dials[1].HasPendingEntry && !dials[2].HasPendingEntry
+            && gainEntry.Text != "invalid gain" && UpdateEditorCommit.TryCommitWorkspace(fixture.View)
+            && fixture.Graph == original && fixture.Mixer.EditHistory.Entries.Count == 0,
+            "Choosing another EQ band with equal gain and Q cancels both old drafts without changing either band or adding history.");
+
+        widthEntry.Text = "invalid width";
+        dials[2].HandleEntryKey(Key.Tab, ModifierKeys.None);
+        editor.SelectAllBands();
+        require(dials[2].HasPendingEntry && widthEntry.Text == "invalid width" && fixture.Graph == original,
+            "Changing an EQ group selection while retaining its primary band preserves that band's pending numeric draft.");
+        dials[2].CancelPendingEntry();
+        editor.SelectBand(1);
+        gainEntry.Text = "invalid removed-band gain";
+        dials[1].HandleEntryKey(Key.Tab, ModifierKeys.None);
+        int count = editor.BandCount;
+        require(editor.RemoveSelectedBand() && editor.BandCount == count - 1
+            && !dials[1].HasPendingEntry && gainEntry.Text != "invalid removed-band gain"
+            && fixture.Mixer.GraphConfig.Nodes[0].EqBands.All(band => band.GainDb == 0)
+            && fixture.Mixer.EditHistory.Entries.Count == 1,
+            "Removing the selected EQ band clears its draft before another band reuses its index and adds only the removal undo step.");
+    }
+
+    private static void CheckHiddenModeDrafts(Action<bool, string> require)
+    {
+        foreach (string kind in new[] { "denoiser", "compressor" })
+        {
+            using var fixture = new Fixture(kind, legacyCompressor: kind == "compressor");
+            fixture.Mixer.GraphChanged += (_, _) => fixture.View.Apply(fixture.Mixer.GraphConfig.Nodes[0], null, false);
+            string label = kind == "denoiser" ? "Mix" : "Ratio";
+            var dial = Descendants<RotaryValueControl>(fixture.View).Single(control =>
+                AutomationProperties.GetName(Descendants<Slider>(control).Single()) == label);
+            var entry = Descendants<TextBox>(dial).Single();
+            var mode = Descendants<ComboBox>(fixture.View).Single();
+            var originalMode = mode.SelectedItem;
+            double value = dial.Value;
+            string original = fixture.Graph;
+            entry.Text = "invalid hidden draft";
+            entry.RaiseEvent(new KeyboardFocusChangedEventArgs(Keyboard.PrimaryDevice, 0, entry, null)
+                { RoutedEvent = Keyboard.LostKeyboardFocusEvent });
+            require(dial.HasPendingEntry && fixture.Graph == original && fixture.Mixer.EditHistory.Entries.Count == 0,
+                $"{kind}: an invalid value remains pending after focus leaves for the mode selector.");
+            string targetMode = kind == "denoiser" ? "speex" : "limit";
+            mode.SelectedItem = mode.Items.OfType<ComboBoxItem>().Single(item => Equals(item.Tag, targetMode));
+            string changedMode = fixture.Graph;
+            require(changedMode != original && !dial.IsEnabled && !dial.HasPendingEntry
+                && entry.Text != "invalid hidden draft" && dial.Value == value
+                && fixture.Mixer.EditHistory.Entries.Count == 1
+                && UpdateEditorCommit.TryCommitWorkspace(fixture.View),
+                $"{kind}: switching mode cancels its hidden editor's rejected draft, changes only the mode, and leaves preparation usable.");
+            require(fixture.Mixer.Undo() && fixture.Graph == original && dial.IsEnabled && dial.Value == value
+                && !dial.HasPendingEntry && ReferenceEquals(mode.SelectedItem, originalMode),
+                $"{kind}: one Undo restores the original mode and its unchanged value without resurrecting the hidden draft.");
+        }
+    }
+
     private static void CheckInterruptions(Action<bool, string> require)
     {
         foreach (string interruption in new[] { "unload", "disable", "focus loss" })
@@ -263,10 +340,11 @@ internal static class GestureHistoryVerification
         public MixerViewModel Mixer { get; } = new(preview: true);
         public GraphNodeView View { get; }
         public string Graph => JsonSerializer.Serialize(Mixer.GraphConfig, Protocol.Json);
-        public Fixture(string kind)
+        public Fixture(string kind, bool legacyCompressor = false)
         {
             var snapshot = UiPreview.CreateSnapshot([]);
             var node = GraphDefaults.NewNode(kind, 20, 20);
+            if (legacyCompressor) node.DynamicsUiVersion = 0;
             if (kind == "eq") node.EqBands = EqBand.Defaults(); // Existing multi-band gesture fixture.
             snapshot.Configuration.Graph = new GraphConfiguration { Nodes = [node] };
             snapshot.Status.Nodes = [new GraphNodeStatus { Id = node.Id, Path = new() { State = "Running" }, Channels = 2 }];

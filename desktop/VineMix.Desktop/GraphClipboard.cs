@@ -8,7 +8,10 @@ using System.Windows;
 
 namespace VineMix.Desktop;
 
-internal sealed record GraphPaste(IReadOnlyList<GraphNode> Nodes, IReadOnlyList<GraphEdge> Edges, int ClearedAssignments);
+internal sealed record GraphPaste(IReadOnlyList<GraphNode> Nodes, IReadOnlyList<GraphEdge> Edges, int ClearedAssignments)
+{
+    internal IReadOnlyList<GraphFrame> Frames { get; init; } = [];
+}
 
 // A private, versioned clipboard format. This class never reads the system
 // clipboard or edits a graph; the caller commits one complete, validated paste.
@@ -33,6 +36,8 @@ internal static class GraphClipboard
         public int Version { get; set; } = 1;
         public List<GraphNode> Nodes { get; set; } = [];
         public List<GraphEdge> Edges { get; set; } = [];
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public List<GraphFrame>? Frames { get; set; }
     }
 
     internal static string Serialize(GraphConfiguration graph, IEnumerable<string> ids)
@@ -41,10 +46,13 @@ internal static class GraphClipboard
         var nodes = graph.Nodes.Where(n => selected.Contains(n.Id)).ToList();
         if (nodes.Count == 0) return "";
         var included = nodes.Select(n => n.Id).ToHashSet(StringComparer.Ordinal);
+        var frames = graph.Frames.Where(frame => frame.NodeIds.Count > 0 && frame.NodeIds.All(included.Contains))
+            .Select(frame => frame.Copy()).ToList();
         return JsonSerializer.Serialize(new NodeGroup
         {
             Nodes = nodes,
-            Edges = graph.Edges.Where(e => included.Contains(e.From) && included.Contains(e.To)).ToList()
+            Edges = graph.Edges.Where(e => included.Contains(e.From) && included.Contains(e.To)).ToList(),
+            Frames = frames.Count == 0 ? null : frames
         }, Json);
     }
 
@@ -84,7 +92,7 @@ internal static class GraphClipboard
                 error = "Pasting this group would exceed the workspace limit of 96 connections.";
                 return false;
             }
-            var source = new GraphConfiguration { Nodes = group.Nodes, Edges = group.Edges };
+            var source = new GraphConfiguration { Nodes = group.Nodes, Edges = group.Edges, Frames = group.Frames ?? [] };
             error = ValidateValues(source);
             if (error.Length > 0) return false;
             error = GraphDefaults.Validate(source);
@@ -98,6 +106,7 @@ internal static class GraphClipboard
             double left = group.Nodes.Min(n => n.X), top = group.Nodes.Min(n => n.Y);
             var reservedNodes = target.Nodes.Concat(group.Nodes).Select(n => n.Id).ToHashSet(StringComparer.Ordinal);
             var reservedEdges = target.Edges.Concat(group.Edges).Select(e => e.Id).ToHashSet(StringComparer.Ordinal);
+            var reservedFrames = target.Frames.Concat(source.Frames).Select(frame => frame.Id).ToHashSet(StringComparer.Ordinal);
             var remap = new Dictionary<string, string>(StringComparer.Ordinal);
             var assigned = new List<GraphNode>(target.Nodes);
             int clearedAssignments = 0;
@@ -122,17 +131,24 @@ internal static class GraphClipboard
                 edge.From = remap[edge.From];
                 edge.To = remap[edge.To];
             }
+            foreach (var frame in source.Frames)
+            {
+                frame.Id = NewId(reservedFrames);
+                frame.NodeIds = frame.NodeIds.Select(id => remap[id]).ToList();
+            }
             var combined = new GraphConfiguration
             {
                 Nodes = assigned,
                 Edges = [.. target.Edges, .. group.Edges],
+                Frames = [.. target.Frames, .. source.Frames],
                 PanX = target.PanX, PanY = target.PanY, Zoom = target.Zoom
             };
             error = ValidateValues(combined);
             if (error.Length > 0) return false;
             error = GraphDefaults.Validate(combined);
             if (error.Length > 0) return false;
-            paste = new GraphPaste(group.Nodes.AsReadOnly(), group.Edges.AsReadOnly(), clearedAssignments);
+            paste = new GraphPaste(group.Nodes.AsReadOnly(), group.Edges.AsReadOnly(), clearedAssignments)
+                { Frames = source.Frames.AsReadOnly() };
             return true;
         }
         catch (Exception exception) when (exception is JsonException or NotSupportedException or EncoderFallbackException)
@@ -150,7 +166,7 @@ internal static class GraphClipboard
     {
         error = "The copied node group is invalid.";
         if (paste.Nodes.Count == 0) return false;
-        var additions = new GraphConfiguration { Nodes = paste.Nodes.ToList(), Edges = paste.Edges.ToList() };
+        var additions = new GraphConfiguration { Nodes = paste.Nodes.ToList(), Edges = paste.Edges.ToList(), Frames = paste.Frames.ToList() };
         try
         {
             error = ValidateValues(additions);
@@ -172,6 +188,8 @@ internal static class GraphClipboard
                 error = "The workspace changed while pasting. Copy the group again.";
                 return false;
             }
+            if (additions.Frames.Any(frame => target.Frames.Any(existing => existing.Id == frame.Id)))
+            { error = "The workspace changed while pasting. Copy the group again."; return false; }
             if (target.Nodes.Count + additions.Nodes.Count > MaximumNodes || target.Edges.Count + additions.Edges.Count > MaximumEdges)
             {
                 error = "The workspace changed and no longer has room for the whole group (32 nodes, 96 connections).";
@@ -180,6 +198,7 @@ internal static class GraphClipboard
 
             var copiedNodes = additions.Nodes.Select(node => node.Copy()).ToList();
             var copiedEdges = additions.Edges.Select(edge => edge.Copy()).ToList();
+            var copiedFrames = additions.Frames.Select(frame => frame.Copy()).ToList();
             var assigned = new List<GraphNode>(target.Nodes);
             foreach (var node in copiedNodes)
             {
@@ -193,6 +212,7 @@ internal static class GraphClipboard
             var combined = new GraphConfiguration
             {
                 Nodes = assigned, Edges = [.. target.Edges, .. copiedEdges],
+                Frames = [.. target.Frames, .. copiedFrames],
                 PanX = target.PanX, PanY = target.PanY, Zoom = target.Zoom
             };
             error = ValidateValues(combined);
@@ -201,6 +221,7 @@ internal static class GraphClipboard
             if (error.Length > 0) return false;
             target.Nodes.AddRange(copiedNodes);
             target.Edges.AddRange(copiedEdges);
+            target.Frames.AddRange(copiedFrames);
             return true;
         }
         catch (Exception exception) when (exception is JsonException or NotSupportedException or EncoderFallbackException)
@@ -250,6 +271,19 @@ internal static class GraphClipboard
         foreach (var edge in graph.Edges)
             if (edge is null || !ValidId(edge.Id) || !ValidId(edge.From) || !ValidId(edge.To))
                 return "A copied connection has an invalid identity.";
+        var frameIds = new HashSet<string>(StringComparer.Ordinal);
+        var frameMembers = new HashSet<string>(StringComparer.Ordinal);
+        var nodes = graph.Nodes.Select(node => node.Id).ToHashSet(StringComparer.Ordinal);
+        if (graph.Frames.Count > GraphFrames.MaximumFrames) return "There are too many copied groups.";
+        foreach (var frame in graph.Frames)
+        {
+            if (frame is null || !ValidId(frame.Id) || !frameIds.Add(frame.Id)
+                || frame.Name is null || frame.Name != GraphFrames.NormalizeName(frame.Name)
+                || frame.ColorKey is null || frame.ColorKey != GraphFramePalette.NormalizeKey(frame.ColorKey)
+                || frame.NodeIds is null || frame.NodeIds.Count is < 1 or > MaximumNodes
+                || frame.NodeIds.Any(id => !nodes.Contains(id) || !frameMembers.Add(id)))
+                return "A copied group has an invalid name, color or membership.";
+        }
         return "";
     }
 
@@ -268,7 +302,20 @@ internal static class GraphClipboard
 
     private static bool ValidShape(JsonElement root)
     {
-        if (!Properties(root, "format", "version", "nodes", "edges")) return false;
+        string[] rootFields = ["format", "version", "nodes", "edges"];
+        if (root.ValueKind == JsonValueKind.Object && root.TryGetProperty("frames", out _)) rootFields = [.. rootFields, "frames"];
+        if (!Properties(root, rootFields)) return false;
+        if (root.TryGetProperty("frames", out var frames))
+        {
+            if (frames.ValueKind != JsonValueKind.Array || frames.GetArrayLength() > GraphFrames.MaximumFrames) return false;
+            foreach (var frame in frames.EnumerateArray())
+            {
+                if (!Properties(frame, "id", "name", "colorKey", "nodeIds")) return false;
+                var members = frame.GetProperty("nodeIds");
+                if (members.ValueKind != JsonValueKind.Array || members.GetArrayLength() is < 1 or > MaximumNodes
+                    || members.EnumerateArray().Any(member => member.ValueKind != JsonValueKind.String)) return false;
+            }
+        }
         var nodes = root.GetProperty("nodes");
         var edges = root.GetProperty("edges");
         if (nodes.ValueKind != JsonValueKind.Array || edges.ValueKind != JsonValueKind.Array
@@ -277,7 +324,7 @@ internal static class GraphClipboard
         {
             string[] fields = ["id", "kind", "name", "x", "y", "gainDb", "muted", "device", "app", "bypass", "collapsed", "balance", "eqBands", "compressor"];
             if (node.ValueKind != JsonValueKind.Object) return false;
-            foreach (var optional in new[] { "mono", "autoAssignDevice", "denoiser", "deEsser", "plosive", "reverb", "voiceColor", "expander", "alignmentDelay", "dynamicsUiVersion", "ducking" })
+            foreach (var optional in new[] { "controlMultiplier", "mono", "autoAssignDevice", "denoiser", "deEsser", "plosive", "reverb", "voiceColor", "expander", "alignmentDelay", "dynamicsUiVersion", "ducking", "stereoWidth", "panPosition", "crossfadePosition", "crossfadeCurve" })
                 if (node.TryGetProperty(optional, out _)) fields = [.. fields, optional];
             if (!Properties(node, fields)) return false;
             if (!Properties(node.GetProperty("device"), "id", "stableId", "name", "channel")
@@ -321,7 +368,13 @@ internal static class GraphClipboard
             }
         }
         foreach (var edge in edges.EnumerateArray())
-            if (!Properties(edge, "id", "from", "to", "kind", "gainDb", "muted")) return false;
+        {
+            if (edge.ValueKind != JsonValueKind.Object) return false;
+            string[] fields = ["id", "from", "to", "kind", "gainDb", "muted"];
+            foreach (var optional in new[] { "fromPort", "toPort" })
+                if (edge.TryGetProperty(optional, out _)) fields = [.. fields, optional];
+            if (!Properties(edge, fields)) return false;
+        }
         return true;
     }
 }

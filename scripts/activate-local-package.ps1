@@ -26,6 +26,7 @@ $candidateUi = Join-Path $candidate 'VineMix.exe'
 $settingsPath = Join-Path $env:LOCALAPPDATA 'VineMix\settings.json'
 . (Join-Path $PSScriptRoot 'assert-desktop-data-context.ps1')
 . (Join-Path $PSScriptRoot 'local-activation-support.ps1')
+. (Join-Path $PSScriptRoot 'local-package-activation-support.ps1')
 Assert-DesktopDataContext $settingsPath
 $physicalSettingsPath = Get-ActivationPhysicalPath $settingsPath
 Assert-ActivationEvidenceLocation $evidence @($project,$package,$candidate)
@@ -59,6 +60,10 @@ $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
 try { $sid = $identity.User.Value } finally { $identity.Dispose() }
 $sessionId = (Get-Process -Id $PID).SessionId
 $controlEngineId = 0
+$updateRoot = Join-Path (Split-Path -Parent $settingsPath) 'updates'
+$updateMutex = $null
+$inventoryPlan = $null
+$replacements = @()
 
 function Get-ExactProcess([string]$Name, [string]$Path) {
     @(Get-Process -Name $Name -ErrorAction SilentlyContinue | Where-Object { $_.Path -ieq $Path -and $_.SessionId -eq $sessionId })
@@ -126,11 +131,34 @@ function VerifyCandidate {
     $engineVersion = (Get-Item -LiteralPath $candidateEngine).VersionInfo.ProductVersion
     $uiVersion = ((Get-Item -LiteralPath $candidateUi).VersionInfo.ProductVersion -split '\+')[0]
     if (-not $engineVersion -or $engineVersion -cne $uiVersion) { throw 'Candidate controller and engine have different release identities.' }
+    $engineNumeric = (Get-Item -LiteralPath $candidateEngine).VersionInfo.FileVersion
+    $uiNumeric = (Get-Item -LiteralPath $candidateUi).VersionInfo.FileVersion
+    if (-not $engineNumeric -or $engineNumeric -cne $uiNumeric) { throw 'Candidate controller and engine have different Windows file versions.' }
     foreach ($runtime in @('libc++.dll', 'libunwind.dll', 'libwinpthread-1.dll')) {
         if ((FileHash (Join-Path $candidate $runtime)) -cne (FileHash (Join-Path $package $runtime))) {
             throw "Candidate runtime differs from the installed package: $runtime. This update preserves the installed runtime libraries."
         }
     }
+}
+function HoldUpdateGuard {
+    if (-not $script:updateMutex) {
+        $script:updateMutex = Enter-PackageActivationUpdateGuard ('Global\VineMix.Update.' + $sid) $updateRoot
+    }
+    Assert-UiActivationUpdateHistory $updateRoot
+}
+function ReleaseUpdateGuard {
+    if ($script:updateMutex) {
+        try { $script:updateMutex.ReleaseMutex() }
+        finally { $script:updateMutex.Dispose(); $script:updateMutex = $null }
+    }
+}
+function AssertReplacementProcessGuard {
+    if (@(Get-Process -Name VineMix,VineMix.Engine,AudioMixer,AudioMixer.Engine -ErrorAction SilentlyContinue).Count) {
+        throw 'An application process appeared during package replacement. Its process and files were preserved.'
+    }
+    HoldUpdateGuard
+    Assert-DesktopDataContext $settingsPath
+    if ((Get-ActivationPhysicalPath $settingsPath) -ine $physicalSettingsPath) { throw 'The physical workspace changed during replacement.' }
 }
 function Start-PackagedEngine([string]$LogPrefix) {
     # The tested production shell-parent launcher removes inherited AppData
@@ -138,6 +166,10 @@ function Start-PackagedEngine([string]$LogPrefix) {
     Start-ActivationEngine -ExecutablePath $enginePath -WorkingDirectory $package -SettingsPath $settingsPath
 }
 function Start-PackagedUi {
+    # Normal startup checks the same update mutex. No old controller remains to
+    # prepare an update; keep history checked until the actual shortcut launch.
+    Assert-UiActivationUpdateHistory $updateRoot
+    ReleaseUpdateGuard
     Start-DesktopController -ExecutablePath $uiPath -WorkingDirectory $package -ShortcutPath $ShortcutPath `
         -OnVerifiedProcess { param($identity) $script:newUiIdentity = $identity }
 }
@@ -152,6 +184,7 @@ $newUi = $null
 $newUiIdentity = $null
 try {
     VerifyCandidate
+    Assert-UiActivationUpdateHistory $updateRoot
     foreach ($path in @($uiPath, $enginePath, $settingsPath)) {
         if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Required file is missing: $path" }
     }
@@ -182,8 +215,17 @@ try {
     $oldUiVersion = ((Get-Item -LiteralPath $uiPath).VersionInfo.ProductVersion -split '\+')[0]
     if (-not $oldVersion -or $oldVersion -cne $oldUiVersion) { throw 'The current controller and engine have different release identities.' }
     $candidateVersion = (Get-Item -LiteralPath $candidateEngine).VersionInfo.ProductVersion
+    $candidateNumericVersion = (Get-Item -LiteralPath $candidateEngine).VersionInfo.FileVersion
     $result.originalVersion = $oldVersion
     $result.candidateVersion = $candidateVersion
+    $inventoryPlan = New-PackageActivationInventoryPlan $package $evidence $candidate `
+        $result.originalUiHash $oldEngineHash $expectedUiHash $expectedHash $oldVersion $candidateVersion `
+        $candidateNumericVersion -RequireInventory:$packageOverride
+    $result.installedInventoryPresent = $inventoryPlan.Present
+    if ($inventoryPlan.Present) {
+        $result.originalInventoryHash = $inventoryPlan.OriginalHash
+        $result.candidateInventoryHash = $inventoryPlan.CandidateHash
+    }
     # Preserve every known ordinary and redirected workspace view before the
     # first process change. No backup is ever restored over a newer workspace.
     $dataBackups = @(Backup-ActivationDataViews (Split-Path -Parent $settingsPath) (Join-Path $evidence 'data-views'))
@@ -193,6 +235,9 @@ try {
     if ((FileHash $backupUi) -cne $result.originalUiHash -or (FileHash $backupEngine) -cne $oldEngineHash) {
         throw 'A current binary changed while creating its recovery backup. No process was stopped.'
     }
+    $replacements = @(
+        [pscustomobject]@{Source=$candidateEngine;Target=$enginePath;Backup=$backupEngine;OriginalHash=$oldEngineHash;CandidateHash=$expectedHash},
+        [pscustomobject]@{Source=$candidateUi;Target=$uiPath;Backup=$backupUi;OriginalHash=$result.originalUiHash;CandidateHash=$expectedUiHash})
     $quietHash = FileHash $settingsPath
     $preferencesPath = Join-Path (Split-Path -Parent $settingsPath) 'ui.json'
     $preferencesExisted = Test-Path -LiteralPath $preferencesPath -PathType Leaf
@@ -203,12 +248,15 @@ try {
     if ((FileHash $uiPath) -cne $result.originalUiHash -or (FileHash $enginePath) -cne $oldEngineHash) { throw 'The current binaries changed before activation.' }
     Assert-DesktopDataContext $settingsPath
     if ((Get-ActivationPhysicalPath $settingsPath) -ine $physicalSettingsPath) { throw 'The physical workspace changed before activation.' }
+    HoldUpdateGuard
+    Assert-UiActivationInventoryState $inventoryPlan Original
 
     # Window close hides the UI. There is no quit IPC, and the tray is unavailable
     # to this script. Release its sole pipe connection and stop engine supervision.
     $oldUi[0].Kill()
     $controllerStopped = $true
     if (-not $oldUi[0].WaitForExit(5000)) { throw 'The exact controller process did not stop.' }
+    Assert-UiActivationUpdateHistory $updateRoot
     $before = (Request 'snapshot').snapshot
     WriteEvidence 'before.json' $before
     Assert-ActivationSnapshotIdentity $before $oldEngine[0].Id $enginePath $settingsPath $physicalSettingsPath $oldVersion
@@ -223,7 +271,7 @@ try {
     $result.originalEngineHash = $oldEngineHash
     $result.settingsHashBefore = $settingsHash
     $result.revisionBefore = $before.configuration.revision
-    $beforeConfig = Canonical $before.configuration
+    $beforeConfig = Canonical (Get-PackageActivationComparableConfiguration $before.configuration)
     # Application capture has an app binding rather than a device binding.
     # Require every previously running path, including applications, to recover.
     $wasRunning = @($before.status.nodes | Where-Object { $_.path.state -eq 'Running' } | ForEach-Object id)
@@ -233,6 +281,8 @@ try {
     VerifyCandidate
     Assert-DesktopDataContext $settingsPath
     Assert-ActivationDataStable $dataBackups
+    Assert-UiActivationInventoryState $inventoryPlan Original
+    HoldUpdateGuard
     $shutdownRequested = $true
     try { $null = Request 'shutdown' } catch {
         $result.shutdownReplyWarning = $_.Exception.Message
@@ -243,10 +293,10 @@ try {
     }
     Assert-ActivationDataStable $dataBackups
     $replacementAttempted = $true
-    Replace-ActivationBinary $candidateEngine $enginePath $expectedHash
-    Replace-ActivationBinary $candidateUi $uiPath $expectedUiHash
+    Install-PackageActivationPayload $inventoryPlan $replacements { AssertReplacementProcessGuard }
     if ((FileHash $uiPath) -cne $expectedUiHash) { throw 'Installed desktop hash differs from verified candidate.' }
     if ((FileHash $enginePath) -cne $expectedHash) { throw 'The installed engine does not match the verified candidate.' }
+    Assert-UiActivationInventoryState $inventoryPlan Candidate
     $newEngine = Start-PackagedEngine 'candidate-engine'
     $controlEngineId = $newEngine.Id
     $result.newEngineId = $newEngine.Id
@@ -263,7 +313,7 @@ try {
         catch { $lastProbeError = $_.Exception.Message; continue }
         Assert-ActivationSnapshotIdentity $after $newEngine.Id $enginePath $settingsPath (Get-ActivationPhysicalPath $settingsPath) $candidateVersion
         if ((Get-ActivationPhysicalPath $settingsPath) -ine $physicalSettingsPath) { throw 'The candidate opened a different physical settings location.' }
-        if ((Canonical $after.configuration) -cne $beforeConfig) { throw 'Configuration changed across the engine restart.' }
+        if ((Canonical (Get-PackageActivationComparableConfiguration $after.configuration)) -cne $beforeConfig) { throw 'Configuration changed across the engine restart.' }
         if ($null -eq $firstFrames) { $firstFrames = [ulong]$after.status.audioFrames }
         $running = @($after.status.nodes | Where-Object { $_.path.state -eq 'Running' } | ForEach-Object id)
         $missing = @($wasRunning | Where-Object { $_ -notin $running })
@@ -276,24 +326,38 @@ try {
     WriteEvidence 'after.json' $after
     if ((FileHash $settingsPath) -cne $settingsHash) { throw 'Saved settings changed during the restart.' }
     if ((FileHash $uiPath) -cne $expectedUiHash) { throw 'The desktop executable differs from the verified candidate.' }
+    Assert-UiActivationInventoryState $inventoryPlan Candidate
     $newUi = Start-PackagedUi
     $result.newUiId = $newUi.Id
     $result.windowTitle = $newUi.MainWindowTitle
     $result.windowHandle = $newUi.MainWindowHandle.ToInt64()
-    # The UI owns the pipe now; verify persistence without competing for it.
-    Start-Sleep -Milliseconds 300
-    if ((FileHash $settingsPath) -cne $settingsHash) { throw 'Saved settings changed when reopening the controller.' }
-    if ((Test-Path -LiteralPath $preferencesPath -PathType Leaf) -ne $preferencesExisted -or
-        ($preferencesExisted -and (FileHash $preferencesPath) -cne $preferencesHash)) {
-        throw 'Workspace preferences changed when reopening the controller; the newer preferences will be preserved.'
+    # Observe longer than the desktop's six-second stalled-audio threshold.
+    # The UI now owns the control pipe; inspect identities and saved files only.
+    Invoke-PackageActivationObservation {
+        $liveControllers = @(Get-Process -Name VineMix,AudioMixer -ErrorAction SilentlyContinue)
+        $liveEngines = @(Get-Process -Name VineMix.Engine,AudioMixer.Engine -ErrorAction SilentlyContinue)
+        try { Assert-PackageActivationRunningProcesses $liveControllers $liveEngines $newUiIdentity $newEngine }
+        finally { foreach ($process in @($liveControllers) + @($liveEngines)) { $process.Dispose() } }
+        Assert-DesktopDataContext $settingsPath
+        if ((Get-ActivationPhysicalPath $settingsPath) -ine $physicalSettingsPath) { throw 'The physical workspace changed after reopening.' }
+        if ((FileHash $settingsPath) -cne $settingsHash) { throw 'Saved settings changed when reopening the controller.' }
+        if ((Test-Path -LiteralPath $preferencesPath -PathType Leaf) -ne $preferencesExisted -or
+            ($preferencesExisted -and (FileHash $preferencesPath) -cne $preferencesHash)) {
+            throw 'Workspace preferences changed when reopening the controller; the newer preferences will be preserved.'
+        }
+        if ((FileHash $uiPath) -cne $expectedUiHash -or (FileHash $enginePath) -cne $expectedHash) {
+            throw 'A candidate executable changed after reopening the controller.'
+        }
+        Assert-UiActivationInventoryState $inventoryPlan Candidate
+        Assert-UiActivationPreservedWorkspaces $dataBackups
     }
-    $liveEngines = @(Get-ExactProcess 'VineMix.Engine' $enginePath)
-    if ($liveEngines.Count -ne 1 -or $liveEngines[0].Id -ne $newEngine.Id -or $newEngine.HasExited) {
-        throw 'The candidate engine changed or exited after reopening the controller.'
-    }
+    $result.postLaunchObservationMilliseconds = 8000
+    Assert-UiActivationInventoryState $inventoryPlan Candidate
+    Assert-UiActivationPreservedWorkspaces $dataBackups
     # This local candidate replaces only the verified executables. Distribution
     # documentation and installer files belong to a later packaging/release step.
     $result.copiedDocuments = @()
+    $result.installedInventoryConsistent = $true
     $result.installedEngineHash = FileHash $enginePath
     $result.installedUiHash = FileHash $uiPath
     $result.settingsHashAfter = FileHash $settingsPath
@@ -316,6 +380,7 @@ try {
         if ($replacementAttempted) {
             $safeToRestore = $true
             try {
+                HoldUpdateGuard
                 foreach ($process in @(Get-ExactProcess 'VineMix' $uiPath)) {
                     if (-not (Test-ActivationProcessIdentity $process $newUiIdentity)) { throw 'A different controller appeared; rollback will not stop it.' }
                     $process.Kill()
@@ -338,14 +403,7 @@ try {
             } catch { $safeToRestore = $false; $recoveryErrors.Add($_.Exception.Message) }
             if ($safeToRestore) {
                 try {
-                    if ((FileHash $backupEngine) -cne $oldEngineHash) { throw 'The original engine backup hash no longer matches.' }
-                    if ((FileHash $backupUi) -cne $result.originalUiHash) { throw 'Original desktop backup hash differs.' }
-                    if ((FileHash $enginePath) -notin @($oldEngineHash,$expectedHash) -or
-                        (FileHash $uiPath) -notin @($result.originalUiHash,$expectedUiHash)) {
-                        throw 'Installed executables changed independently; rollback will not overwrite them.'
-                    }
-                    Replace-ActivationBinary $backupEngine $enginePath $oldEngineHash
-                    Replace-ActivationBinary $backupUi $uiPath $result.originalUiHash
+                    Restore-PackageActivationPayload $inventoryPlan $replacements { AssertReplacementProcessGuard }
                     if ((FileHash $uiPath) -cne $result.originalUiHash) { throw 'Restored desktop hash differs.' }
                     if ((FileHash $enginePath) -cne $oldEngineHash) { throw 'The restored engine hash does not match the original.' }
                     $result.rolledBack = $true
@@ -371,6 +429,7 @@ try {
     }
     $result.recoveryErrors = @($recoveryErrors)
 } finally {
+    ReleaseUpdateGuard
     $result.finished = [DateTimeOffset]::Now.ToString('o')
     WriteEvidence 'result.json' $result
 }

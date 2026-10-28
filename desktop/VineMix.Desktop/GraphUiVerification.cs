@@ -98,7 +98,8 @@ internal static class GraphUiVerification
             Require(workspace.ConnectNodes(spawned["mix"], spawned["eq"], "audio").Length > 0 && mixer.GraphConfig.Edges.Count == cables, "Feedback is rejected without mutating the graph");
             Require(workspace.ConnectNodes(spawned["microphone"], spawned["eq"], "audio").Length > 0, "Duplicate audio connections are rejected");
             Require(workspace.ConnectNodes(spawned["output"], spawned["gain"], "audio").Length > 0, "A listening destination cannot act as an audio source");
-            Require(workspace.ConnectNodes(spawned["control"], spawned["eq"], "control").Length == 0, "A shared control connects through the separate control path");
+            Require(workspace.ConnectNodes(spawned["control"], spawned["eq"], "control").Length > 0, "Effects reject new linked level connections");
+            Require(workspace.ConnectNodes(spawned["control"], spawned["mix"], "control").Length == 0, "A shared control connects to a Mix level knob through the separate control path");
             Require(workspace.ConnectNodes(spawned["control"], spawned["mix"], "audio").Length > 0, "Control signals cannot enter audio sockets");
 
             workspace.NodeChanged(spawned["eq"], n => { n.EqBands = EqBand.Defaults(); n.EqBands[2].FrequencyHz = 1800; n.EqBands[2].GainDb = -6; n.EqBands[2].Q = 1.4; n.Bypass = true; });

@@ -1,9 +1,12 @@
 VINEMIX INSTALLATION HELP
 
 First time here?
-  Install VineMix only: leave both optional driver checkboxes clear and click
-  Next. Your existing Windows microphone and headphones do not require either
-  bundled driver. You can run Setup again to add an optional driver later.
+  Keep both missing-driver checkboxes selected to enable VineMix's Virtual
+  input and Virtual output. VB-CABLE is required for Virtual input; a compatible
+  VAC driver is required for Virtual output, and VAC Lite is included.
+  Existing drivers are retained. Read and accept the selected drivers' terms.
+  If you only need physical microphone/headphone routing, you can clear both
+  boxes. You can run Setup again to add a missing driver later.
   After installation, open VineMix, choose your microphone on Physical input,
   then choose headphones on Listening output. New outputs start muted; turn up
   and unmute only when you are ready to listen quietly.
@@ -35,7 +38,7 @@ Existing portable copies
   hides it to the tray. Do not manually run two engines against the same files.
 
 Virtual audio drivers
-  Both are optional and start unchecked. Choose one only for its use case:
+  Missing drivers are selected by default for these features:
   - VB-CABLE: route other applications' playback into VineMix's Virtual input.
     Running app capture is another way to receive one application's audio.
   - VAC Lite: send VineMix's Virtual output to a recording/microphone app.
@@ -43,9 +46,11 @@ Virtual audio drivers
   Setup checks installed device and driver-package identity, including disabled
   devices. Existing packages are kept; their names/settings are not reset.
   When you select a missing driver, the next page shows separate vendor terms.
-  Driver installation requires your consent and administrator approval in the
-  original vendor installation window. Restart Windows before using a new
-  driver. Cancelling that window leaves VineMix installed; run Setup to retry.
+  Driver installation requires your consent and administrator approval.
+  VAC Lite installs first, then VB-CABLE. If a vendor window asks for a restart,
+  finish VineMix Setup before restarting. VB-CABLE requires a restart; VAC
+  normally works immediately, but may request a restart in some cases.
+  Cancelling a driver leaves VineMix installed; run Setup to retry.
 
   VB-CABLE by VB-Audio is donationware; all contributions are welcome.
   https://vb-audio.com/Cable/

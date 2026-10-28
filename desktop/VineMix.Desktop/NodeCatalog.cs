@@ -16,8 +16,8 @@ internal static class NodeCatalog
             "Inputs" => "Bring sound into the workspace from a microphone, a virtual cable or a running app.",
             "Outputs" => "Send the finished mix to a listening device or to a virtual microphone for another app.",
             "Effects" => "Shape tone, control loudness, reduce unwanted noise or add space to an audio path.",
-            "Mixing" => "Combine audio paths, adjust stereo balance or combine left and right into mono.",
-            "Controls" => "Share one level adjustment across several connected nodes using control connections.",
+            "Mixing" => "Combine, split and blend audio paths, or adjust their stereo position and width.",
+            "Controls" => "Scale several node levels together using a linked multiplier.",
             _ => ""
         };
     }
@@ -27,13 +27,13 @@ internal static class NodeCatalog
         new("Inputs", "NodeInputHeaderBrush", ["microphone", "virtualInput", "appInput"]),
         new("Outputs", "NodeOutputHeaderBrush", ["output", "virtualOutput"]),
         new("Effects", "NodeProcessorHeaderBrush", ["eq", "tone", "voiceColor", "highPass", "lowPass", "compressor", "limiter", "ducking", "expander", "gate", "alignmentDelay", "denoiser", "plosive", "deEsser", "reverb"]),
-        new("Mixing", "NodeUtilityHeaderBrush", ["mix", "pan", "mono"]),
+        new("Mixing", "NodeUtilityHeaderBrush", ["mix", "pan", "mono", "channelSwap", "stereoWidth", "stereoPan", "crossfade", "stereoCombine", "stereoSplit"]),
         new("Controls", "NodeControllerHeaderBrush", ["control"])
     ];
 
     internal static Category CategoryFor(string kind) => Categories.First(category => category.Kinds.Contains(kind is "gain" or "reroute" ? "mix" : kind));
     internal static bool CanCreate(string kind) => Categories.Any(category => category.Kinds.Contains(kind));
-    internal static bool HasLevelControl(string kind) => kind is "microphone" or "virtualInput" or "appInput" or "output" or "virtualOutput" or "mix" or "gain" or "control" or "reroute";
+    internal static bool HasLevelControl(string kind) => kind is "microphone" or "virtualInput" or "appInput" or "output" or "virtualOutput" or "mix" or "gain" or "reroute";
     internal static string Title(string kind) => GraphDefaults.KindLabel(kind);
     internal static string Description(string kind) => kind switch
     {
@@ -60,14 +60,20 @@ internal static class NodeCatalog
         "mix" => "Combine several incoming audio paths and adjust their shared level, or use one input to control a single branch.",
         "pan" => "Adjust left/right stereo balance by reducing the opposite channel. Centre preserves the original stereo sound.",
         "mono" => "Combine left and right equally and send the same centred sound to both channels.",
-        "control" => "Adjust the level of several connected nodes together. Uses control connections and carries no audio.",
+        "channelSwap" => "Exchange the left and right channels without changing their levels.",
+        "stereoWidth" => "Adjust stereo width: 0% is mono, 100% keeps the original sound, and 200% widens existing stereo detail.",
+        "stereoPan" => "Position a mono signal from left to right using equal-power panning. Stereo input is first combined to mono.",
+        "crossfade" => "Blend stereo inputs A and B with one control. Equal power suits different sources; Linear suits matching signals. Bypass plays A only.",
+        "stereoCombine" => "Place the Left input in the left channel and the Right input in the right channel of one stereo output. Each input is combined to mono; an empty side stays silent.",
+        "stereoSplit" => "Extract left and right from stereo audio as separate mono outputs, ready for independent processing or Stereo Combine.",
+        "control" => "Scale connected node levels together. 100% is unchanged; 0% is silent.",
         "gain" => "Adjust the level of one audio path. Kept for existing workspaces; use Mix when adding a node.",
         "reroute" => "Pass audio through a named point in an existing route. Kept for existing workspaces.",
         _ => ""
     };
     internal static bool MatchesSearch(string kind, string query)
         => (Title(kind) + " " + kind + " " + CategoryFor(kind).Title + " " + Description(kind)
-            + (kind == "ducking" ? " sidechain music voice trigger" : "")).Contains(query, System.StringComparison.OrdinalIgnoreCase);
+            + (kind == "ducking" ? " sidechain music voice trigger" : kind == "control" ? " multiplier volume" : "")).Contains(query, System.StringComparison.OrdinalIgnoreCase);
     internal static string HeaderBrushKey(string kind) => CategoryFor(kind).HeaderBrushKey;
     internal static Brush HeaderBrush(string kind) => CategoryFor(kind).HeaderBrush;
 }

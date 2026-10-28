@@ -85,12 +85,29 @@ This object is stored under `configuration.graph`, alongside the retained legacy
 fields. IDs are stable and independent of names or positions. Node kinds:
 `microphone`, `virtualInput`, `appInput`, `mix`, `eq`, `tone`, `highPass`, `lowPass`,
 `compressor`, `limiter`, `ducking`, `expander`, `gate`, `alignmentDelay`, `denoiser`, `deEsser`, `plosive`, `reverb`, `voiceColor`, `pan`, `mono`, `output`,
-`virtualOutput`, `control`. Legacy `gain` and `reroute` remain supported for
+`virtualOutput`, `control`, `channelSwap`, `stereoWidth`, `stereoPan`, `crossfade`,
+`stereoCombine`, `stereoSplit`. Legacy `gain` and `reroute` remain supported for
 existing graphs and clipboard compatibility, but are absent from the Add menu.
 
 Nodes also serialize the optional effect records below. Missing records use these
 defaults when reading older configuration files; reading does not save the file.
 Values are finite and validated before plan construction.
+
+Mixing nodes add `stereoWidth` (default 1, range 0–2), `panPosition` (default 0,
+range −1–1), `crossfadePosition` (default 0, range 0–1), and `crossfadeCurve`
+(default `equalPower`, alternatively `linear`). Pan averages its input to mono
+before constant-power positioning. Width scales the side component while
+preserving mid. Crossfade bypass selects A. Split and Combine retain their
+routing even if a legacy client supplies bypass.
+
+Edges add `fromPort` and `toPort`, both defaulting to `audio` when omitted.
+Stereo Split exposes `left` and `right` output ports; Stereo Combine accepts
+`left` and `right` input ports; Crossfade accepts `a` and `b` input ports.
+Other audio ports remain `audio`. Control cables keep both fields `audio`;
+sidechain cables use `toPort: audio` and can select a Split output with
+`fromPort`. Port selection participates in duplicate detection and topology.
+An extracted Split output is dual mono internally; Combine averages each
+incoming frame before routing it to the selected side. Missing inputs are silent.
 
 | Field | Defaults | Ranges |
 |---|---|---|
@@ -154,8 +171,13 @@ Connections:
 ```
 
 An audio edge connects a source/processor to a processor/output. A control edge
-connects a `control` node to an audio node and adds the control's dB offset plus
-the edge's dB offset. Muting the control node silences its connected targets.
+connects a `control` node to an audio node. `controlMultiplier` defaults to `-1`
+for compatibility: this sentinel uses the existing control `gainDb`. An explicit
+finite value from 0 to 2 replaces the control's dB offset with a linear amplitude
+multiplier; 0 is exact silence, 1 unity, and 2 double amplitude. The control
+cable's dB offset still applies. Control bypass removes the multiplier, including
+zero; explicit legacy node mute remains authoritative. New desktop controls use
+multiplier 1. Muting the control node silences its connected targets.
 Muting the control connection disengages that shared control, restoring the
 target's local level and mute settings.
 A target accepts one control edge. No edge can reference a missing node,

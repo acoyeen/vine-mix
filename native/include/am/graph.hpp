@@ -6,7 +6,9 @@
 
 namespace am {
 enum class GraphKind { microphone, virtualInput, appInput, mix, gain, output, virtualOutput, control,
-    eq, tone, compressor, pan, mono, reroute, highPass, lowPass, denoiser, deEsser, plosive, reverb, voiceColor, expander, alignmentDelay, limiter, ducking, gate };
+    eq, tone, compressor, pan, mono, reroute, highPass, lowPass, denoiser, deEsser, plosive, reverb, voiceColor, expander, alignmentDelay, limiter, ducking, gate,
+    channelSwap, stereoWidth, stereoPan, crossfade, stereoCombine, stereoSplit };
+enum class GraphPort { audio, left, right, a, b };
 bool isSource(GraphKind kind) noexcept;
 bool isSink(GraphKind kind) noexcept;
 
@@ -16,6 +18,7 @@ struct GraphPlan {
         std::string id;
         GraphKind kind{};
         float gainDb{};
+        float controlMultiplier = -1;
         bool muted{};
         bool mono{};
         bool selectedMicrophoneChannel{};
@@ -33,6 +36,8 @@ struct GraphPlan {
         ExpanderSettings expander{};
         AlignmentDelaySettings alignmentDelay{};
         float panLeft = 1, panRight = 1;
+        float stereoWidth = 1, position{}, fadePosition{};
+        bool equalPower = true;
         bool bypass{};
         DenoiserSettings denoiser{};
         DeEsserSettings deEsser{};
@@ -49,6 +54,7 @@ struct GraphPlan {
         bool sidechain{};
         float gainDb{};
         bool muted{};
+        GraphPort fromPort = GraphPort::audio, toPort = GraphPort::audio;
         bool operator==(const Edge&) const = default;
     };
     std::array<Node, maximumGraphNodes> nodes;
@@ -107,6 +113,7 @@ private:
         double duckingGain = 1, duckingDetector{};
         bool duckingActive{};
         Ramp wet{}, panLeft{}, panRight{}, makeup{}, mono{}, limitMix{};
+        Ramp width{}, position{}, fadePosition{}, fadeCurve{};
     };
     std::array<std::array<Frame, quantumFrames>, maximumGraphNodes> buffers_{};
     std::array<Ramp, maximumGraphNodes> nodeRamps_{};

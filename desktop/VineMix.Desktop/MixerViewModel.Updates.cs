@@ -74,6 +74,7 @@ public sealed partial class MixerViewModel
         bool entered = false;
         try
         {
+            EnsureUiPreferencesSaved();
             await _engineGate.WaitAsync(token); entered = true;
             _restartOperations!.ValidateTarget();
             ConnectionStatus = "Saving your workspace before updating…";
@@ -90,6 +91,7 @@ public sealed partial class MixerViewModel
                     if (_pending.Count == 0)
                     {
                         Accept(current, forceConfiguration: true);
+                        EnsureUiPreferencesSaved();
                         return current;
                     }
                 }
@@ -112,6 +114,7 @@ public sealed partial class MixerViewModel
                     throw new IOException("The saved workspace could not be confirmed. The update was not started.");
                 AcknowledgePending(batch, null); _unconfirmedUpdateBatch = null;
                 Accept(confirmed, forceConfiguration: true);
+                EnsureUiPreferencesSaved();
                 return confirmed;
             }
             throw new IOException("The workspace changed repeatedly while saving. Your edits have been retained; try the update again.");
@@ -165,6 +168,7 @@ public sealed partial class MixerViewModel
         bool entered = false;
         try
         {
+            EnsureUiPreferencesSaved();
             await _engineGate.WaitAsync(token); entered = true;
             var latest = await _restartOperations!.Request("snapshot", null, null, token);
             if (!latest.Ok || latest.Snapshot is null || _pending.Count != 0
@@ -173,6 +177,9 @@ public sealed partial class MixerViewModel
                 || !SameSavedConfiguration(prepared.Configuration, latest.Snapshot.Configuration)
                 || latest.Snapshot.EnginePid != prepared.EnginePid)
                 throw new IOException("The workspace or audio engine changed during update preparation. Try again after it has saved.");
+            // Preferences may change while the final snapshot is awaited.
+            // Recheck them at the same last boundary as the engine workspace.
+            EnsureUiPreferencesSaved();
             ConnectionStatus = "Stopping audio for the update…";
             var response = await _restartOperations.Request("shutdown", null, null, token);
             if (!response.Ok) throw new IOException("The audio engine did not accept a clean shutdown. " + response.Error);

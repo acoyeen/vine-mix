@@ -71,7 +71,7 @@ internal static class GraphConnectionVerification
         require(!GraphConnectionEditing.TryApply(graph, detach!, out _) && JsonSerializer.Serialize(graph) == before,
             "An incident cable-level change invalidates a pending detach without a partial edge mutation.");
 
-        foreach (string kind in GraphDefaults.Kinds.Where(k => GraphDefaults.HasAudioInput(k) && GraphDefaults.HasAudioOutput(k)))
+        foreach (string kind in GraphDefaults.Kinds.Where(k => GraphConnectionEditing.IsInsertable(GraphDefaults.NewNode(k, 0, 0))))
         {
             graph = Fixture(kind); graph.Edges = [Edge("original", "source", "a", -11, true)];
             before = JsonSerializer.Serialize(graph);

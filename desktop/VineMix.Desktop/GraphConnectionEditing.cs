@@ -19,9 +19,12 @@ internal static class GraphConnectionEditing
         if (ValidateEdges(graph, plan, out error)) return true;
         plan = null; return false;
     }
-    internal static bool TryPrepareRewire(GraphConfiguration graph, GraphEdge original, string destination, out EdgePlan? plan, out string error)
+    internal static bool TryPrepareRewire(GraphConfiguration graph, GraphEdge original, string destination, out EdgePlan? plan, out string error, string destinationPort = "audio")
     {
-        var replacement = original.Copy(); replacement.To = destination;
+        var replacement = original.Copy(); replacement.To = destination; replacement.ToPort = destinationPort;
+        if (replacement.Kind == "control" && (replacement.To != original.To || replacement.ToPort != original.ToPort)
+            && graph.Nodes.FirstOrDefault(n => n.Id == destination) is { } target && !LinkedLevelControl.SupportsInput(target.Kind))
+        { plan = null; error = "Connect Level control to a node with a Level knob."; return false; }
         plan = new([original.Copy()], [replacement]);
         if (ValidateEdges(graph, plan, out error)) return true;
         plan = null; return false;
@@ -45,6 +48,11 @@ internal static class GraphConnectionEditing
         if (plan.Removed.Any(old => !graph.Edges.Any(e => SameEdge(e, old)))
             || plan.Added.Any(added => graph.Edges.Any(e => e.Id == added.Id && !removed.Contains(e.Id))))
         { error = "A cable changed during this gesture. Its current connections were kept."; return false; }
+        if (plan.Added.Any(added => added.Kind == "control"
+                && !plan.Removed.Any(old => old.Kind == "control" && old.From == added.From && old.To == added.To
+                    && old.FromPort == added.FromPort && old.ToPort == added.ToPort)
+                && graph.Nodes.FirstOrDefault(n => n.Id == added.To) is { } target && !LinkedLevelControl.SupportsInput(target.Kind)))
+        { error = "Connect Level control to a node with a Level knob."; return false; }
         error = GraphDefaults.Validate(EdgeOnlyCopy(graph, graph.Edges.Where(e => !removed.Contains(e.Id)).Concat(plan.Added)));
         return error.Length == 0;
     }
@@ -77,7 +85,7 @@ internal static class GraphConnectionEditing
     }
 
     internal static bool IsInsertable(GraphNode node)
-        => GraphDefaults.HasAudioInput(node.Kind) && GraphDefaults.HasAudioOutput(node.Kind);
+        => GraphDefaults.AudioInputPorts(node.Kind) is ["audio"] && GraphDefaults.AudioOutputPorts(node.Kind) is ["audio"];
 
     internal static string InsertionError(GraphConfiguration graph, string nodeId, string edgeId)
     {
@@ -91,11 +99,11 @@ internal static class GraphConnectionEditing
         if (edge is null || edge.Kind != "audio") return "Drop the node onto an audio cable.";
         if (graph.Edges.Count >= 96) return "Inserting a node needs one spare connection slot (96 maximum).";
         var candidate = EdgeOnlyCopy(graph, graph.Edges.Where(e => e.Id != edgeId));
-        var incoming = new GraphEdge { From = edge.From, To = nodeId, GainDb = edge.GainDb, Muted = edge.Muted };
+        var incoming = new GraphEdge { From = edge.From, FromPort = edge.FromPort, To = nodeId, GainDb = edge.GainDb, Muted = edge.Muted };
         string error = GraphDefaults.ConnectionError(candidate, incoming);
         if (error.Length > 0) return error;
         candidate.Edges.Add(incoming);
-        return GraphDefaults.ConnectionError(candidate, new GraphEdge { From = nodeId, To = edge.To });
+        return GraphDefaults.ConnectionError(candidate, new GraphEdge { From = nodeId, To = edge.To, ToPort = edge.ToPort });
     }
 
     internal static bool TryPrepareInsertion(GraphConfiguration graph, string nodeId, string edgeId, out Plan? plan, out string error)
@@ -105,8 +113,8 @@ internal static class GraphConnectionEditing
         var node = graph.Nodes.Single(n => n.Id == nodeId);
         var edge = graph.Edges.Single(e => e.Id == edgeId);
         plan = new(nodeId, node.Kind, graph.Edges.Where(e => e.From == nodeId || e.To == nodeId).Select(e => e.Copy()).ToArray(), [edge.Copy()],
-            [new() { Id = Guid.NewGuid().ToString("N"), From = edge.From, To = nodeId, GainDb = edge.GainDb, Muted = edge.Muted },
-             new() { Id = Guid.NewGuid().ToString("N"), From = nodeId, To = edge.To }]);
+            [new() { Id = Guid.NewGuid().ToString("N"), From = edge.From, FromPort = edge.FromPort, To = nodeId, GainDb = edge.GainDb, Muted = edge.Muted },
+             new() { Id = Guid.NewGuid().ToString("N"), From = nodeId, To = edge.To, ToPort = edge.ToPort }]);
         return ValidatePlan(graph, plan, out error);
     }
 
@@ -131,7 +139,7 @@ internal static class GraphConnectionEditing
             if (!AudioLevel.IsValidGain(gain))
             { error = "The combined path level cannot fit in one cable's range. Detach left the connections unchanged."; return false; }
             added.Add(new() { Id = Guid.NewGuid().ToString("N"), From = inputs[0].From, To = output.To,
-                GainDb = gain, Muted = inputs[0].Muted || output.Muted });
+                FromPort = inputs[0].FromPort, ToPort = output.ToPort, GainDb = gain, Muted = inputs[0].Muted || output.Muted });
         }
         plan = new(node.Id, node.Kind, incident.Select(e => e.Copy()).ToArray(),
             incident.Select(e => e.Copy()).ToArray(), added);
@@ -170,5 +178,6 @@ internal static class GraphConnectionEditing
         => new() { Nodes = graph.Nodes, Edges = edges.ToList(), PanX = graph.PanX, PanY = graph.PanY, Zoom = graph.Zoom };
     private static bool SameEdge(GraphEdge first, GraphEdge second)
         => first.Id == second.Id && first.From == second.From && first.To == second.To && first.Kind == second.Kind
+            && first.FromPort == second.FromPort && first.ToPort == second.ToPort
             && first.GainDb == second.GainDb && first.Muted == second.Muted;
 }

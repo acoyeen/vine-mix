@@ -1,0 +1,11 @@
+{
+  "name": "vine-mix-website-redesign",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "check": "node scripts/check-story.mjs && node scripts/check-meters.mjs && node scripts/check-floating-brand.mjs && node scripts/check-page-navigation.mjs && node scripts/check-releases.mjs && node scripts/check-pipeline.mjs && node scripts/check-download-atmosphere.mjs && node scripts/check-p-shader.mjs && node scripts/check-server.mjs && node scripts/check-build.mjs",
+    "check:browser": "node scripts/check-browser.mjs",
+    "start": "node scripts/serve.mjs"
+  }
+}

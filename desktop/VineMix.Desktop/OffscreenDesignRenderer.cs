@@ -115,8 +115,9 @@ internal sealed class OffscreenDesignRenderer
             }
             RenderMenu(MainWindow.CreateSettingsMenu(mixer), "settings-menu.png");
             string? copiedVersion = null;
-            bool aboutClosed = false;
-            var about = MainWindow.CreateAboutContent(() => aboutClosed = true, value => copiedVersion = value);
+            bool aboutClosed = false, creditsOpened = false;
+            var about = MainWindow.CreateAboutContent(() => aboutClosed = true, value => copiedVersion = value,
+                showCredits: () => creditsOpened = true);
             var aboutHost = new Border { Width = 520, Child = about, UseLayoutRounding = true, SnapsToDevicePixels = true };
             TextElement.SetFontFamily(aboutHost, window.FontFamily); TextElement.SetFontSize(aboutHost, 13);
             aboutHost.SetResourceReference(TextElement.ForegroundProperty, "ConsoleTextBrush");
@@ -128,11 +129,14 @@ internal sealed class OffscreenDesignRenderer
                 "About exposes selectable full version, build, source and distribution information.");
             Render(aboutHost, "about.png");
             var aboutButtons = Descendants<Button>(aboutHost).ToArray();
+            aboutButtons.Single(button => Equals(button.Content, "Credits and licences")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Require(creditsOpened, "The About Credits and licences action is available without network access.");
             aboutButtons.Single(button => Equals(button.Content, "Copy version information")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Require(copiedVersion == ReleaseInfo.FullInformation,
                 "The real About Copy action passes complete version information to an injected inert clipboard action.");
             aboutButtons.Single(button => Equals(button.Content, "Close")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Require(aboutClosed, "The real About Close action invokes its close callback.");
+            CreditsVerification.Run(Require, (element, name) => Render(element, name));
             RequireNoNativeWindow(root);
             Require(_bindings.Messages.Length == 0, "Sanitized documentation renders have no WPF binding errors.");
             WriteReport(true, null);
@@ -175,6 +179,7 @@ internal sealed class OffscreenDesignRenderer
             Render(QuitRecoveryVerification.Preview(), "quit-recovery.png");
             await UpdateUiVerification.RunAsync(Require, (element, name) => Render(element, name));
             Render(WhatsNewVerification.Run(Require), "whats-new.png");
+            CreditsVerification.Run(Require, (element, name) => Render(element, name));
             await AddNodeHelpVerification.RunAsync(Require);
             DeviceVisibilitySettingsVerification.Run(Require);
             NodeSearchVerification.Run(Require);
@@ -182,6 +187,8 @@ internal sealed class OffscreenDesignRenderer
             LayoutLockVerification.Run(Require, (element, name) => Render(element, name));
             Render(DeviceChoicesVerification.Run(Require), "device-visibility.png");
             GraphConnectionVerification.Run(Require);
+            MixingRoutingVerification.Run(Require);
+            LinkedControlVerification.Run(Require);
             WorkspaceHistoryVerification.Run(Require);
             AutosaveVerification.Run(Require);
             GestureHistoryVerification.Run(Require);
@@ -194,6 +201,7 @@ internal sealed class OffscreenDesignRenderer
             var openedWebsites = new List<string>();
             var window = new MainWindow(mixer, openedWebsites.Add);
             Render(RotaryControlVerification.Run(Require), "rotary-controls.png");
+            Render(PointerEntryVerification.Run(Require), "numeric-entry-retained-draft.png");
             Render(ToolTipVerification.Run(Require), "tooltips.png");
             CheckNumericResetAndEntryTemplates();
             CheckStereoMeters();
@@ -284,9 +292,15 @@ internal sealed class OffscreenDesignRenderer
             await DynamicsFeedbackVerification.RunAsync(workspace, mixer, () => Layout(root), Require,
                 (view, name) => RenderNode(view, workspace, name));
             await GraphGroupVerification.RunAsync(workspace, mixer, () => Layout(root), Require, name => Render(root, name));
+            await NamedFrameVerification.RunAsync(workspace, mixer, () => Layout(root), Require, name => Render(root, name));
+            NodeStackingVerification.Run(Require, (element, name) => Render(element, name));
             workspace.SetMessage("");
             await CheckMicrophoneControls(root, workspace, mixer);
             await NodePresentationVerification.RunAsync(workspace, mixer, () => Layout(root), Require);
+            await MixingNodePresentationVerification.RunAsync(workspace, mixer, () => Layout(root), Require,
+                (view, name) => RenderNode(view, workspace, name));
+            await LinkedControlPresentationVerification.RunAsync(workspace, mixer, () => Layout(root), Require,
+                (view, name) => RenderNode(view, workspace, name));
             await PeakMeterPresentationVerification.RunAsync(workspace, mixer, () => Layout(root), Require,
                 (element, name) => Render(element, name));
             InputAvailabilityVerification.Run(Require);
@@ -335,7 +349,7 @@ internal sealed class OffscreenDesignRenderer
             await CanvasNavigationVerification.RunAsync(workspace, mixer, () => Layout(root), Require);
             await FrameSelectionVerification.RunAsync(workspace, mixer, () => Layout(root), Require, name => Render(root, name));
             await WorkspaceHelpVerification.RunAsync(window, mixer, root, () => Layout(root), Require, name => Render(root, name), (name, dpi) => Render(root, name, dpi));
-            await SettingsSearchVerification.RunAsync(window, mixer, root, () => Layout(root), Require, (menu, name) => RenderMenu(menu, name));
+            await SettingsSearchVerification.RunAsync(window, mixer, root, () => Layout(root), Require, (menu, name, dpi) => RenderMenu(menu, name, dpi));
             await NodeSearchPresentationVerification.RunAsync(window, mixer, root, () => Layout(root), Require, name => Render(root, name));
             await NodeAlignmentPresentationVerification.RunAsync(workspace, mixer, () => Layout(root), Require, name => Render(root, name));
             await NodeAlignmentReplayVerification.RunAsync(workspace, mixer, () => Layout(root), Require);
@@ -361,6 +375,7 @@ internal sealed class OffscreenDesignRenderer
                     else Render(element, name);
                 });
             await CableHoverBoundsVerification.RunAsync(workspace, mixer, () => Layout(root), Require);
+            await MixingRoutingVerification.RunAsync(workspace, mixer, () => Layout(root), Require);
             await GraphConnectionVerification.RunAsync(workspace, mixer, () => Layout(root), Require, name =>
             {
                 // Include both endpoints and the target highlight without panning or
@@ -1057,7 +1072,7 @@ internal sealed class OffscreenDesignRenderer
         }
     }
 
-    private void RenderMenu(ContextMenu menu, string filename)
+    private void RenderMenu(ContextMenu menu, string filename, double dpi = 96)
     {
         // Render the real menu tree without opening its Popup or a native window.
         menu.Visibility = Visibility.Visible; menu.ApplyTemplate();
@@ -1070,7 +1085,7 @@ internal sealed class OffscreenDesignRenderer
         // Fix the width before measuring wrapped item headers and feedback.
         menu.Measure(new Size(menu.Width, 520));
         menu.Height = Math.Min(menu.MaxHeight, Math.Max(80, menu.DesiredSize.Height + 4));
-        Render(menu, filename);
+        Render(menu, filename, dpi);
         Require(!menu.IsOpen && PresentationSource.FromVisual(menu) is null, "Menu preview remains detached from the desktop.");
     }
 
@@ -1615,7 +1630,9 @@ internal sealed class OffscreenDesignRenderer
     private void CheckSockets(GraphNodeView node, bool collapsed)
     {
         var sockets = Descendants<GraphWorkspace.Socket>(node).ToList();
-        Require(sockets.Count == 3, $"The {(collapsed ? "collapsed" : "expanded")} EQ retains audio input/output and control input sockets.");
+        Require(sockets.Count == 2 && sockets.All(socket => socket.Kind == "audio")
+                && sockets.Count(socket => socket.Output) == 1,
+            $"The {(collapsed ? "collapsed" : "expanded")} EQ has audio input/output and no unused Level control socket.");
         var centers = sockets.ToDictionary(socket => socket, socket => socket.TranslatePoint(new Point(socket.ActualWidth / 2, socket.ActualHeight / 2), node));
         Require(sockets.All(socket => EffectivelyVisible(socket, node) && socket.Content is FrameworkElement shape
                 && shape.Visibility == Visibility.Visible && shape.ActualWidth > 0 && shape.ActualHeight > 0
@@ -1623,12 +1640,7 @@ internal sealed class OffscreenDesignRenderer
                 && centers[socket].Y > 0 && centers[socket].Y < node.ActualHeight),
             $"All {(collapsed ? "collapsed" : "expanded")} EQ socket glyphs remain visible at the correct node edge, with centers inside its height.");
         var inputs = sockets.Where(socket => !socket.Output).OrderBy(socket => centers[socket].Y).ToList();
-        double firstGlyphHeight = ((FrameworkElement)inputs[0].Content).ActualHeight;
-        double secondGlyphHeight = ((FrameworkElement)inputs[1].Content).ActualHeight;
-        Require(centers[inputs[1]].Y - centers[inputs[0]].Y >= (firstGlyphHeight + secondGlyphHeight) / 2 + 1,
-            $"The {(collapsed ? "collapsed" : "expanded")} EQ audio/control input glyphs have separate, non-overlapping vertical positions; pointer hit-testing is not exercised.");
-        Require(centers[inputs[1]].Y - centers[inputs[0]].Y >= (inputs[0].ActualHeight + inputs[1].ActualHeight) / 2 - .01,
-            $"The {(collapsed ? "collapsed" : "expanded")} EQ audio/control button hit regions do not overlap after layout rounding.");
+        Require(inputs.Count == 1 && inputs[0].Kind == "audio", "EQ exposes only its required audio input.");
         _socketLayouts.Add(new
         {
             node = "Equalizer", collapsed, width = node.ActualWidth, height = node.ActualHeight,

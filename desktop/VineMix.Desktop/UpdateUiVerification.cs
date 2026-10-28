@@ -27,6 +27,8 @@ internal static class UpdateUiVerification
     internal static async Task RunAsync(Action<bool, string> require, Action<FrameworkElement, string>? render = null)
     {
         IInputElement? focus = Keyboard.FocusedElement;
+        WorkspaceDialogVerification.Run(require);
+        await VerifyAboutAsync(require, render);
         using var controller = new UpdateController(preview: true);
         using var preferences = new MixerViewModel(preview: true);
         var changed = new HashSet<string>();
@@ -84,8 +86,8 @@ internal static class UpdateUiVerification
         require(controller.IsBusy && controller.IsInstalling && !controller.CanCheck && !controller.CanDownload
             && !controller.CanInstall && !controller.CanCancel && progress.Visibility == Visibility.Visible && progress.IsIndeterminate
             && new[] { "Check for updates", "Download update", "Install and restart", "Cancel" }.All(label => !buttons[label].IsEnabled && buttons[label].Visibility == Visibility.Collapsed)
-            && !buttons["Close"].IsEnabled,
-            "Installation hides unavailable actions, disables Close and keeps the progress indicator visible.");
+            && !buttons["Close"].IsEnabled && !automatic.IsEnabled,
+            "Installation hides unavailable actions, disables Close and preference edits, and keeps the progress indicator visible.");
         Capture("updates-installing.png");
         buttons["Close"].RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         controller.Cancel(); await controller.CheckAsync();
@@ -93,6 +95,7 @@ internal static class UpdateUiVerification
             "Close, cancellation and another check cannot dismiss or replace an installation already in progress.");
         controller.SetInstalling(false); controller.Report("The update did not finish. Your current session is still available; try again when ready.");
         await Arrange(root); RequireIdle();
+        require(automatic.IsEnabled, "Automatic-check preferences become editable again after installation preparation ends.");
         Capture("updates-error.png");
         require(status.Text == controller.Message && changed.IsSupersetOf([nameof(UpdateController.Message), nameof(UpdateController.IsBusy),
             nameof(UpdateController.IsInstalling), nameof(UpdateController.CanCheck), nameof(UpdateController.CanDownload),
@@ -183,6 +186,48 @@ internal static class UpdateUiVerification
 
     private static bool SameColour(Brush actual, Brush expected) => actual is SolidColorBrush first
         && expected is SolidColorBrush second && first.Color == second.Color;
+
+    private static async Task VerifyAboutAsync(Action<bool, string> require, Action<FrameworkElement, string>? render)
+    {
+        int closed = 0, checkedUpdates = 0;
+        string? copiedVersion = null;
+        var content = MainWindow.CreateAboutContent(() => closed++, value => copiedVersion = value, () => checkedUpdates++);
+        var root = new Border { Width = 520, Child = content, UseLayoutRounding = true };
+        root.SetResourceReference(Border.BackgroundProperty, "ConsoleWindowBrush");
+        root.SetResourceReference(TextBlock.ForegroundProperty, "ConsoleTextBrush");
+        var buttons = Descendants<Button>(root).ToDictionary(button => (string)button.Content);
+        var version = Descendants<TextBox>(root).Single();
+        require(buttons.Keys.ToHashSet().SetEquals(["Close", "Check for updates", "Copy version information"])
+            && version.IsReadOnly && version.Text == ReleaseInfo.FullInformation,
+            "The real About footer retains close, checking for updates and copying complete selectable build information.");
+        foreach (double dpi in new[] { 96d, 144d, 192d })
+        foreach (double width in new[] { 440d, 520d })
+        {
+            VisualTreeHelper.SetRootDpi(root, new DpiScale(dpi / 96, dpi / 96));
+            root.Width = width; await Arrange(root);
+            bool Fits(FrameworkElement element)
+            {
+                var bounds = element.TransformToAncestor(root).TransformBounds(new Rect(element.RenderSize));
+                return bounds.Width > 0 && bounds.Height > 0 && bounds.Left >= 0 && bounds.Top >= 0
+                    && bounds.Right <= root.ActualWidth + 1 && bounds.Bottom <= root.ActualHeight + 1;
+            }
+            var buttonBounds = buttons.Values.Select(button => button.TransformToAncestor(root)
+                .TransformBounds(new Rect(button.RenderSize))).ToArray();
+            require(buttons.Values.All(Fits) && Fits(version)
+                && buttonBounds.SelectMany((first, index) => buttonBounds.Skip(index + 1).Select(second => (first, second)))
+                    .All(pair => { var overlap = Rect.Intersect(pair.first, pair.second);
+                        return overlap.IsEmpty || overlap.Width < .01 || overlap.Height < .01; }),
+                $"At About width {width:0} and DPI {dpi:0}, all three actions and the version details fit without overlap.");
+        }
+        VisualTreeHelper.SetRootDpi(root, new DpiScale(1, 1)); root.Width = 520; await Arrange(root);
+        root.Height = Math.Ceiling(root.ActualHeight); render?.Invoke(root, "about-current.png");
+        buttons["Copy version information"].RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        buttons["Check for updates"].RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        buttons["Close"].RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        require(copiedVersion == ReleaseInfo.FullInformation && checkedUpdates == 1 && closed == 1
+            && PresentationSource.FromVisual(root) is null,
+            "All three About actions reach their distinct callbacks once without clipboard access, update checks or native windows.");
+    }
 
     private static UpdateOffer CreateOffer()
     {

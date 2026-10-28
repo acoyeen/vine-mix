@@ -39,12 +39,12 @@ internal static class NativeCaption
     }
 
     /// <summary>Own the title-bar visuals while retaining native move and system-menu behavior.</summary>
-    public static void Attach(Window window, double captionHeight = 52, bool resizable = false)
+    public static void Attach(Window window, double captionHeight = 52, bool resizable = false, bool movable = true)
     {
         window.WindowStyle = WindowStyle.None;
         WindowChrome.SetWindowChrome(window, new WindowChrome
         {
-            CaptionHeight = captionHeight,
+            CaptionHeight = movable ? captionHeight : 0,
             ResizeBorderThickness = new Thickness(resizable ? ResizeBorderSize : 0),
             GlassFrameThickness = new Thickness(0),
             CornerRadius = new CornerRadius(0),
@@ -53,6 +53,10 @@ internal static class NativeCaption
         HwndSource? source = null;
         IntPtr WindowHook(IntPtr handle, int message, IntPtr parameter, IntPtr data, ref bool handled)
         {
+            // Fixed information windows retain their initial centred position,
+            // including when Windows requests a move through a system command.
+            if (!movable && message == 0x0112 && (parameter.ToInt64() & 0xFFF0) == 0xF010)
+                handled = true;
             // Keep auxiliary fixed-size windows fixed. The workspace retains native
             // edge resizing, caption double-click, snap, and restore-on-drag behavior.
             if (!resizable && (message == 0x0112 && ((parameter.ToInt64() & 0xFFF0) is 0xF000 or 0xF030)
@@ -97,6 +101,7 @@ internal static class NativeCaption
         {
             if (args.Key != Key.System || args.SystemKey != Key.Space) return;
             args.Handled = true;
+            if (!movable) return;
             var screen = window.PointToScreen(new Point(0, captionHeight));
             var dpi = VisualTreeHelper.GetDpi(window);
             SystemCommands.ShowSystemMenu(window, new Point(screen.X / dpi.DpiScaleX, screen.Y / dpi.DpiScaleY));

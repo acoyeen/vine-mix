@@ -6,7 +6,6 @@ using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Data;
-using VineMix.Desktop.Controls;
 
 namespace VineMix.Desktop;
 
@@ -24,7 +23,7 @@ public partial class MainWindow
     {
         if (Workspace.HasActiveGesture)
         { Workspace.SetMessage("Finish moving or connecting the node before updating.", true); return false; }
-        if (UpdateEditorCommit.TryCommitFocused()) return true;
+        if (UpdateEditorCommit.TryCommitWorkspace(Workspace)) return true;
         Workspace.SetMessage("Enter a valid value before updating. Your draft has been kept.", true);
         return false;
     }
@@ -35,13 +34,8 @@ public partial class MainWindow
         if (_updateDialog is not null) { _updateDialog.Activate(); return; }
         _updates ??= new UpdateController(_mixer.IsPreview);
         var controller = _updates;
-        var dialog = new Window { Owner = this, Title = "VineMix · Updates", Width = 500, MinWidth = 440,
-            SizeToContent = SizeToContent.Height, ResizeMode = ResizeMode.NoResize, ShowInTaskbar = false,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner, FontFamily = FontFamily, FontSize = FontSize,
-            DataContext = controller };
-        NativeCaption.Attach(dialog, 24, resizable: false);
-        dialog.SetResourceReference(BackgroundProperty, "ConsoleWindowBrush");
-        dialog.SetResourceReference(ForegroundProperty, "ConsoleTextBrush");
+        var dialog = WorkspaceDialog.Create(this, "VineMix · Updates", 500, () => !controller.IsInstalling);
+        dialog.DataContext = controller;
         dialog.Content = CreateUpdateContent(controller, dialog.Close, async () =>
         {
             if (controller.Download is null || _mixer.IsPreview) return;
@@ -103,6 +97,10 @@ public partial class MainWindow
             var automatic = new CheckBox { Content = "Check automatically", HorizontalAlignment = HorizontalAlignment.Left };
             automatic.SetBinding(System.Windows.Controls.Primitives.ToggleButton.IsCheckedProperty,
                 new Binding(nameof(MixerViewModel.AutomaticallyCheckForUpdates)) { Source = preferences, Mode = BindingMode.TwoWay });
+            var automaticStyle = new Style(typeof(CheckBox), (Style)Application.Current.FindResource(typeof(CheckBox)));
+            var installingPreference = new DataTrigger { Binding = new Binding(nameof(UpdateController.IsInstalling)), Value = true };
+            installingPreference.Setters.Add(new Setter(IsEnabledProperty, false));
+            automaticStyle.Triggers.Add(installingPreference); automatic.Style = automaticStyle;
             const string automaticHelp = "Checks daily while VineMix is running. Failed checks retry automatically. You choose when to download and install.";
             AutomationProperties.SetName(automatic, "Check for updates automatically");
             AutomationProperties.SetHelpText(automatic, automaticHelp);
@@ -117,14 +115,10 @@ public partial class MainWindow
         }
 
         var footer = new DockPanel { Margin = new Thickness(0, 22, 0, 0), LastChildFill = true };
-        var later = new Button { Content = "Close", Padding = new Thickness(10, 7, 10, 7), MinHeight = 34,
-            HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Bottom, IsCancel = true,
-            Background = System.Windows.Media.Brushes.Transparent, BorderThickness = new Thickness(0) };
-        later.SetResourceReference(ForegroundProperty, "ConsoleMutedBrush");
+        var later = WorkspaceDialog.CloseButton(() => { if (!controller.IsInstalling) close(); });
         var closeStyle = new Style(typeof(Button), (Style)Application.Current.FindResource(typeof(Button)));
         var installing = new DataTrigger { Binding = new Binding(nameof(UpdateController.IsInstalling)), Value = true };
         installing.Setters.Add(new Setter(IsEnabledProperty, false)); closeStyle.Triggers.Add(installing); later.Style = closeStyle;
-        later.Click += (_, _) => { if (!controller.IsInstalling) close(); };
         DockPanel.SetDock(later, Dock.Left); footer.Children.Add(later);
         var actions = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Right };
         footer.Children.Add(actions); content.Children.Add(footer);

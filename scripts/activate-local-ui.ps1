@@ -49,7 +49,7 @@ $result = [ordered]@{
     engineRestartRequested = $false; engineBinaryReplaced = $false; settingsRestoredFromBackup = $false
     pendingEditsIndependentlyChecked = $false
 }
-$state = @{ NewUiIdentity = $null; OriginalStillRunning = $false; UpdateMutex = $null }
+$state = @{ NewUiIdentity = $null; OriginalStillRunning = $false; UpdateMutex = $null; Inventory = $null }
 $oldUi = $null
 $oldEngine = $null
 $engineIdentity = $null
@@ -111,6 +111,12 @@ function AssertEngineUnchanged {
 function AssertSettingsIdentity {
     Assert-DesktopDataContext $settingsPath
     if ((Get-ActivationPhysicalPath $settingsPath) -ine $physicalSettings) { throw 'The physical settings location changed; the current workspace was left untouched.' }
+}
+function AssertReplacementProcessGuard {
+    AssertEngineUnchanged
+    if (@(Get-Process -Name VineMix,AudioMixer -ErrorAction SilentlyContinue).Count) {
+        throw 'A desktop appeared during file replacement. Its process and files were left untouched.'
+    }
 }
 function AssertSavedWorkspaceUnchanged {
     AssertSettingsIdentity
@@ -218,6 +224,12 @@ try {
     }
     AssertCandidate
     AssertEngineUnchanged
+    $state.Inventory = New-UiActivationInventoryPlan $package $evidence $candidateUi $expectedOldUi $expectedUi $state.Version
+    $result.installedInventoryPresent = $state.Inventory.Present
+    if ($state.Inventory.Present) {
+        $result.originalInventoryHash = $state.Inventory.OriginalHash
+        $result.candidateInventoryHash = $state.Inventory.CandidateHash
+    }
     # Preserve every known ordinary/redirected view, including legacy copies.
     # Disk stability is not a claim to have inspected pending in-memory edits.
     $state.DataBackups = @(Backup-ActivationDataViews (Split-Path -Parent $settingsPath) (Join-Path $evidence 'data-views'))
@@ -230,11 +242,13 @@ try {
     Start-Sleep -Milliseconds 1500
     $actions = @{
         VerifyBeforeStop = {
+            $result.stage = 'verifying-before-controller-stop'
             # Update workers must own this mutex before they signal Ready, and
             # the desktop never shuts down audio before that signal. Hold it
             # through replacement to close a concurrent install-click race.
             HoldUpdateGuard
             AssertEngineUnchanged; AssertCandidate; AssertNoUpdate; AssertSavedWorkspaceUnchanged
+            Assert-UiActivationInventoryState $state.Inventory Original
             Assert-ActivationDataStable $state.DataBackups
             Assert-ActivationShortcut $ShortcutPath $uiPath
             if ((Hash $uiPath) -cne $expectedOldUi -or -not (Test-ActivationProcessIdentity $oldUi $oldUiIdentity)) {
@@ -242,37 +256,51 @@ try {
             }
         }
         StopOriginalUi = {
+            $result.stage = 'stopping-controller'
             # Close hides the window; normal Quit intentionally stops audio.
             # Stop only this exact controller, leaving its independent engine.
             $oldUi.Kill()
             if (-not $oldUi.WaitForExit(5000)) { throw 'The exact original desktop did not exit.' }
         }
         CaptureBaseline = {
+            $result.stage = 'capturing-engine-baseline'
             $state.Before = GetSnapshot
             SaveEvidence 'before.json' $state.Before
         }
         VerifyBeforeReplace = {
+            $result.stage = 'verifying-before-replacement'
             AssertEngineUnchanged; AssertCandidate; AssertNoUpdate; AssertSavedWorkspaceUnchanged
+            Assert-UiActivationInventoryState $state.Inventory Original
             Assert-ActivationDataStable $state.DataBackups
             if ((Hash $uiPath) -cne $expectedOldUi) { throw 'The installed desktop changed independently before replacement.' }
         }
-        InstallUi = { Replace-ActivationBinary $candidateUi $uiPath $expectedUi }
+        InstallUi = {
+            $result.stage = 'replacing-desktop'
+            Assert-UiActivationInventoryState $state.Inventory Original
+            Replace-ActivationBinary $candidateUi $uiPath $expectedUi @($expectedOldUi) { AssertReplacementProcessGuard } 5000
+            $result.stage = 'replacing-installed-inventory'
+            Install-UiActivationInventory $state.Inventory { AssertReplacementProcessGuard } 5000
+        }
         VerifyBeforeLaunch = {
+            $result.stage = 'verifying-before-shortcut-launch'
             Start-Sleep -Milliseconds 200
             $state.After = GetSnapshot
             Assert-UiActivationSnapshotStable $state.Before $state.After
             SaveEvidence 'after-ui-replacement.json' $state.After
             AssertSavedWorkspaceUnchanged; Assert-ActivationDataStable $state.DataBackups
+            Assert-UiActivationInventoryState $state.Inventory Candidate
             if ((Hash $uiPath) -cne $expectedUi) { throw 'The installed desktop no longer matches the verified candidate.' }
         }
-        StartUi = { StartUi }
+        StartUi = { $result.stage = 'opening-workspace'; StartUi }
         VerifyAfterLaunch = {
+            $result.stage = 'verifying-reopened-workspace'
             # The new UI owns the pipe. Check the original engine identity for
             # longer than the desktop's six-second stalled-audio threshold,
             # without competing for its connection or restarting anything.
             $watch = [Diagnostics.Stopwatch]::StartNew()
             do {
                 AssertEngineUnchanged; AssertSavedWorkspaceUnchanged
+                Assert-UiActivationInventoryState $state.Inventory Candidate
                 $uis = @(Get-Process -Name VineMix,AudioMixer -ErrorAction SilentlyContinue)
                 try {
                     if ($uis.Count -ne 1 -or -not (Test-ActivationProcessIdentity $uis[0] $state.NewUiIdentity) -or
@@ -285,6 +313,11 @@ try {
             if ((Hash $uiPath) -cne $expectedUi) { throw 'The installed desktop changed after reopening.' }
         }
         StopCandidateUi = {
+            $result.stage = 'recovery-stopping-controller'
+            # The launch path releases the update guard. Reacquire it before
+            # any recovery so a newly prepared update cannot race restoration.
+            HoldUpdateGuard
+            AssertNoUpdate
             $uis = @(Get-Process -Name VineMix,AudioMixer -ErrorAction SilentlyContinue)
             try {
                 foreach ($ui in $uis) {
@@ -300,14 +333,24 @@ try {
             } finally { foreach ($ui in $uis) { $ui.Dispose() } }
         }
         RestoreUi = {
+            $result.stage = 'recovery-restoring-desktop'
             if (@(Get-Process -Name VineMix,AudioMixer -ErrorAction SilentlyContinue).Count) { throw 'A desktop remains active; rollback will not overwrite it.' }
-            Restore-UiActivationBinary $backupUi $uiPath $expectedOldUi $expectedUi
+            # Validate the companion recovery file before restoring either.
+            # An independent inventory edit must not leave an old desktop
+            # paired with a newer package inventory.
+            Assert-UiActivationInventoryState $state.Inventory Recoverable
+            Restore-UiActivationBinary $backupUi $uiPath $expectedOldUi $expectedUi { AssertReplacementProcessGuard } 5000
+            $result.stage = 'recovery-restoring-inventory'
+            Restore-UiActivationInventory $state.Inventory { AssertReplacementProcessGuard } 5000
         }
         VerifyRecovery = {
+            $result.stage = 'recovery-verifying-original'
             AssertEngineUnchanged; AssertSettingsIdentity; AssertNoUpdate
+            Assert-UiActivationInventoryState $state.Inventory Original
             if ((Hash $uiPath) -cne $expectedOldUi) { throw 'The original desktop was not restored safely; reopening was withheld.' }
         }
         ReopenOriginalUi = {
+            $result.stage = 'recovery-opening-original'
             if (-not $state.OriginalStillRunning) { StartUi }
             else { ReleaseUpdateGuard }
             AssertEngineUnchanged; AssertSettingsIdentity
@@ -326,9 +369,10 @@ try {
         $result.frameCounterAdvancingBeforeUiReopen = $true
         $result.originalRunningPathsPreservedBeforeUiReopen = $true
         $result.settingsAndPreferencesUnchanged = $true
+        $result.installedInventoryConsistent = $true
         $result.engineObservedUnchangedAfterUiReopenSeconds = 8
     }
-} catch { $result.passed = $false; $result.error = $_.Exception.ToString() }
+} catch { $result.passed = $false; $result.error = $_.Exception.ToString(); $result.scriptStackTrace = $_.ScriptStackTrace; $result.failureStage = $result.stage }
 finally {
     ReleaseUpdateGuard
     if ($oldUi) { $oldUi.Dispose() }

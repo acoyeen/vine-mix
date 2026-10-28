@@ -104,10 +104,10 @@ internal static class NodeDialRedesignVerification
         require(Dials(duckingView).Where(dial => Visible(dial, duckingView)).Select(Label).SequenceEqual(["Threshold", "Duck amount", "Attack", "Release"])
             && Descendants<ComboBox>(duckingView).Single() is var duckMode && AutomationProperties.GetName(duckMode) == "Ducking mode"
             && duckingView.FindSocket("audio", false) is not null && duckingView.FindSocket("audio", true) is not null
-            && duckingView.FindSocket("sidechain", false) is not null && duckingView.FindSocket("control", false) is not null
+            && duckingView.FindSocket("sidechain", false) is not null && duckingView.FindSocket("control", false) is null
             && duckingView.FindSocket("sidechain", true) is null
-            && Descendants<TextBlock>(duckingView).Any(text => text.Text == "Trigger / Sidechain · detector only"),
-            "Ducking exposes four dials and separately labelled audio, detector-only trigger and linked-control sockets.");
+            && Descendants<TextBlock>(duckingView).Any(text => text.Text == "Trigger"),
+            "Ducking exposes four dials and separately labelled audio and detector-only trigger sockets, without an unrelated level input.");
 
         workspace.NodeChanged(Current("compressor").Id, node => { node.Compressor.AttackMs = .125; node.Compressor.ReleaseMs = 119.375; });
         workspace.NodeChanged(Current("alignmentDelay").Id, node => node.AlignmentDelay.Samples = 1); await layout();

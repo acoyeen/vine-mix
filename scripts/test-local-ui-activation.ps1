@@ -144,6 +144,187 @@ try {
     Reject { Restore-UiActivationBinary $backup $target $originalHash $candidateHash } 'Rollback refuses an altered backup.'
     Check ((FileHash $target) -ceq $candidateHash) 'A damaged recovery copy cannot overwrite the verified candidate.'
 
+    # Exercise real Windows rename locks in temporary files. The delay runs in
+    # a managed task; no controller, engine or desktop input is involved.
+    Add-Type -TypeDefinition @'
+public static class UiActivationFixtureLock {
+    public static System.Threading.Tasks.Task Hold(string path, int milliseconds) {
+        var stream = new System.IO.FileStream(path, System.IO.FileMode.Open, System.IO.FileAccess.Read,
+            System.IO.FileShare.ReadWrite);
+        return System.Threading.Tasks.Task.Delay(milliseconds).ContinueWith(_ => stream.Dispose());
+    }
+}
+'@
+    'original-ui' | Set-Content -LiteralPath $target -Encoding utf8
+    Copy-Item -LiteralPath $target -Destination $backup
+    $retryState = @{attempts=0}
+    $held = [UiActivationFixtureLock]::Hold($target, 400)
+    Replace-ActivationBinary $candidateFile $target $candidateHash @($originalHash) { $retryState.attempts++ } 2000
+    $held.GetAwaiter().GetResult()
+    Check ($retryState.attempts -gt 1 -and (FileHash $target) -ceq $candidateHash) 'A transient Windows rename lock is retried within a bounded interval after rechecking the process and file guards.'
+    $retryState.attempts = 0
+    $held = [UiActivationFixtureLock]::Hold($target, 400)
+    Restore-UiActivationBinary $backup $target $originalHash $candidateHash { $retryState.attempts++ } 2000
+    $held.GetAwaiter().GetResult()
+    Check ($retryState.attempts -gt 1 -and (FileHash $target) -ceq $originalHash) 'Rollback uses the same bounded guarded retry for transient file locks.'
+    $held = [UiActivationFixtureLock]::Hold($target, 600)
+    $timeout = [Diagnostics.Stopwatch]::StartNew()
+    Reject { Replace-ActivationBinary $candidateFile $target $candidateHash @($originalHash) { } 100 } 'A lock that outlasts the retry deadline reports failure instead of waiting indefinitely.'
+    $held.GetAwaiter().GetResult()
+    Check ($timeout.ElapsedMilliseconds -lt 3000 -and (FileHash $target) -ceq $originalHash) 'A timed-out rename leaves the original destination bytes intact.'
+    $retryState.attempts = 0
+    $held = [UiActivationFixtureLock]::Hold($target, 600)
+    Reject { Replace-ActivationBinary $candidateFile $target $candidateHash @($originalHash) {
+        $retryState.attempts++
+        if ($retryState.attempts -gt 1) {
+            $writer = [IO.FileStream]::new($target, [IO.FileMode]::Create, [IO.FileAccess]::Write, [IO.FileShare]::ReadWrite)
+            try { $writer.Write([Text.Encoding]::UTF8.GetBytes('independent-destination')) } finally { $writer.Dispose() }
+        }
+    } 2000 } 'A destination changed between rename attempts is never overwritten.'
+    $held.GetAwaiter().GetResult()
+    Check ((Get-Content -LiteralPath $target -Raw).Contains('independent-destination')) 'A refused retry preserves the independent destination edit.'
+    Copy-Item -LiteralPath $backup -Destination $target
+    $retryState.attempts = 0
+    $held = [UiActivationFixtureLock]::Hold($target, 600)
+    Reject { Replace-ActivationBinary $candidateFile $target $candidateHash @($originalHash) {
+        $retryState.attempts++
+        if ($retryState.attempts -gt 1) { throw 'An unrelated controller appeared.' }
+    } 2000 } 'A process guard refusing a later attempt stops retry before any replacement.'
+    $held.GetAwaiter().GetResult()
+    Check ((FileHash $target) -ceq $originalHash) 'A refused process guard leaves the original desktop bytes intact.'
+    $retryState.attempts = 0
+    $held = [UiActivationFixtureLock]::Hold($target, 600)
+    Reject { Replace-ActivationBinary $candidateFile $target $candidateHash @($originalHash) {
+        $retryState.attempts++
+        if ($retryState.attempts -gt 1) { 'independent-source' | Set-Content -LiteralPath $candidateFile -Encoding utf8 }
+    } 2000 } 'A source changed between rename attempts is rejected even when the staged copy is unchanged.'
+    $held.GetAwaiter().GetResult()
+    Check ((FileHash $target) -ceq $originalHash) 'A changed replacement source cannot alter the original desktop.'
+    'candidate-ui' | Set-Content -LiteralPath $candidateFile -Encoding utf8
+    Reject { Replace-ActivationBinary $candidateFile $target $candidateHash @($originalHash) $null 100 } 'Retries cannot be enabled without an explicit process guard.'
+
+    $package = Join-Path $root 'inventory-package'
+    $support = Join-Path $package 'SetupSupport'
+    $null = New-Item -ItemType Directory -Path $support -Force
+    $installedUi = Join-Path $package 'VineMix.exe'
+    $installedEngine = Join-Path $package 'VineMix.Engine.exe'
+    $inventoryPath = Join-Path $support 'package-manifest.json'
+    'original-inventoried-ui' | Set-Content -LiteralPath $installedUi -Encoding utf8
+    Copy-Item -LiteralPath $engineFile -Destination $installedEngine
+    $installedUiBackup = Join-Path $root 'inventoried-ui.before'
+    Copy-Item -LiteralPath $installedUi -Destination $installedUiBackup
+    $installedUiHash = FileHash $installedUi
+    $noInventory = New-UiActivationInventoryPlan $package $root $candidateFile $installedUiHash $candidateHash 'example-version'
+    Install-UiActivationInventory $noInventory
+    Restore-UiActivationInventory $noInventory
+    Check (-not $noInventory.Present -and -not (Test-Path -LiteralPath $inventoryPath)) 'A development package without an installed inventory keeps the original UI-only behavior.'
+    '{}' | Set-Content -LiteralPath $inventoryPath -Encoding utf8
+    Reject { Assert-UiActivationInventoryState $noInventory Original } 'An independently appearing inventory is preserved and blocks replacement.'
+    $inventory = [ordered]@{
+        version='example-version';numericVersion='1.2.3.4';sourceSnapshotSha256=('b'*64);gitDirty=$false
+        extra=[ordered]@{name='Example fixture';enabled=$true;values=@(1,2,3)}
+        files=@(
+            [ordered]@{path='VineMix.exe';size=(Get-Item -LiteralPath $installedUi).Length;sha256=$installedUiHash;custom='retain-desktop-metadata'},
+            [ordered]@{path='VineMix.Engine.exe';size=(Get-Item -LiteralPath $installedEngine).Length;sha256=$engineHash;custom='retain-engine-metadata'})
+    }
+    function ResetInventory {
+        Copy-Item -LiteralPath $installedUiBackup -Destination $installedUi
+        $inventory | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $inventoryPath -Encoding utf8
+    }
+    function InventoryPlan {
+        $privateEvidence = Join-Path $root ('inventory-evidence-' + [guid]::NewGuid().ToString('N'))
+        $null = New-Item -ItemType Directory -Path $privateEvidence
+        New-UiActivationInventoryPlan $package $privateEvidence $candidateFile $installedUiHash $candidateHash 'example-version'
+    }
+    ResetInventory
+    $inventoryOriginalHash = FileHash $inventoryPath
+    $plan = InventoryPlan
+    $stagedInventory = Get-Content -LiteralPath $plan.Candidate -Raw | ConvertFrom-Json -Depth 20
+    Check ($plan.Present -and $plan.OriginalHash -ceq $inventoryOriginalHash -and (FileHash $plan.Backup) -ceq $inventoryOriginalHash) 'Installed inventory preparation retains a byte-identical private recovery copy.'
+    Check ($stagedInventory.files[0].size -eq (Get-Item -LiteralPath $candidateFile).Length -and $stagedInventory.files[0].sha256 -ceq $candidateHash) 'The staged inventory records the reviewed candidate desktop size and hash.'
+    $expectedInventory = Clone $inventory
+    $expectedInventory.files[0].size = (Get-Item -LiteralPath $candidateFile).Length
+    $expectedInventory.files[0].sha256 = $candidateHash
+    Check ((ConvertTo-UiActivationCanonical $stagedInventory) -ceq (ConvertTo-UiActivationCanonical $expectedInventory)) 'Only the desktop size and hash change; release metadata, unknown properties and other payload entries are preserved.'
+    Check ((FileHash $installedUi) -ceq $installedUiHash -and (FileHash $inventoryPath) -ceq $inventoryOriginalHash) 'Inventory preparation does not mutate the installed desktop or inventory.'
+    foreach ($invalid in @('wrong-release','wrong-ui-hash','wrong-size','missing-engine','duplicate-path','traversal','absolute-path','backslash-path')) {
+        $brokenInventory = Clone $inventory
+        switch ($invalid) {
+            'wrong-release' { $brokenInventory.version = 'another-version' }
+            'wrong-ui-hash' { $brokenInventory.files[0].sha256 = 'a'*64 }
+            'wrong-size' { $brokenInventory.files[0].size++ }
+            'missing-engine' { $brokenInventory.files = @($brokenInventory.files[0]) }
+            'duplicate-path' { $brokenInventory.files[1].path = 'VINEMIX.EXE' }
+            'traversal' { $brokenInventory.files[1].path = '../untouched-engine.bin' }
+            'absolute-path' { $brokenInventory.files[1].path = $installedEngine }
+            'backslash-path' { $brokenInventory.files[1].path = 'directory\VineMix.Engine.exe' }
+        }
+        $brokenInventory | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $inventoryPath -Encoding utf8
+        Reject { InventoryPlan } ('Invalid installed inventory is rejected before replacement: ' + $invalid + '.')
+    }
+    ResetInventory
+    Reject { New-UiActivationInventoryPlan $package $root $candidateFile ('c'*64) $candidateHash 'example-version' } 'An inventory matching the file still cannot bypass the reviewed original desktop hash.'
+    Reject { New-UiActivationInventoryPlan $package $root $candidateFile $installedUiHash ('c'*64) 'example-version' } 'The candidate hash is independently verified before preparing its inventory.'
+    foreach ($failurePoint in @('none','manifest-write','post-launch','independent-inventory','independent-ui','damaged-inventory-backup')) {
+        ResetInventory
+        $plan = InventoryPlan
+        $actions = @{}
+        foreach ($name in $forward + $recovery) { $actions[$name] = { } }
+        $actions.InstallUi = {
+            Assert-UiActivationInventoryState $plan Original
+            Replace-ActivationBinary $candidateFile $installedUi $candidateHash
+            if ($failurePoint -eq 'manifest-write') { 'damaged-stage' | Set-Content -LiteralPath $plan.Candidate -Encoding utf8 }
+            Install-UiActivationInventory $plan
+        }
+        $actions.VerifyBeforeLaunch = {
+            Assert-UiActivationInventoryState $plan Candidate
+            $currentInventory = Get-Content -LiteralPath $inventoryPath -Raw | ConvertFrom-Json
+            if ($currentInventory.files[0].sha256 -cne (FileHash $installedUi) -or
+                $currentInventory.files[0].size -ne (Get-Item -LiteralPath $installedUi).Length) { throw 'Mismatched inventory before launch.' }
+        }
+        $actions.VerifyAfterLaunch = {
+            if ($failurePoint -eq 'none') { return }
+            '{"revision":73}' | Set-Content -LiteralPath $workspace -Encoding utf8
+            if ($failurePoint -eq 'independent-inventory') { '{"independent":true}' | Set-Content -LiteralPath $inventoryPath -Encoding utf8 }
+            if ($failurePoint -eq 'independent-ui') { 'independent-ui' | Set-Content -LiteralPath $installedUi -Encoding utf8 }
+            if ($failurePoint -eq 'damaged-inventory-backup') { 'damaged-backup' | Set-Content -LiteralPath $plan.Backup -Encoding utf8 }
+            throw 'Injected failure after UI launch.'
+        }
+        $actions.RestoreUi = {
+            Assert-UiActivationInventoryState $plan Recoverable
+            Restore-UiActivationBinary $installedUiBackup $installedUi $installedUiHash $candidateHash
+            Restore-UiActivationInventory $plan
+        }
+        $actions.VerifyRecovery = { Assert-UiActivationInventoryState $plan Original }
+        $outcome = [ordered]@{}
+        Invoke-UiActivationTransaction $actions $outcome
+        switch ($failurePoint) {
+            'none' {
+                Check ($outcome.passed -and (FileHash $installedUi) -ceq $candidateHash -and (FileHash $inventoryPath) -ceq $plan.CandidateHash) 'Successful UI-only activation keeps the installed inventory consistent before relaunch.'
+            }
+            { $_ -in @('manifest-write','post-launch') } {
+                Check (-not $outcome.passed -and $outcome.rolledBack -and (FileHash $installedUi) -ceq $installedUiHash -and
+                    (FileHash $inventoryPath) -ceq $inventoryOriginalHash) ('Failure at ' + $failurePoint + ' restores both original UI and exact inventory bytes.')
+            }
+            'independent-inventory' {
+                Check (-not $outcome.passed -and -not $outcome.rolledBack -and $outcome.recoveryErrors.Count -eq 1 -and
+                    (FileHash $installedUi) -ceq $candidateHash -and (Get-Content -LiteralPath $inventoryPath -Raw).Contains('independent')) 'An independent inventory edit blocks both recovery writes and is never overwritten.'
+            }
+            'independent-ui' {
+                Check (-not $outcome.passed -and -not $outcome.rolledBack -and $outcome.recoveryErrors.Count -eq 1 -and
+                    (Get-Content -LiteralPath $installedUi -Raw).Contains('independent') -and (FileHash $inventoryPath) -ceq $plan.CandidateHash) 'An independent desktop edit blocks recovery before the inventory can be restored.'
+            }
+            'damaged-inventory-backup' {
+                Check (-not $outcome.passed -and -not $outcome.rolledBack -and $outcome.recoveryErrors.Count -eq 1 -and
+                    (FileHash $installedUi) -ceq $candidateHash -and (FileHash $inventoryPath) -ceq $plan.CandidateHash) 'An altered inventory backup prevents any paired recovery write.'
+            }
+        }
+        Check ((FileHash $installedEngine) -ceq $engineHash) ('Inventory activation and recovery leave the engine unchanged: ' + $failurePoint + '.')
+        if ($failurePoint -notin @('none','manifest-write')) {
+            Check ((Get-Content -LiteralPath $workspace -Raw).Contains('73')) ('Inventory recovery preserves newer saved workspace contents: ' + $failurePoint + '.')
+        }
+    }
+
     $view = Join-Path $root 'preserved-view'
     $null = New-Item -ItemType Directory -Path $view
     $viewSettings = Join-Path $view 'settings.json'

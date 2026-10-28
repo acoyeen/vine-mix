@@ -1,7 +1,20 @@
 # Release source and provenance
 
-Every published version has its own source tag and retained executable downloads.
+Every published version has its own retained source tag and release post.
 The [release history](RELEASES.md) links each version's notes and assets.
+
+## 0.4.0-beta
+
+The release consolidates the unpublished Beta 6 development work, offline
+attribution and the cleanup pass. Matching Setup and standalone packages,
+exact-source archive, signed update envelope and checksums identify one reviewed
+source snapshot. The archive includes root LICENSE and ATTRIBUTION.md, complete
+build inputs and a sanitized verification manifest. Neutral archive metadata
+and per-file hashes are checked before publication.
+
+Beta 1–5 tags and release posts remain. Their uploaded attachments are retired
+after the verified 0.4.0 download cutover; the historical records below describe
+their original publication. GitHub-generated source archives remain available.
 
 ## 0.3.0-beta.5
 

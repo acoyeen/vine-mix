@@ -1,8 +1,8 @@
 # VineMix testing
 
-Use the [current beta qualification guide](docs/BETA_TESTING_CURRENT.md) for
+Use the [current beta qualification guide](docs/RELEASE_0.4.0_QUALIFICATION.md) for
 commands, test scope and manual release gates. The
-[Beta 5 release notes](docs/releases/0.3.0-beta.5.md) identify the current
+[0.4.0 Beta release notes](docs/releases/0.4.0-beta.md) identify the current
 version and separate passed, failed and unperformed checks.
 
 The current native suites and detached desktop checks never substitute for

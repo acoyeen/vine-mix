@@ -43,6 +43,14 @@ $report = Get-Content -LiteralPath $reportPath -Raw | ConvertFrom-Json
 try {
     & (Join-Path $PSScriptRoot 'assert-release-file-version.ps1') -Path $engine -Version $receipt.version -NumericVersion $receipt.numericVersion
     $report.checks = @($report.checks) + 'The delivered standalone engine has matching numeric FileVersion text and fixed fields, with the expected product version.'
+    foreach ($name in @('LICENSE','ATTRIBUTION.md','THIRD_PARTY_NOTICES.md')) {
+        $notice = Join-Path (Split-Path -Parent $engine) $name
+        if (-not (Test-Path -LiteralPath $notice -PathType Leaf) -or
+            (Get-FileHash -LiteralPath $notice -Algorithm SHA256).Hash -ne (Get-FileHash -LiteralPath (Join-Path $project $name) -Algorithm SHA256).Hash) {
+            throw "The standalone payload does not contain the authoritative $name."
+        }
+        $report.checks = @($report.checks) + "The extracted standalone payload preserves authoritative $name bytes."
+    }
 } catch {
     $report.passed = $false; $report.error = $_.Exception.Message
     throw

@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    /* Keep the early skip link out of flow before external CSS arrives. */
+    body { margin: 0; }
+    .skip-link { position: fixed; top: -100px; }
+    html.is-starting { overflow-anchor: none; }
+  </style>
+  <script>
+    document.documentElement.classList.add('has-script', 'is-starting');
+    // Layout initialization must not compete with native scroll restoration.
+    window.addEventListener('pageshow', () => requestAnimationFrame(() => {
+      document.documentElement.classList.remove('is-starting');
+    }), { once: true });
+  </script>
+  <meta name="theme-color" content="#080f0d">
+  <meta name="description" content="VineMix is an open-source visual audio mixer for Windows. Connect your microphone and apps, then choose what you hear and share.">
+  <meta property="og:title" content="VineMix">
+  <meta property="og:description" content="Connect your microphone and apps, then choose what you hear and share. An open-source beta for Windows 11 x64.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://vinemix.app/">
+  <link rel="canonical" href="https://vinemix.app/">
+  <title>VineMix</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="preload" href="assets/IBM-Plex-Sans-Regular.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="preload" href="assets/IBM-Plex-Sans-SemiBold.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="preload" href="assets/IBM-Plex-Sans-Bold.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="preload" href="assets/IBM-Plex-Sans-Reader-Variable.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="story.css">
+  <link rel="stylesheet" href="modules.css">
+  <link rel="stylesheet" href="downloads.css">
+  <link rel="stylesheet" href="faq.css">
+  <script type="module" src="motion.js"></script>
+  <script type="module" src="header.js"></script>
+  <script type="module" src="downloads.js"></script>
+  <script type="module" src="download-atmosphere.js"></script>
+  <script type="module" src="pipeline.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#sound" data-section-jump>Skip to the product</a>
+  <main>
+    <section class="arrival" id="top" aria-labelledby="arrival-title">
+      <div class="atmosphere" aria-hidden="true"><canvas id="background-canvas"></canvas></div>
+      <header class="site-header" data-site-header>
+        <a class="site-brand" href="#top" aria-label="VineMix — Return to top" title="Return to top">
+          <svg xmlns="http://www.w3.org/2000/svg" width="1230" height="320" viewBox="500 196 1230 320" class="site-brand-art" fill="currentColor" aria-hidden="true" focusable="false">
+            <defs>
+              <clipPath id="header-lettering-clip" class="brand-mask" clipPathUnits="userSpaceOnUse">
+                <rect class="brand-window" x="778" y="196" width="2000" height="320" />
+              </clipPath>
+            </defs>
+            <g class="brand-clip" clip-path="url(#header-lettering-clip)">
+              <g class="brand-lettering">
+                <g>
+                  <path d="M845 273 H879 Q882 273 883 276 L919.5 386 L957 276 Q958 273 961 273 H994 Q998 273 996.5 277.5 L942 429 Q940.6 433.5 936 433.5 H904 Q900 433.5 898.7 429.5 L842.5 277.5 Q841 273 845 273 Z" />
+                  <g>
+                    <rect x="1007" y="273" width="37" height="34" rx="4" />
+                    <rect x="1007" y="318" width="37" height="116" rx="2.5" />
+                  </g>
+                  <path d="M1062 311.5 H1091 Q1094 311.5 1094 314.5 V324 C1102 314 1113 309.5 1125 309.5 C1154.5 309.5 1169 328 1169 354 V430.5 Q1169 433.5 1166 433.5 H1136 Q1133 433.5 1133 430.5 V362 C1133 348 1127 341.5 1115 341.5 C1102 341.5 1094 350.5 1094 364 V430.5 Q1094 433.5 1091 433.5 H1062 Q1059 433.5 1059 430.5 V314.5 Q1059 311.5 1062 311.5 Z" />
+                  <path fill-rule="evenodd" d="M1235 310 C1271 310 1292 335 1292 372 V377 Q1292 381 1288 381 H1213 C1215 396 1223 404 1236 404 C1246 404 1253 400 1260 390 L1284 403 Q1287 404.5 1285 408 C1274 425 1259 434 1236 434 C1200 434 1177 410 1177 372 C1177 336 1200 310 1235 310 Z M1213 359 H1257 C1255 346 1248 339.5 1235 339.5 C1224 339.5 1216 346.5 1213 359 Z" />
+                </g>
+                <g>
+                  <path d="M1304 273 H1337 Q1340 273 1342 277 L1380.5 345 L1422 277 Q1424 273 1427 273 H1459 Q1462 273 1462 276 V430 Q1462 433 1459 433 H1429 Q1426 433 1426 430 V335 L1388 394 Q1386 398 1382 398 H1379 Q1375 398 1373 394 L1336 335 V430 Q1336 433 1333 433 H1304 Q1301 433 1301 430 V276 Q1301 273 1304 273 Z" />
+                  <g>
+                    <rect x="1477" y="273" width="36" height="33" rx="4" />
+                    <rect x="1477" y="318" width="36" height="115" rx="2.5" />
+                  </g>
+                  <path d="M1526 311.5 H1559 Q1562 311.5 1564 314.5 L1586 346 L1608 314.5 Q1610 311.5 1613 311.5 H1647 Q1652 311.5 1648.5 316 L1607.5 372 L1649 428.5 Q1652 433 1647 433 H1612 Q1609 433 1607 430 L1586 398 L1563 430 Q1561 433 1558 433 H1525 Q1520 433 1523.5 428.5 L1564 372 L1523.5 316 Q1520.5 311.5 1526 311.5 Z" />
+                </g>
+              </g>
+            </g>
+            <g class="brand-symbol">
+              <g transform="translate(578 253) scale(2)">
+                <path d="M2,0 H21 Q22,0 23,1 L50,28 L77,1 Q78,0 79,0 H98 Q101,0 99,3 L52,50 Q50,52 48,50 L1,3 Q-1,0 2,0 Z" />
+                <path d="M3,24 Q3,21 5,23 L50,68 L95,23 Q97,21 97,24 V99 Q97,101 95,101 H81 Q79,101 79,99 V60 L52,87 Q50,89 48,87 L21,60 V99 Q21,101 19,101 H5 Q3,101 3,99 Z" />
+              </g>
+            </g>
+          </svg>
+        </a>
+        <nav class="site-navigation" id="site-navigation" aria-label="Main navigation">
+          <a href="#sound" data-section-jump="fade">How it works</a>
+          <a href="#faq" data-section-jump="fade">FAQ</a>
+          <a href="#download" data-section-jump="fade">Downloads</a>
+          <a class="site-docs" href="https://github.com/acoyeen/vine-mix/blob/v0.4.0-beta/docs/USER_GUIDE.md">Docs<img src="assets/arrow-up-right.svg" alt="" width="14" height="14"></a>
+        </nav>
+      </header>
+      <h1 class="sr-only" id="arrival-title">VineMix. A visual audio mixer for Windows.</h1>
+      <div class="arrival-identity">
+        <div class="hero-reader" aria-hidden="true" translate="no">
+          <span class="effect-stack" aria-hidden="true">
+            <span class="token outgoing">
+            </span>
+            <span class="token incoming brand">
+              <svg xmlns="http://www.w3.org/2000/svg" width="1230" height="320" viewBox="500 196 1230 320" role="img" class="brand-art" fill="currentColor" aria-label="VineMix">
+                <defs>
+                  <clipPath id="reader-lettering-clip-base" class="lettering-mask" clipPathUnits="userSpaceOnUse">
+                    <rect class="lettering-window" x="778" y="196" width="2000" height="320" />
+                  </clipPath>
+                </defs>
+                <title>VineMix wide logo</title>
+                <desc>Monochrome VM symbol followed by the VineMix wordmark. Full-width i dots align with the capital V and M; both i stems are shortened from the top. All artwork is editable vector paths and shapes.</desc>
+                <g class="lettering-clip" clip-path="url(#reader-lettering-clip-base)">
+                  <g class="lettering-motion">
+                    <g>
+                      <path d="M845 273 H879 Q882 273 883 276 L919.5 386 L957 276 Q958 273 961 273 H994 Q998 273 996.5 277.5 L942 429 Q940.6 433.5 936 433.5 H904 Q900 433.5 898.7 429.5 L842.5 277.5 Q841 273 845 273 Z" />
+                      <g>
+                        <rect x="1007" y="273" width="37" height="34" rx="4" />
+                        <rect x="1007" y="318" width="37" height="116" rx="2.5" />
+                      </g>
+                      <path d="M1062 311.5 H1091 Q1094 311.5 1094 314.5 V324 C1102 314 1113 309.5 1125 309.5 C1154.5 309.5 1169 328 1169 354 V430.5 Q1169 433.5 1166 433.5 H1136 Q1133 433.5 1133 430.5 V362 C1133 348 1127 341.5 1115 341.5 C1102 341.5 1094 350.5 1094 364 V430.5 Q1094 433.5 1091 433.5 H1062 Q1059 433.5 1059 430.5 V314.5 Q1059 311.5 1062 311.5 Z" />
+                      <path fill-rule="evenodd" d="M1235 310 C1271 310 1292 335 1292 372 V377 Q1292 381 1288 381 H1213 C1215 396 1223 404 1236 404 C1246 404 1253 400 1260 390 L1284 403 Q1287 404.5 1285 408 C1274 425 1259 434 1236 434 C1200 434 1177 410 1177 372 C1177 336 1200 310 1235 310 Z M1213 359 H1257 C1255 346 1248 339.5 1235 339.5 C1224 339.5 1216 346.5 1213 359 Z" />
+                    </g>
+                    <g>
+                      <path d="M1304 273 H1337 Q1340 273 1342 277 L1380.5 345 L1422 277 Q1424 273 1427 273 H1459 Q1462 273 1462 276 V430 Q1462 433 1459 433 H1429 Q1426 433 1426 430 V335 L1388 394 Q1386 398 1382 398 H1379 Q1375 398 1373 394 L1336 335 V430 Q1336 433 1333 433 H1304 Q1301 433 1301 430 V276 Q1301 273 1304 273 Z" />
+                      <g>
+                        <rect x="1477" y="273" width="36" height="33" rx="4" />
+                        <rect x="1477" y="318" width="36" height="115" rx="2.5" />
+                      </g>
+                      <path d="M1526 311.5 H1559 Q1562 311.5 1564 314.5 L1586 346 L1608 314.5 Q1610 311.5 1613 311.5 H1647 Q1652 311.5 1648.5 316 L1607.5 372 L1649 428.5 Q1652 433 1647 433 H1612 Q1609 433 1607 430 L1586 398 L1563 430 Q1561 433 1558 433 H1525 Q1520 433 1523.5 428.5 L1564 372 L1523.5 316 Q1520.5 311.5 1526 311.5 Z" />
+                    </g>
+                  </g>
+                </g>
+                <g class="symbol-motion">
+                  <g transform="translate(578 253) scale(2)">
+                    <path d="M2,0 H21 Q22,0 23,1 L50,28 L77,1 Q78,0 79,0 H98 Q101,0 99,3 L52,50 Q50,52 48,50 L1,3 Q-1,0 2,0 Z" />
+                    <path d="M3,24 Q3,21 5,23 L50,68 L95,23 Q97,21 97,24 V99 Q97,101 95,101 H81 Q79,101 79,99 V60 L52,87 Q50,89 48,87 L21,60 V99 Q21,101 19,101 H5 Q3,101 3,99 Z" />
+                  </g>
+                </g>
+              </svg>
+            </span>
+          </span>
+        </div>
+      </div>
+      <div class="arrival-links">
+        <div class="arrival-actions">
+          <a class="button primary download-action" href="#download" data-section-jump>
+            <span class="download-content"><img class="download-icon" src="assets/arrow-down-to-line.svg" alt="" width="20" height="20"><span>Download</span></span>
+          </a>
+        </div>
+      </div>
+      <a class="section-jump scroll-hint" id="scroll-hint" href="#sound" data-section-jump><span>Scroll for more</span><svg class="section-jump__icon" width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3v13m-5-5 5 5 5-5"/></svg></a>
+    </section>
+
+    <div class="audio-canvas">
+    <section class="sound-story" id="sound" aria-labelledby="sound-title" aria-describedby="story-summary">
+      <div class="story-pin">
+        <div class="story-heading">
+          <div class="story-copy is-current" data-chapter="0">
+            <h2 id="sound-title">See where your sound goes.</h2>
+            <p class="story-description">One microphone. Two destinations. Choose what you hear in your headphones and what you send to your apps.</p>
+            <div class="story-fallback">
+              <div class="story-static-route"><span>Microphone</span><span class="story-static-arrow" aria-hidden="true">↓</span><div class="story-static-branches"><span>Listening output<br><small>Your headphones</small></span><span>Virtual output<br><small>Your shared mix</small></span></div></div>
+              <p>Each destination has its own level and mute control. A separate virtual audio driver carries the shared mix to your apps.</p>
+            </div>
+          </div>
+          <div class="story-copy" data-chapter="1">
+            <h2 id="shape-title">Shape it along the way.</h2>
+            <p class="story-description">Place an effect in the path. Low / Mid / High gives you three simple controls to shape the sound before it reaches either destination.</p>
+            <div class="story-fallback">
+              <div class="story-static-route"><span>Microphone</span><span class="story-static-arrow" aria-hidden="true">↓</span><span class="story-static-effect">Low / Mid / High<small>Three tone controls · −12 to +12 dB</small></span><span class="story-static-arrow" aria-hidden="true">↓</span><div class="story-static-branches"><span>Listening output</span><span>Virtual output</span></div></div>
+              <p>Adjust lows, mids and highs independently. The settings change as you scroll; the same tone node stays in the path as the setup grows.</p>
+            </div>
+          </div>
+          <div class="story-copy" data-chapter="2">
+            <h2 id="duck-title">Make room for your voice.</h2>
+            <p class="story-description">Keep your voice setup. Add music through Ducking, so it lowers when you speak. Both paths meet at the shared output; your headphone branch stays separate.</p>
+            <div class="story-fallback">
+              <div class="story-static-route"><span>Music app</span><span class="story-static-arrow" aria-hidden="true">↓</span><span class="story-static-effect">Ducking<small>Microphone → Low / Mid / High → Trigger</small></span><span class="story-static-arrow" aria-hidden="true">↓</span><span>Virtual output</span></div>
+              <p>The original microphone → Low / Mid / High → Listening output route stays. The tone node also connects to Virtual output for audible voice, and to Ducking’s trigger to lower the music. The trigger is detector-only. Your music app’s normal headphone playback continues.</p>
+            </div>
+          </div>
+        </div>
+
+        <p class="sr-only" id="story-summary">Start with a microphone connected to listening and sharing outputs. Add Low / Mid / High to the microphone path. Keep that whole setup, then add music through Ducking to the shared output. The treated voice also triggers Ducking and stays audible through its separate connection to the shared output. Listening remains a separate voice-monitoring branch.</p>
+        <div class="story-stage"><div class="story-world" role="img" aria-label="Microphone connected to listening and sharing outputs."><svg class="story-cables" viewBox="0 0 1280 820" aria-hidden="true"></svg>
+            <div class="story-node" data-story-node="mic"><span class="story-node-role">Your microphone</span><img src="assets/nodes/physical-input.png" width="784" height="786" alt="" loading="lazy" draggable="false"><img class="story-meter" data-story-meter="mic" data-meter-height="480" data-meter-lane="462" src="assets/nodes/meter-mic-full.png" width="56" height="480" alt="" style="top:21.882952%" loading="lazy"></div>
+            <div class="story-node" data-story-node="listen"><span class="story-node-role">What you hear</span><img src="assets/nodes/listening-output.png" width="784" height="714" alt="" loading="lazy" draggable="false"></div>
+            <div class="story-node" data-story-node="share"><span class="story-node-role">What you share</span><img src="assets/nodes/virtual-output.png" width="784" height="714" alt="" loading="lazy" draggable="false"><img class="story-meter" data-story-meter="share" data-meter-height="352" data-meter-lane="334" src="assets/nodes/meter-share-full.png" width="56" height="352" alt="" style="top:24.089636%" loading="lazy"></div>
+            <div class="story-node" data-story-node="tone"><span class="story-node-role">Shape your tone</span><img src="assets/nodes/tone-00.png" width="824" height="1118" alt="" loading="lazy" draggable="false"><img class="story-tone-next" src="assets/nodes/tone-01.png" width="824" height="1118" alt="" loading="lazy" draggable="false"><img class="story-meter" data-story-meter="tone" data-meter-height="660" data-meter-lane="642" src="assets/nodes/meter-tone-full.png" width="56" height="660" alt="" style="left:7.524272%;width:6.796117%;top:15.384615%" loading="lazy"></div>
+            <div class="story-node" data-story-node="music"><span class="story-node-role">Add your music</span><img src="assets/nodes/running-app.png" width="784" height="714" alt="" loading="lazy" draggable="false"><img class="story-meter" data-story-meter="music" data-meter-height="408" data-meter-lane="390" src="assets/nodes/meter-music-full.png" width="56" height="408" alt="" style="top:24.089636%" loading="lazy"></div>
+            <div class="story-node" data-story-node="duck"><span class="story-node-role">Make room for your voice</span><img src="assets/nodes/ducking.png" width="784" height="1184" alt="" loading="lazy" draggable="false"><img class="story-meter" data-story-meter="duck" data-meter-height="670" data-meter-lane="652" src="assets/nodes/meter-duck-full.png" width="56" height="670" alt="" style="top:14.527027%" loading="lazy"></div>
+        </div></div>
+        <div class="story-progress-track" aria-hidden="true"><span class="story-progress-fill"></span></div>
+        <div class="story-skip-row"><a class="section-jump story-skip" href="#audio-pipeline" data-section-jump aria-label="Skip to audio pipeline"><span>Skip</span><svg class="section-jump__icon" width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3v13m-5-5 5 5 5-5"/></svg></a></div>
+      </div>
+    </section>
+
+    <vine-mix-pipeline id="audio-pipeline">
+      <template shadowrootmode="open"><style>:host{display:block;color:#e9edeb;font-family:"IBM Plex Sans",Pipeline Plex,Arial,sans-serif;--mint:#b5e2c8;--muted:#939e98}
+*{box-sizing:border-box}
+.pipeline{min-height:100svh;display:flex;flex-direction:column;justify-content:center;padding:128px 28px 112px;overflow:hidden}
+.intro{width:100%;max-width:1200px;margin:0 auto;display:flex;align-items:end;justify-content:space-between;gap:48px}
+h2{font-size:var(--section-heading-size,clamp(32px,3.5vw,56px));font-weight:var(--section-heading-weight,600);letter-spacing:var(--section-heading-tracking,-.045em);line-height:var(--section-heading-leading,1.08);text-wrap:balance;margin:0}
+.canvas-scroll{flex:none;width:100%;margin:64px auto 28px;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;scrollbar-color:#40594b #090e0b;overscroll-behavior-x:contain}
+.canvas-scroll:focus-visible{outline:1px solid #78be98;outline-offset:4px}
+.stage{position:relative;width:100%;margin:100px 0 0;aspect-ratio:3792/909;isolation:isolate}
+.wires{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
+.wire-outline{fill:none;stroke:#000;stroke-width:3.6}
+.wire{fill:none;stroke:#78BE98;stroke-width:1.6;opacity:.95}
+.pulse{fill:none;stroke-linecap:butt;opacity:0}
+.node-flow{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:hidden;mix-blend-mode:screen}
+.eq-spectrum{position:absolute;pointer-events:none;overflow:hidden;opacity:0}
+.spectrum-channel{stroke:#9dcbb1;stroke-width:2;fill:#78be9826;stroke-linejoin:round}
+.channel-1{stroke:#b8c9da88;fill:#9db7d014}
+.node{display:block;position:absolute;margin:0;padding:0;border:0;background:transparent;color:inherit;cursor:default;text-align:left;isolation:isolate}
+.node img{display:block;width:100%;height:100%;pointer-events:none;user-select:none}
+.node .stereo-fill{position:absolute;pointer-events:none}
+.node-caption{position:absolute;left:4.6%;right:4.6%;bottom:calc(100% + 6px);height:112px}
+.node-caption h3{font-size:clamp(16px,1.25vw,20px);font-weight:600;line-height:1.2;letter-spacing:-.025em;margin:0;color:#e3ece6}
+.node-caption p{font-size:14px;line-height:1.45;margin:7px 0 0;max-width:230px;color:#9baa9f}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}
+
+@media(max-width:700px){.pipeline{min-height:0;padding:88px 16px 72px}.intro{display:block}.node-caption h3{font-size:18px}}
+@media(prefers-reduced-motion:reduce){.pulse,.node-flow,.eq-spectrum,.stereo-fill{display:none}}
+@media(forced-colors:active){.pipeline{background:Canvas}.wire{stroke:CanvasText}.pulse,.node-flow,.eq-spectrum,.stereo-fill{display:none}.node img{forced-color-adjust:none}.node-caption h3,.node-caption p{color:CanvasText}}
+@media(max-width:1200px){.stage{width:2100px;max-width:none;margin:100px 0 0}.canvas-scroll{margin-top:32px}.pipeline{padding-left:16px;padding-right:16px}.intro{padding-inline:max(0px,calc(var(--gutter,26px) - 16px))}}
+</style>
+    <section class="pipeline" aria-labelledby="pipeline-heading">
+      <header class="intro"><h2 id="pipeline-heading">A clear path for your voice.</h2></header>
+      <p class="sr-only">Illustrated audio route: Physical input, 100 Hz high-pass filter, Denoiser, Expander, Compressor, Equaliser, Virtual output. The moving light represents signal flow. No audio is recorded or played.</p>
+      <noscript><style>.canvas-scroll{display:none}</style><p>Physical input → High-pass filter → Denoiser → Expander → Compressor → Equaliser → Virtual output</p></noscript>
+      <div class="canvas-scroll" tabindex="0" role="region" aria-label="Horizontal audio pipeline. Scroll sideways to follow the signal."><div class="stage" role="group" aria-label="Seven-node audio pipeline"><svg class="wires" aria-hidden="true"></svg></div></div>
+    </section></template>
+      <div class="pipeline-fallback wrap">
+        <h2>A clear path for your voice.</h2>
+        <p>Physical input → 100 Hz high-pass filter → Denoiser → Expander → Compressor → Equaliser → Virtual output</p>
+        <p class="small">Illustrated signal flow. No audio is recorded or played.</p>
+      </div>
+    </vine-mix-pipeline>
+    </div>
+
+    <section class="vm-open" id="open" aria-labelledby="open-title">
+      <div class="vm-open__intro">
+        <h2 id="open-title">Open source.<br>Yours to shape.</h2>
+        <p>Explore the code. Make it your own.<br>Help shape what comes next.</p>
+        <a class="vm-open__button" href="https://github.com/acoyeen/vine-mix"><span class="vm-open__button-content"><span class="vm-open__button-icon" aria-hidden="true"><img src="assets/github.svg" width="20" height="20" alt=""></span><span class="vm-open__button-label">Explore on GitHub</span></span></a>
+      </div>
+      <div class="vm-open__details">
+        <article>
+          <h3>Free to download. Free to use.</h3>
+          <p>Bring your microphone, music and apps together. VineMix is yours to use, free of charge.</p>
+        </article>
+        <article>
+          <h3>Audio processing stays on your PC.</h3>
+          <p>Mix and shape your sound locally, without sending it to the cloud for processing.</p>
+        </article>
+        <article>
+          <h3>Open code. More possibilities.</h3>
+          <p>See how it works, adapt it to your setup, or build something new from the source.</p>
+        </article>
+        <article>
+          <h3>In beta. Built in the open.</h3>
+          <p>You don't have to write code to contribute. Share an idea or feedback and help shape what comes next.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="vm-faq" id="faq" aria-labelledby="faq-title">
+      <div class="vm-faq__wrap">
+        <h2 id="faq-title">Before you install.</h2>
+        <div class="vm-faq__questions">
+          <details name="vinemix-faq">
+            <summary>Will VineMix work on my PC?</summary>
+            <div class="vm-faq__answer"><p>VineMix is built for Windows 11 on x64 PCs. There are no native macOS, Linux or ARM builds. The app includes its .NET runtime, so you don’t need to install that separately.</p></div>
+          </details>
+          <details name="vinemix-faq">
+            <summary>Is VineMix free?</summary>
+            <div class="vm-faq__answer"><p>Yes. VineMix is free to download and use, with no subscription. Its source code is available under the MIT licence. Third-party virtual audio drivers have their own licences and may have separate costs for your use.</p></div>
+          </details>
+          <details name="vinemix-faq">
+            <summary>Do I need extra hardware or audio drivers?</summary>
+            <div class="vm-faq__answer"><p>You don’t need a hardware mixer. Start with a microphone and headphones available in Windows; this route needs no virtual audio driver.</p><p>To send your mix to another app as a microphone, you’ll need Virtual Audio Cable. VB-CABLE is a separate option for bringing audio in through a virtual input. Setup can guide you through installing missing drivers; this may require administrator permission and a restart.</p></div>
+          </details>
+          <details name="vinemix-faq">
+            <summary>Can I use it with voice chat, games or streaming apps?</summary>
+            <div class="vm-faq__answer"><p>VineMix can send your microphone and selected app audio together to a virtual microphone. Apps that let you choose a Windows recording device can receive that mix by selecting the cable’s recording device as their input.</p><p>Compatibility depends on the receiving app and your setup. Try the app’s microphone test or a short recording before a call or stream.</p></div>
+          </details>
+          <details name="vinemix-faq">
+            <summary>Do I need to know how to mix audio?</summary>
+            <div class="vm-faq__answer"><p>You can start simply: choose your microphone and headphones in the ready-connected starter. Both outputs begin muted, so you choose when to listen or share. Add effects and more audio sources when you need them.</p></div>
+          </details>
+          <details name="vinemix-faq">
+            <summary>Is my audio processed in the cloud?</summary>
+            <div class="vm-faq__answer"><p>No. VineMix mixes and processes audio on your PC. If you send your mix to a calling or streaming app, that app handles sharing it. VineMix can connect to GitHub to check for updates; automatic checks can be turned off in Settings.</p></div>
+          </details>
+          <details name="vinemix-faq">
+            <summary>Should I choose the installer or standalone version?</summary>
+            <div class="vm-faq__answer"><p>Choose the installer for its own app folder, shortcuts and guided setup for the drivers required for virtual inputs and outputs. Choose standalone if you prefer to launch a single EXE without installing the app; any virtual audio drivers are installed separately. Both use the same mixer and save settings on your PC.</p><p>The current beta is unsigned, so Windows may show an unknown publisher warning. Check the download against the checksum on its matching release page before deciding to run it.</p></div>
+          </details>
+          <details name="vinemix-faq">
+            <summary>Is the beta ready for everyday use?</summary>
+            <div class="vm-faq__answer"><p>It’s available to try, but bugs and compatibility issues are still possible. Long sessions, device recovery and latency still need further testing. Try your own setup before relying on it for an important call, recording or live stream.</p></div>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <section class="vm-downloads" id="download" aria-labelledby="download-title" data-repository="https://github.com/acoyeen/vine-mix">
+      <div class="vm-download-atmosphere" aria-hidden="true"><canvas></canvas></div>
+      <div class="vm-download-wrap">
+        <header class="vm-download-heading">
+          <h2 id="download-title">Download VineMix.</h2>
+          <p>Windows 11 / x64</p>
+        </header>
+
+        <div class="vm-download-content">
+          <div class="vm-download-release"><a data-release-link href="https://github.com/acoyeen/vine-mix/releases/tag/v0.4.0-beta" target="_blank" rel="noopener noreferrer"><span data-release-version>0.4.0 · Beta</span> <span data-release-state>(Saved release)</span><span class="vm-sr-only"> (opens in a new tab)</span></a></div>
+          <p class="vm-download-status" role="status" hidden></p>
+          <ul class="vm-download-list" aria-label="Application downloads">
+            <li class="vm-download-installer">
+              <div class="vm-download-row">
+                <h3>Installer <span class="vm-download-recommended">(Recommended)</span></h3>
+                <a class="vm-download-button" data-download="installer" href="https://github.com/acoyeen/vine-mix/releases/download/v0.4.0-beta/VineMix-0.4.0-beta-Setup-x64.exe" aria-label="Download installer">Download <span aria-hidden="true">↓</span></a>
+              </div>
+              <p class="vm-download-installation">Installs VineMix in its own folder, with guided setup for the drivers required for virtual inputs and outputs.</p>
+            </li>
+            <li class="vm-download-standalone">
+              <span class="vm-download-choice-divider" aria-hidden="true">or</span>
+              <div class="vm-download-row">
+                <h3>Standalone</h3>
+                <a class="vm-download-button" data-download="standalone" href="https://github.com/acoyeen/vine-mix/releases/download/v0.4.0-beta/VineMix-0.4.0-beta-Standalone-x64.exe" aria-label="Download standalone">Download <span aria-hidden="true">↓</span></a>
+              </div>
+              <div class="vm-download-drivers">
+                <p>Install drivers separately.</p>
+                <ul aria-label="Official driver downloads">
+                  <li><a href="https://download.vb-audio.com/Download_CABLE/VBCABLE_Driver_Pack45.zip" aria-label="Download VB-CABLE driver ZIP from VB-Audio">VB-CABLE <span class="vm-driver-format">ZIP</span><span aria-hidden="true">↓</span></a></li>
+                  <li><a href="https://software.muzychenko.net/freeware/vac471lite.zip" aria-label="Download Virtual Audio Cable Lite driver ZIP from its publisher">VAC Lite <span class="vm-driver-format">ZIP</span><span aria-hidden="true">↓</span></a></li>
+                </ul>
+              </div>
+            </li>
+          </ul>
+          <nav class="vm-download-resources" aria-label="Download resources"><a href="https://github.com/acoyeen/vine-mix/releases" target="_blank" rel="noopener noreferrer">Older versions<span class="vm-sr-only"> (opens in a new tab)</span></a><a data-release-notes href="https://github.com/acoyeen/vine-mix/releases/tag/v0.4.0-beta">Release notes</a><a data-checksums href="https://github.com/acoyeen/vine-mix/releases/download/v0.4.0-beta/SHA256SUMS.txt">Checksums</a><a data-installation href="https://github.com/acoyeen/vine-mix/blob/v0.4.0-beta/docs/INSTALLATION_AND_UPDATES.md">Installation help</a></nav>
+          <p class="vm-driver-source">Driver files download directly from the vendors’ servers.<br>They are not hosted or maintained by VineMix.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+  <footer class="site-footer">
+    <div class="site-footer__inner">
+      <a class="site-footer__brand" href="#top" aria-label="VineMix — Back to the top" data-section-jump="fade" translate="no">
+        <img src="assets/wordmark.svg" alt="VineMix" width="140" height="36">
+        <span class="site-footer__brand-name" aria-hidden="true">VineMix</span>
+      </a>
+      <nav class="site-footer__links" aria-label="Footer">
+        <a href="attribution.html">Attribution</a>
+        <a href="credits.html">Credits</a>
+        <a href="assets/LICENSE.txt">License</a>
+        <a href="#top" data-section-jump="fade">Back to top <span aria-hidden="true">↑</span></a>
+      </nav>
+    </div>
+  </footer>
+  <svg class="filter-defs" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><defs>
+    <filter id="reader-threshold" x="-25%" y="-50%" width="150%" height="200%" color-interpolation-filters="sRGB">
+      <feColorMatrix in="SourceGraphic" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 255 -140" />
+    </filter>
+  </defs></svg>
+</body>
+</html>

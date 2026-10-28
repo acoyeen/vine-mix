@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="ribbon" gradientUnits="userSpaceOnUse" x1="0" y1="280" x2="0" y2="660">
+      <stop stop-color="#304c3c" stop-opacity="0"/>
+      <stop offset=".44" stop-color="#304c3c" stop-opacity=".98"/>
+      <stop offset="1" stop-color="#304c3c" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="gold" gradientUnits="userSpaceOnUse" x1="0" y1="280" x2="0" y2="660">
+      <stop stop-color="#50441e" stop-opacity="0"/>
+      <stop offset=".44" stop-color="#50441e" stop-opacity=".68"/>
+      <stop offset="1" stop-color="#50441e" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="red" gradientUnits="userSpaceOnUse" x1="0" y1="280" x2="0" y2="660">
+      <stop stop-color="#512620" stop-opacity="0"/>
+      <stop offset=".44" stop-color="#512620" stop-opacity=".55"/>
+      <stop offset="1" stop-color="#512620" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="edges" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#030405"/>
+      <stop offset=".2" stop-color="#030405" stop-opacity="0"/>
+      <stop offset=".8" stop-color="#030405" stop-opacity="0"/>
+      <stop offset="1" stop-color="#030405"/>
+    </linearGradient>
+    <filter id="grain" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency=".72" numOctaves="2" stitchTiles="stitch" seed="14"/>
+      <feColorMatrix type="saturate" values="0" result="noise"/>
+      <feBlend in="SourceGraphic" in2="noise" mode="multiply"/>
+    </filter>
+  </defs>
+  <g filter="url(#grain)">
+    <path fill="#030405" d="M0 0h1440v900H0z"/>
+    <path fill="url(#gold)" d="M0 410C260 290 460 540 740 440S1140 300 1440 455V900H0Z"/>
+    <path fill="url(#red)" d="M0 510C250 570 420 310 690 360S1140 560 1440 400V900H0Z"/>
+    <path fill="url(#ribbon)" d="M0 420C300 320 550 450 800 510S1180 410 1440 330V900H0Z"/>
+    <path fill="url(#ribbon)" d="M0 350C300 390 550 550 820 440S1200 320 1440 420V900H0Z"/>
+  </g>
+  <path fill="url(#edges)" d="M0 0h1440v900H0z"/>
+</svg>

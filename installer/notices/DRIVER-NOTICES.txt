@@ -1,7 +1,7 @@
-VineMix: optional virtual audio drivers
-Reviewed 21 October 2026
+VineMix: virtual input and output drivers
+Reviewed 27 October 2026
 
-VineMix is a separate application. The two optional drivers included with this
+VineMix is a separate application. The two virtual audio drivers included with this
 free, non-commercial installer belong to their respective vendors and keep
 their own licences. VineMix's MIT licence does not relicense these drivers.
 All original package files, documentation and vendor terms are preserved.
@@ -33,9 +33,11 @@ not the Trial or paid edition. The vendor's terms govern your use.
 VAC Lite carries VineMix's mixed output into another application as a
 recording device or microphone.
 
-Driver installation is optional and uses the vendors' original installers.
+Missing drivers are selected by default for Virtual input and Virtual output.
+You can clear a selection when you do not need that route. Setup uses the
+vendors' original installers, with VAC Lite first and VB-CABLE second.
 Each vendor's terms must be accepted separately. Existing compatible drivers
 should be retained; do not reinstall, replace, remove or rename them merely
 to install VineMix. Driver installation may require administrator approval
-and a Windows restart. Uninstalling VineMix should leave shared drivers in
+and a Windows restart. Finish VineMix Setup before restarting. Uninstalling VineMix should leave shared drivers in
 place so other applications can continue using them.

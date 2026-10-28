@@ -1,18 +1,18 @@
 # VineMix installation and updates
 
-Updated 24 October 2026 for **0.3.0 · Beta 5**. VineMix is an
+Updated 28 October 2026 for **0.4.0 · Beta**. VineMix is an
 MIT-licensed open-source beta for Windows 11 x64. Download versioned packages,
 checksums and matching source from [GitHub Releases](https://github.com/acoyeen/vine-mix/releases).
 See the [beta test guide](BETA_TESTER_GUIDE.md) for installation instructions and
-[current qualification](BETA_TESTING_CURRENT.md) for outstanding gates.
+[current qualification](RELEASE_0.4.0_QUALIFICATION.md) for verification and limits.
 
 ## Packages and files
 
 **Upgrading from Beta 2, 3 or 4:** updates to those older packages can roll back
-because of incorrect engine version metadata. Beta 5 corrects that metadata and
-automatic-check scheduling. For recovery, wait for Saved, choose **Quit VineMix**,
-then run Beta 5 Setup using the existing folder. Do not uninstall first.
-Standalone users should quit and replace their launcher with the Beta 5 download.
+because of incorrect engine version metadata. 0.4.0 Beta retains the corrected
+metadata and automatic-check scheduling. For recovery, wait for Saved, choose **Quit VineMix**,
+then run 0.4.0 Beta Setup using the existing folder. Do not uninstall first.
+Standalone users should quit and replace their launcher with the 0.4.0 Beta download.
 Keep optional drivers unchanged if they already work. Intermediate betas are not
 required. See the [update investigation](UPDATE_INVESTIGATION_2026-10-24.md).
 
@@ -38,6 +38,12 @@ visible recovery before normal editing and audio starts. Recovery archives the
 originals before restoring a backup or creating the muted starter.
 
 ## Optional drivers
+
+The 0.4.0 Beta installer selects both missing eligible drivers by
+default, labels their Virtual input/output roles and runs VAC Lite before
+VB-CABLE. Separate vendor consent remains required, and restart guidance says
+to finish VineMix Setup first. Clear either selection if it is not needed;
+this change is tracked in [TWEAK-014](TWEAKS.md#tweak-014).
 
 Setup detects VB-CABLE and VAC by their driver/package identities, including
 installed but disabled or nonpresent devices. It offers original vendor setup

@@ -1,10 +1,17 @@
 # VineMix visual identity
 
-Implemented 20 October 2026. The approved direction is a minimal native audio
-workspace using the split VM mark, IBM Plex typography and forest-green actions.
-See the [implementation plan and evidence](BRANDING_IMPLEMENTATION_PLAN.md).
+Updated 28 October 2026 for the monochrome refresh planned for Beta 6. The
+native workspace uses the split VM mark, IBM Plex typography and forest-green
+actions. The logo follows the website's single-colour treatment while controls
+retain their operational colours. The [original implementation plan and
+evidence](BRANDING_IMPLEMENTATION_PLAN.md) records the earlier two-colour identity.
 
 ## Naming
+
+For independent forks, see [Crediting VineMix](../ATTRIBUTION.md). A short text
+acknowledgement and original-project link are the requested attribution; keeping
+the logo or naming a fork VineMix is not required. The visual conventions below
+describe the official product.
 
 Use **VineMix**, without a space, in product copy, accessibility text, release
 titles and documentation. Use `vine-mix` for the repository, Codex project and
@@ -18,8 +25,12 @@ retain their original spelling where it is required for accuracy.
 The symbol consists of a separate V above an M. Their long diagonals share a
 45-degree angle; a visible gap separates the pieces. Small corner radii soften
 the shape. The application caption pairs the symbol with the approved outlined
-**VineMix** wordmark: green **Vine**, light **Mix**, with full-width square i dots
-aligned to the capital letters and shorter i stems.
+**VineMix** wordmark in one foreground colour, with full-width square i dots
+aligned to the capital letters and shorter i stems. Both symbol pieces and all
+letters share the live text brush, including Windows high-contrast foreground.
+The website reference is the monochrome header/hero in
+`website-redesign/src/index.html` and its white `src/favicon.svg`; the geometry
+and existing caption proportions are preserved.
 Use **VineMix** consistently in Windows titles, accessible identity and tray commands.
 
 The caption centres the 106 × 20 DIP wide artwork across the full visible header,
@@ -35,7 +46,7 @@ underline or mouse highlight. Its accessible name remains available. A separate
 outline appears for keyboard navigation and follows the live theme.
 
 An 8 × 8 DIP connection dot sits at the far left, vertically centred in the same
-header, with the current compact version (**0.3.0 · Beta 3**) beside it. Green means the interface is connected to the audio engine and ready to
+header, with the current compact release version beside it. Green means the interface is connected to the audio engine and ready to
 accept edits; it dims during disconnection or restart. Its hover text and
 accessible name expose the current connection status. Warnings occupy the left
 half; saved status, Settings and window actions occupy the right without shifting
@@ -48,13 +59,18 @@ the central mark.
 - [256px icon preview](../desktop/VineMix.Desktop/Assets/Branding/app.png)
 
 Icons contain 16, 20, 24, 32, 40, 48, 64, 128 and 256px frames. Their backgrounds
-are transparent; only the green V and white M are painted, including in the
-taskbar, executable/window icon and tray. Shortcuts using the default application
-icon inherit this artwork. The smallest frames use the brighter established
-green for optical clarity. Recreate the standalone mark and icons with
+are transparent; both pieces use the in-app logo's soft white `#E8EBF2` in the
+taskbar, executable/window icon and tray. This follows the maintainer's
+28 October refinement of the initial grey icons. No background plate is added;
+visibility on a light desktop background depends on the background image.
+The mark uses 80% of the canvas height, up from 72%, making it about 11% larger
+while retaining clear transparent margins at every supplied size.
+Shortcuts, Setup and Installed apps inherit the packaged application icon.
+The portable SVG artwork is white. Recreate the standalone mark and icons with
 `scripts/generate-brand-assets.ps1`; keep its paths synchronized with the native
-vector in `Controls/BrandMark.cs`. The wide wordmark is maintained separately in
-`wordmark.svg` and drawn by `Controls/BrandWordmark.cs`.
+vector in `Controls/BrandMark.cs`. The generator also normalizes the existing
+`wordmark.svg` to one ink without changing its custom lettering; it is drawn by
+`Controls/BrandWordmark.cs`.
 
 ## Typography and colour
 
@@ -70,7 +86,9 @@ character, keeping their shape consistent across Settings and other menus.
 
 | Role | Normal palette | Meaning |
 | --- | --- | --- |
-| Mark accent | `#3B8C66` | Forest-green identity |
+| In-app logo | `ConsoleTextBrush` (`#E8EBF2`) | One foreground for the entire identity |
+| Windows icon | `#E8EBF2` | Soft white matching the normal in-app logo |
+| Portable SVG logo | `#FFFFFF` | Website-aligned monochrome artwork |
 | Primary action / active Mono | `#2D6A4F` | Deliberate interaction |
 | Primary action text | `#F5F8F6` | Readable light label |
 | Primary action hover | `#347B5B` | Hover feedback |
@@ -81,7 +99,7 @@ character, keeping their shape consistent across Settings and other menus.
 | Control cable / square socket | `#A0A8B3` | Control connection |
 
 Retain distinct muted category headers, explicit Mute/Bypass labels and
-green/amber/red meter zones. Do not reuse brand green for warnings or replace
+green/amber/red meter zones. Do not reuse action green for warnings or replace
 the sidechain role with audio green. High contrast replaces operational colours
 with Windows system colours through dynamic resources.
 
@@ -97,6 +115,7 @@ use the same application-wide ownership rules.
 | --- | --- |
 | Caption wide logo, website button and Windows title/icon | `MainWindow.xaml`, `MainWindow.cs`, `Controls/BrandWordmark.cs`, `Controls/BrandMark.cs` |
 | Executable/taskbar icon and product metadata | `VineMix.Desktop.csproj`, `Assets/Branding/` |
+| Setup, Installed apps and default shortcuts | `installer/VineMix.iss`, application icon embedded in `VineMix.exe` |
 | Tray icon, menu font, tooltip and commands | `App.xaml.cs`, `TrayBranding.cs` |
 | Interface, detached menus and tooltips | `App.xaml` shared font/control styles |
 | Live palette and Windows high contrast | `Controls/ConsoleTheme.cs`, `Theme.xaml` |
@@ -118,10 +137,15 @@ compatibility readers retain their original context.
 
 The separate verification build's `--render-design` checks actual embedded fonts and weights, glyph coverage,
 numeric alignment, menu/tooltip inheritance, drawn labels, two separate logo
-pieces, all icon frames, contrast and high-contrast restoration. Existing suites
+pieces sharing one ink, all icon frames' soft-white colour and transparency,
+and high-contrast restoration. Existing suites
 continue to cover every creatable node, routing/editing, numeric entry, meters,
 search/help, window dimensions, zoom and DPI. See [testing](../TESTING.md).
 
-![Rebranded native workspace](images/workspace.png)
+The images below record the original branding implementation; they predate the
+monochrome refresh. Windows Volume Mixer session identity is a separate
+[tracked refinement](TWEAKS.md#tweak-011), not verified by replacing desktop icons.
+
+![Original native workspace branding](images/workspace.png)
 
 ![Settings typography](images/branding-settings.png)

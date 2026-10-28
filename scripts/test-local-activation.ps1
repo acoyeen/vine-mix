@@ -52,6 +52,31 @@ try {
     Check (Test-ActivationProcessIdentity $captured $captured) 'Rollback identity accepts the captured exact process token.'
     $replacement = [pscustomobject]@{Id=123;StartTime=$captured.StartTime.AddSeconds(1);Path=$captured.Path;SessionId=2}
     Check (-not (Test-ActivationProcessIdentity $replacement $captured)) 'A reused PID with a different start time cannot be stopped by rollback.'
+    function ControllerFixture([bool]$ExitDuringPathRead = $false) {
+        $fixture = [pscustomobject]@{HasExited=$false;SessionId=2;StartTime=$captured.StartTime.AddSeconds(1);
+            ImagePath=$captured.Path;ExitDuringPathRead=$ExitDuringPathRead;RefreshCount=0}
+        $fixture | Add-Member -MemberType ScriptMethod -Name Refresh -Value { $this.RefreshCount++ }
+        $fixture | Add-Member -MemberType ScriptProperty -Name Path -Value {
+            if ($this.ExitDuringPathRead) { $this.HasExited=$true; return $null }
+            return $this.ImagePath
+        }
+        return $fixture
+    }
+    $normalizing = ControllerFixture -ExitDuringPathRead $true
+    Check (-not (Test-DesktopControllerCandidate $normalizing $captured.Path 2 $captured.StartTime) -and
+        $normalizing.RefreshCount -eq 2) 'A normalization launcher exiting during image-path inspection is rechecked and skipped before the final controller appears.'
+    $finalController = ControllerFixture
+    Check (Test-DesktopControllerCandidate $finalController $captured.Path 2 $captured.StartTime) 'The later live controller must still match the expected executable, Windows session and launch time.'
+    foreach ($mismatch in @('path','missing-path','session','start-time')) {
+        $unexpected = ControllerFixture
+        switch ($mismatch) {
+            'path' { $unexpected.ImagePath = Join-Path $root 'Other.exe' }
+            'missing-path' { $unexpected.ImagePath = $null }
+            'session' { $unexpected.SessionId = 99 }
+            'start-time' { $unexpected.StartTime = $captured.StartTime.AddSeconds(-1) }
+        }
+        Reject { Test-DesktopControllerCandidate $unexpected $captured.Path 2 $captured.StartTime } ('A still-running controller with a mismatched ' + $mismatch + ' is never accepted or ignored.')
+    }
     Reject { Assert-ActivationEvidenceLocation (Join-Path $project 'artifacts\private-backup') @($project) } 'Evidence cannot be saved inside the source checkout.'
     Reject { Assert-ActivationEvidenceLocation $root @($root) } 'Evidence cannot be the application package itself.'
     Assert-ActivationEvidenceLocation ($root + '-sibling') @($root)

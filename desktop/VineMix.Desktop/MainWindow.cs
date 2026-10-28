@@ -62,7 +62,7 @@ public partial class MainWindow : Window
         Workspace.SetFooterStatus(SaveIndicator);
         InitializeLayoutLock();
         _settingsMenu = CreateSettingsMenu(mixer, Workspace.SetMessage, OpenHelp, OpenNodeSearch, OpenHelpEntry, OpenAbout, OpenUpdates,
-            quit: QuitFromSettingsAsync, showWhatsNew: () => OpenWhatsNew());
+            quit: QuitFromSettingsAsync, showWhatsNew: () => OpenWhatsNew(), showActivity: OpenActivity);
         SettingsButton.PreviewMouseDown += (_, args) => { if (!TryPrepareUpdateEditors()) args.Handled = true; };
         ConsoleGrid.Children.Add(Workspace);
         HelpView = new WorkspaceHelpView(CloseHelp) { MaxWidth = 960, MaxHeight = 680,
@@ -108,49 +108,10 @@ public partial class MainWindow : Window
     }
     private void Settings_Click(object sender, RoutedEventArgs e) => OpenSettings();
     private void Website_Click(object sender, RoutedEventArgs e) => _openExternal(WebsiteUrl);
-    private void OpenAbout()
+    private void OpenActivity()
     {
         _settingsMenu.IsOpen = false;
-        var dialog = new Window { Owner = this, Title = "About VineMix", Width = 520, SizeToContent = SizeToContent.Height,
-            ResizeMode = ResizeMode.NoResize, WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            FontFamily = FontFamily, FontSize = 13, ShowInTaskbar = false };
-        dialog.SetResourceReference(BackgroundProperty, "ConsoleWindowBrush");
-        dialog.SetResourceReference(ForegroundProperty, "ConsoleTextBrush");
-        dialog.Content = CreateAboutContent(dialog.Close, showUpdates: () => { dialog.Close(); OpenUpdates(); });
-        dialog.ShowDialog();
-    }
-    internal static FrameworkElement CreateAboutContent(Action closeAbout, Action<string>? copyVersion = null, Action? showUpdates = null)
-    {
-        var content = new StackPanel { Margin = new Thickness(24) };
-        content.Children.Add(new TextBlock { Text = "VineMix", FontSize = 24, FontWeight = FontWeights.SemiBold });
-        content.Children.Add(new TextBlock { Text = "Local audio routing · Beta", Margin = new Thickness(0, 4, 0, 16) });
-        var version = new TextBox { Text = ReleaseInfo.FullInformation, IsReadOnly = true, IsReadOnlyCaretVisible = true, TextWrapping = TextWrapping.Wrap,
-            BorderThickness = new Thickness(0), Background = System.Windows.Media.Brushes.Transparent,
-            Padding = new Thickness(0), Margin = new Thickness(0, 0, 0, 16) };
-        version.SetResourceReference(ForegroundProperty, "ConsoleTextBrush");
-        AutomationProperties.SetName(version, "Full VineMix version and build information");
-        content.Children.Add(version);
-        var actions = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
-        var copy = new Button { Content = "Copy version information", Padding = new Thickness(12, 6, 12, 6), Margin = new Thickness(0, 0, 8, 0) };
-        copy.Click += (_, _) =>
-        {
-            try
-            {
-                if (copyVersion is null) Clipboard.SetText(ReleaseInfo.FullInformation);
-                else copyVersion(ReleaseInfo.FullInformation);
-                copy.Content = "Copied";
-            }
-            catch (System.Runtime.InteropServices.ExternalException) { version.SelectAll(); version.Focus(); }
-        };
-        var close = new Button { Content = "Close", IsCancel = true, Padding = new Thickness(12, 6, 12, 6) };
-        close.Click += (_, _) => closeAbout();
-        if (showUpdates is not null)
-        {
-            var updates = new Button { Content = "Check for updates", Padding = new Thickness(12, 6, 12, 6), Margin = new Thickness(0, 0, 8, 0) };
-            updates.Click += (_, _) => showUpdates(); actions.Children.Add(updates);
-        }
-        actions.Children.Add(copy); actions.Children.Add(close); content.Children.Add(actions);
-        return content;
+        Workspace.ShowHistoryMenu(SettingsButton);
     }
     internal void OpenHelp()
     {
@@ -188,8 +149,8 @@ public partial class MainWindow : Window
     internal bool TryHelpShortcut(Key key, ModifierKeys modifiers, DependencyObject? focused = null)
     {
         if (modifiers != ModifierKeys.None) return false;
-        // Blurring a numeric entry discards its uncommitted draft. Let the
-        // editor finish before F1 opens a reference that would take its focus.
+        // Keep F1 from interrupting text entry or implicitly applying a value
+        // by moving focus into Help. The editor retains its existing shortcut policy.
         if (key == Key.F1 && !GraphWorkspace.IsTextEditor(focused)) { OpenHelp(); return true; }
         if (key == Key.Escape && IsHelpOpen)
         {
@@ -243,7 +204,7 @@ public partial class MainWindow : Window
     }
     internal static ContextMenu CreateSettingsMenu(MixerViewModel mixer, Action<string, bool>? feedback = null,
         Action? showHelp = null, Action? findNode = null, Action<string>? showHelpEntry = null, Action? showAbout = null, Action? showUpdates = null,
-        Func<System.Threading.Tasks.Task>? quit = null, Action? showWhatsNew = null)
+        Func<System.Threading.Tasks.Task>? quit = null, Action? showWhatsNew = null, Action? showActivity = null)
     {
         var menu = new ContextMenu { Width = 380, MaxHeight = 560 };
         AutomationProperties.SetName(menu, "VineMix settings");
@@ -251,12 +212,12 @@ public partial class MainWindow : Window
             ToolTip = "Find a node by name, type, device or app." };
         find.Click += (_, _) => findNode?.Invoke();
         menu.Items.Add(find);
-        var help = new MenuItem { Header = "Help & shortcuts", InputGestureText = "F1",
-            ToolTip = "Keyboard shortcuts and silent control practice." };
-        AutomationProperties.SetHelpText(help, "Open shortcuts and practice controls. Escape first cancels an active example, then closes Help.");
-        help.Click += (_, _) => showHelp?.Invoke();
-        menu.Items.Add(help);
-        menu.Items.Add(new Separator());
+        const string activityHelp = "Recent workspace edits and messages from this session.";
+        var activity = new MenuItem { Header = "Activity", ToolTip = activityHelp };
+        AutomationProperties.SetName(activity, "Activity");
+        AutomationProperties.SetHelpText(activity, activityHelp);
+        activity.Click += (_, _) => { menu.IsOpen = false; showActivity?.Invoke(); };
+        menu.Items.Add(activity);
 
         MenuItem Preference(string title, string property, string help, ItemCollection? items = null)
         {
@@ -271,6 +232,9 @@ public partial class MainWindow : Window
             "Right-drag empty canvas to pan; release without dragging for its menu.");
         rightPan.ToolTip = NodeToolTip.Create("Right-click drag to pan", "Enables right-button canvas panning");
         Preference("Reduce meter animation", nameof(MixerViewModel.ReducedAnimation), "Use less motion in audio meters.");
+        Preference("Show action notifications", nameof(MixerViewModel.ShowActionNotifications),
+            "Show brief messages after workspace actions.");
+        menu.Items.Add(new Separator());
         const string visibilityHelp = "Choose which extra audio devices appear in the input and output lists. Your assigned device always remains visible. These preferences do not change Windows devices or audio routing.";
         var visibility = new MenuItem { Header = "Audio device visibility", ToolTip = NodeToolTip.Create("Audio device visibility", visibilityHelp) };
         AutomationProperties.SetHelpText(visibility, visibilityHelp);
@@ -281,10 +245,6 @@ public partial class MainWindow : Window
         Preference("Show advanced inputs and outputs", nameof(MixerViewModel.ShowAdvancedAudioDevices),
             "Show line-level inputs, telephone endpoints, and S/PDIF or digital passthrough devices. Ordinary and streamed microphones, speakers, headphones and HDMI outputs remain visible; unclassified active devices also remain visible. Availability controls still apply.", visibility.Items);
         menu.Items.Add(visibility);
-        var startup = Preference("Start VineMix when I sign in", nameof(MixerViewModel.StartAtLogin),
-            "Automatically start the mixer when you sign in to Windows.");
-        startup.SetBinding(IsEnabledProperty, new Binding(nameof(MixerViewModel.CanEdit)) { Source = mixer });
-        menu.Items.Add(new Separator());
         var sound = new MenuItem { Header = "Windows sound settings", ToolTip = "Open the Windows audio device settings." };
         sound.Click += (_, _) => App.OpenExternal("ms-settings:sound"); menu.Items.Add(sound);
         var retry = new MenuItem { Header = "Retry assigned devices", ToolTip = "Reconnect the audio devices already assigned to your nodes." };
@@ -304,11 +264,20 @@ public partial class MainWindow : Window
         };
         menu.Items.Add(restart);
         menu.Items.Add(new Separator());
+        var startup = Preference("Start VineMix when I sign in", nameof(MixerViewModel.StartAtLogin),
+            "Automatically start the mixer when you sign in to Windows.");
+        startup.SetBinding(IsEnabledProperty, new Binding(nameof(MixerViewModel.CanEdit)) { Source = mixer });
         var updates = new MenuItem { Header = "Check for updates", ToolTip = "Check GitHub for a newer verified VineMix release." };
         AutomationProperties.SetHelpText(updates, "Check for a newer version. Installation only starts after you choose Install and restart; audio briefly stops then.");
         updates.Click += (_, _) => showUpdates?.Invoke(); menu.Items.Add(updates);
         Preference("Automatically check for updates", nameof(MixerViewModel.AutomaticallyCheckForUpdates),
             "Check daily while VineMix is running, with automatic retries after failed checks. Turning this on checks shortly. Downloads and installation require your choice.");
+        menu.Items.Add(new Separator());
+        var help = new MenuItem { Header = "Help & shortcuts", InputGestureText = "F1",
+            ToolTip = "Keyboard shortcuts and silent control practice." };
+        AutomationProperties.SetHelpText(help, "Open shortcuts and practice controls. Escape first cancels an active example, then closes Help.");
+        help.Click += (_, _) => showHelp?.Invoke();
+        menu.Items.Add(help);
         const string whatsNewHelp = "Read the bundled release highlights.";
         var whatsNew = new MenuItem { Header = "What's new?", ToolTip = whatsNewHelp };
         AutomationProperties.SetName(whatsNew, "What's new?");

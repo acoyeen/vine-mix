@@ -20,16 +20,56 @@ remaining muted. Existing saved workspaces retain their graph and assignments.
 ## Node library
 
 - **Inputs:** physical microphone, base VB-CABLE virtual input, running application.
-- **Mixing:** Mix, stereo balance and mono; a linked control adjusts several levels together.
+- **Mixing:** Mix, Balance, Mono, Channel Swap, Stereo Width, Pan, Crossfade,
+  Stereo Combine and Stereo Split; a linked control adjusts several levels together.
 - **Processing:** interactive EQ with up to eight bands, High-pass, Low-pass,
   Low / Mid / High tone controls, Voice Color, Compressor, Limiter, Ducking,
   Expander, Gate, Alignment Delay, denoiser, de-esser, plosive remover and reverb.
 - **Outputs:** physical or streamed listening output and VAC Lite virtual microphone output.
 
-The creation menu contains **24 node types**. Mix acts as a volume control with
+The local Beta 6 creation menu contains **30 node types**. Mix acts as a volume control with
 one incoming connection and combines sound when several connections arrive.
 Gain / Multiply and Reroute are no longer offered for creation; existing saved
-nodes still work, bringing the compatible engine library to 26 types.
+nodes still work, bringing the compatible engine library to 32 types.
+
+**Level control** inputs appear on nodes with dedicated **Level** knobs:
+Physical input, Virtual input, Running app, Mix, Listening output and Virtual
+output (plus saved Gain/Reroute nodes). Connect a **Linked control** to scale
+those levels together. Its **Multiplier** starts at **100%** in the middle of
+a **0–200%** dial: 0% silences, 100% leaves levels unchanged, and 200% doubles
+signal amplitude (about +6 dB). This is amplitude, not perceived loudness.
+Bypass removes the multiplier, including a zero setting.
+
+Effects and other mixing utilities have no new Level control input. To control
+their output level, route their audio into a Mix node. Existing control links
+from older workspaces remain visible and functional until removed; they are
+not silently moved or deleted. Existing decibel-based Linked controls keep
+their exact gain until edited. Out-of-range legacy percentages are displayed
+explicitly with a **Use multiplier** action to reset to 100%; they are never
+silently clamped. Level knobs elsewhere retain decibels and their existing names.
+
+To place two microphones in separate stereo channels, connect one to Stereo
+Combine's **Left** input and the other to **Right**. Each socket averages its
+incoming stereo channels to mono, then assigns that sound to its named side.
+An unconnected side stays silent. Stereo Split does the reverse: its **Left**
+and **Right** outputs each carry the extracted channel as centred mono, so each
+can be processed separately and reconnected to Stereo Combine. Splitting a mono
+source produces two identical mono outputs. Split and Combine have no bypass.
+
+Channel Swap exchanges the sides. Stereo Width is unchanged at 100%, mono at
+0%, and wider above 100%; it does not generate stereo from mono. Pan first
+combines its input to mono and positions that signal; centre uses −3 dB on each
+side for constant-power panning. Balance preserves the original stereo channels
+and reduces the opposite side instead. Bypassing Pan restores the original stereo.
+
+Crossfade blends separate stereo **A** and **B** inputs. It starts with A only;
+turning toward B lowers A while raising B. **Equal power** suits unrelated
+sources such as two music apps; **Linear** suits aligned copies of the same
+signal, such as an original and processed branch. Equal power can raise the
+level of correlated signals at the centre. Bypass selects A. Unequal effect
+delays need manual Alignment Delay before blending; there is no automatic
+parallel-path delay compensation. Missing inputs remain silent rather than
+automatically selecting the other source.
 
 The graph supports up to **32 nodes and 96 connections**. Sources can feed several
 destinations, and each listening output has independent buffering and recovery.
@@ -84,10 +124,11 @@ it. Nodes stay expanded. Audio sockets are round; shared-control
 sockets are square; detector-only sidechain sockets are diamonds. Every scalar
 numeric parameter uses the shared dial control. Related effect controls form
 compact groups, with persistent labels, values and units. Drag up/down, hold
-Shift for fine adjustment, or click the number and press Enter to apply an exact
-value. Tab or Shift+Tab applies a valid value before moving to the next or previous
-control; invalid text stays editable. Each dial and its value box has its own
-Tab stop. Escape cancels. Double-click or Home resets the focused dial; EQ frequency
+Shift for fine adjustment, or click the number and type an exact value. Enter,
+Tab, Shift+Tab or clicking away applies a valid value. Invalid text stays visible
+with a validation outline and is not applied; correct it or cancel the edit.
+Right-click the value for **Apply value** or **Cancel edit**; Escape also cancels.
+Each dial and its value box has its own Tab stop. Double-click or Home resets the focused dial; EQ frequency
 resets to the selected band's reset anchor. Arrow keys adjust the focused dial,
 and Page Up/Down make larger changes. Focus remains visible. Decimal precision
 is retained, and sample counts accept whole numbers only. The wheel zooms the
@@ -98,6 +139,9 @@ Tooltips describe each control's purpose or current state. Mouse and keyboard
 instructions are in **Settings → Help & shortcuts**. Open **Settings** at the top
 right for workspace preferences, start-at-login, Windows sound settings and
 device recovery.
+Search stays at the top. Separators group workspace controls first, audio tools
+second, app startup and updates third, then Help, What's new? and About. Quit
+remains separate at the bottom. Activity sits directly after Find node.
 
 Physical device dropdowns show available devices by default. Under
 **Settings → Audio device visibility**, optionally show disabled, disconnected
@@ -146,6 +190,37 @@ vertical column. **Alt+A** runs **Auto Align**, choosing the direction the
 selection already extends furthest; ties use a row. The same actions are in
 the alignment submenu.
 
+When nodes overlap, the most recently selected or dragged node stays in front
+after release. This visual order lasts for the current app session and does not
+change the nodes' sound or connections.
+
+To organize a section visually, drag over empty canvas to select its nodes, or
+Shift-click to add and remove nodes from the selection. Right-click and choose
+**Group selected nodes**, or press **Ctrl+G**. A group is a named background
+frame with no inputs, outputs or audio behavior. Its heading shows only the
+centered group name.
+
+Click the heading or an exposed area of the group background to select it;
+drag either to move all its members together. Nodes and cables keep their own
+controls. Hold **Shift** or **Ctrl** while dragging the group background to
+box-select nodes, or use middle-drag or **Space+drag** to pan. The frame automatically
+fits the member nodes as they move or change size; its title stays readable down
+to 30% zoom. Double-click the title, or select the frame and press **F2**, to
+rename it. **Enter** applies the name, **Escape** cancels, and clicking elsewhere
+applies it. Right-click the heading or exposed background for **Group color** and choose Sage, Teal, Blue,
+Violet, Rose, Amber or Slate. **Ungroup (keep nodes)** removes the frame while
+keeping every node and connection; Delete has that same effect when the frame
+is selected.
+
+Each node belongs to at most one group; groups do not nest. Use the selected
+nodes' **Add to group** or **Remove from group** menu to change membership.
+Dragging a member beyond the frame keeps it in the group and expands the frame.
+Grouping and membership changes support Undo/Redo. Copying all of a group's
+members preserves its name and color around the pasted copies; copying only
+some members copies those nodes without the frame. Selecting the group
+before **Ctrl+C** copies the whole group. **Fit**, **Home** and **Frame selection**
+include the relevant group headings when bringing nodes into view.
+
 For VR controllers or mice without an accessible middle button, enable
 **Settings → Right-click drag to pan**. Drag with the right button
 on empty canvas to pan; release without dragging to open the context menu.
@@ -156,12 +231,17 @@ preference; it does not change audio settings.
 
 The Add menu groups nodes into **Inputs, Outputs, Effects, Mixing and Controls**,
 using the same category colours as their headers. Search also accepts a category
-name. The upper toolbar holds creation, selection, Undo, Redo, Activity, Fit and
-zoom controls. Connection status stays in the header; save status is centred in
+name. The upper toolbar holds creation, selection, Undo, Redo, Fit and zoom
+controls, with the node count centred beneath the logo. Open **Settings → Activity**
+for session history. Connection status stays in the header; save status is centred in
 the footer. Action results and errors temporarily replace it. A thin green bar
 shrinks from right to left over five seconds, then the save status returns.
 **Dismiss** returns to save status immediately. The latest message remains in
 **Activity**, and control instructions are available in **Help & shortcuts**.
+Turn off **Settings → Show action notifications** for a quieter footer. This
+saved preference hides routine timed messages immediately; errors and save
+status remain visible, and Activity still retains recent edits and the latest
+message. Notifications are on by default.
 Drag the title, passive header text or unused toolbar space to move the window;
 buttons keep their normal actions and the canvas keeps its own gestures.
 **Undo / Redo** restore up to 100 graph edits in the current app session. One
@@ -337,7 +417,8 @@ Selecting a node or cable stays quiet; missing-device warnings remain visible.
 Windows reduced-motion settings use immediate, temporary emphasis. High contrast uses system
 colors with the same distinct shapes and accessible state text. The lock blocks
 moving, adding, deleting, pasting and aligning nodes, structural cable edits and
-structural Undo/Redo. Volume, mute, bypass, device choices, renaming, cable level,
+structural Undo/Redo. It also blocks group creation, movement, membership changes,
+ungrouping, and group name/color edits. Volume, mute, bypass, device choices, node renaming, cable level,
 parameter Undo/Redo, selection, copy, search, pan and zoom remain available.
 Hiding and reopening the window preserves the lock; a new app session starts
 unlocked. The lock does not change the saved graph.
@@ -346,13 +427,18 @@ The denoiser dropdown shows **SpeexDSP · 20 ms** and **RNNoise · 30 ms**. Thes
 are VineMix's node delays, including bypass. They do not describe complete system
 latency or CPU cost; perceived cleanup quality depends on the voice and noise.
 
-**Settings → What's new?**, immediately above **About VineMix**, opens curated
+**Settings → What's new?**, immediately below **Help & shortcuts**, opens curated
 bundled highlights. After an update the notice waits for a healthy, visible, active workspace without an
 editor, gesture, pending save or another dialog. A fresh install establishes a
 baseline without an upgrade notice; an existing workspace from a version without
 this feature gets one transition notice. Skipped versions include their available
 bundled highlights. Dismissal is stored under `updates/whats-new.json`, separately
 from workspace settings and Undo. Closing the notice leaves audio unchanged.
+What's New, Updates and About use the same minimal window style. They open
+centred and cannot be dragged or resized. Click back on
+the app, press Escape or choose Close to dismiss them; an update installation
+already in progress stays protected. **About VineMix** follows **What's new?**
+in the help section, above the separately grouped **Quit VineMix**.
 
 After building, launch **`artifacts/VineMix/VineMix.exe`**. The native engine
 is alongside it, and the package includes the .NET desktop runtime. Closing the

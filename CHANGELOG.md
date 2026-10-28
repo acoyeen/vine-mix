@@ -1,5 +1,50 @@
 # Changelog
 
+## 0.4.0-beta — 28 October 2026
+
+The [release hub](docs/RELEASE_0.4.0_BETA.md) tracks the combined scope,
+integrated follow-ups, attribution embedding, qualification and staged retirement
+of Beta 1–5 downloads. This release consolidates the work formerly called Beta 6.
+
+- Add Channel Swap, Stereo Width, Pan, Crossfade, Stereo Combine and Stereo
+  Split, with named audio sockets retained through saving, copying and history.
+- Use one Level control where Volume and Gain duplicated the same setting;
+  label Linked control as Multiplier and Ducking's sidechain as Trigger.
+- Embed project credit, MIT licence, attribution policy and third-party notices
+  in the offline Credits and licences view and all delivered formats.
+- Protect node/group rename drafts and failed preference saves during quit and
+  update preparation. Reuse settled Pan/Crossfade weights without changing
+  sample-accurate smoothing.
+- Advance the actual version number with an unnumbered Beta label. Preserve
+  old release posts and tags while retiring their uploaded downloads after cutover.
+
+- Add named organizational node groups with automatic bounds, shared movement,
+  seven preset colors and headings readable at low zoom. Select nodes and use
+  **Group selected nodes** or **Ctrl+G**. Groups have no audio inputs or outputs;
+  ungrouping keeps their nodes and connections. Group metadata supports saving,
+  Undo/Redo and copying complete groups.
+- Brighten group fills and borders, allow selection and movement from their
+  exposed background, and shorten group and action-notification hover help.
+  Center the group name in a clean heading with no color marker or node count.
+  Keep the most recently selected or dragged node in front after release and
+  interface refreshes; moving a group preserves its members' relative order.
+- Add a saved **Show action notifications** toggle in Settings to hide routine
+  timed footer messages while retaining errors, save status and Activity.
+- Apply valid precise numeric edits when leaving a field; retain invalid drafts
+  with clear feedback and offer Apply value / Cancel edit from the text menu.
+- Align the Settings search placeholder with its caret and typed text across
+  display scaling.
+- Use consistent compact information windows, centre the node count, and
+  group Settings into workspace controls, audio tools, app preferences and
+  help/information using the existing separators, with Quit separate at the bottom.
+- Use monochrome in-app branding and brighter soft-white Windows icons.
+- Clarify optional virtual-route drivers in Setup, select missing eligible
+  drivers by default, preserve explicit deselections, and run VAC Lite before
+  VB-CABLE with separate consent and restart guidance.
+- See the [release notes](docs/releases/0.4.0-beta.md),
+  [qualification record](docs/RELEASE_0.4.0_QUALIFICATION.md) and dated
+  [development evidence](docs/BETA6_DEVELOPMENT.md).
+
 ## 0.3.0-beta.5 — 24 October 2026
 
 - Correct the engine's Windows file-version text so existing update workers

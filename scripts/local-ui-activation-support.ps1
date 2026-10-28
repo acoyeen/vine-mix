@@ -78,12 +78,123 @@ function Assert-UiActivationPreservedWorkspaces($Records) {
     Assert-ActivationDataStable $workspaces
 }
 
-function Restore-UiActivationBinary([string]$Backup, [string]$Target, [string]$OriginalHash, [string]$CandidateHash) {
+function Restore-UiActivationBinary([string]$Backup, [string]$Target, [string]$OriginalHash, [string]$CandidateHash,
+        [scriptblock]$BeforeReplace = $null, [int]$RetryTimeoutMilliseconds = 0) {
     if ((Get-FileHash -LiteralPath $Backup -Algorithm SHA256).Hash -cne $OriginalHash.ToUpperInvariant() -or
         (Get-FileHash -LiteralPath $Target -Algorithm SHA256).Hash -notin @($OriginalHash.ToUpperInvariant(),$CandidateHash.ToUpperInvariant())) {
         throw 'A desktop executable changed independently; rollback will not overwrite it.'
     }
-    Replace-ActivationBinary $Backup $Target $OriginalHash
+    Replace-ActivationBinary $Backup $Target $OriginalHash @($OriginalHash,$CandidateHash) $BeforeReplace $RetryTimeoutMilliseconds
+}
+
+# Installed update recovery validates the package inventory before taking its
+# backup. Keep its desktop entry consistent with a local UI-only replacement,
+# without changing the engine, release metadata or any other payload entry.
+function Assert-UiActivationInventoryPath([string]$Path) {
+    $current = [IO.Path]::GetFullPath($Path)
+    while ($current) {
+        if (Test-Path -LiteralPath $current) {
+            if ((Get-Item -LiteralPath $current -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) {
+                throw 'Installed inventory paths must not pass through a link or junction.'
+            }
+        }
+        $current = [IO.Path]::GetDirectoryName($current)
+    }
+}
+
+function New-UiActivationInventoryPlan([string]$Package, [string]$Evidence, [string]$CandidateUi,
+        [string]$OriginalUiHash, [string]$CandidateUiHash, [string]$Version) {
+    $path = Join-Path $Package 'SetupSupport\package-manifest.json'
+    Assert-UiActivationInventoryPath $path
+    $plan = [pscustomobject]@{Present=$false;Path=$path;OriginalHash=$null;CandidateHash=$null;Backup=$null;Candidate=$null}
+    if (-not (Test-Path -LiteralPath $path)) { return $plan }
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf) -or (Get-Item -LiteralPath $path).Length -gt 2MB) {
+        throw 'The installed package inventory is missing or too large to validate.'
+    }
+    $originalHash = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash
+    $document = [Text.Json.Nodes.JsonNode]::Parse([IO.File]::ReadAllText($path))
+    if ($document -isnot [Text.Json.Nodes.JsonObject] -or $document['version'].GetValue[string]() -cne $Version -or
+        $document['files'] -isnot [Text.Json.Nodes.JsonArray] -or $document['files'].Count -gt 2048) {
+        throw 'The installed package inventory does not describe the current release.'
+    }
+    $names = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    $desktopEntry = $null
+    $root = [IO.Path]::GetFullPath($Package).TrimEnd('\','/') + [IO.Path]::DirectorySeparatorChar
+    foreach ($entry in $document['files']) {
+        $relative = $entry['path'].GetValue[string]()
+        $size = $entry['size'].GetValue[long]()
+        $hash = $entry['sha256'].GetValue[string]()
+        if ([string]::IsNullOrWhiteSpace($relative) -or [IO.Path]::IsPathRooted($relative) -or
+            $relative -match '[:\\]' -or @($relative.Split('/') | Where-Object { $_ -in @('','.','..') }).Count -or
+            -not $names.Add($relative) -or $size -le 0 -or $hash -cnotmatch '^[a-fA-F0-9]{64}$') {
+            throw 'The installed package inventory contains an invalid or duplicate payload entry.'
+        }
+        $file = [IO.Path]::GetFullPath((Join-Path $Package $relative))
+        if (-not $file.StartsWith($root, [StringComparison]::OrdinalIgnoreCase)) { throw 'An inventory path escapes the installed package.' }
+        Assert-UiActivationInventoryPath $file
+        if (-not (Test-Path -LiteralPath $file -PathType Leaf) -or (Get-Item -LiteralPath $file).Length -ne $size -or
+            (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash -ine $hash) {
+            throw 'An installed payload file differs from its inventory. No desktop was stopped.'
+        }
+        if ($relative -ieq 'VineMix.exe') {
+            if ($hash -ine $OriginalUiHash) { throw 'The installed inventory does not match the reviewed current desktop.' }
+            $desktopEntry = $entry
+        }
+    }
+    if ($null -eq $desktopEntry -or -not $names.Contains('VineMix.Engine.exe')) {
+        throw 'The installed inventory does not own both the desktop and unchanged engine.'
+    }
+    if ((Get-FileHash -LiteralPath $CandidateUi -Algorithm SHA256).Hash -ine $CandidateUiHash) {
+        throw 'The candidate desktop changed before its inventory was prepared.'
+    }
+    $backup = Join-Path $Evidence 'package-manifest.before.json'
+    $candidate = Join-Path $Evidence 'package-manifest.candidate.json'
+    if ((Test-Path -LiteralPath $backup) -or (Test-Path -LiteralPath $candidate)) { throw 'Inventory evidence must use fresh private paths.' }
+    Copy-Item -LiteralPath $path -Destination $backup
+    if ((Get-FileHash -LiteralPath $backup -Algorithm SHA256).Hash -cne $originalHash -or
+        (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash -cne $originalHash) { throw 'The installed inventory changed during backup.' }
+    $desktopEntry['size'] = [Text.Json.Nodes.JsonValue]::Create([long](Get-Item -LiteralPath $CandidateUi).Length)
+    $desktopEntry['sha256'] = [Text.Json.Nodes.JsonValue]::Create($CandidateUiHash.ToUpperInvariant())
+    [IO.File]::WriteAllText($candidate, $document.ToJsonString([Text.Json.JsonSerializerOptions]@{WriteIndented=$true}), [Text.UTF8Encoding]::new($false))
+    $plan.Present = $true; $plan.OriginalHash = $originalHash
+    $plan.CandidateHash = (Get-FileHash -LiteralPath $candidate -Algorithm SHA256).Hash
+    $plan.Backup = $backup; $plan.Candidate = $candidate
+    return $plan
+}
+
+function Assert-UiActivationInventoryState($Plan, [ValidateSet('Original','Candidate','Recoverable')][string]$State) {
+    if ($null -eq $Plan) { throw 'Inventory preservation was not prepared.' }
+    Assert-UiActivationInventoryPath $Plan.Path
+    if (-not $Plan.Present) {
+        if (Test-Path -LiteralPath $Plan.Path) { throw 'An installed inventory appeared independently. Its contents were preserved.' }
+        return
+    }
+    $allowed = switch ($State) {
+        'Original' { @($Plan.OriginalHash) }
+        'Candidate' { @($Plan.CandidateHash) }
+        'Recoverable' { @($Plan.OriginalHash, $Plan.CandidateHash) }
+    }
+    if (-not (Test-Path -LiteralPath $Plan.Path -PathType Leaf) -or
+        (Get-FileHash -LiteralPath $Plan.Path -Algorithm SHA256).Hash -cnotin $allowed) {
+        throw 'The installed inventory changed independently. Neither it nor the desktop will be overwritten during recovery.'
+    }
+    if ($State -eq 'Recoverable' -and
+        (-not (Test-Path -LiteralPath $Plan.Backup -PathType Leaf) -or
+        (Get-FileHash -LiteralPath $Plan.Backup -Algorithm SHA256).Hash -cne $Plan.OriginalHash)) {
+        throw 'The inventory recovery copy changed. Desktop and inventory recovery were withheld.'
+    }
+}
+
+function Install-UiActivationInventory($Plan, [scriptblock]$BeforeReplace = $null, [int]$RetryTimeoutMilliseconds = 0) {
+    Assert-UiActivationInventoryState $Plan Original
+    if ($Plan.Present) { Replace-ActivationBinary $Plan.Candidate $Plan.Path $Plan.CandidateHash @($Plan.OriginalHash) $BeforeReplace $RetryTimeoutMilliseconds }
+    Assert-UiActivationInventoryState $Plan Candidate
+}
+
+function Restore-UiActivationInventory($Plan, [scriptblock]$BeforeReplace = $null, [int]$RetryTimeoutMilliseconds = 0) {
+    Assert-UiActivationInventoryState $Plan Recoverable
+    if ($Plan.Present) { Replace-ActivationBinary $Plan.Backup $Plan.Path $Plan.OriginalHash @($Plan.OriginalHash,$Plan.CandidateHash) $BeforeReplace $RetryTimeoutMilliseconds }
+    Assert-UiActivationInventoryState $Plan Original
 }
 
 function Invoke-UiActivationTransaction([System.Collections.IDictionary]$Actions, [System.Collections.IDictionary]$TransactionState) {
@@ -105,8 +216,11 @@ function Invoke-UiActivationTransaction([System.Collections.IDictionary]$Actions
         & $Actions.StartUi
         & $Actions.VerifyAfterLaunch
         $TransactionState.passed = $true
+        $TransactionState.stage = 'complete'
     } catch {
         $TransactionState.error = $_.Exception.ToString()
+        $TransactionState.scriptStackTrace = $_.ScriptStackTrace
+        $TransactionState.failureStage = $TransactionState.stage
         $recoveryErrors = [Collections.Generic.List[string]]::new()
         if ($TransactionState.controllerStopAttempted) {
             try {
@@ -121,7 +235,11 @@ function Invoke-UiActivationTransaction([System.Collections.IDictionary]$Actions
                 # desktop supervisor must not cold-start an engine for recovery.
                 & $Actions.VerifyRecovery
                 & $Actions.ReopenOriginalUi
-            } catch { $recoveryErrors.Add($_.Exception.Message) }
+            } catch {
+                $recoveryErrors.Add($_.Exception.Message)
+                $TransactionState.recoveryFailureStage = $TransactionState.stage
+                $TransactionState.recoveryScriptStackTrace = $_.ScriptStackTrace
+            }
         }
         $TransactionState.recoveryErrors = @($recoveryErrors)
     }

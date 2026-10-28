@@ -70,6 +70,8 @@ struct GraphNode {
     float gainDb{};
     bool muted{};
     bool mono{};
+    // -1 preserves the saved decibel-based controller in older workspaces.
+    double controlMultiplier = -1;
     DeviceBinding device{};
     ProcessBinding app{};
     std::vector<EqBand> eqBands{{"lowShelf", true, 80, 0, .70710678, 80},
@@ -86,6 +88,10 @@ struct GraphNode {
     ReverbSettings reverb{};
     VoiceColorSettings voiceColor{};
     double balance{};
+    double stereoWidth = 1;
+    double panPosition{};
+    double crossfadePosition{};
+    std::string crossfadeCurve = "equalPower";
     bool bypass{};
     bool collapsed{};
     bool autoAssignDevice = true;
@@ -97,6 +103,8 @@ struct GraphEdge {
     std::string kind = "audio";
     float gainDb{};
     bool muted{};
+    std::string fromPort = "audio";
+    std::string toPort = "audio";
 };
 struct AudioGraph {
     std::vector<GraphNode> nodes;

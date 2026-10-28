@@ -16,7 +16,7 @@ $repository = 'acoyeen/vine-mix'
 $project = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $release = Get-Content -LiteralPath (Join-Path $project 'release.json') -Raw | ConvertFrom-Json
 if (-not $Version) { $Version = $release.version }
-if ($Version -notmatch '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-(?:alpha|beta|rc)\.(0|[1-9][0-9]*))?$') { throw 'Use a canonical release version.' }
+if ($Version -notmatch '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-(?:alpha|beta|rc)(?:\.(0|[1-9][0-9]*))?)?$') { throw 'Use a canonical release version.' }
 if ($LegacyWithoutUpdater -and $Version -ne '0.3.0-beta.1') { throw 'The unsigned-update legacy exception is only for 0.3.0-beta.1.' }
 if (-not $LegacyWithoutUpdater -and $Version -ne $release.version) { throw 'The version must match release.json.' }
 $numericVersion = if ($LegacyWithoutUpdater) { '0.3.0.1' } else { $release.numericVersion }
@@ -139,7 +139,8 @@ $existing = (Invoke-Gh @('release','list','--repo',$repository,'--limit','1000',
 if (@($existing | Where-Object tagName -ceq $tag).Count) { throw 'The release already exists; never overwrite its assets.' }
 $pre = if ($Version.Contains('-')) { 'true' } else { 'false' }
 $latest = if ($Version.Contains('-')) { 'false' } else { 'true' }
-$create = @('release','create',$tag,'--repo',$repository,'--draft',('--prerelease=' + $pre),'--target',$SourceCommit,'--title',('VineMix ' + $Version),'--notes-file',$notesFile,('--latest=' + $latest))
+$titleVersion = if ($Version -ceq $release.version) { $release.displayVersion.Replace(' · ', ' ') } else { $Version }
+$create = @('release','create',$tag,'--repo',$repository,'--draft',('--prerelease=' + $pre),'--target',$SourceCommit,'--title',('VineMix ' + $titleVersion),'--notes-file',$notesFile,('--latest=' + $latest))
 $null = Invoke-Gh $create
 $null = Invoke-Gh (@('release','upload',$tag,'--repo',$repository) + @($assets | ForEach-Object path))
 $downloadRoot = Join-Path ([IO.Path]::GetTempPath()) ('VineMix-release-verify-' + [Guid]::NewGuid().ToString('N'))

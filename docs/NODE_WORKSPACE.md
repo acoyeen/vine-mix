@@ -54,6 +54,9 @@ this application uses its own WPF implementation and native audio engine.
 - [TouchDesigner Audio Dynamics](https://derivative.ca/UserGuide/Audio_Dynamics_CHOP)
 
 Use **Add node**, Shift+A, or the canvas context menu. Drag headers to move nodes.
+The most recently selected or dragged node stays above overlapping nodes after
+release. This visual order is retained for the current session, independently
+of saved node positions and audio routing.
 Connect matching sockets by dragging or clicking an output and then an input.
 Multiple inputs may use the same microphone, virtual input or running app.
 Right-click an input and choose **Duplicate input** to add a named copy nearby,
@@ -67,7 +70,8 @@ graph. Click the zoom percentage or press Ctrl+0 for 100%. **F** frames selected
 nodes while the canvas is focused; the same action
 is in the node context menu. It centers their rendered bounds at 30–100% zoom,
 without moving nodes or creating an Undo entry. Fit and Home still frame all
-nodes. With no selection, F gives a short instruction and leaves the view alone.
+nodes. Complete organizational groups include their title and padded bounds
+when fitted. With no selection, F gives a short instruction and leaves the view alone.
 Open **Settings → Help & shortcuts**, or press **F1** outside text entry, for
 six topics: **Controls**, **Dials & values**, **Buttons & menus**,
 **Search & results**, **Equalizer**, and **Meters & status**. Controls shows one
@@ -119,6 +123,41 @@ horizontal spread is greater or equal, otherwise a column. Node sizes determine
 clearance, not the chosen direction. Auto also appears in the alignment submenu;
 its chosen direction stays fixed if a pending edit is replayed. Text fields,
 other focused controls and active gestures keep their own keyboard behavior.
+
+Organizational groups add named background frames to the canvas. Drag empty
+space to select nodes (Shift adds to the selection), then choose **Group selected
+nodes** from the context menu or press **Ctrl+G**. Click a group's heading or
+exposed background to select it; drag either to move every member with one
+shared offset and one Undo step. Frame bounds follow the
+rendered member positions and dimensions, including movement previews and node
+size changes. The heading contains only the centered group name. The title keeps
+a minimum 15-screen-DIP font and a 32-screen-DIP
+header at 30% zoom, while the frame stays behind nodes and cables. Node, socket
+and cable controls retain input precedence. Shift/Ctrl-drag on the group
+background box-selects nodes; middle-drag and Space+drag preserve canvas panning.
+
+Double-click the heading or press **F2** with the frame selected to edit its name;
+Enter or loss of focus commits, and Escape cancels. The heading/background context menu offers
+seven named colors: Sage, Teal, Blue, Violet, Rose, Amber and Slate. High contrast
+uses system colors. **Ungroup (keep nodes)**, or Delete with the frame selected,
+removes only the organizational frame. The group has no sockets and cannot
+change audio routing; dragging a one-node group onto a cable does not insert
+that node into the cable.
+
+Groups do not nest, and each node belongs to at most one group. **Add to group**
+and **Remove from group** change explicit membership. Moving a member beyond a
+frame expands its bounds rather than removing the member. Grouping already
+grouped nodes transfers those members to the new group, and empty groups are
+removed. Group creation, names, colors and membership support Undo/Redo.
+Copying every member preserves the group's presentation around newly identified
+pasted nodes; a partial selection copies only those nodes. These are visual
+organizational groups, separate from future saved sections or reusable subgraphs.
+The layout lock blocks group edits while selection and copying remain available.
+Frame membership, names and colors are saved in the desktop's `ui.json` workspace
+preferences. They are omitted from the engine's settings payload; the existing
+audio graph keeps its original nodes and connections. The current session's
+history and clipboard carry the visual metadata alongside node edits.
+
 New graphs begin at
 100%; new or version-1-migrated layouts use 330 DIP row spacing for larger source
 and output nodes. Loading a saved graph retains its zoom and node positions.
@@ -134,6 +173,11 @@ Denoiser; Mix for Reverb; L/R balance; and Milliseconds for Alignment Delay.
 
 The top-right **Settings** menu contains workspace preferences, start-at-login,
 Windows sound settings, retrying assigned devices and **Restart audio engine**.
+Search stays first; existing separators group workspace controls, audio tools,
+application preferences, and help/information, with Quit alone at the bottom.
+Activity follows Find node. Device visibility sits with the audio actions, while
+start-at-login sits with the two update controls. Help, What's new? and About
+share the final information group. No additional headings or submenus are added.
 Restart briefly interrupts audio while keeping the workspace open. It saves queued
 edits before restarting when possible; edits that cannot be saved remain queued
 for reconnection. The action remains available when the engine is offline and
@@ -166,6 +210,11 @@ seconds, then the message dismisses and save status returns. A new message
 restarts the countdown; **Dismiss** closes it immediately. The latest message
 remains in Activity. Windows reduced motion keeps the bar static, with the same
 five-second dismissal. Control instructions are available in Help & shortcuts.
+**Settings → Show action notifications** controls routine timed messages and
+defaults to on. Turning it off immediately dismisses an ordinary message and
+stops its countdown. Errors remain visible; save status and Activity are
+preserved. The preference is saved locally, independently of audio routing and
+undo history. Turning it back on shows future messages without replaying old ones.
 Nodes omit repeated gesture instructions and parameter-category headings.
 Tooltips describe a control's audio role or current state, including the dial
 face and its numeric field. Gesture and shortcut references are in Help & shortcuts.
@@ -230,8 +279,9 @@ graphs and copied legacy nodes, making 26 compatible types. Category submenus
 keep the initial menu compact; typing searches
 both node names and category names. Down/Enter/Escape navigate, add and dismiss.
 
-The toolbar uses flat controls and contains the node count, Undo, Redo and
-Activity. Save and connection status remain in the application header.
+The toolbar uses flat controls, with the node count centred beneath the logo
+and Undo/Redo beside the editing controls. **Settings → Activity** opens session
+history. Connection status remains in the header; save status is in the footer.
 Undo/Redo retain up to 100 graph edits for the current controller session:
 nodes, cables, assignments, parameters, mute, bypass, rename and layout edits.
 One pointer drag is one step, regardless of its duration; separate clicks,
@@ -283,7 +333,13 @@ and screen-space snapping remain unchanged.
 | Reverb | Stereo room tail; wet/dry mix, decay, damping and pre-delay |
 | Balance | Attenuate the opposite stereo channel; centre preserves the original stereo signal |
 | Mono | Average left/right and send the result equally to both channels |
-| Linked control | Share a level offset across connected nodes; bypass removes its contribution; carries settings, not audio |
+| Channel Swap | Exchange left and right; bypass restores the original order |
+| Stereo Width | 0–200% width: 0% mono, 100% original stereo; increases existing side information without generating stereo from mono |
+| Pan | Average the input to mono, then position it left/right with constant-power panning; bypass restores the original input |
+| Crossfade | Separate stereo A/B inputs and one blend control; Equal power or Linear curve; starts at A and bypass returns to A |
+| Stereo Combine | Separate Left/Right inputs, each averaged to mono and assigned to its named output channel; missing sides stay silent |
+| Stereo Split | One stereo input and separate Left/Right mono outputs, each retaining the extracted channel level |
+| Linked control | Multiplier 0–200%, initially 100%; scales connected Level knobs, with exact silence at 0%; bypass removes its contribution; carries settings, not audio |
 | Listening output | Explicit physical device with its own worker, queue, level and mute |
 | Virtual output | Playback side of VAC Lite, delivered as a microphone to Discord/games |
 
@@ -304,8 +360,11 @@ the safe muted default. Reset can change audible gain; test it on a preview or
 an isolated quiet route.
 
 Each input can fan out to several nodes. Multiple audio connections arriving at
-a processing or output node are summed. A linked control adds its dB offset to
-the destination's own level. An audio node accepts at most one linked control.
+a processing or output node are summed. A Linked control scales the destination's
+own level. New links target nodes with Level knobs only; effects and channel
+utilities use a downstream Mix for level control. An audio node accepts at most
+one linked control. Saved older effect-control links remain supported and visible
+until removed. Existing decibel-based controls retain their sound until edited.
 Saved legacy control mutes still silence their destinations until explicitly
 cleared, preserving the safety of existing routes.
 
@@ -384,9 +443,13 @@ in-flight block from the previous source.
 
 There is no arbitrary DC-offset or sample-wise arithmetic expression node in
 this release. Mix exposes summing and branch volume through audio-specific
-controls. Recording, VST hosting, MIDI, modulation oscillators,
-reusable graph groups and group frames remain
+controls. Recording, VST hosting, MIDI, modulation oscillators and
+reusable subgraphs remain
 future additions rather than nonfunctional entries in the node library.
+Organizational group frames are implemented and locally integrated into Beta 6.
+The [implemented idea](IDEAS_IMPLEMENTED.md#idea-023) retains the request and
+decisions; [Beta 6 development](BETA6_DEVELOPMENT.md#named-organizational-groups--28-october-2026)
+records local verification and integration separately from release qualification.
 
 ## EQ and dynamics
 

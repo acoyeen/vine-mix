@@ -81,7 +81,7 @@ internal static class SocketPresentationVerification
                 Point local = socket.TranslatePoint(Center(socket.RenderSize), view);
                 Rect geometry = shape.RenderedGeometry.Bounds;
                 Point glyph = shape.TranslatePoint(new(geometry.X + geometry.Width / 2, geometry.Y + geometry.Height / 2), view);
-                string label = socket.Kind == "audio" ? "Audio" : socket.Kind == "sidechain" ? "Trigger / Sidechain · detector only"
+                string label = socket.Kind == "audio" ? "Audio" : socket.Kind == "sidechain" ? "Trigger"
                     : socket.Output ? "Control" : "Level control";
                 var row = Descendants<TextBlock>(view).Where(text => text.Text == label
                     && text.HorizontalAlignment == (socket.Output ? HorizontalAlignment.Right : HorizontalAlignment.Left))
@@ -117,7 +117,7 @@ internal static class SocketPresentationVerification
             {
                 (Socket(microphone.Id, "audio", true), Socket(compressor.Id, "audio")),
                 (Socket(microphone.Id, "audio", true), Socket(compressor.Id, "sidechain")),
-                (Socket(control.Id, "control", true), Socket(compressor.Id, "control"))
+                (Socket(control.Id, "control", true), Socket(output.Id, "control"))
             })
             {
                 Point anchor = Screen(workspace.SocketPosition(target));
@@ -149,12 +149,12 @@ internal static class SocketPresentationVerification
         RequireState(Socket(compressor.Id, "sidechain"), true, "A sidechain cable fills only the detector input.");
         RequireState(Socket(compressor.Id, "audio"), false, "A detector cable leaves the main audio input hollow.");
         RequireState(Socket(compressor.Id, "audio", true), false, "An incoming cable does not mark an unrelated output connected.");
-        require(workspace.ConnectNodes(control.Id, compressor.Id, "control").Length == 0
+        require(workspace.ConnectNodes(control.Id, output.Id, "control").Length == 0
             && workspace.ConnectNodes(compressor.Id, output.Id, "audio").Length == 0
             && workspace.ConnectNodes(microphone.Id, compressor.Id, "audio").Length == 0,
             "Audio and control connections are added using the actual workspace actions.");
         await layout(); workspace.UpdateWires(); await layout();
-        foreach (var socket in new[] { Socket(control.Id, "control", true), Socket(compressor.Id, "control"),
+        foreach (var socket in new[] { Socket(control.Id, "control", true), Socket(output.Id, "control"),
             Socket(compressor.Id, "audio"), Socket(compressor.Id, "audio", true), Socket(output.Id, "audio") })
             RequireState(socket, true, "Each connected socket fills in its own signal-kind colour.");
         RequireState(Socket(microphone.Id, "control"), false, "An audio output connection leaves that node's control input hollow.");
@@ -234,7 +234,7 @@ internal static class SocketPresentationVerification
                         require(Near(local.X, renderedEdge) && Near(local, glyph)
                             && Near(shape.ActualWidth, shape.ActualHeight) && socket.RenderSize == new Size(24, 20),
                             context + " centers its symmetric glyph and full target on the measured border after DPI layout rounding.");
-                        string label = socket.Kind == "audio" ? "Audio" : socket.Kind == "sidechain" ? "Trigger / Sidechain · detector only"
+                        string label = socket.Kind == "audio" ? "Audio" : socket.Kind == "sidechain" ? "Trigger"
                             : socket.Output ? "Control" : "Level control";
                         var row = Descendants<TextBlock>(view).Where(text => text.Text == label
                             && text.HorizontalAlignment == (socket.Output ? HorizontalAlignment.Right : HorizontalAlignment.Left))

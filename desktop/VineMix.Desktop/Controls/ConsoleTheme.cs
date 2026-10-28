@@ -30,7 +30,7 @@ public static class ConsoleTheme
     {
         var palette = new Dictionary<string, Brush>
         {
-            ["BrandAccentBrush"] = Color("#3B8C66"), ["BrandActionBrush"] = Color("#2D6A4F"),
+            ["BrandActionBrush"] = Color("#2D6A4F"),
             ["BrandActionTextBrush"] = Color("#F5F8F6"), ["BrandHoverBrush"] = Color("#347B5B"),
             ["ConsoleWindowBrush"] = Color("#0C0D0F"), ["ConsolePanelBrush"] = Color("#15181E"),
             ["ConsoleTextBrush"] = Color("#E8EBF2"), ["ConsoleMutedBrush"] = Color("#A5ADBA"),
@@ -63,7 +63,6 @@ public static class ConsoleTheme
             foreach (string key in new[] { "NodeOutlineBrush", "NodeAudioBrush", "NodeControlBrush", "NodeSidechainBrush" }) palette[key] = SystemColors.WindowTextBrush;
             palette["NodeSelectedBrush"] = SystemColors.HighlightBrush;
             palette["NodeGridBrush"] = SystemColors.GrayTextBrush;
-            palette["BrandAccentBrush"] = SystemColors.WindowTextBrush;
             palette["BrandActionBrush"] = palette["BrandHoverBrush"] = SystemColors.HighlightBrush;
             palette["BrandActionTextBrush"] = SystemColors.HighlightTextBrush;
         }

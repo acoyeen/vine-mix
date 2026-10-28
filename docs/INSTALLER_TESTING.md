@@ -7,6 +7,10 @@ are not Windows Authenticode signed. Get the exact versioned files and SHA-256
 checksums from the matching [GitHub release](https://github.com/acoyeen/vine-mix/releases).
 See the [qualification record](BETA_TESTING_CURRENT.md) for completed checks.
 
+The next beta's installer candidate changes missing-driver defaults and order:
+test the checked defaults, explicit vendor consent and VAC-before-VB-CABLE flow
+below against that candidate. Published Beta 5 retains its original defaults.
+
 ## Setup
 
 1. Check the supplied `VineMix-0.3.0-beta.3-Setup-x64.exe` against the checksum
@@ -14,11 +18,15 @@ See the [qualification record](BETA_TESTING_CURRENT.md) for completed checks.
 2. Open Setup. Confirm terms must be accepted and the wizard text fits. Use its
    default per-user application folder unless deliberately testing another one.
 3. Record how its driver page classifies VB-CABLE and VAC. On a genuinely clean
-   machine both should be missing. Read the separate vendor terms. VAC Lite is
+   machine both should be missing and checked by default. VB-CABLE enables
+   Virtual input; a compatible VAC driver enables Virtual output. Read the
+   separate vendor terms; consent must remain unchecked. VAC Lite is
    restricted to private home use without income generation; select it only if
    that applies. Both drivers can be skipped.
-4. For a selected missing driver, confirm the original vendor installer opens
-   separately with any required administrator prompt. Record its result.
+4. With both selected, confirm the original VAC Lite installer opens first,
+   followed by VB-CABLE, with required administrator prompts. If asked to
+   restart, defer it until VineMix Setup finishes. Record each driver's result.
+   Successful VAC installation normally needs no restart; VB-CABLE does.
 5. Restart Windows when required. Confirm Setup does not launch VineMix early
    after a driver-triggered restart. Open the Start menu or desktop shortcut.
 6. Confirm the three-node starter, both outputs muted, physical devices
@@ -46,6 +54,10 @@ notice files. Do not mix files from different builds.
       levels, mutes, layout and preferences after full quit and reopen.
 - [ ] Fresh state has exactly the three starter nodes and two audio cables.
 - [ ] Missing drivers can be skipped; physical routes remain usable.
+- [ ] Missing eligible drivers start checked, existing/uncertain packages are
+      disabled, and returning to the page preserves a user's cleared choice.
+- [ ] Driver consent is unchecked initially and clears when selection changes.
+- [ ] VAC Lite runs before VB-CABLE; restart guidance waits for Setup completion.
 - [ ] Original driver installation, vendor cancellation and required restart
       each produce an understandable result.
 - [ ] Re-running Setup recognises existing/disabled/staged drivers and avoids a

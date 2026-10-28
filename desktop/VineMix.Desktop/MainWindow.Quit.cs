@@ -16,7 +16,7 @@ public partial class MainWindow
     {
         if (Workspace.HasActiveGesture)
         { Workspace.SetMessage("Finish moving or connecting the node before quitting.", true); return false; }
-        if (UpdateEditorCommit.TryCommitFocused()) return true;
+        if (UpdateEditorCommit.TryCommitWorkspace(Workspace)) return true;
         Workspace.SetMessage("Enter a valid value before quitting. Your draft has been kept.", true);
         return false;
     }

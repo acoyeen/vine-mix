@@ -1,0 +1,158 @@
+[
+  {
+    "file": "physical-input.png",
+    "label": "Physical input",
+    "width": 784,
+    "height": 786,
+    "logicalWidth": 392,
+    "logicalHeight": 393,
+    "padding": 36,
+    "ports": [
+      {
+        "kind": "audio",
+        "output": true,
+        "x": 747,
+        "y": 130
+      },
+      {
+        "kind": "control",
+        "output": false,
+        "x": 37,
+        "y": 706
+      }
+    ]
+  },
+  {
+    "file": "virtual-output.png",
+    "label": "Virtual output",
+    "width": 784,
+    "height": 714,
+    "logicalWidth": 392,
+    "logicalHeight": 357,
+    "padding": 36,
+    "ports": [
+      {
+        "kind": "audio",
+        "output": false,
+        "x": 37,
+        "y": 578
+      },
+      {
+        "kind": "control",
+        "output": false,
+        "x": 37,
+        "y": 634
+      }
+    ]
+  },
+  {
+    "file": "listening-output.png",
+    "label": "Listening output",
+    "width": 784,
+    "height": 714,
+    "logicalWidth": 392,
+    "logicalHeight": 357,
+    "padding": 36,
+    "ports": [
+      {
+        "kind": "audio",
+        "output": false,
+        "x": 37,
+        "y": 578
+      },
+      {
+        "kind": "control",
+        "output": false,
+        "x": 37,
+        "y": 634
+      }
+    ]
+  },
+  {
+    "file": "running-app.png",
+    "label": "Running app",
+    "width": 784,
+    "height": 714,
+    "logicalWidth": 392,
+    "logicalHeight": 357,
+    "padding": 36,
+    "ports": [
+      {
+        "kind": "audio",
+        "output": true,
+        "x": 747,
+        "y": 130
+      },
+      {
+        "kind": "control",
+        "output": false,
+        "x": 37,
+        "y": 634
+      }
+    ]
+  },
+  {
+    "file": "mix.png",
+    "label": "Mix",
+    "width": 704,
+    "height": 746,
+    "logicalWidth": 352,
+    "logicalHeight": 373,
+    "padding": 36,
+    "ports": [
+      {
+        "kind": "audio",
+        "output": false,
+        "x": 37,
+        "y": 514
+      },
+      {
+        "kind": "audio",
+        "output": true,
+        "x": 667,
+        "y": 130
+      },
+      {
+        "kind": "control",
+        "output": false,
+        "x": 37,
+        "y": 570
+      }
+    ]
+  },
+  {
+    "file": "ducking.png",
+    "label": "Ducking",
+    "width": 784,
+    "height": 1184,
+    "logicalWidth": 392,
+    "logicalHeight": 592,
+    "padding": 36,
+    "ports": [
+      {
+        "kind": "audio",
+        "output": false,
+        "x": 37,
+        "y": 896
+      },
+      {
+        "kind": "audio",
+        "output": true,
+        "x": 747,
+        "y": 130
+      },
+      {
+        "kind": "sidechain",
+        "output": false,
+        "x": 37,
+        "y": 952
+      },
+      {
+        "kind": "control",
+        "output": false,
+        "x": 37,
+        "y": 1008
+      }
+    ]
+  }
+]

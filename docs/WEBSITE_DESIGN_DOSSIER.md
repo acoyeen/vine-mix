@@ -1,5 +1,21 @@
 # VineMix website design dossier
 
+> **Current direction, 24 October 2026:** use the
+> [one-page scroll plan](../website/SCROLL_PLAN.md) and
+> [new reference research](../website/SCROLL_RESEARCH.md) and
+> [psychology evidence](../website/PSYCHOLOGY_RESEARCH.md) for the next website
+> design pass. The rotating headline has been withdrawn. The proposed product
+> reveal uses real VineMix nodes inspired by the supplied perspective tunnel.
+> The documents below retain historical decisions, not the current brief.
+>
+> **Product facts superseded:** VineMix is now a released MIT-licensed open-source
+> beta, currently Beta 5, with installer, standalone download, implemented update
+> checks and signed update metadata. Older statements below about no release,
+> future-only installer/updater, or absence of runtime HTTP do not describe the
+> current product. Use the [current release](releases/0.3.0-beta.5.md) and
+> [qualification record](BETA_TESTING_CURRENT.md). Repository visibility remains
+> a separate maintainer decision; it does not reinstate historical release holds.
+
 > Historical website research and design decisions, recorded 20–21 October 2026.
 > Dated implementation notes describe those stages. See the
 > [website documentation](../website/README.md) for the current site.

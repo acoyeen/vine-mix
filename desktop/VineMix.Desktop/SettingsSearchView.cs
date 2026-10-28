@@ -65,9 +65,14 @@ internal sealed class SettingsSearchView : StackPanel
         field.Children.Add(SearchBox);
         _placeholder = Text("Search settings and help", muted: true);
         _placeholder.IsHitTestVisible = false;
-        _placeholder.VerticalAlignment = VerticalAlignment.Center;
-        _placeholder.Margin = new Thickness(9, 0, 9, 0);
+        _placeholder.VerticalAlignment = VerticalAlignment.Top;
+        _placeholder.TextWrapping = TextWrapping.NoWrap;
+        _placeholder.TextTrimming = TextTrimming.CharacterEllipsis;
+        foreach (var property in new[] { TextBlock.FontFamilyProperty, TextBlock.FontSizeProperty,
+            TextBlock.FontStyleProperty, TextBlock.FontWeightProperty, TextBlock.FontStretchProperty })
+            _placeholder.SetBinding(property, new Binding(property.Name) { Source = SearchBox });
         field.Children.Add(_placeholder);
+        SearchBox.LayoutUpdated += (_, _) => AlignPlaceholder();
         Children.Add(field);
 
         var resultArea = new StackPanel { Margin = new Thickness(6, 3, 6, 4), DataContext = new object() };
@@ -132,6 +137,18 @@ internal sealed class SettingsSearchView : StackPanel
         };
         menu.Closed += (_, _) => ResetQuery();
         Refresh();
+    }
+
+    private void AlignPlaceholder()
+    {
+        if (_placeholder.Visibility != Visibility.Visible) return;
+        // The content host applies its own padding as well as the template's
+        // margin. Use WPF's actual text origin, including its inner text inset
+        // and DPI rounding, instead of guessing either from the outer border.
+        Rect caret = SearchBox.GetRectFromCharacterIndex(0);
+        if (caret.IsEmpty) return;
+        var margin = new Thickness(caret.Left, caret.Top, caret.Left, 0);
+        if (_placeholder.Margin != margin) _placeholder.Margin = margin;
     }
 
     internal void ResetQuery()

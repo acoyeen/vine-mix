@@ -311,20 +311,20 @@ internal static class RotaryControlVerification
             && peer.GetItemStatus().Length == 0 && !peer.GetHelpText().Contains("Invalid value"),
             "Escape still cancels a rejected draft and clears its error without editing the saved value.");
         entry.Text = Text(-18); Blur();
-        require(level.Value == -9.25 && changes == 3 && entry.Text != Text(-18),
-            "Leaving a field without Enter or Tab retains the existing cancel-on-blur behavior.");
+        require(level.Value == -18 && changes == 4 && !level.HasPendingEntry,
+            "Leaving a valid draft applies it once without requiring Enter or Tab.");
 
         var samples = new RotaryValueControl("Samples", 0, 96000, 1, "samples", 0, _ => changes++, integer: true);
         var samplesEntry = Descendants<TextBox>(samples).Single();
         samplesEntry.Text = 1.5.ToString(CultureInfo.CurrentCulture);
-        require(PressKey(samplesEntry, Key.Tab).Handled && samples.Value == 0 && changes == 3
+        require(PressKey(samplesEntry, Key.Tab).Handled && samples.Value == 0 && changes == 4
             && AutomationProperties.GetItemStatus(samplesEntry).Contains("whole number"),
             "Tab preserves whole-sample validation and explains the integer requirement accessibly.");
         samplesEntry.Text = "48 samples";
-        require(!PressKey(samplesEntry, Key.Tab).Handled && samples.Value == 48 && changes == 4,
+        require(!PressKey(samplesEntry, Key.Tab).Handled && samples.Value == 48 && changes == 5,
             "Tab accepts a valid whole-sample value with its unit suffix.");
         samples.IsEnabled = false; samplesEntry.Text = "96 samples";
-        require(!samples.HandleEntryKey(Key.Tab, ModifierKeys.None) && samples.Value == 48 && changes == 4,
+        require(!samples.HandleEntryKey(Key.Tab, ModifierKeys.None) && samples.Value == 48 && changes == 5,
             "A disabled numeric editor cannot commit through the shared key handler.");
         require(PresentationSource.FromVisual(level) is null && PresentationSource.FromVisual(samples) is null,
             "Tab validation checks never focus a control, create a native source or inject keyboard input; native traversal remains untested.");

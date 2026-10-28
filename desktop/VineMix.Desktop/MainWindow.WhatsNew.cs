@@ -62,11 +62,10 @@ public partial class MainWindow
         CloseHelp();
         _whatsNewState ??= new(Path.Combine(UpdateTransaction.Root, "whats-new.json"));
         var highlights = WhatsNewContent.Since(automatic ? _whatsNewState.PreviousVersion : null, ReleaseInfo.Version);
-        var dialog = new Window { Owner = this, Title = "What's new in VineMix", Width = 580, Height = 560,
-            MinWidth = 440, MinHeight = 320, WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            ShowInTaskbar = false, FontFamily = FontFamily, FontSize = 13 };
-        dialog.SetResourceReference(BackgroundProperty, "ConsoleWindowBrush");
-        dialog.SetResourceReference(ForegroundProperty, "ConsoleTextBrush");
+        var dialog = WorkspaceDialog.Create(this, "What's new in VineMix", 580);
+        dialog.SizeToContent = SizeToContent.Manual;
+        dialog.Height = 560;
+        dialog.MinHeight = 320;
         dialog.Content = CreateWhatsNewContent(highlights, dialog.Close);
         dialog.Closed += (_, _) =>
         {
@@ -80,7 +79,7 @@ public partial class MainWindow
             { Workspace.SetMessage("What's new was closed, but its reminder could not be saved. It may appear next time.", true); }
         };
         _whatsNewDialog = dialog;
-        dialog.ShowDialog();
+        dialog.Show();
     }
 
     internal static FrameworkElement CreateWhatsNewContent(IReadOnlyList<ReleaseHighlight> highlights, Action close)
@@ -89,10 +88,15 @@ public partial class MainWindow
         root.RowDefinitions.Add(new() { Height = GridLength.Auto });
         root.RowDefinitions.Add(new() { Height = new GridLength(1, GridUnitType.Star) });
         root.RowDefinitions.Add(new() { Height = GridLength.Auto });
-        var heading = new TextBlock { Text = "What's new in VineMix\n" + ReleaseInfo.DisplayVersion,
-            FontSize = 21, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 14) };
+        var header = new StackPanel { Margin = new Thickness(0, 0, 0, 24) };
+        var heading = new TextBlock { Text = "What's new", FontSize = 22, FontWeight = FontWeights.SemiBold,
+            TextWrapping = TextWrapping.Wrap };
         AutomationProperties.SetHeadingLevel(heading, AutomationHeadingLevel.Level1);
-        root.Children.Add(heading);
+        header.Children.Add(heading);
+        var version = new TextBlock { Text = ReleaseInfo.DisplayVersion, FontSize = 12,
+            TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 5, 0, 0) };
+        version.SetResourceReference(TextBlock.ForegroundProperty, "ConsoleMutedBrush");
+        header.Children.Add(version); root.Children.Add(header);
         var cards = new StackPanel();
         foreach (var highlight in highlights.GroupBy(item => item.Version).Reverse().SelectMany(group => group))
         {
@@ -100,17 +104,19 @@ public partial class MainWindow
                 TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 5) };
             AutomationProperties.SetHeadingLevel(title, AutomationHeadingLevel.Level2);
             cards.Children.Add(title);
-            cards.Children.Add(new TextBlock { Text = highlight.Description, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 18) });
+            var description = new TextBlock { Text = highlight.Description, FontSize = 13, LineHeight = 20,
+                TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 22) };
+            description.SetResourceReference(TextBlock.ForegroundProperty, "ConsoleMutedBrush");
+            cards.Children.Add(description);
         }
         if (highlights.Count == 0) cards.Children.Add(new TextBlock { Text = "You're up to date with the bundled highlights.", TextWrapping = TextWrapping.Wrap });
         var scroll = new ScrollViewer { Content = cards, VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Margin = new Thickness(0, 0, 0, 12) };
         AutomationProperties.SetName(scroll, "Bundled release highlights");
         Grid.SetRow(scroll, 1); root.Children.Add(scroll);
-        var dismiss = new Button { Content = "Back to workspace", IsDefault = true, IsCancel = true,
-            HorizontalAlignment = HorizontalAlignment.Right, Padding = new Thickness(14, 7, 14, 7) };
-        AutomationProperties.SetName(dismiss, "Close What's new and return to the workspace");
-        dismiss.Click += (_, _) => close(); Grid.SetRow(dismiss, 2); root.Children.Add(dismiss);
+        var dismiss = WorkspaceDialog.CloseButton(close);
+        dismiss.Margin = new Thickness(0, 10, 0, 0);
+        Grid.SetRow(dismiss, 2); root.Children.Add(dismiss);
         return root;
     }
 }

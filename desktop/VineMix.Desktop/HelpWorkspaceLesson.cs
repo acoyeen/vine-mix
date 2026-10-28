@@ -81,7 +81,7 @@ internal sealed class HelpWorkspaceLesson : IHelpLesson
                 HelpLessonUi.Hint("Exit canvas returns the wheel to scrolling Help.")]
             : [HelpLessonUi.Hint("Drag headers to move nodes. Shift-click selects more; double-click a title to rename."),
                 HelpLessonUi.Hint("Drag between matching sockets. Right-click a cable for its actions."),
-                HelpLessonUi.Hint("Round Audio sockets carry sound; diamond Trigger sockets detect it; square Control sockets share level."),
+                HelpLessonUi.Hint("Round sockets carry audio; diamonds accept triggers; squares link Level knobs."),
                 HelpLessonUi.Hint("Add creates a node. Ctrl+C / Ctrl+V copies nodes within this sample. Ctrl+Z undoes.")];
         _view.Children.Add(HelpLessonUi.Section("", "", instructions));
 
@@ -223,7 +223,7 @@ internal sealed class HelpWorkspaceLesson : IHelpLesson
                 new() { Id = "practice-audio-in", From = microphone.Id, To = ducking.Id },
                 new() { Id = "practice-audio-out", From = ducking.Id, To = output.Id },
                 new() { Id = "practice-trigger", From = microphone.Id, To = ducking.Id, Kind = "sidechain" },
-                new() { Id = "practice-level", From = control.Id, To = ducking.Id, Kind = "control" }
+                new() { Id = "practice-level", From = control.Id, To = output.Id, Kind = "control" }
             ]
         };
         snapshot.Endpoints =

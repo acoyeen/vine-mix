@@ -54,6 +54,9 @@ internal sealed class GraphNodeView : Border
     private readonly Button? _mono;
     private readonly List<ComboBox> _dropDowns = [];
     private readonly RotaryValueControl? _gain;
+    private readonly RotaryValueControl? _multiplier;
+    private readonly TextBlock? _legacyMultiplierValue;
+    private readonly bool _hasLevelInput, _legacyMultiplierPresentation;
     private EqualizerEditor? _eqPlot;
     private ReductionStrip? _reductionStrip;
     private ulong _dynamicsFrame;
@@ -127,7 +130,9 @@ internal sealed class GraphNodeView : Border
     internal MeterPeakDisplay PeakMeterDisplay => _meterPeakDisplay;
     internal bool MatchesPresentation(GraphNode node) => node.Kind == _kind
         && (_kind is not ("expander" or "gate") || _gatePresentation == IsGate(node))
-        && (_kind != "compressor" || _legacyCompressorPresentation == (node.DynamicsUiVersion == 0));
+        && (_kind != "compressor" || _legacyCompressorPresentation == (node.DynamicsUiVersion == 0))
+        && _hasLevelInput == LinkedLevelControl.ShowInput(_owner.Graph, node)
+        && _legacyMultiplierPresentation == (node.Kind == "control" && LinkedLevelControl.HasLegacyValue(node));
     private static bool IsGate(GraphNode node) => node.Kind == "gate" || node.Kind == "expander" && node.Expander.Mode == "gate";
     internal double HeaderGrabTopPadding => 8;
     internal double HeaderGrabSidePadding => 6;
@@ -136,8 +141,10 @@ internal sealed class GraphNodeView : Border
     public GraphNodeView(GraphWorkspace owner, GraphNode node)
     {
         _owner = owner; _node = node; _kind = node.Kind;
+        _hasLevelInput = LinkedLevelControl.ShowInput(owner.Graph, node);
+        _legacyMultiplierPresentation = node.Kind == "control" && LinkedLevelControl.HasLegacyValue(node);
         _gatePresentation = IsGate(node); _legacyCompressorPresentation = node.DynamicsUiVersion == 0;
-        Width = node.Kind switch { "eq" => 620, "compressor" or "expander" or "gate" => 428, "voiceColor" => 392, "tone" => 376, "gain" or "pan" or "mono" or "reroute" => 316, "control" => 280, "mix" => 316, _ => 356 };
+        Width = node.Kind switch { "eq" => 620, "compressor" or "expander" or "gate" => 428, "voiceColor" => 392, "tone" => 376, "gain" or "pan" or "mono" or "reroute" or "channelSwap" or "stereoWidth" or "stereoPan" or "stereoCombine" or "stereoSplit" => 316, "control" => 280, "mix" => 316, _ => 356 };
         BorderThickness = new Thickness(1); CornerRadius = new CornerRadius(5); SnapsToDevicePixels = true; UseLayoutRounding = true;
         // Whole-node effects put text into an intermediate render target.
         // Keep the control tree directly rendered at the display's DPI.
@@ -151,7 +158,7 @@ internal sealed class GraphNodeView : Border
         TextOptions.SetTextRenderingMode(this, TextRenderingMode.Grayscale);
         SetResourceReference(BackgroundProperty, "ConsolePanelBrush"); SetResourceReference(BorderBrushProperty, "NodeOutlineBrush");
         _root.RowDefinitions.Add(new() { Height = new GridLength(32) });
-        _root.RowDefinitions.Add(new() { Height = new GridLength(GraphDefaults.HasAudioOutput(node.Kind) || node.Kind == "control" ? 28 : 0) });
+        _root.RowDefinitions.Add(new() { Height = new GridLength(node.Kind == "stereoSplit" ? 56 : GraphDefaults.HasAudioOutput(node.Kind) || node.Kind == "control" ? 28 : 0) });
         _root.RowDefinitions.Add(new() { Height = GridLength.Auto }); _root.RowDefinitions.Add(new() { Height = GridLength.Auto });
         _root.RowDefinitions.Add(new() { Height = GridLength.Auto });
         var header = new Grid { Cursor = Cursors.Arrow, ToolTip = NodeDescription(_gatePresentation ? "gate" : node.Kind) };
@@ -169,17 +176,38 @@ internal sealed class GraphNodeView : Border
         AutomationProperties.SetName(_rename, "Node name");
         header.MouseLeftButtonDown += (_, e) => { if (_rename.IsKeyboardFocusWithin || !IsNodeDragSurface(e.OriginalSource as DependencyObject)) return; if (e.ClickCount == 2) { _rename.Text = _node.Name; _rename.Visibility = Visibility.Visible; _rename.Focus(); _rename.SelectAll(); e.Handled = true; } else _owner.BeginDrag(this, e); };
         _root.Children.Add(headerFace);
-        if (GraphDefaults.HasAudioOutput(node.Kind) || node.Kind == "control")
+        if (node.Kind == "stereoSplit")
         {
-            _outputRow = PortRow(node.Kind == "control" ? "Control" : "Audio", true); Grid.SetRow(_outputRow, 1); _root.Children.Add(_outputRow);
+            _outputRow = new Grid();
+            _outputRow.RowDefinitions.Add(new() { Height = new GridLength(28) });
+            _outputRow.RowDefinitions.Add(new() { Height = new GridLength(28) });
+            var left = PortRow("Left · mono", true); var right = PortRow("Right · mono", true);
+            _outputRow.Children.Add(left); Grid.SetRow(right, 1); _outputRow.Children.Add(right);
+            Grid.SetRow(_outputRow, 1); _root.Children.Add(_outputRow);
+            AddSocket("audio", true, left, "left"); AddSocket("audio", true, right, "right");
+        }
+        else if (GraphDefaults.HasAudioOutput(node.Kind) || node.Kind == "control")
+        {
+            _outputRow = PortRow(node.Kind == "control" ? "Control" : node.Kind is "stereoCombine" or "crossfade" ? "Stereo" : "Audio", true); Grid.SetRow(_outputRow, 1); _root.Children.Add(_outputRow);
             AddSocket(node.Kind == "control" ? "control" : "audio", true, _outputRow);
         }
-        if (GraphDefaults.HasAudioInput(node.Kind)) { var row = PortRow("Audio", false); _inputs.Children.Add(row); AddSocket("audio", false, row); }
+        if (node.Kind is "stereoCombine" or "crossfade")
+        {
+            var ports = node.Kind == "stereoCombine" ? new[] { ("left", "Left"), ("right", "Right") } : new[] { ("a", "A · stereo"), ("b", "B · stereo") };
+            foreach (var (port, label) in ports)
+            { var row = PortRow(label, false); _inputs.Children.Add(row); AddSocket("audio", false, row, port); }
+        }
+        else if (GraphDefaults.HasAudioInput(node.Kind)) { var row = PortRow(node.Kind == "stereoSplit" ? "Stereo" : "Audio", false); _inputs.Children.Add(row); AddSocket("audio", false, row); }
         if (GraphDefaults.HasSidechainInput(node))
         {
-            var row = PortRow("Trigger / Sidechain · detector only", false); _inputs.Children.Add(row); AddSocket("sidechain", false, row);
+            var row = PortRow("Trigger", false); _inputs.Children.Add(row); AddSocket("sidechain", false, row);
         }
-        if (node.Kind != "control") { var row = PortRow("Level control", false); _inputs.Children.Add(row); AddSocket("control", false, row); }
+        if (_hasLevelInput)
+        {
+            var row = PortRow("Level control", false); _inputs.Children.Add(row); AddSocket("control", false, row);
+            if (LinkedLevelControl.HasLegacyConnection(owner.Graph, node))
+                row.ToolTip = "Existing level link. Use a Mix node for new level control.";
+        }
         Grid.SetRow(_inputs, 3); _root.Children.Add(_inputs);
         _status = GraphWorkspace.Text("Not assigned", 13); _status.Height = 18; _status.TextWrapping = TextWrapping.NoWrap;
         _status.TextTrimming = TextTrimming.CharacterEllipsis; _status.Margin = new Thickness(0, 7, 0, 7);
@@ -271,13 +299,36 @@ internal sealed class GraphNodeView : Border
         }
         else _body.Children.Add(_status);
         AddEffects(node.Kind);
-        if (NodeCatalog.HasLevelControl(node.Kind))
+        if (node.Kind == "control")
+        {
+            if (_legacyMultiplierPresentation)
+            {
+                _legacyMultiplierValue = GraphWorkspace.Text("", 16, true);
+                _legacyMultiplierValue.HorizontalAlignment = HorizontalAlignment.Center;
+                _legacyMultiplierValue.Margin = new Thickness(0, 12, 0, 12);
+                AutomationProperties.SetName(_legacyMultiplierValue, "Saved multiplier");
+                _body.Children.Add(_legacyMultiplierValue);
+                var useMultiplier = GraphWorkspace.Button("Use multiplier", "Set the multiplier to 100%.");
+                AutomationProperties.SetName(useMultiplier, "Use multiplier");
+                useMultiplier.Click += (_, _) => _owner.NodeChanged(Id, n => LinkedLevelControl.SetPercent(n, 100));
+                _body.Children.Add(useMultiplier);
+            }
+            else
+            {
+                _multiplier = new RotaryValueControl("Multiplier", 0, 200, .1, "%", 100,
+                    v => _owner.NodeChanged(Id, n => LinkedLevelControl.SetPercent(n, v)), smallChange: 1, largeChange: 10,
+                    tile: true, primary: true, format: "0.#",
+                    description: "Scales linked levels. 100% is unchanged; 0% is silent.")
+                    { HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 0, 0, 6) };
+                TrackEditGesture(_multiplier); _body.Children.Add(_multiplier);
+            }
+        }
+        else if (NodeCatalog.HasLevelControl(node.Kind))
         {
             var divider = new Border { Height = 1, Margin = new Thickness(0, 4, 0, 10) }; divider.SetResourceReference(BackgroundProperty, "ConsoleBorderBrush"); _body.Children.Add(divider);
             _gain = new RotaryValueControl("Level", -60, 12, .1, "dB", GraphDefaults.NewNode(node.Kind, 0, 0).GainDb,
                 v => _owner.NodeChanged(Id, n => n.GainDb = v), smallChange: .5, largeChange: 3,
-                description: node.Kind == "control" ? "Adjusts the linked node levels while each node keeps its own level setting."
-                    : "Adjusts this node's audio level. 0 dB leaves it unchanged.")
+                description: "Adjusts this node's audio level. 0 dB leaves it unchanged.")
                 { Margin = new Thickness(0, 0, 0, 6) }; TrackEditGesture(_gain); _body.Children.Add(_gain);
         }
         if (IsDeviceNode(node.Kind))
@@ -361,6 +412,16 @@ internal sealed class GraphNodeView : Border
         return true;
     }
 
+    internal bool HasPendingRename => _rename.Visibility == Visibility.Visible;
+
+    internal bool TryCommitPendingRename()
+    {
+        if (!HasPendingRename) return true;
+        if (!_owner.Mixer.CanEdit || !IsEnabled || !_rename.IsEnabled || _rename.IsReadOnly) return false;
+        CommitRename();
+        return true;
+    }
+
     private Grid PortRow(string name, bool output)
     {
         var row = new Grid { Height = 28, Margin = new Thickness(12, 0, 12, 0) };
@@ -369,7 +430,13 @@ internal sealed class GraphNodeView : Border
     private static object NodeDescription(string kind) => kind switch
     {
         "mono" => NodeToolTip.Create("Mono", "Combines left and right equally"),
-        "control" => NodeToolTip.Create("Control", "Links several node levels", "Each node keeps its own level setting"),
+        "channelSwap" => NodeToolTip.Create("Channel Swap", "Exchanges left and right", "Channel levels stay unchanged"),
+        "stereoWidth" => NodeToolTip.Create("Stereo Width", "0% · Mono", "100% · Original stereo", "Above 100% · Wider stereo", "Mono input remains mono"),
+        "stereoPan" => NodeToolTip.Create("Pan", "Positions a mono signal left to right", "Stereo input is combined to mono first", "Equal-power curve · Centre is −3 dB per side"),
+        "crossfade" => NodeToolTip.Create("Crossfade", "Blends stereo inputs A and B", "0% · A only", "100% · B only", "Bypass · A only"),
+        "stereoCombine" => NodeToolTip.Create("Stereo Combine", "Left input → Left channel", "Right input → Right channel", "Each input is combined to mono", "An empty input leaves its side silent"),
+        "stereoSplit" => NodeToolTip.Create("Stereo Split", "Extracts left and right separately", "Each output is a centred mono signal", "Use Stereo Combine to rebuild stereo"),
+        "control" => NodeToolTip.Create("Linked control", "Scales connected levels while keeping their individual settings."),
         "gain" => NodeToolTip.Create("Gain", "Adjusts the incoming level", "0 dB · Unchanged"),
         "mix" => NodeToolTip.Create("Mix", "Combines incoming audio", "Level · Adjusts the combined volume"),
         "highPass" => NodeToolTip.Create("High-pass", "Reduces sound below the cutoff"),
@@ -417,9 +484,9 @@ internal sealed class GraphNodeView : Border
         Canvas.SetLeft(_grabRight, width - BorderThickness.Left); Canvas.SetTop(_grabRight, -BorderThickness.Top);
         _grabRight.Width = side; _grabRight.Height = headerHeight;
     }
-    private void AddSocket(string kind, bool output, FrameworkElement row)
+    private void AddSocket(string kind, bool output, FrameworkElement row, string port = "audio")
     {
-        var socket = new GraphWorkspace.Socket(_owner, Id, kind, output); _sockets.Add(socket); _portAnchors.Add((socket, row));
+        var socket = new GraphWorkspace.Socket(_owner, Id, kind, output, port); _sockets.Add(socket); _portAnchors.Add((socket, row));
     }
     private void PositionSockets()
     {
@@ -441,7 +508,7 @@ internal sealed class GraphNodeView : Border
         if (changed) _socketLayoutDirty = true;
         else if (_socketLayoutDirty) { _socketLayoutDirty = false; _owner.UpdateWires(); }
     }
-    public GraphWorkspace.Socket? FindSocket(string kind, bool output) => _sockets.FirstOrDefault(s => s.Kind == kind && s.Output == output);
+    public GraphWorkspace.Socket? FindSocket(string kind, bool output, string port = "audio") => _sockets.FirstOrDefault(s => s.Kind == kind && s.Output == output && s.Port == port);
     internal bool IsNodeDragSurface(DependencyObject? current)
     {
         while (current is not null)
@@ -487,9 +554,12 @@ internal sealed class GraphNodeView : Border
             _node = node; _title.Text = node.Name;
             foreach (var socket in _sockets)
                 socket.SetConnected(_owner.Graph.Edges.Any(edge => socket.Output
-                    ? edge.From == Id && (socket.Kind == "audio" ? edge.Kind is "audio" or "sidechain" : edge.Kind == socket.Kind)
-                    : edge.To == Id && edge.Kind == socket.Kind));
+                    ? edge.From == Id && edge.FromPort == socket.Port && (socket.Kind == "audio" ? edge.Kind is "audio" or "sidechain" : edge.Kind == socket.Kind)
+                    : edge.To == Id && edge.ToPort == socket.Port && edge.Kind == socket.Kind));
             _gain?.SetValue(node.GainDb);
+            _multiplier?.SetValue(LinkedLevelControl.GetPercent(node));
+            if (_legacyMultiplierValue is not null)
+                _legacyMultiplierValue.Text = $"Saved multiplier {LinkedLevelControl.GetPercent(node):0.###}%";
             // The legacy Collapsed setting remains serialized, but nodes now
             // always present their complete controls and normal port positions.
             _body.IsEnabled = _owner.Mixer.CanEdit;
@@ -517,6 +587,13 @@ internal sealed class GraphNodeView : Border
             // Preserve the status row's geometry when an endpoint reconnects,
             // clipping clears or a mute changes. Only its ink disappears.
             _status.Visibility = _virtualDevice is not null || !_owner.Mixer.CanEdit || legacyMuted || deviceNode && status?.Path.State != "Running" || status?.Clipped == true && !node.Muted ? Visibility.Visible : Visibility.Hidden;
+            if (node.Kind == "control" && _owner.Mixer.CanEdit && !legacyMuted)
+            {
+                _status.Text = _legacyMultiplierPresentation ? "Existing level retained" : node.Bypass ? "Multiplier bypassed"
+                    : node.ControlMultiplier == 0 ? "Linked levels silenced" : "Linked levels";
+                _status.Visibility = _legacyMultiplierPresentation || node.Bypass || node.ControlMultiplier == 0 ? Visibility.Visible : Visibility.Hidden;
+                statusHelp = null;
+            }
             if (_virtualDevice is not null)
             {
                 ApplyVirtualDevice(node);
@@ -531,7 +608,7 @@ internal sealed class GraphNodeView : Border
                 else if (_owner.Mixer.CanEdit && status?.Path.State == "Running" && node.Muted)
                     _status.Text = "Connected · muted";
             }
-            if (_gain is null && node.GainDb != 0 && !legacyMuted && _owner.Mixer.CanEdit && status?.Clipped != true)
+            if (node.Kind != "control" && _gain is null && node.GainDb != 0 && !legacyMuted && _owner.Mixer.CanEdit && status?.Clipped != true)
             {
                 _status.Text = $"Saved level {node.GainDb:0.#} dB · right-click";
                 statusHelp = _savedLevelTip ??= NodeToolTip.Create("Saved effect level", "Retained level adjustment from an older version");
@@ -546,8 +623,7 @@ internal sealed class GraphNodeView : Border
             // actual channel measurements arrive instead of inventing stereo.
             bool hasStereoTelemetry = status?.PeakLeft is not null && status.PeakRight is not null;
             int channels = hasStereoTelemetry ? status!.Channels : 1;
-            bool linkedMute = _owner.Graph.Edges.Any(edge => edge.Kind == "control" && edge.To == node.Id && !edge.Muted
-                && _owner.Graph.Nodes.Any(control => control.Id == edge.From && control.Muted));
+            bool linkedMute = LinkedLevelSilenced(node);
             bool observePeak = ObservePeakSample(node, status);
             _meter.Update(status?.PeakLeft ?? status?.Peak ?? 0, status?.PeakRight ?? status?.Peak ?? 0, channels,
                 status?.Clipped ?? false, node.Muted || linkedMute || !_owner.Mixer.CanEdit || status?.Path.State != "Running",
@@ -563,6 +639,13 @@ internal sealed class GraphNodeView : Border
     }
     private static (string Device, string Stable, int Channel, bool Mono, uint Process, string App) PeakSource(GraphNode node)
         => (node.Device.Id, node.Device.StableId, node.Device.Channel, node.Mono, node.App.ProcessId, node.App.ExecutablePath);
+    private bool LinkedLevelSilenced(GraphNode node)
+    {
+        bool active = !node.Bypass || IsDeviceNode(node.Kind) || node.Kind is "stereoSplit" or "stereoCombine";
+        return _owner.Graph.Edges.Any(edge => edge.Kind == "control" && edge.To == node.Id && !edge.Muted
+            && _owner.Graph.Nodes.Any(control => control.Id == edge.From
+                && (control.Muted || active && !control.Bypass && control.ControlMultiplier == 0)));
+    }
     private bool ObservePeakSample(GraphNode node, GraphNodeStatus? status)
     {
         bool fresh = _peakSampleSequence != _owner.Mixer.MeterSampleSequence || !ReferenceEquals(_peakSampleStatus, status);
@@ -709,8 +792,7 @@ internal sealed class GraphNodeView : Border
         }
         bool fresh = status is { DynamicsFrame: > 0 } && nowSeconds >= _lastDynamicsTime && nowSeconds - _lastDynamicsTime <= .25;
         bool valid = fresh && status?.Path.State == "Running" && _dynamicsValid;
-        bool linkedMute = _owner.Graph.Edges.Any(edge => edge.Kind == "control" && edge.To == node.Id && !edge.Muted
-            && _owner.Graph.Nodes.Any(control => control.Id == edge.From && control.Muted));
+        bool linkedMute = LinkedLevelSilenced(node);
         VisibleReductionDb = presentationAvailable && valid && !node.Bypass && !node.Muted && !linkedMute
             ? Math.Clamp(_dynamicsReduction, 0, 96) : 0;
         _reductionStrip.Amount = Math.Min(1, VisibleReductionDb / 24);
@@ -805,7 +887,7 @@ internal sealed class GraphNodeView : Border
 
     private void AddEffects(string kind)
     {
-        if (!IsDeviceNode(kind))
+        if (!IsDeviceNode(kind) && kind is not ("stereoSplit" or "stereoCombine"))
         {
             var bypass = _effectToggle = GraphWorkspace.Button("Bypass", "Pass audio through without this node's processing or level adjustment.");
             bypass.Height = bypass.MinHeight = 36; bypass.FontSize = 14; bypass.FontWeight = FontWeights.SemiBold;
@@ -840,8 +922,9 @@ internal sealed class GraphNodeView : Border
                 bypass.Foreground = ConsoleTheme.Get(n.Bypass ? "ConsoleInkBrush" : "ConsoleTextBrush");
                 bypass.BorderBrush = ConsoleTheme.Get(n.Bypass ? "ConsoleMuteBrush" : "ConsoleMutedBrush");
                 bypass.ToolTip = n.Muted ? previouslyMutedTip
+                    : kind == "control" ? n.Bypass ? "Apply the multiplier again." : "Leave linked levels unchanged."
                     : n.Bypass ? "Restore this node's processing and level adjustment."
-                    : kind == "control" ? "Stop applying this controller's level to connected nodes."
+                    : kind == "crossfade" ? "Play input A only, without blending input B."
                     : "Pass audio through without this node's processing or level adjustment.";
                 AutomationProperties.SetItemStatus(bypass, n.Muted ? "Legacy muted" : n.Bypass ? "On" : "Off");
             });
@@ -861,6 +944,26 @@ internal sealed class GraphNodeView : Border
             var help = GraphWorkspace.Text("48 kHz · 48 samples = 1 ms", 12); help.Margin = new Thickness(0, 3, 0, 7); _body.Children.Add(help);
         }
         if (kind == "pan") { StartDialGroup(1); EffectNumber("L / R", -1, 1, .01, "", n => n.Balance, (n, v) => n.Balance = v, primary: true); }
+        if (kind == "stereoWidth")
+        {
+            StartDialGroup(1); EffectNumber("Width", 0, 200, 1, "%", n => n.StereoWidth * 100, (n, v) => n.StereoWidth = v / 100, primary: true);
+            AddNote("0% Mono · 100% Original · 200% Wide");
+        }
+        if (kind == "stereoPan")
+        {
+            StartDialGroup(1); EffectNumber("L / R", -1, 1, .01, "", n => n.PanPosition, (n, v) => n.PanPosition = v, primary: true);
+            AddNote("Stereo input is combined to mono.");
+        }
+        if (kind == "crossfade")
+        {
+            var curve = EffectChoice("Crossfade curve", [("equalPower", "Equal power"), ("linear", "Linear")], n => n.CrossfadeCurve, (n, value) => n.CrossfadeCurve = value);
+            curve.ToolTip = NodeToolTip.Create("Fade curve", "Equal power · Different sources", "Linear · Matching signals", "Delayed paths may need Alignment Delay");
+            StartDialGroup(1); EffectNumber("A / B", 0, 100, 1, "%", n => n.CrossfadePosition * 100, (n, v) => n.CrossfadePosition = v / 100, primary: true);
+            AddNote("0% A only · 100% B only");
+        }
+        if (kind == "channelSwap") AddNote("Left → Right\nRight → Left");
+        if (kind == "stereoCombine") AddNote("Each input becomes one channel.\nAn empty side stays silent.");
+        if (kind == "stereoSplit") AddNote("Each output is a mono signal.");
         if (kind == "denoiser")
         {
             var algorithmLabel = GraphWorkspace.Text("Algorithm", 12, true);
@@ -882,6 +985,7 @@ internal sealed class GraphNodeView : Border
                 bool selectedNeural = n.Denoiser.Algorithm == "rnnoise";
                 spectral.Visibility = selectedNeural ? Visibility.Hidden : Visibility.Visible;
                 neural.Visibility = selectedNeural ? Visibility.Visible : Visibility.Hidden;
+                spectral.IsEnabled = !selectedNeural; neural.IsEnabled = selectedNeural;
                 delay.Text = selectedNeural ? "Delay · 30 ms, including bypass" : "Delay · 20 ms, including bypass";
             });
             _dialGroup = null;
@@ -948,6 +1052,7 @@ internal sealed class GraphNodeView : Border
             bool limit = node.Compressor.Mode == "limit";
             compression.Visibility = limit ? Visibility.Hidden : Visibility.Visible;
             limiting.Visibility = limit ? Visibility.Visible : Visibility.Hidden;
+            compression.IsEnabled = !limit; limiting.IsEnabled = limit;
         });
         _dialGroup = null;
     }
@@ -1063,6 +1168,9 @@ internal sealed class GraphNodeView : Border
     {
         ("alignmentDelay", _) => "Delays this audio path to align it with another.",
         ("pan", _) => "Balances audio between the left and right channels.",
+        ("stereoWidth", _) => "Sets stereo width. 0% is mono; 100% is unchanged. Wider settings can raise peaks. Mono input remains mono.",
+        ("stereoPan", _) => "Moves a mono signal from left (-1) to centre (0) to right (1). Stereo input is combined to mono first; centre is -3 dB per side.",
+        ("crossfade", _) => "Blends stereo inputs A and B. 0% plays A only; 100% plays B only. Bypass plays A only.",
         ("denoiser", "Reduction") => "Sets how strongly SpeexDSP reduces steady background noise.",
         ("denoiser", "Mix") => "Blends original and RNNoise audio. 0% is original; 100% is fully denoised.",
         ("deEsser", "Frequency") => "Sets the frequency of the harsh S and SH sounds to reduce.",
@@ -1120,7 +1228,7 @@ internal sealed class GraphNodeView : Border
 
     private void BuildEq()
     {
-        int selected = 0; bool updating = false;
+        int selected = 0, bandCount = -1; bool updating = false;
         var plot = _eqPlot = new EqualizerEditor { Height = 300, Margin = new Thickness(0, 0, 0, 7) }; _body.Children.Add(plot);
         plot.EditGestureStarted += BeginControlEditGesture;
         plot.EditGestureEnded += EndControlEditGesture;
@@ -1146,9 +1254,17 @@ internal sealed class GraphNodeView : Border
         foreach (var control in new[] { frequency, gain, q }) TrackEditGesture(control);
         Grid.SetColumn(gain, 1); Grid.SetColumn(q, 2);
         details.Children.Add(frequency); details.Children.Add(gain); details.Children.Add(q);
+        void CancelBandEntries()
+        {
+            frequency.CancelPendingEntry(); gain.CancelPendingEntry(); q.CancelPendingEntry();
+        }
         void Update(GraphNode n)
         {
-            selected = n.EqBands.Count == 0 || selected < 0 ? -1 : Math.Min(selected, n.EqBands.Count - 1); updating = true;
+            int nextSelected = n.EqBands.Count == 0 || selected < 0 ? -1 : Math.Min(selected, n.EqBands.Count - 1);
+            // Band removal can give the same index to a different band, whose
+            // gain and Q may even equal the previous target's values.
+            if (nextSelected != selected || bandCount != n.EqBands.Count) CancelBandEntries();
+            selected = nextSelected; bandCount = n.EqBands.Count; updating = true;
             try
             {
                 bool hasBand = selected >= 0;
@@ -1164,7 +1280,12 @@ internal sealed class GraphNodeView : Border
             }
             finally { updating = false; }
         }
-        plot.SelectedBandChanged += index => { if (updating) return; selected = index; Update(_node); };
+        plot.SelectedBandChanged += index =>
+        {
+            if (updating) return;
+            if (selected != index) CancelBandEntries();
+            selected = index; Update(_node);
+        };
         plot.BandsEdited += bands =>
         {
             if (updating || _applying) return;

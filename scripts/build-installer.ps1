@@ -27,7 +27,7 @@ $sourceIdentity = & (Join-Path $PSScriptRoot 'get-source-identity.ps1')
 if ($receipt.buildMode -ne 'Installed' -or $receipt.version -ne $release.version -or $receipt.sourceIdentity.sourceSnapshotSha256 -ne $sourceIdentity.sourceSnapshotSha256) { throw 'The installed package source receipt does not match the current release source.' }
 # Deliberate release allowlist. Checkout guides, fixtures, images and research
 # notes do not enter the package, even if present in a caller-supplied folder.
-$required = @('VineMix.exe','VineMix.Engine.exe','libc++.dll','libunwind.dll','libwinpthread-1.dll','LICENSE','THIRD_PARTY_NOTICES.md')
+$required = @('VineMix.exe','VineMix.Engine.exe','libc++.dll','libunwind.dll','libwinpthread-1.dll','LICENSE','ATTRIBUTION.md','THIRD_PARTY_NOTICES.md')
 $licenseNames = @('IBM-Plex-OFL.txt','libsamplerate-LICENSE','libsamplerate-source-notices.txt',
     'SpeexDSP-COPYING.txt','SpeexDSP-source-notices.txt','RNNoise-COPYING.txt','RNNoise-source-notices.txt',
     'nlohmann-json-LICENSE','nlohmann-json-third-party-notices.txt','LLVM-runtime-LICENSE.txt','MinGW-w64-COPYING.txt',
@@ -41,6 +41,10 @@ foreach ($name in $required) {
     $entry = @($receipt.files | Where-Object path -CEQ $name.Replace('\','/'))
     if ($entry.Count -ne 1 -or (Get-Item -LiteralPath $file).Length -ne $entry[0].size -or
         (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash -ne $entry[0].sha256) { throw "Staged file no longer matches its build receipt: $name" }
+    if ($name -in @('LICENSE','ATTRIBUTION.md','THIRD_PARTY_NOTICES.md') -and
+        (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash -ne (Get-FileHash -LiteralPath (Join-Path $project $name) -Algorithm SHA256).Hash) {
+        throw "Staged distribution notice differs from the authoritative source: $name"
+    }
     $destination = Join-Path $payload $name
     $null = New-Item -ItemType Directory -Force -Path (Split-Path $destination -Parent)
     Copy-Item -LiteralPath $file -Destination $destination

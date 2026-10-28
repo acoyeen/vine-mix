@@ -66,6 +66,10 @@ public sealed partial class MixerViewModel : Observable, IDisposable
     // Detached verification can exercise the real pending/acknowledgement path
     // without creating a pipe, changing preferences or starting an engine.
     internal bool QueuePreviewEdits { get; set; }
+    // An optional in-memory writer exercises preference failures in detached
+    // verification; ordinary preview models never touch the filesystem.
+    internal Action<string>? PreviewUiPreferencesWriter { get; set; }
+    private bool _uiPreferencesNeedSave;
     internal int PendingEditCount => _pending.Count;
     internal delegate bool CheckedEdit(MixerConfiguration configuration, out string error);
     internal sealed class PendingEdit
@@ -73,12 +77,14 @@ public sealed partial class MixerViewModel : Observable, IDisposable
         internal Action<MixerConfiguration>? Change { get; init; }
         internal CheckedEdit? CheckedChange { get; init; }
         internal WorkspaceGraphRestore? Restore { get; init; }
+        internal IReadOnlyList<GraphFrame>? FramesBefore { get; init; }
+        internal IReadOnlyList<GraphFrame>? FramesAfter { get; init; }
         internal bool TryApply(MixerConfiguration configuration, out string error)
         {
             error = "";
             if (CheckedChange is not null) return CheckedChange(configuration, out error);
             if (Restore is null) { Change!(configuration); return true; }
-            if (!Restore.TryApply(configuration.Graph, out var restored, out error)) return false;
+            if (!Restore.TryApply(configuration.Graph, out var restored, out error, restoreFrames: false)) return false;
             configuration.Graph = restored;
             return true;
         }
@@ -88,6 +94,7 @@ public sealed partial class MixerViewModel : Observable, IDisposable
     private ulong _lastFrames;
     private bool _connected, _visible = true, _startAtLogin, _reducedAnimation, _rightClickDragToPan;
     private bool _showDisabledAudioDevices, _showDisconnectedAudioDevices, _showAdvancedAudioDevices;
+    private bool _showActionNotifications = true;
     private bool? _registeredStartup;
     private string _connectionStatus = "Connecting to the audio engine…", _warning = "", _editError = "", _saveError = "", _startupError = "", _uiError = "", _saveStatus = "", _frameLabel = "Engine offline";
     private string PendingSaveStatus => _saveError.Length > 0 ? "Changes not saved · retrying…" : "Saving changes…";
@@ -125,6 +132,15 @@ public sealed partial class MixerViewModel : Observable, IDisposable
         set
         {
             if (Applying || !Set(ref _reducedAnimation, value)) return;
+            SaveUiPreferences();
+        }
+    }
+    public bool ShowActionNotifications
+    {
+        get => _showActionNotifications;
+        set
+        {
+            if (Applying || !Set(ref _showActionNotifications, value)) return;
             SaveUiPreferences();
         }
     }
@@ -194,10 +210,12 @@ public sealed partial class MixerViewModel : Observable, IDisposable
     {
         public bool? AutomaticallyCheckForUpdates { get; set; }
         public bool? ReducedAnimation { get; set; }
+        public bool? ShowActionNotifications { get; set; }
         public bool RightClickDragToPan { get; set; }
         public bool ShowDisabledAudioDevices { get; set; }
         public bool ShowDisconnectedAudioDevices { get; set; }
         public bool ShowAdvancedAudioDevices { get; set; }
+        public List<GraphFrame> Frames { get; set; } = [];
     }
     // These JSON-only seams also let detached verification exercise the same
     // persistence format without reading or writing the user's settings file.
@@ -206,36 +224,55 @@ public sealed partial class MixerViewModel : Observable, IDisposable
         var preferences = JsonSerializer.Deserialize<UiPreferences>(json, Protocol.Json);
         _automaticallyCheckForUpdates = preferences?.AutomaticallyCheckForUpdates ?? true;
         _reducedAnimation = preferences?.ReducedAnimation ?? _reducedAnimation;
+        _showActionNotifications = preferences?.ShowActionNotifications ?? true;
         _rightClickDragToPan = preferences?.RightClickDragToPan ?? false;
         _showDisabledAudioDevices = preferences?.ShowDisabledAudioDevices ?? false;
         _showDisconnectedAudioDevices = preferences?.ShowDisconnectedAudioDevices ?? false;
         _showAdvancedAudioDevices = preferences?.ShowAdvancedAudioDevices ?? false;
+        _visualFrames = GraphFrames.Normalize(preferences?.Frames);
     }
     internal string SerializeUiPreferences() => JsonSerializer.Serialize(new UiPreferences
     {
         AutomaticallyCheckForUpdates = _automaticallyCheckForUpdates,
         ReducedAnimation = _reducedAnimation,
+        ShowActionNotifications = _showActionNotifications,
         RightClickDragToPan = _rightClickDragToPan,
         ShowDisabledAudioDevices = _showDisabledAudioDevices,
         ShowDisconnectedAudioDevices = _showDisconnectedAudioDevices,
-        ShowAdvancedAudioDevices = _showAdvancedAudioDevices
+        ShowAdvancedAudioDevices = _showAdvancedAudioDevices,
+        Frames = _visualFrames.Select(frame => frame.Copy()).ToList()
     }, Protocol.Json);
     private static string UiPreferencesPath => WorkspacePaths.Preferences;
     private void SaveUiPreferences()
     {
-        if (_preview || HasSettingsRecovery) return;
+        _uiPreferencesNeedSave = true;
+        if (HasSettingsRecovery) return;
+        if (_preview && PreviewUiPreferencesWriter is null) { _uiPreferencesNeedSave = false; return; }
         try
         {
-            string path = UiPreferencesPath;
-            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            string temporary = path + ".new";
-            File.WriteAllText(temporary, SerializeUiPreferences());
-            File.Move(temporary, path, true);
+            if (_preview) PreviewUiPreferencesWriter!(SerializeUiPreferences());
+            else
+            {
+                string path = UiPreferencesPath;
+                Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+                string temporary = path + ".new";
+                File.WriteAllText(temporary, SerializeUiPreferences());
+                File.Move(temporary, path, true);
+            }
+            _uiPreferencesNeedSave = false;
             _uiError = "";
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or System.Security.SecurityException)
         { _uiError = "Workspace preferences apply for this session, but could not be saved: " + error.Message; }
         UpdateWarning();
+    }
+    private void EnsureUiPreferencesSaved()
+    {
+        if (!_uiPreferencesNeedSave) return;
+        SaveUiPreferences();
+        if (_uiPreferencesNeedSave)
+            throw new IOException("Workspace preferences, including node groups, could not be saved. Your changes remain in this session. "
+                + (HasSettingsRecovery ? "Finish workspace recovery before continuing." : _uiError));
     }
     private void UpdateWarning() => Warning = string.Join("\n", new[] { _editError, _saveError, _startupError, _uiError, _snapshot?.Warning ?? "" }.Where(s => !string.IsNullOrWhiteSpace(s)));
     public bool HasSettingsRecovery => _snapshot is { SettingsState: not ("loaded" or "new") };
@@ -278,6 +315,8 @@ public sealed partial class MixerViewModel : Observable, IDisposable
     {
         if (!_preview) throw new InvalidOperationException("Design data can only be applied to a preview model.");
         if (!snapshot.Configuration.IsValidShape) throw new ArgumentException("Preview configuration has an unsupported shape.", nameof(snapshot));
+        if (snapshot.Configuration.Graph.Frames.Count > 0)
+            _visualFrames = GraphFrames.Normalize(snapshot.Configuration.Graph.Frames);
         if (!QueuePreviewEdits) { EditHistory.Clear(); NotifyHistory(); }
         _canvasView = null;
         Accept(snapshot);
@@ -304,9 +343,20 @@ public sealed partial class MixerViewModel : Observable, IDisposable
         // result only after success, with no partial graph or history on failure.
         var candidate = operation.CheckedChange is null && !IsLayoutLocked ? _desired : _desired.Copy();
         if (!operation.TryApply(candidate, out error)) return false;
+        GraphFrames.Normalize(candidate.Graph);
         if (IsLayoutLocked && WorkspaceHistory.ChangesLayout(before.Graph, candidate.Graph))
         { error = LayoutLockedMessage; NotifyLayoutEditBlocked(); return false; }
         _desired = candidate;
+        // A purely visual group edit never triggers device assignment or an
+        // engine configure/save request. It still participates in graph Undo.
+        bool framesChanged = !GraphFrames.Same(before.Graph.Frames, _desired.Graph.Frames);
+        if (WorkspaceHistory.SameValue(before, _desired))
+        {
+            if (!framesChanged) return true;
+            EditHistory.Record(before.Graph, _desired.Graph);
+            SaveVisualFrames(); NotifyHistory(); ApplyDesired();
+            return true;
+        }
         var manualPolicies = new Dictionary<string, bool>();
         foreach (var node in _desired.Graph.Nodes.Where(n => VirtualDeviceBindings.IsVirtual(n.Kind)))
         {
@@ -318,7 +368,8 @@ public sealed partial class MixerViewModel : Observable, IDisposable
         var assignments = AutomaticAssignments();
         VirtualDeviceBindings.Apply(_desired.Graph, assignments);
         foreach (var assignment in assignments) _automaticAssignmentAttempts.Add(assignment.AttemptKey);
-        if (WorkspaceHistory.SameValue(before, _desired)) return true;
+        if (WorkspaceHistory.SameValue(before, _desired) && !framesChanged) return true;
+        if (framesChanged) SaveVisualFrames();
         EditHistory.Record(before.Graph, _desired.Graph);
         NotifyHistory();
         if (_preview && !QueuePreviewEdits)
@@ -335,10 +386,13 @@ public sealed partial class MixerViewModel : Observable, IDisposable
             VirtualDeviceBindings.Apply(c.Graph, assignments);
             if (view is { } v) { c.Graph.PanX = v.X; c.Graph.PanY = v.Y; c.Graph.Zoom = v.Zoom; }
         }
+        var framesBefore = framesChanged ? before.Graph.Frames.Select(frame => frame.Copy()).ToArray() : null;
+        var framesAfter = framesChanged ? _desired.Graph.Frames.Select(frame => frame.Copy()).ToArray() : null;
         _pending.Add(operation.CheckedChange is null
-            ? new() { Change = c => { operation.Change!(c); Complete(c); } }
+            ? new() { Change = c => { operation.Change!(c); Complete(c); }, FramesBefore = framesBefore, FramesAfter = framesAfter }
             : new() { CheckedChange = (MixerConfiguration c, out string replayError) =>
-                { if (!operation.TryApply(c, out replayError)) return false; Complete(c); return true; } });
+                { if (!operation.TryApply(c, out replayError)) return false; Complete(c); return true; },
+                FramesBefore = framesBefore, FramesAfter = framesAfter });
         _editDispatch.Queue(_clock.Elapsed);
         _editError = "";
         SaveStatus = PendingSaveStatus;
@@ -380,6 +434,13 @@ public sealed partial class MixerViewModel : Observable, IDisposable
         }
         var previousGraph = _desired.Graph;
         _desired.Graph = restored;
+        if (!GraphFrames.Same(previousGraph.Frames, restored.Frames)) SaveVisualFrames();
+        if (WorkspaceHistory.SameValue(previousGraph, restored))
+        {
+            _editError = "";
+            UpdateWarning(); NotifyHistory(); ApplyDesired();
+            return true;
+        }
         // An explicit restoration of an unassigned node is authoritative for
         // this session, even if inventory changes would otherwise reassign it.
         foreach (var node in restored.Nodes.Where(node => VirtualDeviceBindings.IsVirtual(node.Kind)))
@@ -394,9 +455,14 @@ public sealed partial class MixerViewModel : Observable, IDisposable
         else
         {
             var policies = restored.Nodes.Where(n => !n.AutoAssignDevice).Select(n => n.Id).ToHashSet();
-            _pending.Add(new() { Restore = restore, CheckedChange = (MixerConfiguration c, out string replayError) =>
+            _pending.Add(new() { Restore = restore,
+                FramesBefore = previousGraph.Frames.Select(frame => frame.Copy()).ToArray(),
+                FramesAfter = restored.Frames.Select(frame => frame.Copy()).ToArray(),
+                CheckedChange = (MixerConfiguration c, out string replayError) =>
             {
-                if (!restore!.TryApply(c.Graph, out var graph, out replayError)) return false;
+                // Frame metadata already committed locally when Undo/Redo was
+                // requested. The engine replay only restores audio/layout data.
+                if (!restore!.TryApply(c.Graph, out var graph, out replayError, restoreFrames: false)) return false;
                 foreach (var node in graph.Nodes) if (policies.Contains(node.Id)) node.AutoAssignDevice = false;
                 c.Graph = graph; return true;
             } });
@@ -414,19 +480,27 @@ public sealed partial class MixerViewModel : Observable, IDisposable
         NotifyHistory(); UpdateWarning();
     }
 
-    private MixerConfiguration ReplayPending(MixerConfiguration configuration)
+    private MixerConfiguration ReplayPending(MixerConfiguration configuration, out bool conflict)
     {
-        bool conflict = false;
+        conflict = false;
+        var dropped = new List<PendingEdit>();
         foreach (var edit in _pending.ToArray())
         {
-            if (conflict && edit.Restore is not null) { _pending.Remove(edit); continue; }
+            if (conflict && edit.Restore is not null) { _pending.Remove(edit); dropped.Add(edit); continue; }
             var candidate = edit.CheckedChange is null ? configuration : configuration.Copy();
             if (edit.TryApply(candidate, out string error)) { configuration = candidate; continue; }
             // A refused operation must not leave later dependent redo/undo
             // commands in the queue. Ordinary newer edits remain rebasable.
-            _pending.Remove(edit); conflict = true; ResetHistoryAfterConflict(error);
+            _pending.Remove(edit); dropped.Add(edit); conflict = true; ResetHistoryAfterConflict(error);
         }
-        if (conflict) _editDispatch.Complete(_pending.Count > 0);
+        if (conflict)
+        {
+            _editDispatch.Complete(_pending.Count > 0);
+            // Checked operations and later history restores can be dropped
+            // during rebase just as they can be rejected by the engine. Their
+            // optimistic local membership changes need the same guarded undo.
+            _visualFramesNeedSave |= RestoreRejectedVisualFrames(dropped);
+        }
         return configuration;
     }
 
@@ -434,8 +508,15 @@ public sealed partial class MixerViewModel : Observable, IDisposable
     {
         ReconcileUnconfirmedUpdate(basis);
         ReconcileUnconfirmedQuit(basis);
-        var configuration = ReplayPending(basis.Copy());
+        var configuration = ReplayPending(basis.Copy(), out bool conflict);
         if (_canvasView is { } view) { configuration.Graph.PanX = view.X; configuration.Graph.PanY = view.Y; configuration.Graph.Zoom = view.Zoom; }
+        if (conflict)
+        {
+            configuration.Graph.Frames = GraphFrames.Normalize(_visualFrames, configuration.Graph.Nodes.Select(node => node.Id));
+            _desired = configuration.Copy();
+            if (_visualFramesNeedSave || !GraphFrames.Same(_visualFrames, _desired.Graph.Frames)) SaveVisualFrames();
+            ApplyDesired();
+        }
         return new(configuration, _pending.ToArray());
     }
 
@@ -472,13 +553,16 @@ public sealed partial class MixerViewModel : Observable, IDisposable
 
     internal void RejectPending(PendingBatch batch, MixerSnapshot snapshot, string error)
     {
-        _pending.RemoveAll(edit => batch.Edits.Contains(edit) || edit.Restore is not null);
+        var rejected = _pending.Where(edit => batch.Edits.Contains(edit) || edit.Restore is not null).ToArray();
+        bool framesRestored = RestoreRejectedVisualFrames(rejected);
+        _pending.RemoveAll(rejected.Contains);
         _editDispatch.Complete(_pending.Count > 0);
         _saveError = "";
         EditHistory.Clear(); NotifyHistory();
         _editError = "The engine rejected a change: " + error + " Undo and redo were reset to keep the saved workspace consistent.";
         if (_pending.Count > 0) SaveStatus = PendingSaveStatus;
         Accept(snapshot, forceConfiguration: true);
+        if (framesRestored && !HasSettingsRecovery) SaveVisualFrames();
     }
 
     internal void SetCanvasView(double x, double y, double zoom)
@@ -529,7 +613,8 @@ public sealed partial class MixerViewModel : Observable, IDisposable
             // Rebase local edits only when the committed base changes. Each
             // optimistic edit already updated _desired, so telemetry cannot
             // require another full JSON round trip or another pending replay.
-            var desired = recovery ? snapshot.Configuration.Copy() : ReplayPending(snapshot.Configuration.Copy());
+            var desired = recovery ? snapshot.Configuration.Copy() : ReplayPending(snapshot.Configuration.Copy(), out _);
+            desired.Graph.Frames = GraphFrames.Normalize(_visualFrames, desired.Graph.Nodes.Select(node => node.Id));
             if (!recovery && _canvasView is { } view) { desired.Graph.PanX = view.X; desired.Graph.PanY = view.Y; desired.Graph.Zoom = view.Zoom; }
             _desired = desired;
             ConfigurationRefreshCount++;
@@ -537,6 +622,7 @@ public sealed partial class MixerViewModel : Observable, IDisposable
         else TelemetryOnlySnapshotCount++;
         if (_preview || !ReferenceEquals(_snapshot?.Status, snapshot.Status)) MeterSampleSequence++;
         _snapshot = snapshot; CanEdit = !HasSettingsRecovery;
+        if (configurationChanged && !recovery && (_visualFramesNeedSave || !GraphFrames.Same(_visualFrames, _desired.Graph.Frames))) SaveVisualFrames();
         Changed(nameof(HasSettingsRecovery)); Changed(nameof(CanRestoreBackup));
         Changed(nameof(CanStartFresh)); Changed(nameof(RecoveryDescription));
         Changed(nameof(CanRestartEngine));
@@ -555,7 +641,9 @@ public sealed partial class MixerViewModel : Observable, IDisposable
         if (_pending.Count == 0)
         {
             _saveError = "";
-            SaveStatus = _preview ? "Preview · no settings are saved" : _editError.Length == 0 ? $"Saved · revision {snapshot.Configuration.Revision}" : "Change was not saved";
+            SaveStatus = _preview ? "Preview · no settings are saved"
+                : _uiError.Length > 0 ? "Workspace preferences need attention"
+                : _editError.Length == 0 ? $"Saved · revision {snapshot.Configuration.Revision}" : "Change was not saved";
         }
         if (!HasSettingsRecovery && !IsPreparingUpdate && !IsPreparingQuit && !IsUpdateHealthMode && (configurationChanged || inventoryChanged))
         {

@@ -19,7 +19,7 @@ internal static class Program
         try
         {
             Semver(); Signatures();
-            await Sources(); await Downloads();
+            await Sources(); await ReleaseTransitionSources(); await Downloads();
             Check(UpdateTrust.Production is not null, "Production embeds a loadable pinned RSA trust map.");
             Console.WriteLine($"PASS: {Checks.Count} isolated updater checks; no network, settings, audio or application processes used.");
             int report = Array.IndexOf(args, "--report");
@@ -34,6 +34,10 @@ internal static class Program
     {
         string[] ordered = ["0.3.0-alpha", "0.3.0-alpha.1", "0.3.0-alpha.beta", "0.3.0-beta.2", "0.3.0-beta.10", "0.3.0-rc.1", "0.3.0", "0.3.1", "1.0.0"];
         Check(ordered.Zip(ordered.Skip(1)).All(pair => SemanticVersion.Parse(pair.First).CompareTo(SemanticVersion.Parse(pair.Second)) < 0), "Semantic precedence orders beta.2 before beta.10 and stable after prereleases.");
+        string[] releaseOrder = ["0.3.0-beta.5", "0.3.0-beta.6", "0.4.0-beta", "0.4.1-beta", "0.5.0-beta", "1.0.0"];
+        Check(releaseOrder.Zip(releaseOrder.Skip(1)).All(pair => SemanticVersion.Parse(pair.First).CompareTo(SemanticVersion.Parse(pair.Second)) < 0),
+            "Numbered betas advance to versioned betas, later patch/minor releases and 1.0.0 without a downgrade.");
+        Check(new Version("0.4.0.0") > new Version("0.3.0.7"), "The 0.4.0 Windows identity advances beyond the final local numbered beta.");
         Check(SemanticVersion.Parse("1.2.3+build.1").CompareTo(SemanticVersion.Parse("1.2.3+build.2")) == 0, "Build metadata does not change precedence.");
         foreach (string invalid in new[] { "v1.2.3", "01.2.3", "1.2", "1.2.3-beta.01", "1.2.3\n", "1.2.3/other", "1.2.3-", "1.2.3+", "1.2.3.4" })
             Check(!SemanticVersion.TryParse(invalid, out _), "Reject malformed semantic version: " + invalid.Replace("\n", "<newline>"));
@@ -150,6 +154,59 @@ internal static class Program
         using (var source = new GitHubUpdateSource(Trust, Compatible, Handler((request, _) => request.RequestUri!.Host == "api.github.com"
             ? Response(200, Releases((beta2, tampered))) : Response(200, tampered))))
             Check((await source.CheckAsync("0.3.0-beta.1", true, default)).Status == UpdateCheckStatus.InvalidRelease, "A malformed published signed manifest is not offered.");
+    }
+    private static async Task ReleaseTransitionSources()
+    {
+        var next = Manifest("0.4.0-beta") with { NumericVersion = "0.4.0.0" };
+        var patch = Manifest("0.4.1-beta") with { NumericVersion = "0.4.1.0" };
+        var minor = Manifest("0.5.0-beta") with { NumericVersion = "0.5.0.0" };
+        var stable = Manifest("1.0.0") with { NumericVersion = "1.0.0.0" };
+        byte[] envelope = Sign(next);
+        var releases = JsonNode.Parse(Releases((next, envelope)))!.AsArray();
+        foreach (int beta in Enumerable.Range(1, 5))
+            releases.Add(new JsonObject
+            {
+                ["tag_name"] = $"v0.3.0-beta.{beta}", ["draft"] = false, ["prerelease"] = true,
+                ["published_at"] = "2026-01-01T00:00:00Z", ["assets"] = new JsonArray()
+            });
+        byte[] releaseBytes = Encoding.UTF8.GetBytes(releases.ToJsonString());
+        foreach (int beta in Enumerable.Range(2, 5))
+        {
+            int manifestRequests = 0;
+            using var source = new GitHubUpdateSource(Trust, Compatible, Handler((request, _) =>
+            {
+                if (request.RequestUri!.Host == "api.github.com") return Response(200, releaseBytes);
+                Check(request.RequestUri.AbsoluteUri == UpdateTrust.AssetUrl(next.Version, UpdateTrust.ManifestFileName(next.Version)),
+                    "Retired numbered-beta manifests are never fetched while a verified 0.4.0 update is available.");
+                manifestRequests++;
+                return Response(200, envelope);
+            }));
+            var result = await source.CheckAsync($"0.3.0-beta.{beta}", true, default);
+            Check(result.Status == UpdateCheckStatus.Available && result.Offer?.Version == next.Version
+                && result.Offer.Manifest.NumericVersion == "0.4.0.0" && manifestRequests == 1,
+                $"Current update discovery accepts a Beta {beta} installed identity and offers 0.4.0 Beta with retired Beta 1–5 assets absent.");
+        }
+        using (var source = Source(minor, next, patch))
+            Check((await source.CheckAsync(next.Version, true, default)).Offer?.Version == minor.Version,
+                "Later versioned betas are ordered by version rather than publication order or a beta sequence number.");
+        using (var source = Source(patch, next))
+            Check((await source.CheckAsync(next.Version, true, default)).Offer?.Version == patch.Version,
+                "A versioned beta patch is offered as an upgrade.");
+        using (var source = Source(stable, minor, next))
+            Check((await source.CheckAsync(next.Version, false, default)).Offer?.Version == stable.Version,
+                "The stable channel skips versioned betas and can advance directly to 1.0.0.");
+        using (var source = Source(next))
+            Check((await source.CheckAsync(next.Version, true, default)).Status == UpdateCheckStatus.UpToDate,
+                "The installed versioned beta is not offered again.");
+        using (var source = Source(next))
+            Check((await source.CheckAsync(next.Version, false, default)).Status == UpdateCheckStatus.Unavailable,
+                "A beta remains excluded from the stable-only channel even without a beta sequence number.");
+        Reject(Sign(next with { NumericVersion = "0.3.0.7" }), next.Version,
+            "Renaming a beta cannot pair the new signed release identity with old binary versions.");
+        releases[0]!["prerelease"] = false;
+        using (var source = new GitHubUpdateSource(Trust, Compatible, Handler((_, _) => Response(200, Encoding.UTF8.GetBytes(releases.ToJsonString())))))
+            Check((await source.CheckAsync("0.3.0-beta.6", true, default)).Status == UpdateCheckStatus.UpToDate,
+                "A release whose beta suffix disagrees with the GitHub prerelease flag is not offered.");
     }
     private static async Task Downloads()
     {

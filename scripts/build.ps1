@@ -43,7 +43,7 @@ $licenseNames = @(
     'dotnet-windowsdesktop-LICENSE.txt', 'dotnet-wpf-ThirdPartyNotices.txt', 'dotnet-winforms-ThirdPartyNotices.txt',
     'W3C-Audio-EQ-Cookbook-NOTICE.txt', 'Microsoft-Windows-classic-samples-LICENSE.txt'
 )
-$noticePaths = @('LICENSE','THIRD_PARTY_NOTICES.md') + @($licenseNames | ForEach-Object { 'licenses\' + $_ })
+$noticePaths = @('LICENSE','ATTRIBUTION.md','THIRD_PARTY_NOTICES.md') + @($licenseNames | ForEach-Object { 'licenses\' + $_ })
 foreach ($relative in $noticePaths) {
     $required = Join-Path $projectRoot $relative
     if (-not (Test-Path -LiteralPath $required -PathType Leaf) -or (Get-Item -LiteralPath $required).Length -eq 0) { throw "Required notice missing or empty: $relative" }

@@ -43,7 +43,9 @@ public sealed partial class MixerViewModel
         bool entered = false;
         try
         {
+            EnsureUiPreferencesSaved();
             await _engineGate.WaitAsync(token); entered = true;
+            EnsureUiPreferencesSaved();
             _quitRecoveryConfiguration ??= (_recoveryPending ?? _desired).Copy();
             if (_pending.Count == 0) return new(true, "", 0);
             if (IsUpdateHealthMode)
@@ -58,6 +60,7 @@ public sealed partial class MixerViewModel
                 if (_pending.Count == 0)
                 {
                     Accept(current, forceConfiguration: true);
+                    EnsureUiPreferencesSaved();
                     return new(true, "", 0);
                 }
                 // This strict replay throws on a conflict instead of rejecting
@@ -81,6 +84,7 @@ public sealed partial class MixerViewModel
                     throw new IOException("The audio engine did not confirm the saved changes.");
                 AcknowledgePending(batch, null); _unconfirmedQuitBatch = null;
                 Accept(confirmed, forceConfiguration: true);
+                EnsureUiPreferencesSaved();
                 return new(true, "", 0);
             }
             throw new IOException("The saved workspace kept changing. Your queued edits have been retained.");
@@ -120,6 +124,7 @@ public sealed partial class MixerViewModel
         SetPreparingQuit(false);
         _quitRecoveryConfiguration = null;
         SaveStatus = _pending.Count > 0 ? PendingSaveStatus
+            : _uiPreferencesNeedSave ? "Workspace preferences need attention"
             : _preview ? "Preview · no settings are saved" : $"Saved · revision {_snapshot?.Configuration.Revision ?? 0}";
         ConnectionStatus = _pending.Count > 0 ? "Quit cancelled · your changes are still queued" : "Quit cancelled · audio session kept open";
     }
@@ -127,6 +132,9 @@ public sealed partial class MixerViewModel
     internal string SerializeQuitRecovery()
     {
         if (!IsPreparingQuit) throw new InvalidOperationException("Prepare the pending workspace before making a quit recovery copy.");
+        // This file contains the engine workspace. Do not let a successful
+        // engine-only copy silently discard unsaved desktop group metadata.
+        EnsureUiPreferencesSaved();
         var configuration = (_quitRecoveryConfiguration ?? _recoveryPending ?? _desired).Copy();
         if (_canvasView is { } view)
         { configuration.Graph.PanX = view.X; configuration.Graph.PanY = view.Y; configuration.Graph.Zoom = view.Zoom; }

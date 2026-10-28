@@ -72,9 +72,14 @@ function Test-ActivationProcessIdentity($Actual, $Captured) {
     } catch { $false }
 }
 
-function Replace-ActivationBinary([string]$Source, [string]$Destination, [string]$ExpectedHash) {
+function Replace-ActivationBinary([string]$Source, [string]$Destination, [string]$ExpectedHash,
+        [string[]]$ExpectedDestinationHashes = @(), [scriptblock]$BeforeReplace = $null,
+        [ValidateRange(0,10000)][int]$RetryTimeoutMilliseconds = 0) {
     $target = [IO.Path]::GetFullPath($Destination)
     $stage = Join-Path (Split-Path -Parent $target) ('.activation-' + [guid]::NewGuid().ToString('N') + '.new')
+    if ($RetryTimeoutMilliseconds -gt 0 -and (-not $BeforeReplace -or -not $ExpectedDestinationHashes.Count)) {
+        throw 'Replacement retries require an explicit process guard and known destination hashes.'
+    }
     try {
         Copy-Item -LiteralPath $Source -Destination $stage
         if ((Get-FileHash -LiteralPath $stage -Algorithm SHA256).Hash -cne $ExpectedHash.ToUpperInvariant()) {
@@ -82,7 +87,35 @@ function Replace-ActivationBinary([string]$Source, [string]$Destination, [string
         }
         # An interrupted copy only affects our fresh staging file. The existing
         # executable remains intact until the same-directory atomic replacement.
-        [IO.File]::Move($stage, $target, $true)
+        $timer = [Diagnostics.Stopwatch]::StartNew()
+        $attempt = 0
+        do {
+            # A stopped process can briefly leave a mapped-image/scanner lock.
+            # Never treat a retry as permission to overwrite a newer file or
+            # a controller that appeared independently while waiting.
+            if ($BeforeReplace) { & $BeforeReplace }
+            if ($ExpectedDestinationHashes.Count -and
+                ((Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash -notin $ExpectedDestinationHashes)) {
+                throw ('The destination changed before replacing ' + [IO.Path]::GetFileName($target) + '. Its newer contents were preserved.')
+            }
+            if ((Get-FileHash -LiteralPath $Source -Algorithm SHA256).Hash -cne $ExpectedHash.ToUpperInvariant() -or
+                (Get-FileHash -LiteralPath $stage -Algorithm SHA256).Hash -cne $ExpectedHash.ToUpperInvariant()) {
+                throw ('The replacement source changed for ' + [IO.Path]::GetFileName($target) + '.')
+            }
+            $attempt++
+            try { [IO.File]::Move($stage, $target, $true); break }
+            catch {
+                $cause = $_.Exception
+                while ($cause.InnerException) { $cause = $cause.InnerException }
+                $code = $cause.HResult -band 0xffff
+                $transient = ($cause -is [IO.IOException] -or $cause -is [UnauthorizedAccessException]) -and $code -in @(5,32,33)
+                if (-not $transient -or $timer.ElapsedMilliseconds -ge $RetryTimeoutMilliseconds) {
+                    throw [IO.IOException]::new(('Could not replace {0} after {1} attempt(s); Windows error {2}.' -f
+                        [IO.Path]::GetFileName($target), $attempt, $code), $cause)
+                }
+                Start-Sleep -Milliseconds ([Math]::Min(150, [Math]::Max(1, $RetryTimeoutMilliseconds - $timer.ElapsedMilliseconds)))
+            }
+        } while ($true)
         if ((Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash -cne $ExpectedHash.ToUpperInvariant()) {
             throw 'The installed executable no longer matches the staged replacement.'
         }

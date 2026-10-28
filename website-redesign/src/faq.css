@@ -1,0 +1,90 @@
+/* Scoped module, intended between Open source and Downloads. */
+.vm-faq {
+  box-sizing: border-box;
+  --faq-fade-height: clamp(180px, 28vw, 320px);
+  /* Fade only inside bottom padding, with solid space after the final answer. */
+  background: #0c0d0f linear-gradient(to bottom,
+    transparent calc(100% - var(--faq-fade-height)), #030405 100%);
+  color: #f0f2e9;
+  font: 17px/1.6 "IBM Plex Sans", sans-serif;
+  padding: 96px clamp(22px, 5vw, 80px) calc(var(--faq-fade-height) + 32px);
+  scroll-margin-top: 80px;
+}
+.vm-faq * { box-sizing: border-box; }
+.vm-faq__wrap { max-width: 800px; margin-inline: auto; }
+.vm-faq h2 {
+  margin: 0 0 52px;
+  font-size: var(--section-heading-size, clamp(32px, 3.5vw, 56px));
+  font-weight: var(--section-heading-weight, 600);
+  line-height: var(--section-heading-leading, 1.08);
+  letter-spacing: var(--section-heading-tracking, -.045em);
+  text-align: center;
+  text-wrap: balance;
+}
+.vm-faq details { border-bottom: 1px solid #ffffff1c; }
+.vm-faq details:first-child { border-top: 1px solid #ffffff1c; }
+.vm-faq summary {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  min-height: 73px;
+  padding: 22px 2px;
+  list-style: none;
+  cursor: pointer;
+  font-size: 18px;
+  font-weight: 400;
+  line-height: 1.5;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.vm-faq summary::-webkit-details-marker { display: none; }
+.vm-faq summary::after {
+  content: "";
+  width: 12px;
+  height: 12px;
+  flex: 0 0 12px;
+  margin-right: 4px;
+  background: linear-gradient(currentColor, currentColor) center / 12px 1px no-repeat,
+              linear-gradient(currentColor, currentColor) center / 1px 12px no-repeat;
+  color: #9da7a0;
+}
+.vm-faq details[open] summary { color: #a2cfb4; }
+.vm-faq details[open] summary::after {
+  color: #a2cfb4;
+  background: linear-gradient(currentColor, currentColor) center / 12px 1px no-repeat;
+}
+.vm-faq summary:hover { color: #a2cfb4; }
+.vm-faq summary:focus-visible { outline: 2px solid #a2cfb4; outline-offset: 5px; border-radius: 2px; }
+.vm-faq__answer { max-width: 71ch; padding: 0 38px 25px 2px; color: #b1b9b2; font-size: 16px; line-height: 1.65; }
+.vm-faq__answer p { margin: 0; max-width: none; }
+.vm-faq__answer p + p { margin-top: 12px; }
+/* Animate the native content wrapper so closing and grouped answers slide too.
+   Keep the summary outside the clip, including its keyboard focus outline. */
+@supports selector(details::details-content) and (transition-behavior: allow-discrete) {
+  @media (prefers-reduced-motion: no-preference) {
+    .vm-faq details::details-content {
+      display: grid;
+      grid-template-rows: 0fr;
+      overflow: clip;
+      transition: grid-template-rows 260ms cubic-bezier(.4, 0, .2, 1),
+                  content-visibility 260ms allow-discrete;
+    }
+    .vm-faq details[open]::details-content { grid-template-rows: 1fr; }
+    .vm-faq__answer { min-height: 0; overflow: clip; padding-bottom: 0; }
+    .vm-faq__answer > p:last-child { padding-bottom: 25px; }
+  }
+}
+@media (max-width: 600px) {
+  .vm-faq { padding-block: 64px calc(var(--faq-fade-height) + 24px); }
+  .vm-faq h2 { margin-bottom: 36px; }
+  .vm-faq summary { min-height: 72px; font-size: 17px; gap: 20px; padding-block: 20px; }
+  .vm-faq__answer { padding-right: 20px; }
+}
+@media (forced-colors: active) {
+  .vm-faq details { border-color: CanvasText; }
+  .vm-faq summary::after { content: "+"; background: none; color: ButtonText; width: auto; height: auto; }
+  .vm-faq details[open] summary::after { content: "−"; background: none; color: ButtonText; }
+  .vm-faq summary:focus-visible { outline-color: Highlight; }
+}

@@ -15,7 +15,7 @@ internal static class WhatsNewVerification
     {
         string root = Path.Combine(Path.GetTempPath(), "VineMix-whats-new-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
-        const string old = "0.3.0-beta.1", current = "0.3.0-beta.5";
+        const string old = "0.3.0-beta.1", current = "0.3.0-beta.5", latest = "0.4.0-beta";
         try
         {
             string path = Path.Combine(root, "updates", "whats-new.json");
@@ -37,7 +37,24 @@ internal static class WhatsNewVerification
             updated.Dismiss(old);
             require(updated.Progress.LastSeenReleaseVersion == current && !updated.Pending(old, true),
                 "Opening an older release never lowers the watermark or prompts on downgrade.");
-            require(updated.Pending("0.3.0-beta.6", true), "A subsequent Beta 6 compares newer than Beta 5.");
+            require(updated.Pending(latest, true), "A subsequent 0.4.0 Beta compares newer than Beta 5.");
+            var latestHighlights = WhatsNewContent.Since(current, latest);
+            require(latestHighlights.Count > 0 && latestHighlights.All(item => item.Version == latest)
+                && latestHighlights.All(item => !string.IsNullOrWhiteSpace(item.Title) && !string.IsNullOrWhiteSpace(item.Description)
+                    && !item.Description.Contains("http", StringComparison.OrdinalIgnoreCase)),
+                "Updating from Beta 5 includes only the bundled 0.4.0 Beta highlights, with complete plain-text titles and descriptions.");
+            require(highlights.All(item => item.Version != latest)
+                && WhatsNewContent.Since(old, latest).SequenceEqual(highlights.Concat(latestHighlights))
+                && WhatsNewContent.Since(latest, latest).Count == 0 && WhatsNewContent.Since(latest, current).Count == 0,
+                "0.4.0 Beta preserves historical release cutoffs, includes skipped highlights in order and adds none for the same or an older release.");
+            updated.Dismiss(latest);
+            var seenLatest = new WhatsNewState(path);
+            require(seenLatest.PreviousVersion == latest && !seenLatest.Pending(latest, true)
+                && seenLatest.Pending("0.4.1-beta", true),
+                "Dismissing 0.4.0 Beta persists its watermark while a later 0.4.1 Beta remains eligible for a notice.");
+            seenLatest.Dismiss(current);
+            require(new WhatsNewState(path).PreviousVersion == latest && !seenLatest.Pending(current, true),
+                "Reopening Beta 5 cannot roll back a saved 0.4.0 Beta dismissal or show a downgrade notice.");
             string legacy = Path.Combine(root, "legacy", "whats-new.json");
             require(new WhatsNewState(legacy).Pending(current, true) && !new WhatsNewState(legacy).Pending(current, false),
                 "An existing pre-feature workspace gets one transition notice; a fresh workspace does not.");
@@ -63,7 +80,7 @@ internal static class WhatsNewVerification
             && !Ready(captured: true) && !Ready(other: true),
             "Automatic highlights defer background/tray, inactive/minimized windows, health or quit preparation, pending edits, numeric entry, gestures, capture and other dialogs.");
         int closed = 0;
-        var content = MainWindow.CreateWhatsNewContent(WhatsNewContent.Since(old, current), () => closed++);
+        var content = MainWindow.CreateWhatsNewContent(WhatsNewContent.Since(old, latest), () => closed++);
         var surface = new Border { Width = 580, Height = 560, Child = content };
         surface.SetResourceReference(Border.BackgroundProperty, "ConsoleWindowBrush");
         surface.SetResourceReference(TextBlock.ForegroundProperty, "ConsoleTextBrush");
@@ -79,19 +96,24 @@ internal static class WhatsNewVerification
         }
         Descendants<Button>(surface).Single().RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         require(closed == 1 && Descendants<TextBlock>(surface).All(block => block.TextWrapping == TextWrapping.Wrap)
+            && Equals(Descendants<Button>(surface).Single().Content, "Close")
+            && Descendants<Button>(surface).Single().HorizontalAlignment == HorizontalAlignment.Left
             && Descendants<ScrollViewer>(surface).Single().VerticalScrollBarVisibility == ScrollBarVisibility.Auto
             && PresentationSource.FromVisual(surface) is null,
-            "Actual curated text wraps in a scrollable detached surface; dismissal is callable without a window or audio changes.");
+            "Curated highlights wrap and scroll above the same quiet Close action as Updates, without the Back to workspace button.");
         int opened = 0, aboutOpened = 0, helpOpened = 0;
         using var mixer = new MixerViewModel(preview: true);
         var settings = MainWindow.CreateSettingsMenu(mixer, showHelp: () => helpOpened++, showAbout: () => aboutOpened++,
             showWhatsNew: () => opened++);
         var whatsNew = settings.Items.OfType<MenuItem>().Single(item => Equals(item.Header, "What's new?"));
         var about = settings.Items.OfType<MenuItem>().Single(item => Equals(item.Header, "About VineMix"));
-        require(settings.Items.IndexOf(about) == settings.Items.IndexOf(whatsNew) + 1
+        var helpItem = settings.Items.OfType<MenuItem>().Single(item => Equals(item.Header, "Help & shortcuts"));
+        require(settings.Items.IndexOf(whatsNew) == settings.Items.IndexOf(helpItem) + 1
+            && settings.Items.IndexOf(about) == settings.Items.IndexOf(whatsNew) + 1
+            && settings.Items[settings.Items.IndexOf(about) + 1] is Separator
             && AutomationProperties.GetName(whatsNew) == "What's new?"
             && AutomationProperties.GetHelpText(whatsNew) == "Read the bundled release highlights.",
-            "Settings places the accessible What's new? action immediately above About VineMix.");
+            "Settings groups Help, What's new? and About together, with a separator before Quit.");
         whatsNew.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
         require(opened == 1 && aboutOpened == 0 && helpOpened == 0 && !settings.IsOpen && PresentationSource.FromVisual(settings) is null,
             "The real detached Settings What's new? action invokes its own callback once without opening Help, About or a native popup.");

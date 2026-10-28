@@ -2,7 +2,7 @@
 
 One Windows 11 x64 setup contains the self-contained VineMix app, its read-only
 setup helper and both complete original driver packages. It requires acceptance
-of [TERMS.txt](TERMS.txt); optional driver installation also requires consent to
+of [TERMS.txt](TERMS.txt); driver installation also requires consent to
 the vendor terms. This is the current free, non-commercial distribution. Future
 monetisation and signing are separate release decisions.
 
@@ -41,12 +41,15 @@ development settings, research artifacts and build tools are excluded.
 Default application directory: `%LOCALAPPDATA%\Programs\VineMix`.
 Existing saved data: `%LOCALAPPDATA%\VineMix`.
 
-The optional-audio page leads with an application-only path: leave both driver
-boxes clear and choose Next. Both start unchecked on fresh install and upgrade;
-driver detection never opts the user in. Choosing a missing driver shows a
-separate vendor-terms page. Returning and changing the selection clears the
-previous driver consent. Existing microphone/headphone routes and Virtual
-Desktop microphone input do not require either bundled cable.
+The virtual-audio page selects both missing eligible drivers by default on
+interactive fresh install and upgrade. VB-CABLE is required for Virtual input;
+a compatible VAC driver is required for Virtual output, with VAC Lite bundled.
+The user can clear either selection. A separate vendor-terms page requires
+explicit acceptance; preselection never accepts those terms. Returning and
+changing the selection clears the previous driver consent. Existing
+microphone/headphone routes and Virtual Desktop microphone input do not require
+either bundled cable. Existing or uncertain driver installations are disabled
+and unselected, preserving them without an automatic reinstall.
 
 Setup is per-user. It requests administrator rights only when the user chooses
 a missing driver, using that vendor's original installer. Existing driver names,
@@ -73,10 +76,12 @@ Application-only unattended setup requires explicit terms acknowledgement:
 .\VineMix-0.3.0-beta.3-Setup-x64.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /ACCEPTTERMS=1 /DRIVERS=none
 ```
 
-Driver installation is interactive only. Vendor windows and Windows elevation
-prompts remain visible and user-controlled. After installing a driver, Setup
-requests a restart and suppresses application launch. Cancelling a driver leaves
-the app installed, with the driver result explained; re-run Setup to retry.
+Selected drivers install in the order **VAC Lite, then VB-CABLE**. Setup explains
+that any restart must wait until VineMix Setup finishes. Windows elevation and
+vendor consent remain explicit. VB-CABLE requires a restart; VAC normally does
+not, although its installer can report one. Setup suppresses application launch
+while a restart is pending. Cancelling a driver leaves the app installed, with
+the driver result explained; re-run Setup to retry.
 
 ## Verification
 
@@ -89,9 +94,11 @@ a new isolated target and a distinct test AppId, with `/TESTMODE=1`, no icons,
 no driver execution, no startup changes and no normal app launch. It checks:
 
 - Silent setup rejects missing explicit terms acceptance.
-- Optional drivers and their consent start unchecked; measured hidden wizard
-  text/control bounds fit on both pages. This is geometry evidence, not a visual
-  check of the interactive wizard or its keyboard/screen-reader behavior.
+- Missing drivers start selected in interactive policy fixtures; installed,
+  uncertain, unattended and test-mode choices remain unselected. Vendor terms
+  start unaccepted. Measured hidden wizard text/control bounds fit on both
+  pages. This is geometry evidence, not a visual check of interactive wizard
+  keyboard/screen-reader behavior.
 - A harmless waiting fixture called VineMix.exe inside the target prevents
   replacement; it exits cooperatively without audio, shared settings or engine IPC.
 - Install and same-version repair preserve exact packaged bytes and user files.

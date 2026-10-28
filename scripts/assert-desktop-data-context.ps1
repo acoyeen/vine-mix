@@ -53,6 +53,28 @@ function Assert-DesktopDataContext([string]$SettingsPath) {
     }
 }
 
+function Test-DesktopControllerCandidate($Process, [string]$ExpectedPath, [int]$Session, [DateTime]$Started) {
+    try {
+        $Process.Refresh()
+        if ($Process.HasExited) { return $false }
+        if ($Process.Path -ine $ExpectedPath -or $Process.SessionId -ne $Session -or
+            $Process.StartTime.ToUniversalTime() -lt $Started) {
+            # The normalization launcher can exit between HasExited and Path.
+            # PowerShell's Path property may then return null without throwing.
+            # Only an exited process may be skipped; a live mismatch still fails.
+            $Process.Refresh()
+            if ($Process.HasExited) { return $false }
+            throw 'An unexpected controller instance appeared while reopening the application.'
+        }
+        return $true
+    } catch [System.ComponentModel.Win32Exception], [InvalidOperationException] {
+        $exited = $false
+        try { $Process.Refresh(); $exited = $Process.HasExited } catch { }
+        if ($exited) { return $false }
+        throw 'A running controller could not be identified safely while reopening the application.'
+    }
+}
+
 function Start-DesktopController {
     [CmdletBinding()]
     param(
@@ -101,22 +123,7 @@ function Start-DesktopController {
             try {
                 $live = @()
                 foreach ($process in $candidates) {
-                    try {
-                        $process.Refresh()
-                        if ($process.HasExited) { continue }
-                        if ($process.Path -ine $expected -or $process.SessionId -ne $session -or
-                            $process.StartTime.ToUniversalTime() -lt $started) {
-                            throw 'An unexpected controller instance appeared while reopening the application.'
-                        }
-                        $live += $process
-                    } catch [System.ComponentModel.Win32Exception], [InvalidOperationException] {
-                        # A short-lived launcher may exit while its properties
-                        # are inspected. Never attach to an unverified process.
-                        $exited = $false
-                        try { $process.Refresh(); $exited = $process.HasExited } catch { }
-                        if ($exited) { continue }
-                        throw 'A running controller could not be identified safely while reopening the application.'
-                    }
+                    if (Test-DesktopControllerCandidate $process $expected $session $started) { $live += $process }
                 }
                 if ($live.Count -eq 1) {
                     $process = $live[0]

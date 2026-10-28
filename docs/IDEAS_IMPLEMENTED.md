@@ -20,6 +20,138 @@ Return to the [active ideas log](IDEAS.md).
 - [IDEA-019: Denoiser dropdown delay labels](#idea-019)
 - [IDEA-020: Post-update What's new](#idea-020)
 - [IDEA-021: Save recovery before quitting](#idea-021)
+- [IDEA-023: Named organizational groups with automatic bounds](#idea-023)
+- [IDEA-049: Cumulative website node story](#idea-049)
+
+<a id="idea-023"></a>
+## IDEA-023: Named organizational groups with automatic bounds
+
+- **Captured:** 2026-10-23. **Clarified and implementation authorized:**
+  2026-10-28. **Original priority:** P2. **Status:** Implemented and locally
+  integrated into the installed Beta 6 app on 2026-10-28. Beta 6 remains in
+  development; this does not finalize, publish or replace any release.
+- **Maintainer request and rationale:** Select an area or a set of nodes, then
+  right-click to group them in a named frame that makes a busy workspace easier
+  to read. The 28 October clarification explicitly authorized implementation:
+  groups are purely organizational, have no inputs or outputs, and do not change
+  sound, routing or node identity. Moving the group moves every member together.
+- **Required behavior:** Bounds automatically follow member positions and sizes.
+  Names can be changed and remain readable while zoomed out. Colors come from a
+  small designed palette rather than a color wheel. Frames, titles, menus and
+  editing must fit the existing interface and leave nodes, cables, sockets,
+  selection and warnings legible.
+- **Implemented controls:** **Group selected nodes** or **Ctrl+G** creates a
+  frame; its title moves the members. Double-click the title or select the frame
+  and press **F2** to rename. Enter or loss of focus commits; Escape cancels.
+  The palette is Sage, Teal, Blue, Violet, Rose, Amber and Slate. Titles retain
+  at least 15 screen DIPs at 30% zoom. **Ungroup (keep nodes)** removes only the
+  frame; Delete has that same effect when the frame is selected. Fit, Home and
+  Frame selection include complete groups' headings. The first implementation
+  left frame interiors transparent to ordinary canvas selection and navigation;
+  the later refinement below supersedes that input choice.
+- **Membership and copying decisions:** One group per node and no nested groups.
+  Membership is explicit through **Add to group** and **Remove from group**;
+  moving a member beyond the current frame expands the frame rather than
+  removing membership. Creating a new group transfers the selected members
+  from their previous groups. Empty groups disappear. Copying every member
+  preserves the frame's name and color around the pasted copies with new IDs;
+  partial copies contain only those nodes. These choices resolve the original
+  proposal's open membership, movement, copy and nesting questions.
+- **Scope, dependencies and tradeoffs:** Extends existing selection, shared node
+  movement, history and clipboard paths. Group creation, names, colors,
+  membership, ungrouping and movement support Undo/Redo. The layout lock blocks
+  group edits while selection and copying remain available. Presentation and
+  membership are saved in desktop workspace preferences, separately from the
+  engine's configuration; frames never become processing objects. A one-node
+  group dragged across a cable does not insert or detach its member. Local
+  source inspection informed the implementation; no external feasibility
+  research was needed. No additional dependency or audio-engine change was
+  required.
+- **Verification and integration (2026-10-28):** The final detached suite passed
+  13,491 checks with 272 renders and zero binding errors. Real pointer/keyboard
+  checks in an isolated preview covered box selection and right-click creation,
+  double-click rename and Enter, whole-group movement, the color menu and Violet,
+  empty frame-body interaction, member movement with automatic bounds, and title
+  readability at 30% zoom. Guarded UI-only activation passed against the installed
+  app, preserving the running engine and settings/preferences and verifying an
+  actual Explorer shortcut launch. Details and limits are recorded in
+  [Beta 6 development](BETA6_DEVELOPMENT.md#named-organizational-groups--28-october-2026),
+  separately from published release qualification.
+- **Follow-up requested 2026-10-28:** Brighter, more saturated, less transparent
+  colors, selection/movement from exposed group backgrounds and shorter hover
+  help are tracked in [TWEAK-017](TWEAKS.md#tweak-017). This supersedes the original
+  faint tint and heading-only group interaction; modifier-assisted box selection
+  remains available within frames. The overlapping-node selection defect is
+  separate [ISSUE-022](KNOWN_ISSUES.md#issue-022). Both refinements are implemented
+  and locally integrated; their detached checks, render review and guarded
+  activation are recorded in the
+  [follow-up evidence](BETA6_DEVELOPMENT.md#group-refinements-and-node-stacking--28-october-2026).
+  Real-pointer checks of these changes were not completed; the original feature's
+  pointer checks above do not qualify the refined interaction.
+- **Later extensions:** Canvas notes and reusable subgraphs/exposed controls stay
+  P4 possibilities; neither is required for organizational frames. Groups are
+  not automatically saved presets (IDEA-022).
+- **Next step:** Continue everyday testing in the installed Beta 6 app; qualify
+  the final source and binaries together when the maintainer explicitly
+  finalizes Beta 6.
+
+<a id="idea-049"></a>
+## IDEA-049: Cumulative website node story
+
+- **Captured and implementation authorized:** 2026-10-25. **Status:** Implemented
+  locally in `website-redesign`, with final local browser verification complete.
+  Maintainer review remains; no public deployment or desktop release is implied.
+- **Need and rationale:** Visitors should follow one evolving audio system as
+  they scroll. Starting at “See where your sound goes,” the nodes stay in view
+  while headings and routes adapt. The maintainer specifically requested room
+  between nodes because the preceding lower ducking illustration had crossing,
+  crowded cables.
+- **Original request:** Begin with the simple three-node setup; insert a
+  Low / Mid / High effect smoothly when the heading introduces effects, optionally
+  changing its values with scroll; then introduce ducking and adapt the routing.
+  The maintainer explicitly requested the cleanup first, followed by a goal to
+  implement and locally host this direction.
+- **Retained corrections:** The story must be cumulative: keep both the tone
+  node and Listening output when ducking is added. Use actual native node artwork,
+  replacing the initial compact HTML interpretation. Remove the extra Connect /
+  Shape / Duck buttons, visible illustrative disclaimer and Keep exploring link;
+  retain the thin progress line. Remove the unnecessary Mix node: the shared
+  output combines the separate audible voice and ducked-music connections.
+  A subsequent correction keeps Listening output muted and Virtual output
+  unmuted, with silent simulated meters that continue moving while the scene is
+  visible rather than only when the visitor scrolls.
+- **Current behavior:** Three nodes become four with tone, then six with Running
+  app and Ducking. Physical input → Low / Mid / High still feeds Listening output
+  and Virtual output. Tone also feeds Ducking's detector, while Running app →
+  Ducking feeds Virtual output separately. Nine native tone frames blend from
+  zero to +3 / −2 / +2 dB. Headings change in place and reverse scrolling retraces
+  the same layout. Native artwork uses neutral example devices without live audio.
+  Physical input, Running app and Virtual output meter strips show smoothly
+  varying synthetic levels at up to 24 fps. Listening output retains its original
+  muted image without an overlay. One animation loop stops offscreen, when the
+  page is inactive, or under pause, reduced motion and high contrast.
+- **Scope, dependencies and tradeoffs:** Website markup, styles, native image
+  assets, deterministic layout and the existing shared motion controller only.
+  The approved opening remains. Small/short windows, reduced motion, high contrast
+  and no JavaScript show the three chapters as readable static route diagrams.
+  This sacrifices pinned motion where it would compromise legibility. The final
+  headphone route remains connected but muted; the music application's original
+  headphone playback continues, avoiding duplicate captured-music monitoring. No new
+  application capability, driver installation or public hosting change is needed.
+- **Evidence and research:** Local inspection on 2026-10-25 of the website,
+  `docs/USER_GUIDE.md` and native node definitions informed routing and control
+  ranges. The detector is not an audible voice path. No new external design or
+  usability research was performed. Geometric checks sampled 1,001 scroll
+  positions and 155,456 cable segments; browser evidence and limits belong in
+  [website QA](../website-redesign/QA.md), not inferred from those code checks.
+  A browser sample observed 12 distinct meter states over 1.6 seconds while
+  stationary and confirmed the displayed output mute states. This verifies visual
+  motion only, not live audio processing.
+- **Next step:** Review the verified local result; current evidence is in
+  [scroll QA](../website-redesign/SCROLL_QA.md).
+  [Website README](../website-redesign/README.md) and the
+  [cleanup baseline](../website-redesign/CLEANUP.md) document the implementation.
+  Publication remains separate.
 
 ## IDEA-007: Static and Dynamic modes in the Ducking node
 

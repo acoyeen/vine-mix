@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 
 namespace VineMix.Desktop;
@@ -57,5 +58,63 @@ internal static class WorkspaceChromeVerification
         search.Text = "";
         require(groups.All(g => g.Visibility == Visibility.Visible), "Clearing search restores all category submenus.");
         require(workspace.CreateHistoryMenu().Items.OfType<MenuItem>().Any(i => Equals(i.Header, mixer.EditHistory.Entries[0].Description)), "Activity menu retains the workspace edit descriptions.");
+        int activityOpened = 0;
+        long beforeActivity = mixer.ConfigurationPresentationCount;
+        var settings = MainWindow.CreateSettingsMenu(mixer, showActivity: () => activityOpened++);
+        var activity = settings.Items.OfType<MenuItem>().Single(item => Equals(item.Header, "Activity"));
+        var find = settings.Items.OfType<MenuItem>().Single(item => Equals(item.Header, "Find node…"));
+        activity.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+        require(settings.Items.IndexOf(activity) == settings.Items.IndexOf(find) + 1
+            && AutomationProperties.GetName(activity) == "Activity" && activityOpened == 1 && !settings.IsOpen
+            && mixer.ConfigurationPresentationCount == beforeActivity,
+            "Settings groups Activity with Find node; its action closes Settings and opens only session history without editing the workspace.");
+
+        var notifications = settings.Items.OfType<MenuItem>().Single(item => Equals(item.Header, "Show action notifications"));
+        require(notifications.IsCheckable && notifications.IsChecked && mixer.ShowActionNotifications,
+            "Settings exposes action notifications as a checked preference by default.");
+        string graphBefore = System.Text.Json.JsonSerializer.Serialize(mixer.GraphConfig, Protocol.Json);
+        int historyBefore = mixer.EditHistory.Entries.Count;
+        string saveBefore = mixer.SaveStatus;
+        workspace.SetMessage("Notification preference example.");
+        notifications.IsChecked = false;
+        await layout();
+        require(!mixer.ShowActionNotifications && !workspace.HasFeedback && !workspace.FeedbackCountdownTimerRunning
+            && !workspace.FeedbackCountdownAnimationActive && workspace.CountdownElement.Visibility == Visibility.Hidden,
+            "Turning off notifications through Settings immediately dismisses a routine message and stops its timer and animation.");
+        workspace.SetMessage("Hidden action retained in Activity.");
+        require(!workspace.HasFeedback && workspace.FeedbackText.Length == 0 && !workspace.FeedbackCountdownTimerRunning
+            && workspace.CreateHistoryMenu().Items.OfType<MenuItem>().Any(item => item.Header is TextBlock text && text.Text == "Hidden action retained in Activity."),
+            "Suppressed messages do not occupy the footer or start a timer, but Activity retains the latest message.");
+        workspace.SetMessage("Example save failure.", isError: true);
+        await layout();
+        require(workspace.HasFeedback && workspace.FeedbackText == "Attention: Example save failure." && workspace.FeedbackCountdownTimerRunning,
+            "Errors remain visible with their normal dismissal behavior when action notifications are off.");
+        workspace.SetMessage("Another hidden action.");
+        require(workspace.FeedbackText == "Attention: Example save failure.",
+            "A suppressed routine message does not overwrite an error already on screen.");
+        notifications.IsChecked = true; notifications.IsChecked = false;
+        await layout();
+        require(workspace.HasFeedback && workspace.FeedbackText == "Attention: Example save failure.",
+            "Changing the notification preference never dismisses an active error.");
+        using (var restored = new MixerViewModel(preview: true))
+        {
+            restored.LoadUiPreferencesJson(mixer.SerializeUiPreferences());
+            require(!restored.ShowActionNotifications, "The disabled notification preference survives serialization and reload.");
+            restored.LoadUiPreferencesJson("{\"rightClickDragToPan\":true}");
+            require(restored.ShowActionNotifications && restored.RightClickDragToPan,
+                "Older preferences retain their settings and default action notifications to on.");
+        }
+        workspace.DismissMessage();
+        notifications.IsChecked = true;
+        await layout();
+        require(mixer.ShowActionNotifications && !workspace.HasFeedback,
+            "Re-enabling notifications does not replay previously hidden messages.");
+        workspace.SetMessage("New visible action.");
+        require(workspace.HasFeedback && workspace.FeedbackText == "New visible action." && workspace.FeedbackCountdownTimerRunning,
+            "New routine messages resume their countdown after re-enabling notifications.");
+        require(mixer.ConfigurationPresentationCount == beforeActivity && mixer.EditHistory.Entries.Count == historyBefore
+            && mixer.SaveStatus == saveBefore && System.Text.Json.JsonSerializer.Serialize(mixer.GraphConfig, Protocol.Json) == graphBefore,
+            "Notification preferences and messages do not edit routing, save status or graph history.");
+        workspace.DismissMessage();
     }
 }

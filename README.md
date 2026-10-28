@@ -4,14 +4,14 @@ VineMix is an audio mixer for **Windows 11 x64**. Connect a microphone or an app
 headphones and a virtual microphone by drawing cables between nodes. Add effects
 when you need them; each output has its own level and mute.
 
-**0.3.0 · Beta 5** is an MIT-licensed open-source beta.
-Download the [Windows installer](https://github.com/acoyeen/vine-mix/releases/download/v0.3.0-beta.5/VineMix-0.3.0-beta.5-Setup-x64.exe)
-or [standalone EXE](https://github.com/acoyeen/vine-mix/releases/download/v0.3.0-beta.5/VineMix-0.3.0-beta.5-Standalone-x64.exe).
-The [release page](https://github.com/acoyeen/vine-mix/releases/tag/v0.3.0-beta.5)
+**0.4.0 · Beta** is an MIT-licensed open-source beta.
+Download the [Windows installer](https://github.com/acoyeen/vine-mix/releases/download/v0.4.0-beta/VineMix-0.4.0-beta-Setup-x64.exe)
+or [standalone EXE](https://github.com/acoyeen/vine-mix/releases/download/v0.4.0-beta/VineMix-0.4.0-beta-Standalone-x64.exe).
+The [release page](https://github.com/acoyeen/vine-mix/releases/tag/v0.4.0-beta)
 includes checksums, matching source and release notes.
-Beta 5 corrects update-package metadata, improves automatic checks and simplifies
-the update window; see the [release notes](docs/releases/0.3.0-beta.5.md).
-See [the current qualification results](docs/BETA_TESTING_CURRENT.md),
+0.4.0 Beta adds named groups, stereo mixing tools, clearer Level controls and
+offline credits; see the [release notes](docs/releases/0.4.0-beta.md).
+See [the current qualification results](docs/RELEASE_0.4.0_QUALIFICATION.md),
 [the beta test guide](docs/BETA_TESTER_GUIDE.md) and [testing status](TESTING.md)
 for current limitations.
 
@@ -25,8 +25,8 @@ The screenshot uses a silent, simulated workspace. “Example USB Microphone” 
 Choose a download from the release page:
 
 - **Setup** installs VineMix and shortcuts for your Windows account. It can offer
-  optional virtual audio drivers when missing. Both driver boxes start clear;
-  install the app first unless you need those routing features. Accept their
+  optional virtual audio drivers when missing. Missing eligible drivers start
+  selected; clear them if you do not need virtual routes. Accept their
   separate terms only if they fit your use.
 - **Standalone EXE** needs no app installation. Open the supplied EXE in File
   Explorer; its bundled app files are prepared automatically. Install optional
@@ -86,6 +86,8 @@ not change driver terms. Driver information was checked on 21 October 2026.
   quitting or explicitly quit without saving.
 - **Settings → What's new?** reopens bundled release highlights. After an
   update, they appear once when the workspace is ready and you are not editing.
+- Select nodes and press **Ctrl+G** to group them; **F2** renames a group.
+  **About VineMix → Credits and licences** opens the project notices offline.
 - Red device text means a selected device is unavailable. Reconnect it, check
   Windows sound settings, then use **Settings → Retry assigned devices**.
   **Restart audio engine** briefly interrupts audio and reconnects saved routes.
@@ -97,9 +99,9 @@ not change driver terms. Driver information was checked on 21 October 2026.
   they never install without your choice. If checking fails, retry later or use
   the GitHub release page for a manual update.
   **Upgrading from Beta 2–4:** older packages have an update metadata defect.
-  For a dependable recovery, use **Quit VineMix**, then run Beta 5 Setup against
+  For a dependable recovery, use **Quit VineMix**, then run 0.4.0 Beta Setup against
   the existing installation without uninstalling. Standalone users should quit
-  and replace their launcher with the Beta 5 standalone EXE. Beta 3 and Beta 4
+  and replace their launcher with the 0.4.0 Beta standalone EXE. Beta 3 and Beta 4
   are not required intermediate steps. See the
   [update investigation](docs/UPDATE_INVESTIGATION_2026-10-24.md).
 
@@ -118,15 +120,28 @@ backup or Start fresh while preserving originals. See
 - [Device visibility and recovery](docs/DEVICE_VISIBILITY.md)
 - [Effects and limitations](docs/EFFECTS_RESEARCH.md)
 - [Development ideas](docs/IDEAS.md)
+- [0.4.0 Beta release plan](docs/RELEASE_0.4.0_BETA.md)
 - [Known issues](docs/KNOWN_ISSUES.md)
+- [UI and behaviour tweaks](docs/TWEAKS.md)
 - [Changelog](CHANGELOG.md), [testing](TESTING.md) and [contributing](CONTRIBUTING.md)
 - [Third-party credits](THIRD_PARTY_NOTICES.md) and [distribution conditions](docs/DISTRIBUTION.md)
 
-VineMix supports up to 32 nodes and 96 connections, including 24 node types in
-the creation menu. Processing stays local. Per-app capture copies an app's
+VineMix supports up to 32 nodes and 96 connections. The local Beta 6 development
+build offers 30 node types, including six new mixing utilities; the published
+Beta 5 offers 24. Processing stays local. Per-app capture copies an app's
 playback; its original playback remains audible. Parallel paths have no automatic
 latency compensation. The limiter handles sample peaks without lookahead or
 true-peak detection. Audible recovery and long sessions still need qualification.
+
+## Forks and attribution
+
+Forks and modified versions are welcome. Preserve the full [MIT licence notice](LICENSE),
+which credits acoyeen and identifies VineMix and its website. Please also include
+**"Based on VineMix by acoyeen"** in your About, Credits or Licences screen,
+linking to [vinemix.app](https://vinemix.app) or the
+[original repository](https://github.com/acoyeen/vine-mix).
+See [Crediting VineMix](ATTRIBUTION.md) for the required notices, requested
+in-program acknowledgement and guidance for earlier versions.
 
 ## Build from source
 

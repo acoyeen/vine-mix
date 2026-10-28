@@ -52,14 +52,14 @@ internal static class BrandingVerification
         var brandParent = VisualTreeHelper.GetParent(mark);
         require(brandParent is not null && !Descendants<TextBlock>(brandParent).Any(text => text.Text == "VineMix"),
             "The application header uses the vector wordmark without an extra font-rendered product label.");
-        var accentArtwork = (GeometryGroup)BrandWordmark.AccentGeometry;
-        var inkArtwork = (GeometryGroup)BrandWordmark.InkGeometry;
-        require(accentArtwork.Children.Count == 6 && inkArtwork.Children.Count == 5
-            && accentArtwork.Children[2].Bounds.Top == accentArtwork.Children[1].Bounds.Top
-            && inkArtwork.Children[2].Bounds.Top == inkArtwork.Children[1].Bounds.Top
-            && accentArtwork.Children[2].Bounds.Width == accentArtwork.Children[3].Bounds.Width
-            && inkArtwork.Children[2].Bounds.Width == inkArtwork.Children[3].Bounds.Width
-            && accentArtwork.Children[3].Bounds.Top == 318 && inkArtwork.Children[3].Bounds.Top == 318,
+        var vineArtwork = (GeometryGroup)BrandWordmark.VineGeometry;
+        var mixArtwork = (GeometryGroup)BrandWordmark.MixGeometry;
+        require(vineArtwork.Children.Count == 6 && mixArtwork.Children.Count == 5
+            && vineArtwork.Children[2].Bounds.Top == vineArtwork.Children[1].Bounds.Top
+            && mixArtwork.Children[2].Bounds.Top == mixArtwork.Children[1].Bounds.Top
+            && vineArtwork.Children[2].Bounds.Width == vineArtwork.Children[3].Bounds.Width
+            && mixArtwork.Children[2].Bounds.Width == mixArtwork.Children[3].Bounds.Width
+            && vineArtwork.Children[3].Bounds.Top == 318 && mixArtwork.Children[3].Bounds.Top == 318,
             "The packaged wide vector retains full-width i dots aligned to the capitals and the shortened i stems.");
         require(window.Icon is BitmapSource { PixelWidth: > 0, PixelHeight: > 0 },
             "The real main window has a decoded application icon rather than a generic Windows icon.");
@@ -105,6 +105,11 @@ internal static class BrandingVerification
             && Contrast(outlineBrush.Color, fill.Color) >= 3,
             "The actual unchecked checkbox template has a visible outline with at least 3:1 contrast against its fill.");
 
+        var symbol = new BrandMark();
+        // Application resource invalidation visits logical Window trees. Keep
+        // this symbol in a never-shown owner, like the main detached workspace,
+        // so the same instance receives each ordinary theme change notification.
+        var symbolOwner = new Window { Content = symbol };
         bool? previousHighContrast = ConsoleTheme.PreviewHighContrast;
         try
         {
@@ -114,16 +119,15 @@ internal static class BrandingVerification
             var pieces = FilledGeometry(mark).ToArray();
             require(pieces.Length == 2 && pieces.All(piece => !piece.Geometry.Bounds.IsEmpty && piece.Geometry.GetArea() > 1)
                 && Geometry.Combine(pieces[0].Geometry, pieces[1].Geometry, GeometryCombineMode.Intersect, null).GetArea() < .01,
-                "The wide logo draws two non-overlapping vector colour groups, retaining the split symbol and outlined lettering.");
-            require(pieces.Any(piece => SameBrush(piece.Brush, ConsoleTheme.Get("BrandAccentBrush")))
-                && pieces.Any(piece => SameBrush(piece.Brush, ConsoleTheme.Get("ConsoleTextBrush"))),
-                "The actual split logo draws the forest-green V and light M from live palette resources.");
+                "The wide logo retains its two non-overlapping vector groups, split symbol and outlined lettering.");
+            CheckMonochromeArtwork(mark, ConsoleTheme.Get("ConsoleTextBrush"), "Normal wordmark", require);
+            CheckDetachedSymbol(symbol, ConsoleTheme.Get("ConsoleTextBrush"), "Normal symbol", require);
 
             ConsoleTheme.SetPreviewHighContrast(true); await layout();
             Paint(root);
             require(SameBrush(ConsoleTheme.Get("BrandActionBrush"), SystemColors.HighlightBrush)
                 && SameBrush(ConsoleTheme.Get("BrandActionTextBrush"), SystemColors.HighlightTextBrush)
-                && SameBrush(ConsoleTheme.Get("BrandAccentBrush"), SystemColors.WindowTextBrush),
+                && SameBrush(ConsoleTheme.Get("ConsoleTextBrush"), SystemColors.WindowTextBrush),
                 "High contrast replaces branding roles with the user's system highlight and foreground colours.");
             var highContrastPieces = FilledGeometry(mark).ToArray();
             require(highContrastPieces.Length == 2
@@ -131,19 +135,27 @@ internal static class BrandingVerification
                 && SameBrush(ConsoleTheme.Get("NodeAudioBrush"), SystemColors.WindowTextBrush)
                 && SameBrush(ConsoleTheme.Get("NodeSidechainBrush"), SystemColors.WindowTextBrush),
                 "The rendered logo and both route roles respond to high contrast without retaining fixed brand colours.");
+            CheckMonochromeArtwork(mark, SystemColors.WindowTextBrush, "High-contrast wordmark", require);
+            CheckDetachedSymbol(symbol, SystemColors.WindowTextBrush, "High-contrast symbol", require);
             require(SameBrush(ConsoleTheme.Get("NodeSelectedBrush"), SystemColors.HighlightBrush)
                 && SameBrush(ConsoleTheme.Get("ConsoleFocusBrush"), SystemColors.WindowTextBrush),
                 "High contrast keeps separate system selection and keyboard-focus treatments.");
 
             ConsoleTheme.SetPreviewHighContrast(false); await layout(); Paint(root);
             CheckNormalPalette(require);
-            require(FilledGeometry(mark).Any(piece => SameBrush(piece.Brush, ConsoleTheme.Get("BrandAccentBrush"))),
-                "Leaving high contrast restores the rendered forest-green mark through dynamic resources.");
+            CheckMonochromeArtwork(mark, ConsoleTheme.Get("ConsoleTextBrush"), "Restored normal wordmark", require);
+            CheckDetachedSymbol(symbol, ConsoleTheme.Get("ConsoleTextBrush"), "Restored normal symbol", require);
+            require(!symbolOwner.IsVisible && new WindowInteropHelper(symbolOwner).Handle == IntPtr.Zero,
+                "The symbol's theme transitions use only logical window ownership and never create a native window.");
         }
         finally
         {
-            ConsoleTheme.SetPreviewHighContrast(previousHighContrast);
-            await layout();
+            try
+            {
+                ConsoleTheme.SetPreviewHighContrast(previousHighContrast);
+                await layout();
+            }
+            finally { symbolOwner.Content = null; symbolOwner.Close(); }
         }
 
         require(PresentationSource.FromVisual(root) is null && new WindowInteropHelper(window).Handle == IntPtr.Zero,
@@ -187,15 +199,14 @@ internal static class BrandingVerification
             && Colour("NodeControlBrush") != Colour("NodeAudioBrush")
             && Colour("NodeControlBrush") != Colour("NodeSidechainBrush"),
             "Audio remains green, sidechain remains lavender and control connections retain a separate colour.");
-        Color accent = Colour("BrandAccentBrush"), action = Colour("BrandActionBrush");
-        require(accent.G > accent.R && accent.G > accent.B && action.G > action.R && action.G > action.B
-            && accent != Colour("NodeAudioBrush") && action != Colour("NodeAudioBrush"),
-            "Forest-green branding has dedicated roles distinct from the established audio-cable green.");
+        Color ink = Colour("ConsoleTextBrush"), action = Colour("BrandActionBrush");
+        require(action.G > action.R && action.G > action.B && action != Colour("NodeAudioBrush"),
+            "The forest-green action remains distinct from the established audio-cable green.");
         require(Contrast(action, Colour("BrandActionTextBrush")) >= 4.5,
             "Normal-size labels on the forest-green primary action retain at least 4.5:1 contrast.");
         require(new[] { "ConsoleWindowBrush", "ConsolePanelBrush", "ConsoleHeaderBandBrush" }
-                .All(surface => Contrast(accent, Colour(surface)) >= 3),
-            "The forest-green mark and active indicators retain at least 3:1 contrast on their dark surfaces.");
+                .All(surface => Contrast(ink, Colour(surface)) >= 4.5),
+            "The monochrome foreground logo retains at least 4.5:1 contrast on the application's dark surfaces.");
         require(new[] { "ConsoleWindowBrush", "ConsolePanelBrush", "ConsoleWellBrush", "ConsoleButtonFaceBrush" }
                 .All(surface => Contrast(Colour("ConsoleTextBrush"), Colour(surface)) >= 4.5
                     && Contrast(Colour("ConsoleMutedBrush"), Colour(surface)) >= 4.5),
@@ -250,14 +261,23 @@ internal static class BrandingVerification
             int stride = checked(frame.PixelWidth * 4);
             byte[] pixels = new byte[checked(stride * frame.PixelHeight)];
             rgba.CopyPixels(pixels, stride, 0);
-            bool visible = false, transparent = false;
+            Color expectedInk = Colour("ConsoleTextBrush");
+            bool visible = false, transparent = false, opaqueInk = false, matchingInk = true;
             for (int offset = 3; offset < pixels.Length; offset += 4)
             {
                 visible |= pixels[offset] > 0;
                 transparent |= pixels[offset] == 0;
+                if (pixels[offset] == 255)
+                {
+                    opaqueInk = true;
+                    Color colour = Color.FromRgb(pixels[offset - 1], pixels[offset - 2], pixels[offset - 3]);
+                    matchingInk &= colour == expectedInk;
+                }
             }
             require(visible && transparent,
                 $"{name} {frame.PixelWidth}px contains visible artwork and transparent padding rather than an empty or opaque placeholder.");
+            require(opaqueInk && matchingInk,
+                $"{name} {frame.PixelWidth}px uses the same soft-white solid ink as the normal in-app logo.");
             int padding = Math.Max(1, frame.PixelWidth / 10);
             bool clearBackground = true;
             for (int y = 0; y < frame.PixelHeight; y++)
@@ -270,6 +290,29 @@ internal static class BrandingVerification
             require(clearBackground && clearGap,
                 $"{name} {frame.PixelWidth}px has transparent outer margins and a transparent gap between the V and M, with no background plate.");
         }
+    }
+
+    private static void CheckMonochromeArtwork(FrameworkElement artwork, Brush expectedInk, string context,
+        Action<bool, string> require)
+    {
+        var pieces = FilledGeometry(artwork).ToArray();
+        require(pieces.Length == 2 && pieces.All(piece => piece.Geometry.GetArea() > 1 && SameBrush(piece.Brush, expectedInk)),
+            context + " paints both complete vector groups in the same foreground ink without retaining a coloured logo half.");
+    }
+
+    private static void CheckDetachedSymbol(BrandMark symbol, Brush expectedInk, string context,
+        Action<bool, string> require)
+    {
+        foreach (double dpi in new[] { 96d, 144d, 192d })
+        {
+            VisualTreeHelper.SetRootDpi(symbol, new DpiScale(dpi / 96, dpi / 96));
+            MeasureDetached(symbol, symbol.Width);
+            Paint(symbol, dpi);
+            CheckMonochromeArtwork(symbol, expectedInk, $"{context} at {dpi:0} DPI", require);
+        }
+        require(PresentationSource.FromVisual(symbol) is null && !symbol.Focusable
+            && AutomationProperties.GetName(symbol) == "VineMix",
+            context + " preserves its accessible name and is checked without a native window or extra keyboard stop.");
     }
 
     private static void MeasureDetached(FrameworkElement element, double width)

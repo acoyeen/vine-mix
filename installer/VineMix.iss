@@ -99,7 +99,11 @@ var
   DetectionFile, HelperFile, DriverResults: String;
   IsTest, DetectionReady, VbInstalled, VacInstalled, VbKnown, VacKnown: Boolean;
   AppRunning, TargetRunning, ProcessesKnown, DestinationSafe, DriverRestart: Boolean;
+  DriverPolicyFixture: Boolean;
+  DriverFixtureOrder: String;
   DetectionSequence: Integer;
+
+procedure VerifyDriverPagePolicy; forward;
 
 function TestMode: Boolean;
 begin
@@ -181,17 +185,36 @@ begin
   end else Result := 'Not installed';
 end;
 
-procedure UpdateDriverPage;
+procedure UpdateDriverConsent;
 begin
-  StatusText.Caption := 'VB-CABLE: ' + DriverStatus('VBCable', VbKnown, VbInstalled) + #13#10 +
-    'VAC Lite: ' + DriverStatus('VAC', VacKnown, VacInstalled);
-  StatusText.AdjustHeight;
-  VbCheck.Enabled := VbKnown and not VbInstalled and not IsTest;
-  VacCheck.Enabled := VacKnown and not VacInstalled and not IsTest;
-  if not VbCheck.Enabled then VbCheck.Checked := False;
-  if not VacCheck.Enabled then VacCheck.Checked := False;
   DriverTermsCheck.Enabled := VbCheck.Checked or VacCheck.Checked;
   if not DriverTermsCheck.Enabled then DriverTermsCheck.Checked := False;
+end;
+
+procedure ApplyDriverAvailability(Interactive, VerificationMode: Boolean);
+begin
+  VbCheck.Enabled := VbKnown and not VbInstalled and Interactive and not VerificationMode;
+  VacCheck.Enabled := VacKnown and not VacInstalled and Interactive and not VerificationMode;
+  if not VbCheck.Enabled then VbCheck.Checked := False;
+  if not VacCheck.Enabled then VacCheck.Checked := False;
+  UpdateDriverConsent;
+end;
+
+procedure ApplyDriverDefaults(Interactive, VerificationMode: Boolean);
+begin
+  ApplyDriverAvailability(Interactive, VerificationMode);
+  VbCheck.Checked := VbCheck.Enabled;
+  VacCheck.Checked := VacCheck.Enabled;
+  DriverTermsCheck.Checked := False;
+  UpdateDriverConsent;
+end;
+
+procedure UpdateDriverPage;
+begin
+  StatusText.Caption := 'VAC: ' + DriverStatus('VAC', VacKnown, VacInstalled) + #13#10 +
+    'VB-CABLE: ' + DriverStatus('VBCable', VbKnown, VbInstalled);
+  StatusText.AdjustHeight;
+  ApplyDriverAvailability(not WizardSilent, IsTest);
 end;
 
 procedure RefreshClicked(Sender: TObject);
@@ -204,7 +227,7 @@ procedure DriverSelectionChanged(Sender: TObject);
 begin
   { Consent belongs to the currently selected packages, not an earlier choice. }
   DriverTermsCheck.Checked := False;
-  UpdateDriverPage;
+  UpdateDriverConsent;
 end;
 
 procedure OpenVbTerms(Sender: TObject);
@@ -253,41 +276,41 @@ begin
   ExtractArchive(ExpandConstant('{tmp}\vac471lite.zip'), ExpandConstant('{tmp}\drivers\vac-lite'), '', True, nil);
   FileCopy(ExpandConstant('{tmp}\drivers\vac-lite\license.txt'), ExpandConstant('{tmp}\vac-license.txt'), False);
 
-  DriversPage := CreateCustomPage(wpSelectTasks, 'Choose optional audio features',
-    'VineMix works with your existing microphones and listening devices.');
+  DriversPage := CreateCustomPage(wpSelectTasks, 'Set up virtual inputs and outputs',
+    'Install the drivers required for VineMix''s virtual audio routes.');
   AppOnlyText := TNewStaticText.Create(DriversPage);
   AppOnlyText.Parent := DriversPage.Surface;
   AppOnlyText.SetBounds(0, 0, DriversPage.SurfaceWidth, ScaleY(36));
   AppOnlyText.AutoSize := False;
   AppOnlyText.WordWrap := True;
   AppOnlyText.Font.Style := [fsBold];
-  AppOnlyText.Caption := 'Install VineMix only: leave both options clear and click Next.';
+  AppOnlyText.Caption := 'Virtual input requires VB-CABLE. Virtual output requires a VAC driver; VAC Lite is included.';
   AppOnlyText.AdjustHeight;
   InputNotice := TNewStaticText.Create(DriversPage);
   InputNotice.Parent := DriversPage.Surface;
   InputNotice.SetBounds(0, AppOnlyText.Top + AppOnlyText.Height + ScaleY(8), DriversPage.SurfaceWidth, ScaleY(44));
   InputNotice.AutoSize := False;
   InputNotice.WordWrap := True;
-  InputNotice.Caption := 'Using a headset or Virtual Desktop microphone? Connect it first, then choose its Windows input in VineMix. Neither optional driver below is required.';
+  InputNotice.Caption := 'Missing drivers are selected below. Physical microphones, headphones and Virtual Desktop microphone input work without them; clear a box if you do not need that virtual route.';
   InputNotice.AdjustHeight;
-  VbCheck := TNewCheckBox.Create(DriversPage);
-  VbCheck.Parent := DriversPage.Surface;
-  VbCheck.SetBounds(0, InputNotice.Top + InputNotice.Height + ScaleY(18), DriversPage.SurfaceWidth, ScaleY(22));
-  VbCheck.Caption := 'Optional: audio from other apps (VB-CABLE)';
-  VbCheck.Checked := False;
-  VbCheck.OnClick := @DriverSelectionChanged;
   VacCheck := TNewCheckBox.Create(DriversPage);
   VacCheck.Parent := DriversPage.Surface;
-  VacCheck.SetBounds(0, VbCheck.Top + VbCheck.Height + ScaleY(10), DriversPage.SurfaceWidth, ScaleY(22));
-  VacCheck.Caption := 'Optional: your mix as an app microphone (VAC Lite)';
+  VacCheck.SetBounds(0, InputNotice.Top + InputNotice.Height + ScaleY(18), DriversPage.SurfaceWidth, ScaleY(22));
+  VacCheck.Caption := 'VAC Lite - Virtual output: your mix as an app microphone';
   VacCheck.Checked := False;
   VacCheck.OnClick := @DriverSelectionChanged;
+  VbCheck := TNewCheckBox.Create(DriversPage);
+  VbCheck.Parent := DriversPage.Surface;
+  VbCheck.SetBounds(0, VacCheck.Top + VacCheck.Height + ScaleY(10), DriversPage.SurfaceWidth, ScaleY(22));
+  VbCheck.Caption := 'VB-CABLE - Virtual input: audio from other apps';
+  VbCheck.Checked := False;
+  VbCheck.OnClick := @DriverSelectionChanged;
   DriverHelp := TNewStaticText.Create(DriversPage);
   DriverHelp.Parent := DriversPage.Surface;
-  DriverHelp.SetBounds(0, VacCheck.Top + VacCheck.Height + ScaleY(12), DriversPage.SurfaceWidth, ScaleY(42));
+  DriverHelp.SetBounds(0, VbCheck.Top + VbCheck.Height + ScaleY(12), DriversPage.SurfaceWidth, ScaleY(42));
   DriverHelp.AutoSize := False;
   DriverHelp.WordWrap := True;
-  DriverHelp.Caption := 'Choose only what you need. Drivers require separate terms, administrator approval and a restart. You can add them later by running Setup again.';
+  DriverHelp.Caption := 'Setup installs VAC Lite first, then VB-CABLE. Review the driver terms and approve administrator access. If a driver asks to restart, choose to restart later and finish VineMix Setup first.';
   DriverHelp.AdjustHeight;
   StatusText := TNewStaticText.Create(DriversPage);
   StatusText.Parent := DriversPage.Surface;
@@ -302,7 +325,7 @@ begin
     RefreshButton.Top - (DriverHelp.Top + DriverHelp.Height) - ScaleY(18));
 
   DriverTermsPage := CreateCustomPage(DriversPage.ID, 'Review selected driver terms',
-    'Only the optional features you checked will be installed.');
+    'Only the selected missing drivers will be installed.');
   DriverNotice := TNewStaticText.Create(DriverTermsPage);
   DriverNotice.Parent := DriverTermsPage.Surface;
   DriverNotice.SetBounds(0, 0, DriverTermsPage.SurfaceWidth, ScaleY(122));
@@ -310,7 +333,7 @@ begin
   DriverNotice.WordWrap := True;
   DriverNotice.Caption := 'VB-CABLE by VB-Audio receives other apps into VineMix''s Virtual input. It is donationware; contributions are welcome.' + #13#10#13#10 +
     'VAC Lite sends VineMix''s Virtual output to another app''s microphone input. Its licence permits private home use unrelated to earning income.' + #13#10#13#10 +
-    'Selected drivers open their original setup windows and require administrator approval. Restart Windows before using a newly installed driver.';
+    'VAC Lite is installed first, then VB-CABLE. Their setup windows require administrator approval. If asked to restart, choose to restart later; finish VineMix Setup before restarting Windows.';
   DriverNotice.AdjustHeight;
   VbTermsButton := TNewButton.Create(DriverTermsPage);
   VbTermsButton.Parent := DriverTermsPage.Surface;
@@ -327,10 +350,12 @@ begin
   DriverTermsCheck.SetBounds(0, VbTermsButton.Top + VbTermsButton.Height + ScaleY(18), DriverTermsPage.SurfaceWidth, ScaleY(24));
   DriverTermsCheck.Caption := 'I accept these driver terms and their use limits.';
   RefreshDetection;
-  { Drivers are always an explicit interactive opt-in, including on upgrade.
-    Detection and command-line values never select missing packages for a user. }
+  { Interactive setup selects missing drivers once. Revisiting or refreshing the
+    page preserves a user's cleared choices; consent is always explicit. }
+  ApplyDriverDefaults(not WizardSilent, IsTest);
   UpdateDriverPage;
-  Log(Format('DRIVER_CHOICES_OPT_IN: VB=%d VAC=%d terms=%d; application-only setup is the default.', [
+  if IsTest then VerifyDriverPagePolicy;
+  Log(Format('DRIVER_CHOICES_DEFAULTS: VB=%d VAC=%d terms=%d; missing drivers are selected only for interactive setup.', [
     Ord(VbCheck.Checked), Ord(VacCheck.Checked), Ord(DriverTermsCheck.Checked)]));
   Log(Format('DRIVER_PAGE_LAYOUT: surface=%dx%d; options bottom=%d; status top=%d height=%d; refresh top=%d bottom=%d; terms surface=%dx%d bottom=%d', [
     DriversPage.SurfaceWidth, DriversPage.SurfaceHeight, DriverHelp.Top + DriverHelp.Height,
@@ -392,7 +417,7 @@ var ExistingVersion: String;
 begin
   Result := '';
   if (VbCheck.Checked or VacCheck.Checked) and not DriverTermsCheck.Checked then begin
-    Result := 'Accept the selected driver terms, or go Back and clear the optional driver checkboxes.'; Exit;
+    Result := 'Accept the selected driver terms, or go Back and clear the driver checkboxes.'; Exit;
   end;
   if not SafeDestination then begin Result := 'Choose a dedicated application folder.'; Exit; end;
   if not RefreshDetection then begin
@@ -420,20 +445,36 @@ function UpdateReadyMemo(Space, NewLine, MemoUserInfoInfo, MemoDirInfo, MemoType
 begin
   Result := MemoDirInfo + NewLine + NewLine + 'Saved workspaces and preferences:' + NewLine +
     Space + ExpandConstant('{localappdata}\VineMix') + NewLine +
-    Space + 'Existing files are retained, including on uninstall.' + NewLine + NewLine + 'Optional virtual audio drivers:';
+    Space + 'Existing files are retained, including on uninstall.' + NewLine + NewLine + 'Virtual input and output drivers:';
   if not VbCheck.Checked and not VacCheck.Checked then
     Result := Result + NewLine + Space + 'Install VineMix only. No additional audio drivers will be installed.';
-  if VbCheck.Checked then Result := Result + NewLine + Space + 'Install original VB-CABLE package'
-  else Result := Result + NewLine + Space + 'VB-CABLE: keep current installation / skip';
-  if VacCheck.Checked then Result := Result + NewLine + Space + 'Install original VAC Lite package'
+  if VacCheck.Checked then Result := Result + NewLine + Space + 'Install VAC Lite for Virtual output'
   else Result := Result + NewLine + Space + 'VAC: keep current installation / skip';
+  if VbCheck.Checked then Result := Result + NewLine + Space + 'Install VB-CABLE for Virtual input'
+  else Result := Result + NewLine + Space + 'VB-CABLE: keep current installation / skip';
+  if VbCheck.Checked or VacCheck.Checked then Result := Result + NewLine + Space +
+    'Choose restart later in any driver window; finish VineMix Setup before restarting Windows.';
   if AppRunning then Result := Result + NewLine + NewLine + 'A copy of VineMix is already running. Setup will leave it running and will not open another copy.';
   if MemoTasksInfo <> '' then Result := Result + NewLine + NewLine + MemoTasksInfo;
 end;
 
-procedure InstallDriver(const Section, DisplayName, Archive, ExpectedHash, Subfolder, SetupExe: String);
-var Code: Integer; Launched, WasInstalled: Boolean; Directory: String;
+function DriverRequiresRestart(const Section: String; Launched, ConfirmedInstalled: Boolean; Code: Integer): Boolean;
 begin
+  Result := Launched and (((Code = 3010) or (Code = 1641)) or
+    ((Code = 0) and ((Section = 'VBCable') or not ConfirmedInstalled)));
+end;
+
+procedure InstallDriver(const Section, DisplayName, Archive, ExpectedHash, Subfolder, SetupExe: String);
+var Code: Integer; Launched, WasInstalled, InstalledNow, RestartRequired: Boolean; Directory: String;
+begin
+  { The TESTMODE policy fixture records the production dispatch order and exits
+    before detection, extraction, elevation or any vendor executable. }
+  if DriverPolicyFixture then begin
+    if not IsTest then RaiseException('Driver dispatch fixtures require TESTMODE.');
+    if DriverFixtureOrder <> '' then DriverFixtureOrder := DriverFixtureOrder + ',';
+    DriverFixtureOrder := DriverFixtureOrder + DisplayName;
+    Exit;
+  end;
   if IsTest or WizardSilent then RaiseException('Driver installation requires interactive setup.');
   RefreshDetection;
   WasInstalled := BoolIni(Section, 'Installed');
@@ -447,16 +488,85 @@ begin
     RaiseException(DisplayName + ' package integrity check failed.');
   Directory := ExpandConstant('{tmp}\drivers\') + Subfolder;
   ExtractArchive(ExpandConstant('{tmp}\') + Archive, Directory, '', True, nil);
-  WizardForm.StatusLabel.Caption := 'Complete the ' + DisplayName + ' installation window to continue.';
+  WizardForm.StatusLabel.Caption := 'Complete ' + DisplayName + ' setup. If asked to restart, choose restart later and finish VineMix Setup first.';
   Launched := ShellExec('runas', Directory + '\' + SetupExe, '', Directory, SW_SHOWNORMAL, ewWaitUntilTerminated, Code);
   Log(Format('%s installer launch=%d, result=%d', [DisplayName, Ord(Launched), Code]));
   RefreshDetection;
-  if Launched and ((Code = 0) or (Code = 3010) or (Code = 1641)) and BoolIni(Section, 'Installed') then begin
-    DriverResults := DriverResults + #13#10 + DisplayName + ': installed. Restart Windows before using the new driver.';
-    DriverRestart := True;
+  InstalledNow := BoolIni(Section, 'DetectSucceeded') and BoolIni(Section, 'Installed');
+  RestartRequired := DriverRequiresRestart(Section, Launched, InstalledNow, Code);
+  DriverRestart := DriverRestart or RestartRequired;
+  if Launched and ((Code = 0) or (Code = 3010) or (Code = 1641)) and InstalledNow then begin
+    DriverResults := DriverResults + #13#10 + DisplayName + ': installed.';
+    if RestartRequired then DriverResults := DriverResults + ' Restart Windows after finishing VineMix Setup.';
   end else begin
     DriverResults := DriverResults + #13#10 + DisplayName + ': installation was cancelled, failed, or could not yet be confirmed. Run Setup again to retry.';
-    if (Code = 3010) or (Code = 1641) then DriverRestart := True;
+    if RestartRequired then DriverResults := DriverResults + ' Restart Windows after finishing VineMix Setup, then check again.';
+  end;
+end;
+
+procedure InstallSelectedDrivers;
+begin
+  if VacCheck.Checked then InstallDriver('VAC', 'VAC Lite', 'vac471lite.zip', '{#VacArchiveHash}', 'vac-lite', 'setup64.exe');
+  if VbCheck.Checked then InstallDriver('VBCable', 'VB-CABLE', 'VBCABLE_Driver_Pack45.zip', '{#VbArchiveHash}', 'vb-cable', 'VBCABLE_Setup_x64.exe');
+end;
+
+procedure RequireDriverPolicy(Passed: Boolean; const Marker: String);
+begin
+  if not Passed then RaiseException('Installer driver policy failed: ' + Marker);
+  Log(Marker);
+end;
+
+procedure VerifyDriverPagePolicy;
+var SavedVbKnown, SavedVacKnown, SavedVbInstalled, SavedVacInstalled: Boolean;
+begin
+  if not IsTest then RaiseException('Driver policy fixtures require TESTMODE.');
+  SavedVbKnown := VbKnown; SavedVacKnown := VacKnown;
+  SavedVbInstalled := VbInstalled; SavedVacInstalled := VacInstalled;
+  try
+    VbKnown := True; VacKnown := True; VbInstalled := False; VacInstalled := False;
+    ApplyDriverDefaults(True, False);
+    RequireDriverPolicy(VbCheck.Checked and VacCheck.Checked and not DriverTermsCheck.Checked,
+      'DRIVER_POLICY_FRESH: VB=1 VAC=1 terms=0;');
+    DriverTermsCheck.Checked := True;
+    VbCheck.Checked := False;
+    DriverSelectionChanged(VbCheck);
+    RequireDriverPolicy(not DriverTermsCheck.Checked, 'DRIVER_POLICY_CONSENT_RESET: terms=0;');
+    ApplyDriverAvailability(True, False);
+    RequireDriverPolicy(not VbCheck.Checked and VacCheck.Checked,
+      'DRIVER_POLICY_SKIP_PRESERVED: VB=0 VAC=1;');
+    VbInstalled := True; VacInstalled := True;
+    ApplyDriverDefaults(True, False);
+    RequireDriverPolicy(not VbCheck.Checked and not VacCheck.Checked and not VbCheck.Enabled and not VacCheck.Enabled,
+      'DRIVER_POLICY_INSTALLED: VB=0 VAC=0 enabled=0;');
+    VbKnown := False; VacKnown := False; VbInstalled := False; VacInstalled := False;
+    ApplyDriverDefaults(True, False);
+    RequireDriverPolicy(not VbCheck.Checked and not VacCheck.Checked and not VbCheck.Enabled and not VacCheck.Enabled,
+      'DRIVER_POLICY_UNKNOWN: VB=0 VAC=0 enabled=0;');
+    VbKnown := True; VacKnown := True; VacInstalled := True;
+    ApplyDriverDefaults(True, False);
+    RequireDriverPolicy(VbCheck.Checked and not VacCheck.Checked, 'DRIVER_POLICY_MIXED: VB=1 VAC=0;');
+    VacInstalled := False;
+    ApplyDriverDefaults(False, False);
+    RequireDriverPolicy(not VbCheck.Checked and not VacCheck.Checked, 'DRIVER_POLICY_SILENT: VB=0 VAC=0;');
+    ApplyDriverDefaults(True, True);
+    RequireDriverPolicy(not VbCheck.Checked and not VacCheck.Checked, 'DRIVER_POLICY_TESTMODE: VB=0 VAC=0;');
+    ApplyDriverDefaults(True, False);
+    DriverFixtureOrder := ''; DriverPolicyFixture := True;
+    try InstallSelectedDrivers; finally DriverPolicyFixture := False; end;
+    RequireDriverPolicy(DriverFixtureOrder = 'VAC Lite,VB-CABLE', 'DRIVER_POLICY_ORDER: VAC Lite,VB-CABLE;');
+    RequireDriverPolicy(not DriverRequiresRestart('VAC', True, True, 0) and
+      DriverRequiresRestart('VBCable', True, True, 0) and
+      DriverRequiresRestart('VAC', True, True, 3010) and
+      DriverRequiresRestart('VAC', True, True, 1641) and
+      DriverRequiresRestart('VAC', True, False, 0) and
+      not DriverRequiresRestart('VAC', False, False, 0),
+      'DRIVER_POLICY_RESTART: VAC=0 VB=1 explicit=1;');
+  finally
+    DriverPolicyFixture := False;
+    VbKnown := SavedVbKnown; VacKnown := SavedVacKnown;
+    VbInstalled := SavedVbInstalled; VacInstalled := SavedVacInstalled;
+    ApplyDriverDefaults(not WizardSilent, IsTest);
+    UpdateDriverPage;
   end;
 end;
 
@@ -515,8 +625,7 @@ begin
     MigrateOwnedStartup;
     DriverResults := '';
     if not VbCheck.Checked and not VacCheck.Checked then Log('DRIVER_INSTALLATION_SKIPPED');
-    if VbCheck.Checked then InstallDriver('VBCable', 'VB-CABLE', 'VBCABLE_Driver_Pack45.zip', '{#VbArchiveHash}', 'vb-cable', 'VBCABLE_Setup_x64.exe');
-    if VacCheck.Checked then InstallDriver('VAC', 'VAC Lite', 'vac471lite.zip', '{#VacArchiveHash}', 'vac-lite', 'setup64.exe');
+    InstallSelectedDrivers;
     SaveStringToFile(ExpandConstant('{app}\SetupSupport\driver-install-result.txt'),
       'VineMix Setup '#13#10 + DriverResults + #13#10 + 'Use Setup to check or install missing drivers. Existing drivers are never uninstalled with VineMix.', False);
   end;

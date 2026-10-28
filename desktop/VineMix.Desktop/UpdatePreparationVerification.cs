@@ -28,6 +28,7 @@ internal static class UpdatePreparationVerification
         await NewEndpointDoesNotQueueAfterSave(require);
         await ShutdownGuards(require);
         await CooperativeShutdownFailure(require);
+        await LatePreferencesPreventShutdown(require);
         VerifyPreferences(require);
         VerifyHealthReadOnly(require);
     }
@@ -282,6 +283,35 @@ internal static class UpdatePreparationVerification
         catch (Exception error) when (error is IOException or InvalidOperationException or OperationCanceledException) { return error; }
     }
 
+    private static async Task LatePreferencesPreventShutdown(Action<bool, string> require)
+    {
+        var engine = new Engine();
+        using var mixer = Connected(engine);
+        var prepared = await mixer.PrepareForUpdateAsync(CancellationToken.None);
+        bool failWrite = true;
+        string savedPreferences = "";
+        mixer.PreviewUiPreferencesWriter = json =>
+        {
+            if (failWrite) throw new IOException("Example late preference failure");
+            savedPreferences = json;
+        };
+        engine.HoldSnapshot = Signal();
+        var stopping = mixer.ShutdownForUpdateAsync(prepared, CancellationToken.None);
+        await engine.SnapshotEntered.Task.WaitAsync(Deadline);
+        mixer.AutomaticallyCheckForUpdates = false;
+        engine.HoldSnapshot.SetResult();
+        var error = await Failure(() => stopping);
+        require(error is IOException && engine.ShutdownCalls == 0 && !mixer.IsPreparingUpdate && mixer.CanEdit
+            && !mixer.AutomaticallyCheckForUpdates,
+            "A preference-write failure during the awaited final snapshot blocks update shutdown and returns the retained session to editing.");
+        failWrite = false; engine.HoldSnapshot = null;
+        prepared = await mixer.PrepareForUpdateAsync(CancellationToken.None);
+        await mixer.ShutdownForUpdateAsync(prepared, CancellationToken.None);
+        require(engine.ShutdownCalls == 1 && savedPreferences.Contains("\"automaticallyCheckForUpdates\":false", StringComparison.Ordinal),
+            "Retry saves the late preference value before the sole cooperative update shutdown.");
+        mixer.ResumeAfterUpdatePreparation();
+    }
+
     private sealed class Engine
     {
         internal MixerConfiguration Saved = new() { Version = 2, Revision = 7, Graph = new()
@@ -289,6 +319,8 @@ internal static class UpdatePreparationVerification
         internal readonly List<string> Calls = [];
         internal readonly TaskCompletionSource ConfigureEntered = Signal();
         internal TaskCompletionSource? HoldConfigure;
+        internal TaskCompletionSource? HoldSnapshot;
+        internal readonly TaskCompletionSource SnapshotEntered = Signal();
         internal CancellationTokenSource? CancelAfterCommit;
         internal Func<string, ProtocolResponse, ProtocolResponse>? Transform;
         internal List<Endpoint> Endpoints = [];
@@ -325,6 +357,11 @@ internal static class UpdatePreparationVerification
                 return new() { Ok = !RejectShutdown, Error = RejectShutdown ? "preview cooperative refusal" : "" };
             }
             else if (command != "snapshot") throw new InvalidOperationException("Unexpected detached update command: " + command);
+            else if (HoldSnapshot is not null)
+            {
+                SnapshotEntered.TrySetResult();
+                await HoldSnapshot.Task.WaitAsync(token);
+            }
             var response = new ProtocolResponse { Ok = true, Snapshot = Snapshot() };
             return Transform?.Invoke(command, response) ?? response;
         }

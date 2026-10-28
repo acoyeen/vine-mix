@@ -15,11 +15,13 @@ internal class RotaryValueControl : StackPanel
     private readonly TextBox _entry;
     private readonly DialFace _face;
     private readonly Grid _dialSlot;
+    private readonly ContextMenu _entryMenu;
     private readonly Action<double> _changed;
     private readonly double _minimum, _maximum, _step, _smallChange, _largeChange;
     private readonly bool _logarithmic, _integer;
     private readonly string _label, _unit, _format, _description;
     private bool _applying, _dragging, _entryHovered, _entryFocused, _entryInvalid;
+    private bool _entryDirty, _renderingEntry, _entryMenuActive;
     private double _lastY, _dragPosition, _defaultValue;
     private Brush? _lastTextBrush;
     private object? _entryHelp;
@@ -30,6 +32,7 @@ internal class RotaryValueControl : StackPanel
     internal double DefaultValue => _defaultValue;
     internal double NormalizedValue => Normalize(_range.Value);
     internal bool HasVisibleKeyboardFocus => _face.Focused;
+    internal bool HasPendingEntry => _entryDirty || _entryInvalid;
     // Align labels and values across a mixed-size row without enlarging the
     // secondary dial itself. Rows containing only secondary dials stay compact.
     internal void SetDialRowHeight(double height) => _dialSlot.Height = height;
@@ -107,6 +110,35 @@ internal class RotaryValueControl : StackPanel
             HorizontalAlignment = grouped ? HorizontalAlignment.Center : HorizontalAlignment.Right };
         _entry.SetResourceReference(StyleProperty, "NodeNumericEntry");
         AutomationProperties.SetName(_entry, label + " value");
+        _entryMenu = new ContextMenu();
+        var applyEntry = new MenuItem { Header = "Apply value" };
+        var cancelEntry = new MenuItem { Header = "Cancel edit" };
+        applyEntry.Click += (_, _) => TryCommitPendingEntry();
+        cancelEntry.Click += (_, _) => CancelPendingEntry();
+        _entryMenu.Items.Add(applyEntry); _entryMenu.Items.Add(cancelEntry);
+        _entryMenu.Items.Add(new Separator());
+        foreach (var command in new[] { ApplicationCommands.Undo, ApplicationCommands.Cut,
+            ApplicationCommands.Copy, ApplicationCommands.Paste, ApplicationCommands.SelectAll })
+            _entryMenu.Items.Add(new MenuItem { Header = command.Text, Command = command, CommandTarget = _entry });
+        _entry.ContextMenu = _entryMenu;
+        _entry.ContextMenuOpening += (_, _) =>
+        {
+            // Opening a menu moves keyboard focus before its action runs. Keep
+            // that move inside this edit so Cancel cannot accidentally apply.
+            _entryMenuActive = true;
+            applyEntry.IsEnabled = cancelEntry.IsEnabled = HasPendingEntry && IsEnabled && !_entry.IsReadOnly;
+        };
+        _entryMenu.Closed += (_, _) =>
+        {
+            _entryMenuActive = false;
+            // WPF restores focus while leaving menu mode. Inspect it after
+            // that transition, so a text-menu action can return to editing.
+            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Input, new Action(() =>
+            {
+                if (!_entryMenuActive && !_entry.IsKeyboardFocusWithin) FinishEntryOnFocusLoss();
+            }));
+        };
+        _entry.TextChanged += (_, _) => { if (!_renderingEntry) _entryDirty = true; };
 
         if (grouped)
         {
@@ -132,7 +164,10 @@ internal class RotaryValueControl : StackPanel
             // UI Automation can write the underlying range directly too.
             double bounded = Bound(_range.Value);
             if (_range.Value != bounded) { _range.Value = bounded; return; }
-            Render(); if (!_applying) _changed(_range.Value);
+            // A stored value change supersedes a draft, including external
+            // automation writes. Unchanged telemetry/theme refreshes do not.
+            Render(); RenderEntry();
+            if (!_applying) _changed(_range.Value);
         };
         _range.PreviewMouseLeftButtonDown += (_, e) =>
         {
@@ -168,7 +203,12 @@ internal class RotaryValueControl : StackPanel
             _entryFocused = true;
             BeginTextEntry();
         };
-        _entry.LostKeyboardFocus += (_, _) => { _entryFocused = false; RenderEntry(); };
+        _entry.LostKeyboardFocus += (_, _) =>
+        {
+            _entryFocused = false;
+            if (!_entryMenuActive) FinishEntryOnFocusLoss();
+            RefreshEntryBorder();
+        };
         _entry.MouseEnter += (_, _) => { _entryHovered = true; RefreshEntryBorder(); };
         _entry.MouseLeave += (_, _) => { _entryHovered = false; RefreshEntryBorder(); };
         _entry.PreviewMouseDoubleClick += (_, e) =>
@@ -181,8 +221,8 @@ internal class RotaryValueControl : StackPanel
             if (HandleEntryKey(e.Key, Keyboard.Modifiers)) e.Handled = true;
         };
         SetValue(_defaultValue);
-        IsEnabledChanged += (_, _) => { Opacity = IsEnabled ? 1 : .45; if (!IsEnabled) StopAdjustment(); };
-        Unloaded += (_, _) => StopAdjustment();
+        IsEnabledChanged += (_, _) => { Opacity = IsEnabled ? 1 : .45; if (!IsEnabled) SuspendPracticeInteraction(); };
+        Unloaded += (_, _) => SuspendPracticeInteraction();
     }
 
     public void SetValue(double value)
@@ -221,6 +261,7 @@ internal class RotaryValueControl : StackPanel
     internal void BeginAdjustment(double y)
     {
         if (!IsEnabled || !double.IsFinite(y)) return;
+        CancelPendingEntry();
         bool starting = !_dragging;
         _dragging = true; _lastY = y; _dragPosition = Normalize(_range.Value);
         if (starting) EditGestureStarted?.Invoke(this, EventArgs.Empty);
@@ -238,6 +279,7 @@ internal class RotaryValueControl : StackPanel
 
     internal bool TryCommitText(string text)
     {
+        if (!IsEnabled || !_entry.IsEnabled || _entry.IsReadOnly) return false;
         text = text.Replace('−', '-').Trim();
         if (_unit.Length > 0 && text.EndsWith(_unit, StringComparison.OrdinalIgnoreCase))
             text = text[..^_unit.Length].TrimEnd();
@@ -250,28 +292,40 @@ internal class RotaryValueControl : StackPanel
 
     internal bool TryCommitPendingEntry()
     {
-        if (!_entry.IsKeyboardFocusWithin && !_entryInvalid) return true;
+        if (!HasPendingEntry) return true;
+        return ApplyPendingEntry(refocusOnError: true);
+    }
+
+    private bool ApplyPendingEntry(bool refocusOnError)
+    {
+        if (!IsEnabled || !_entry.IsEnabled || _entry.IsReadOnly) return false;
         if (TryCommitText(_entry.Text)) { RenderEntry(); return true; }
         _entryInvalid = true; RefreshEntryBorder(); RefreshEntryAccessibility();
-        _entry.ToolTip = NodeToolTip.Create("Invalid value", EntryRequirement());
-        _entry.Focus();
+        _entry.ToolTip = NodeToolTip.Create("Value not applied", EntryRequirement());
+        if (refocusOnError) _entry.Focus();
         return false;
     }
 
+    private void FinishEntryOnFocusLoss()
+    {
+        if (!IsEnabled || !_entry.IsEnabled || _entry.IsReadOnly) { CancelPendingEntry(); return; }
+        if (HasPendingEntry) ApplyPendingEntry(refocusOnError: false);
+        else RenderEntry();
+    }
+
+    internal void CancelPendingEntry() => RenderEntry();
+
     internal bool HandleEntryKey(Key key, ModifierKeys modifiers)
     {
-        if (!IsEnabled || !_entry.IsEnabled || (modifiers & ~ModifierKeys.Shift) != ModifierKeys.None) return false;
+        if (!IsEnabled || !_entry.IsEnabled || _entry.IsReadOnly || (modifiers & ~ModifierKeys.Shift) != ModifierKeys.None) return false;
         if (key == Key.Escape) { RenderEntry(); return true; }
         if (key is not (Key.Enter or Key.Tab)) return false;
-        if (TryCommitText(_entry.Text))
+        if (ApplyPendingEntry(refocusOnError: false))
         {
-            RenderEntry();
             // WPF retains forward/reverse Tab navigation. Only a rejected
             // value consumes Tab, keeping the draft in its current editor.
             return key == Key.Enter;
         }
-        _entryInvalid = true; RefreshEntryBorder(); RefreshEntryAccessibility();
-        _entry.ToolTip = NodeToolTip.Create("Invalid value", EntryRequirement());
         return true;
     }
 
@@ -289,22 +343,26 @@ internal class RotaryValueControl : StackPanel
             _ => null
         };
         if (!value.HasValue) return false;
+        CancelPendingEntry();
         if (key == Key.Home) ResetToDefault(); else Commit(value.Value);
         return true;
     }
 
     internal void BeginTextEntry()
     {
+        // Returning from the context menu or correcting a rejected draft must
+        // preserve both text and selection, including on an unchanged refresh.
+        if (HasPendingEntry || _entryMenuActive) { RefreshEntryBorder(); return; }
         // The resting readout stays concise. Editing must expose a round-trip
         // number so pressing Enter alone cannot round a precise saved value.
-        _entry.Text = FormatExact(_range.Value); _entry.SelectAll();
+        WriteEntry(FormatExact(_range.Value)); _entry.SelectAll();
         _entryInvalid = false; RefreshEntryBorder(); RefreshEntryAccessibility();
         _entry.ToolTip = _entryHelp;
     }
 
     internal bool TryCancelPracticeInteraction()
     {
-        bool active = _dragging || _entryInvalid
+        bool active = _dragging || HasPendingEntry
             || _entry.IsKeyboardFocusWithin && _entry.Text != FormatExact(_range.Value);
         if (active) SuspendPracticeInteraction();
         return active;
@@ -315,6 +373,8 @@ internal class RotaryValueControl : StackPanel
         StopAdjustment();
         if (_entry.IsMouseCaptured) _entry.ReleaseMouseCapture();
         RenderEntry();
+        _entryMenuActive = false;
+        _entryMenu.IsOpen = false;
     }
 
     private void StopAdjustment()
@@ -364,22 +424,30 @@ internal class RotaryValueControl : StackPanel
     private string EntryRequirement() => $"Enter {(_integer ? "a whole number" : "a number")} from {Format(_minimum)} to {Format(_maximum)}.";
     private void RefreshEntryAccessibility()
     {
-        string error = _entryInvalid ? "Invalid value. " + EntryRequirement() : "";
+        string error = _entryInvalid ? "Invalid value. Not applied. " + EntryRequirement() : "";
         AutomationProperties.SetItemStatus(_entry, error);
         AutomationProperties.SetHelpText(_entry,
             (error.Length > 0 ? error + " " : (_integer ? "Whole numbers only. " : "") + $"{Format(_minimum)} to {Format(_maximum)}. ")
-            + $"Enter applies; Tab or Shift+Tab applies and moves between controls; Escape cancels. Double-click resets to {Format(_defaultValue)}.");
+            + $"Enter applies; Tab or Shift+Tab applies and moves between controls; clicking away applies a valid value. Escape cancels. Right-click for Apply value or Cancel edit. Double-click resets to {Format(_defaultValue)}.");
     }
     private object EntryHelp() => NodeToolTip.Create(_label, _description);
     private void Render()
     {
         _lastTextBrush = ConsoleTheme.Get("ConsoleTextBrush"); FaceRefreshCount++;
         _face.Position = Normalize(_range.Value); _face.DefaultPosition = Normalize(_defaultValue); _face.InvalidateVisual();
-        if (!_entry.IsKeyboardFocusWithin) RenderEntry();
+        if (!_entry.IsKeyboardFocusWithin && !HasPendingEntry && !_entryMenuActive) RenderEntry();
+        else RefreshEntryBorder();
+    }
+    private void WriteEntry(string text)
+    {
+        _renderingEntry = true;
+        try { _entry.Text = text; }
+        finally { _renderingEntry = false; }
+        _entryDirty = false;
     }
     private void RenderEntry()
     {
-        _entry.Text = _entry.IsKeyboardFocusWithin ? FormatExact(_range.Value) : Format(_range.Value);
+        WriteEntry(_entry.IsKeyboardFocusWithin ? FormatExact(_range.Value) : Format(_range.Value));
         _entryInvalid = false; RefreshEntryBorder(); RefreshEntryAccessibility();
         _entry.ToolTip = _entryHelp;
     }

@@ -24,7 +24,18 @@ internal static class WhatsNewContent
         new("0.3.0-beta.4", "Catch up after updates", "These highlights appear after an updated launch when your workspace is ready. To reopen them, choose Settings → What's new?"),
         new("0.3.0-beta.5", "Updates that pass version checks", "Corrected package metadata prevents the update rejection that could restore your previous beta. You can skip intermediate betas."),
         new("0.3.0-beta.5", "A simpler update window", "See your installed version, release notes and the next action in a compact window that follows your theme."),
-        new("0.3.0-beta.5", "Automatic checks keep trying", "Enabling automatic checks schedules a check shortly afterwards. Checks repeat daily and retry after temporary failures. Downloading and installing remain your choice.")
+        new("0.3.0-beta.5", "Automatic checks keep trying", "Enabling automatic checks schedules a check shortly afterwards. Checks repeat daily and retry after temporary failures. Downloading and installing remain your choice."),
+        new("0.4.0-beta", "Organize nodes into named groups", "Select nodes and press Ctrl+G. Colored frames fit their members and move them together. Rename with F2 or a double-click; Undo, Redo and complete-group copying preserve your organization."),
+        new("0.4.0-beta", "More ways to mix stereo audio", "Mix, Pan, Mono, Channel Swap, Stereo Width, Stereo Pan, Crossfade, Stereo Combine and Stereo Split have their own Mixing category. Split and combine channels or blend two sources without losing their port assignments."),
+        new("0.4.0-beta", "One clear Level control", "Level replaces duplicate Volume and Gain controls where both changed the same value. Linked control uses a Multiplier: 100% is unchanged, and 0% is silent."),
+        new("0.4.0-beta", "Keep project credit close", "About VineMix now opens Credits and licences, including the full MIT licence and attribution policy offline. Beta releases now advance the version number, starting with 0.4.0 Beta."),
+        new("0.4.0-beta", "Click away to apply exact values", "Valid numeric edits apply when you click away. Invalid text stays visible with an error. Right-click for Apply value or Cancel edit; Enter, Tab and Escape keep their existing roles."),
+        new("0.4.0-beta", "Aligned Settings search", "The empty search prompt now lines up with the insertion caret and typed text, including at higher display scaling."),
+        new("0.4.0-beta", "A quieter footer when you want it", "Turn off Show action notifications in Settings to hide routine timed messages. Errors and save status remain visible, and Activity keeps recent edits and the latest message. Your choice is remembered."),
+        new("0.4.0-beta", "Consistent information windows", "What's New, About and Updates share a compact, centred style. Close them with Escape, Close or a click on the workspace; an update installation in progress remains protected."),
+        new("0.4.0-beta", "A tidier workspace", "The node count sits beneath the logo. Settings groups workspace controls, audio tools, app preferences and help between familiar separators. Activity sits beside Find node; Help, What's new? and About stay together above the separate Quit action."),
+        new("0.4.0-beta", "A matching monochrome identity", "The app logo follows the website's single-colour design. Brighter, slightly larger soft-white icons carry the same identity into the taskbar, tray and shortcuts."),
+        new("0.4.0-beta", "Clearer virtual-route setup", "Setup explains which drivers virtual inputs and outputs need, selects missing drivers and installs VAC Lite before VB-CABLE. You can clear a selection; driver terms still require explicit acceptance.")
     ];
 
     internal static IReadOnlyList<ReleaseHighlight> Since(string? previous, string current)

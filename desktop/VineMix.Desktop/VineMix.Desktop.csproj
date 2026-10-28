@@ -38,6 +38,9 @@
     <Content Include="Assets/Fonts/IBM-Plex-LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest"/>
     <Content Update="Assets/Fonts/IBM-Plex-LICENSE.txt" CopyToPublishDirectory="Never" Condition="'$(VineMixBuildMode)' == 'Standalone'"/>
     <EmbeddedResource Include="../../release.json" LogicalName="VineMix.Release.json"/>
+    <EmbeddedResource Include="../../LICENSE" LogicalName="VineMix.Notices.LICENSE"/>
+    <EmbeddedResource Include="../../ATTRIBUTION.md" LogicalName="VineMix.Notices.ATTRIBUTION.md"/>
+    <EmbeddedResource Include="../../THIRD_PARTY_NOTICES.md" LogicalName="VineMix.Notices.THIRD_PARTY_NOTICES.md"/>
     <AssemblyMetadata Include="SourceSnapshotHash" Value="$(VineMixSourceSnapshotHash)" Condition="'$(VineMixSourceSnapshotHash)' != ''"/>
     <AssemblyMetadata Include="BuildTimestamp" Value="$(VineMixBuildTimestamp)" Condition="'$(VineMixBuildTimestamp)' != ''"/>
     <EmbeddedResource Include="$(VineMixRuntimeArchive)" LogicalName="VineMix.Runtime.zip" Condition="'$(VineMixBuildMode)' == 'Standalone'"/>

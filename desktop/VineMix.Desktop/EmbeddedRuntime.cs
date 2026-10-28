@@ -118,7 +118,7 @@ internal static class EmbeddedRuntime
             if (file.Size < 0 || file.Size > MaximumPayload || !IsHash(file.Sha256)) throw new IOException("Runtime file metadata is invalid.");
             total = checked(total + file.Size);
         }
-        if (total > MaximumPayload || !new[] { Engine, "libc++.dll", "libunwind.dll", "libwinpthread-1.dll", "LICENSE", "THIRD_PARTY_NOTICES.md" }
+        if (total > MaximumPayload || !new[] { Engine, "libc++.dll", "libunwind.dll", "libwinpthread-1.dll", "LICENSE", "ATTRIBUTION.md", "THIRD_PARTY_NOTICES.md" }
             .All(name => manifest.Files.Any(file => file.Path == name))) throw new IOException("Runtime allowlist is incomplete.");
         return manifest;
     }

@@ -148,9 +148,9 @@ function Quote-Argument([string]$Value) {
     if ($Value.Contains('"') -or $Value.Contains("`r") -or $Value.Contains("`n")) { throw 'Unexpected quote or newline in an installer argument.' }
     '"' + $Value + '"'
 }
-function Invoke-Setup([string]$Name, [bool]$AcceptTerms) {
+function Invoke-Setup([string]$Name, [bool]$AcceptTerms, [string]$DriverSelection = 'none') {
     $log = Join-Path $evidence ($Name + '.log')
-    $arguments = @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-', '/TESTMODE=1', '/DRIVERS=none', '/NOICONS', '/TASKS=""',
+    $arguments = @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-', '/TESTMODE=1', ('/DRIVERS=' + $DriverSelection), '/NOICONS', '/TASKS=""',
         ('/DIR=' + (Quote-Argument $target)), ('/LOG=' + (Quote-Argument $log)))
     if ($AcceptTerms) { $arguments += '/ACCEPTTERMS=1' }
     $timer = [Diagnostics.Stopwatch]::StartNew()
@@ -170,13 +170,29 @@ function Require-LogMarker([string]$Name, [string]$Marker, [string]$Description)
 }
 function Require-DriverPagePolicy([string]$Name) {
     $logText = Get-Content -LiteralPath (Join-Path $evidence ($Name + '.log')) -Raw
-    Require ($logText.Contains('DRIVER_CHOICES_OPT_IN: VB=0 VAC=0 terms=0;')) 'Both optional drivers and their consent begin unselected, including during repair.'
+    # These markers are emitted by the compiled wizard after exercising its real
+    # selection/consent helpers and mock-only ordered dispatch. The dispatch
+    # fixture never reaches elevation or a vendor installer launch.
+    $policyCases = [ordered]@{
+        'DRIVER_POLICY_FRESH: VB=1 VAC=1 terms=0;' = 'Fresh interactive setup selects both missing drivers while leaving vendor consent unaccepted.'
+        'DRIVER_POLICY_INSTALLED: VB=0 VAC=0 enabled=0;' = 'Existing driver packages are neither selected nor enabled for replacement.'
+        'DRIVER_POLICY_UNKNOWN: VB=0 VAC=0 enabled=0;' = 'Uncertain driver detection disables automatic installation instead of guessing.'
+        'DRIVER_POLICY_MIXED: VB=1 VAC=0;' = 'Only the missing eligible driver is selected when the other package already exists.'
+        'DRIVER_POLICY_CONSENT_RESET: terms=0;' = 'Changing the selected packages clears previously accepted vendor consent.'
+        'DRIVER_POLICY_SKIP_PRESERVED: VB=0 VAC=1;' = 'Refreshing driver detection preserves a user decision to skip an eligible driver.'
+        'DRIVER_POLICY_SILENT: VB=0 VAC=0;' = 'Silent setup never inherits the interactive driver defaults.'
+        'DRIVER_POLICY_TESTMODE: VB=0 VAC=0;' = 'Isolated test mode never selects real driver installation.'
+        'DRIVER_POLICY_ORDER: VAC Lite,VB-CABLE;' = 'The shared driver dispatcher invokes VAC Lite before VB-CABLE in its inert fixture.'
+        'DRIVER_POLICY_RESTART: VAC=0 VB=1 explicit=1;' = 'Confirmed VAC installation does not invent a reboot requirement; VB-CABLE and explicit restart results do require it.'
+    }
+    foreach ($marker in $policyCases.Keys) { Require ($logText.Contains($marker)) $policyCases[$marker] }
+    Require ($logText.Contains('DRIVER_CHOICES_DEFAULTS: VB=0 VAC=0 terms=0;')) 'The real silent test wizard finishes fixture verification with drivers and consent unselected, including during repair.'
     $layout = [regex]::Match($logText, 'DRIVER_PAGE_LAYOUT: surface=(\d+)x(\d+); options bottom=(\d+); status top=(\d+) height=(\d+); refresh top=(\d+) bottom=(\d+); terms surface=(\d+)x(\d+) bottom=(\d+)')
     Require $layout.Success 'Setup reports its actual hidden wizard surface and measured text geometry.'
     if (-not $layout.Success) { return }
     $size = @(1..10 | ForEach-Object { [int]$layout.Groups[$_].Value })
     Require ($size[0] -gt 0 -and $size[1] -gt 0 -and $size[2] -lt $size[3] -and $size[4] -gt 0 -and
-        $size[3] + $size[4] -lt $size[5] -and $size[5] -lt $size[6] -and $size[6] -le $size[1]) 'Measured optional-feature text, detection status and refresh action fit without overlapping on the hidden wizard surface.'
+        $size[3] + $size[4] -lt $size[5] -and $size[5] -lt $size[6] -and $size[6] -le $size[1]) 'Measured virtual-driver requirements, choices, detection status and refresh action fit without overlapping on the hidden wizard surface.'
     Require ($size[7] -gt 0 -and $size[8] -gt 0 -and $size[9] -le $size[8]) 'The separately measured driver notice, terms actions and acceptance control fit on their hidden wizard surface.'
 }
 function Invoke-Uninstall([string]$Name, [string]$UninstallerPath) {
@@ -228,6 +244,12 @@ try {
     Require-LogMarker 'terms-required' 'TERMS_NOT_ACCEPTED:' 'The rejection specifically identifies missing terms acceptance.'
     Require (-not (Test-Path -LiteralPath $target)) 'Declining terms did not create the app destination.'
     Require ((To-CanonicalJson (Get-UserUninstallEntries)) -ceq (To-CanonicalJson $registryBefore)) 'Declining terms did not register an installation.'
+
+    $silentDriverCode = Invoke-Setup 'silent-drivers-refused' $true 'all'
+    Require ($silentDriverCode -ne 0) 'Silent setup rejects a driver request even when application terms have been accepted.'
+    Require-LogMarker 'silent-drivers-refused' 'Silent driver installation is not supported.' 'The rejection requires an interactive review of driver selection and vendor terms.'
+    Require (-not (Test-Path -LiteralPath $target)) 'A rejected silent driver request did not create the app destination.'
+    Require ((To-CanonicalJson (Get-UserUninstallEntries)) -ceq (To-CanonicalJson $registryBefore)) 'A rejected silent driver request did not register an installation.'
 
     # Test the real process guard without launching either desktop or engine.
     # This tiny process owns no application resources and exits via our event.
@@ -353,6 +375,11 @@ try {
         } finally { $ui.Dispose() }
         $uiReport = Get-Content -LiteralPath (Join-Path $uiEvidence 'results.json') -Raw | ConvertFrom-Json -Depth 32
         Require ([bool]$uiReport.passed) 'Installed release reported successful smoke checks.'
+        foreach ($name in @('LICENSE','ATTRIBUTION.md','THIRD_PARTY_NOTICES.md')) {
+            $notice = @($uiReport.notices | Where-Object name -CEQ $name)
+            Require ($notice.Count -eq 1 -and $notice[0].sha256 -ieq (File-Hash (Join-Path $project $name))) "The installed desktop embeds the authoritative $name for offline access."
+            Require ((File-Hash (Join-Path $payloadDirectory $name)) -ieq (File-Hash (Join-Path $project $name))) "Installed distribution text matches the authoritative $name."
+        }
     }
 
     $uninstaller = $uninstallers[0].FullName
@@ -425,7 +452,7 @@ try {
         installerHash = File-Hash $installer
         stagedPackage = $package
         testDestination = $target
-        scope = 'An isolated per-user test installation, harmless waiting processes that exercise replacement and uninstall guards, same-version reinstall, downgrade refusal, uninstall, and optional inert installed-release smoke. Driver installation and normal app launch are disabled. The existing mixer is never stopped or relaunched. Personal saved files are read and backed up; any detected concurrent changes are reported without restoration.'
+        scope = 'An isolated per-user test installation; compiled wizard selection, consent-reset, mock driver order and restart-policy fixtures; rejection of unattended driver requests; harmless waiting processes that exercise replacement and uninstall guards; same-version reinstall, downgrade refusal, uninstall, and optional inert installed-release smoke. Driver installation and normal app launch are disabled. The existing mixer is never stopped or relaunched. Personal saved files are read and backed up; any detected concurrent changes are reported without restoration.'
         checks = $checks
         operations = $operations
         resultDirectory = $evidence

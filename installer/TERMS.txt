@@ -15,7 +15,7 @@ A copy already running from another folder shares the same settings and audio
 engine identity. Setup does not stop that copy or launch another one alongside
 it. Quit the existing copy from its tray menu before using the installed copy.
 
-OPTIONAL THIRD-PARTY DRIVERS
+VIRTUAL INPUT AND OUTPUT DRIVERS
 
 VB-CABLE and Virtual Audio Cable (VAC) are independent proprietary products.
 VineMix's MIT licence does not cover them. Including them does not imply their
@@ -23,6 +23,12 @@ vendors endorse VineMix. Their original packages and notices are preserved. Inst
 driver requires your agreement to its vendor terms and Windows administrator
 approval. A restart may be needed. Existing installations are not replaced by
 this setup. Drivers remain installed when VineMix is uninstalled.
+
+Missing drivers are selected by default: VB-CABLE enables Virtual input and
+VAC Lite provides the compatible VAC driver needed for Virtual output. You can
+clear a selection if you do not need that feature. Physical microphone and
+headphone routing do not require either driver. Driver terms are accepted
+separately; a preselected installation box does not accept them for you.
 
 VB-CABLE is made by VB-Audio. It is donationware; all contributions are welcome.
 You can identify the product and donate or obtain a licence from its vendor:
@@ -34,7 +40,7 @@ VAC Lite is made by Eugene Muzychenko. Its licence permits use only in a private
 home environment unrelated to income generation. It is unsuitable for monetised
 streaming, paid audio work or business use under that licence. Do not select its
 installation if those conditions do not fit your use. VineMix can be installed
-without either optional driver. VAC terms and product information:
+without either driver. VAC terms and product information:
 https://vac.muzychenko.net/en/license.txt
 https://vac.muzychenko.net/en/download.htm
 

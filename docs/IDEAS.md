@@ -4,10 +4,33 @@ A working log for rough ideas, researched options, and possible future features.
 Entries are proposals, not delivery commitments or instructions to implement.
 Existing plans elsewhere in `docs/` remain separate unless an idea links to them.
 
+Reported defects and usability limitations belong in [known issues](KNOWN_ISSUES.md).
+Small refinements to existing controls and layout belong in [tweaks](TWEAKS.md).
+On 2026-10-24, IDEA-012 and IDEA-026 through IDEA-028 moved to known issues as
+ISSUE-002 through ISSUE-005. Their original anchors remain below for existing
+links; their previous priorities and research are retained in the issue entries.
+The 2026-10-25 classification review moved IDEA-046's branding follow-ups and
+the presentation-only portions of IDEA-011 and IDEA-032 to tweaks. New processing
+and telemetry capabilities remain here, with links to the separate refinements.
+
 Implemented items are removed from this active list and retained in the
 [implemented ideas archive](IDEAS_IMPLEMENTED.md). IDs are never reused.
 Cleanup on 20 October 2026 archived IDEA-007 through IDEA-010; their remaining
 manual qualification notes are preserved there.
+
+The maintainer's 25 October 2026 website scroll-story direction is recorded as
+[IDEA-049](IDEAS_IMPLEMENTED.md#idea-049). It was explicitly authorized for local
+implementation after the website cleanup; browser verification and maintainer
+review remain distinct from publication.
+
+The next website exploration is [IDEA-050](#idea-050): a section showcasing
+existing effects above the open-source/beta information. Concept images are
+authorized; the implementation direction remains to be selected.
+
+[IDEA-051](#idea-051) records the matching quick-access header exploration.
+The maintainer selected the quiet-frame header, now implemented locally with
+visual review pending. A later correction replaces the two hero actions with
+one Download link and gives header Docs a more prominent pill; pause remains removed.
 
 ## How this log works
 
@@ -45,15 +68,12 @@ preferences. Completed work stays in [the archive](IDEAS_IMPLEMENTED.md).
 | Priority | ID | Idea | Status |
 | --- | --- | --- | --- |
 | P2 | [IDEA-022](#idea-022) | Save selected node sections as User Presets | Captured |
-| P2 | [IDEA-023](#idea-023) | Named organizational groups with automatic bounds | Captured |
 | P2 | [IDEA-024](#idea-024) | Guided introduction to nodes, noodles and navigation | Captured |
 | P2 | [IDEA-025](#idea-025) | Why no sound? with a highlighted blocking node | Needs decision |
-| P2 | [IDEA-026](#idea-026) | Complete graph keyboard and accessibility support | Captured |
-| P2 | [IDEA-027](#idea-027) | Pointer-friendly precise value editing | Captured |
-| P2 | [IDEA-028](#idea-028) | Navigation through crowded and oversized graphs | Captured |
 | P2 | [IDEA-005](#idea-005) | Pin nodes and tasks to the top of the window | Researched |
-| P2 | [IDEA-011](#idea-011) | Compact bypass and separate disable controls | Captured |
+| P2 | [IDEA-011](#idea-011) | Separate Disable control and processing suspension | Captured |
 | P2 | [IDEA-030](#idea-030) | Selected-node inspector at a readable size | Captured |
+| P2 | [IDEA-051](#idea-051) | Website quick-access header and matching actions | Implemented locally; visual review pending |
 | P3 | [IDEA-029](#idea-029) | Route inspection, diagnostics and useful activity history | Captured |
 | P3 | [IDEA-031](#idea-031) | Task templates and favorite or recent node types | Captured |
 | P3 | [IDEA-032](#idea-032) | More informative overload readings | Captured |
@@ -63,7 +83,6 @@ preferences. Completed work stays in [the archive](IDEAS_IMPLEMENTED.md).
 | P3 | [IDEA-003](#idea-003) | Inline switch and toggle nodes | Researched |
 | P3 | [IDEA-004](#idea-004) | User-created tasks for multiple changes | Researched |
 | P3 | [IDEA-048](#idea-048) | Developer API for third-party apps and automation | Captured |
-| P3 | [IDEA-012](#idea-012) | Silence an app's direct playback while monitoring through VineMix | Researched |
 | P3 | [IDEA-013](#idea-013) | Audio-file inputs and soundboard playback | Researched |
 | P3 | [IDEA-002](#idea-002) | Distortion and related creative effects | Researched |
 | P3 | [IDEA-015](#idea-015) | Support additional virtual audio drivers | Captured |
@@ -79,7 +98,6 @@ preferences. Completed work stays in [the archive](IDEAS_IMPLEMENTED.md).
 | P4 | [IDEA-041](IDEAS_LATER.md#idea-041) | True-peak limiting | Captured |
 | P4 | [IDEA-042](IDEAS_LATER.md#idea-042) | Test-signal generator | Captured |
 | P4 | [IDEA-044](IDEAS_LATER.md#idea-044) | Offline draft workspace editing | Captured |
-| P4 | [IDEA-046](IDEAS_LATER.md#idea-046) | Website and Windows mixer branding follow-ups | Captured |
 | Parked | [IDEA-014](#idea-014) | Dedicated VineMix virtual audio driver | Parked |
 | Parked | [IDEA-045](IDEAS_LATER.md#idea-045) | Scenes and A/B comparison — much later | Parked |
 | Parked | [IDEA-047](#idea-047) | System-latency investigation or separate helper | Parked |
@@ -119,6 +137,11 @@ The remaining priority rows retain their prior scope and status.
   Do not revive rejected features as unlogged improvements.
 
 ## Detailed ideas
+
+Homepage animation decisions and prototype history now live in
+[TWEAK-005](TWEAKS.md#tweak-005). Integration is implemented locally; it has not
+been publicly deployed. The preserved reference and its handoff remain linked
+from that entry.
 
 Original entries below retain their dated research and meaningful changes in
 direction. The new entries and [later backlog](IDEAS_LATER.md) consolidate only
@@ -358,17 +381,17 @@ the candidates reviewed with the maintainer, not every historical planning note.
   then specify the closed-eyes-to-five-second-fade scenario end to end.
 
 <a id="idea-011"></a>
-## IDEA-011: Compact bypass control and clear processing semantics
+<a id="idea-011-compact-bypass-control-and-clear-processing-semantics"></a>
+## IDEA-011: Separate Disable control and processing suspension
 
 - **Captured:** 2026-10-20 (UTC+10). **Status:** Captured.
-- **User concern:** The current effect Bypass button's appearance, position, and
-  state presentation feel unsatisfactory. Another chat suggested that bypass
-  still computes the effect but leaves it out of the audible result; the maintainer asked
-  whether that is true.
-- **Requested direction:** Replace the full-width button with a compact control,
-  potentially a circular button or a switch, and reconsider its position. Neither
-  the final control shape nor placement has been chosen. This is a design note,
-  not a request to implement the change now.
+- **Presentation split, 2026-10-25:** The original compact Bypass appearance,
+  placement and state-wording request is now [TWEAK-006](TWEAKS.md#tweak-006).
+  This idea retains the later request for a separate Disable capability and the
+  engine investigation needed to define it. **Previous priority:** P2.
+- **Original question:** Does bypass leave effect computation running even
+  though its treatment is inaudible? The dated findings below answer that
+  question and inform the proposed processing-suspension behavior.
 - **Verified current behavior (local source review, 2026-10-20):**
   In `native/src/graph.cpp`, `GraphProcessor::process` sets the wet blend target
   to zero for bypass, but runs filter/compressor/ducking processing and calls
@@ -387,18 +410,11 @@ the candidates reviewed with the maintainer, not every historical planning note.
   updating, which can support smooth re-enabling; this is an engineering benefit
   inferred from the implementation, not a measured CPU/transition comparison.
   No external research, CPU benchmark, or live audio check was performed.
-- **Current UI and likely scope:**
-  `desktop/VineMix.Desktop/GraphNodeView.cs` creates the full-width bottom
-  button, grey during normal processing and red when bypass is on. Explore a
-  compact control, potentially in the header or beside effect controls (suggested
-  placements only). Make processing-active versus bypass-active unambiguous,
-  including keyboard focus, accessible state, readable contrast, and a usable
-  click target. Preserve saved state, undo, and legacy-mute handling.
-- **Tradeoffs and open questions:** A power icon or an "Enabled" switch can imply
-  suspended computation or invert today's Bypass On meaning. Choose wording and
-  state cues deliberately. The later two-control proposal below gives suspension
-  its own Disable action; effect history, tails, latency, and re-enable transitions
-  still need decisions before implementation.
+- **Presentation dependency:** Coordinate the future Disable control with
+  [TWEAK-006](TWEAKS.md#tweak-006), without making existing Bypass polish depend
+  on new engine behavior. A power icon or Enabled label must not imply that
+  today's Bypass suspends computation. Effect history, tails, latency and
+  re-enable transitions remain decisions for this idea.
 - **Follow-up investigation (2026-10-20):** The maintainer asked whether fully stopping
   processing on click would disrupt the engine and whether it would improve
   latency. Stopping work need not restart the engine: a proposed implementation
@@ -435,72 +451,18 @@ the candidates reviewed with the maintainer, not every historical planning note.
   Bypassed, and Disabled states and prevent contradictory active controls.
   Disable is provisionally a pass-through state, not mute, deletion, or cable
   disconnection; the detailed semantics still need specification.
-- **Next step:** Compare compact layouts containing both controls, choose their
-  placement/state wording, and define disable/resume and latency behavior before
-  implementation. Measure savings and verify smooth transitions separately.
+- **Next step:** Define disable/resume and latency behavior, then coordinate the
+  two-control layout with TWEAK-006. Measure savings and verify smooth transitions
+  separately; presentation changes alone do not implement processing suspension.
 
 <a id="idea-012-silence-an-apps-direct-playback-while-monitoring-through-vine-mix"></a>
 
 <a id="idea-012"></a>
 ## IDEA-012: Silence an app's direct playback while monitoring through VineMix
 
-- **Captured:** 2026-10-20 (UTC+10). **Status:** Researched.
-- **User need:** Apply EQ or other effects to a running application's audio and
-  hear only the processed result. Currently the app's original playback and Vine
-  Mix's listening output can both reach the same headphones, producing duplicate
-  audio.
-- **Requested direction:** Add a button on running-app input nodes to silence
-  the application's direct local playback while retaining capture and the
-  processed listening route. This differs from the node's existing Mute, which
-  silences its signal inside VineMix. Suggested label: **Mute original playback**,
-  with a tooltip explaining the distinction; wording is not yet chosen.
-- **Project fit:** [Application audio](APP_AUDIO.md) documents that process
-  loopback copies the selected process tree's audio without suppressing original
-  playback. `native/src/process_capture.cpp` implements that capture path, and
-  application discovery already inspects Windows render sessions. Existing code
-  deliberately does not alter application mute, volume, or endpoint assignments.
-  This proposal would introduce an explicit user-controlled exception.
-- **Primary-source research (2026-10-20):**
-  [Microsoft ISimpleAudioVolume::SetMute](https://learn.microsoft.com/en-us/windows/win32/api/audioclient/nf-audioclient-isimpleaudiovolume-setmute)
-  can mute a Windows audio session, and
-  [Audio Sessions](https://learn.microsoft.com/en-us/windows/win32/coreaudio/audio-sessions)
-  explains that a session groups streams and render-session mute can persist
-  across restarts. The
-  [application loopback sample](https://learn.microsoft.com/en-us/samples/microsoft/windows-classic-samples/applicationloopbackaudio-sample/)
-  documents endpoint-independent process-tree capture, but does not guarantee
-  that muting the target's render session leaves this capture audible. Do not
-  infer that guarantee from endpoint-master-volume or AEC loopback behavior.
-- **Feasibility conclusion:** A session-mute control is technically available;
-  whether it achieves original-playback suppression while retaining usable
-  process-loopback audio must be tested with this engine and representative
-  applications. No application was muted, Windows routing changed, or live audio
-  test performed for this research. Do not present a simple mute API call as a
-  proven solution to duplicate monitoring.
-- **Alternative:** Explicitly route the source application to an installed virtual
-  cable, then capture one path and listen through VineMix. This is already
-  described in APP_AUDIO.md and in the
-  [OBS application capture guide](https://obsproject.com/kb/application-audio-capture-guide).
-  A guided routing action could be explored if session mute also silences capture,
-  but introduces device/driver requirements and a separate Windows routing change.
-  Do not enable Windows "Listen to this device" or another simultaneous capture
-  route that restores a duplicate path.
-- **Scope and tradeoffs:** Match all relevant render sessions to the selected
-  process tree, including child processes and new sessions after app restarts or
-  endpoint changes. A session may affect more than one stream; a browser target
-  may include multiple tabs. Original playback mute affects the Windows session,
-  not just the VineMix node, and might affect other consumers. Account for
-  multiple nodes targeting the same app, external mute changes, and preserving a
-  pre-existing user mute. Keep control and session discovery off the audio thread.
-- **Open questions:** Reliable capture-after-session-mute behavior; intended scope
-  when the app plays on several devices; ownership and restoration on unselection,
-  node removal, shutdown, crash, or engine failure; and whether the button should
-  require a healthy listening route. Avoid leaving the app unexpectedly muted or
-  silently unmuting it over a later user change. Recovery policy remains undecided.
-- **Next step:** Define an isolated, user-authorized local-audio qualification:
-  compare capture signal presence and direct playback before/after Windows session
-  mute using known non-protected material. Then check child sessions, relaunch,
-  multiple nodes, and restoration. If capture is silenced, investigate guided
-  virtual-cable routing. This entry authorizes research notes only.
+Moved on 2026-10-24 to [ISSUE-002](KNOWN_ISSUES.md#issue-002).
+The report, proposed remedies and research are maintained there; this ID is retained
+for existing references and must not be reused.
 
 <a id="idea-013"></a>
 ## IDEA-013: Audio-file inputs and soundboard playback
@@ -798,14 +760,17 @@ the candidates reviewed with the maintainer, not every historical planning note.
 - **Maintainer request and rationale:** Reuse useful sections of a node setup.
   **Drag a selection area → right-click → Save Preset → enter a name.** Add a
   **User Presets** dropdown beside **Activity** for accessing saved sections.
+  **Placement review, 2026-10-25:** Activity has since moved into Settings
+  ([TWEAK-003](TWEAKS.md#tweak-003)); retain the original request above and review
+  the preset dropdown's final location when designing this feature.
 - **Proposed content:** Store selected nodes, their sound settings, relative
   layout and internal audio/control/sidechain connections. Reuse the existing
   box-selection and `GraphClipboard` remapping patterns. Loading a preset should
   insert an identifiable new section with fresh IDs, as a single Undo operation.
   This insertion behavior is a design assumption for review, not a confirmed
   replacement/overwrite workflow.
-- **Project fit / research:** `GraphWorkspace.cs` has selection, clipboard and
-  Activity controls; `GraphClipboard.cs` handles selected groups. No named preset
+- **Project fit / research:** `GraphWorkspace.cs` has selection and clipboard
+  controls; `GraphClipboard.cs` handles selected groups. No named preset
   library exists. Local review only; no external feasibility research performed.
 - **Scope, tradeoffs and dependencies:** Medium persistence and UI work. Decide
   placement, name collisions, rename/delete, missing node versions and device/app
@@ -822,27 +787,10 @@ the candidates reviewed with the maintainer, not every historical planning note.
 <a id="idea-023"></a>
 ## IDEA-023: Named organizational groups with automatic bounds
 
-- **Captured:** 2026-10-23. **Status:** Captured. **Priority:** P2.
-- **Maintainer request and rationale:** With one or more nodes highlighted,
-  right-click to create an organizational group. Groups resize to encompass
-  their nodes, can be renamed, and offer a curated list of designed colors
-  instead of a color picker.
-- **Proposal:** A labelled background frame with automatic padding around member
-  bounds, updating as members move or change size. It must keep cables, sockets,
-  selected nodes and warning glows legible. Grouping itself does not alter sound,
-  routing or node identity.
-- **Project fit / research:** `GraphWorkspace.cs` already tracks node selection
-  and bounds; [workspace limitations](NODE_WORKSPACE.md) identify group frames as
-  future work. Local evidence only; no external research or prototype.
-- **Scope, tradeoffs and dependencies:** Medium graph-metadata, rendering and
-  Undo work. Decide membership edits, whole-group movement, copy/preset behavior,
-  overlapping frames and lock interaction (IDEA-017). Suggested first scope has
-  no nested groups; deleting a frame leaves its nodes unless explicitly requested.
-  These are assumptions for review, not settled controls.
-- **Later extensions:** Canvas notes and reusable subgraphs/exposed controls stay
-  P4 possibilities; neither is required for the requested organizational frames.
-- **Next step:** Sketch Create group, rename and the small color palette; test
-  automatic bounds conceptually with mixed-size nodes before deciding nesting.
+Implemented and locally integrated into Beta 6 on **2026-10-28**. The clarified
+request, implementation decisions and verification are retained in the
+[implemented entry](IDEAS_IMPLEMENTED.md#idea-023). Beta 6 remains in development;
+this does not finalize or publish a release.
 
 <a id="idea-024"></a>
 ## IDEA-024: Guided introduction to nodes, noodles and navigation
@@ -901,59 +849,24 @@ the candidates reviewed with the maintainer, not every historical planning note.
 <a id="idea-026"></a>
 ## IDEA-026: Complete graph keyboard and accessibility support
 
-- **Captured:** 2026-10-23. **Status:** Captured. **Priority:** P2.
-- **Origin and need:** Prior UI-review suggestion. Existing keyboard controls
-  should extend to navigating and understanding a complete graph without a mouse.
-- **Proposal:** Next/previous and connected-node traversal, keyboard positioning,
-  F2 rename, automatic reveal of focused nodes, and an optional node/connection
-  outline. Keep accessible node names current after rename; describe controls and
-  real toggle states in context.
-- **Project fit / research:** `GraphWorkspace.cs` and `GraphNodeView.cs` already
-  provide shortcuts, focusable controls and sockets; [the guide](USER_GUIDE.md)
-  records Find node, dial editing and high contrast. This completes remaining
-  interactions rather than replacing existing support. Local review only.
-- **Scope, tradeoffs and dependencies:** Medium; avoid shortcut conflicts and
-  unexpected parameter edits during navigation. Coordinate lock (IDEA-017),
-  groups and presets. Define traversal for branched graphs and editing fields.
-- **Next step:** Walk through create/select/connect/rename/inspect using only a
-  keyboard, then specify missing actions and assistive-technology expectations.
+Moved on 2026-10-24 to [ISSUE-003](KNOWN_ISSUES.md#issue-003).
+The report, proposed remedies and research are maintained there; this ID is retained
+for existing references and must not be reused.
 
 <a id="idea-027"></a>
 ## IDEA-027: Pointer-friendly precise value editing
 
-- **Captured:** 2026-10-23. **Status:** Captured. **Priority:** P2.
-- **Origin and need:** Prior UI-review suggestion for mouse/VR users who cannot
-  conveniently use Enter, Shift or double-click for precise edits.
-- **Proposal:** Explore compact pointer Apply/Cancel, visible pending text,
-  inline validation, a fine-adjustment option and a discoverable reset action.
-  Preserve today's keyboard commit/cancel and deliberate wheel behavior.
-- **Project fit / research:** `Controls/RotaryValueControl.cs` supports exact
-  fields and keyboard gestures; pending text can be discarded on focus loss.
-  Local review only. Controls and accepted compact styling already exist.
-- **Scope, tradeoffs and dependencies:** Small to medium; the extra affordances
-  must not overwhelm every node. Decide whether they appear only during editing
-  or in a contextual editor. Keep one undoable edit per completed gesture.
-- **Next step:** Compare one minimal contextual-edit design with the current
-  control, using pointer-only entry, invalid text, cancellation and focus changes.
+Moved on 2026-10-24 to [ISSUE-004](KNOWN_ISSUES.md#issue-004).
+The discarded-edit problem and apply/cancel remedies remain there. Optional
+fine-adjustment/reset presentation is now [TWEAK-007](TWEAKS.md#tweak-007).
+This ID is retained for existing references and must not be reused.
 
 <a id="idea-028"></a>
 ## IDEA-028: Navigation through crowded and oversized graphs
 
-- **Captured:** 2026-10-23. **Status:** Captured. **Priority:** P2.
-- **Origin and need:** Prior UI-review suggestion. Users need to pan even when
-  nodes fill the window, and understand a Fit action that cannot show everything.
-- **Proposal:** Explore a hand/pan mode or reserved navigation area, with an
-  optional overview navigator. Make the minimum-zoom fit limit understandable
-  rather than implying every graph will fit. Existing Find and Frame selection
-  remain available.
-- **Project fit / research:** `GraphWorkspace.cs` clamps zoom and initiates
-  right-drag panning on empty space; [workspace controls](NODE_WORKSPACE.md)
-  document existing navigation. Local inspection only; no external research.
-- **Scope and tradeoffs:** Medium UI work; avoid intercepting dials, cable edits
-  or selection. No decision to change supported zoom bounds or renderer. A hand
-  mode may solve the main problem without an always-visible overview panel.
-- **Next step:** Review a dense example at minimum zoom and select the smallest
-  navigation addition that works with lock mode and pointer-only use.
+Moved on 2026-10-24 to [ISSUE-005](KNOWN_ISSUES.md#issue-005).
+The report, proposed remedies and research are maintained there; this ID is retained
+for existing references and must not be reused.
 
 <a id="idea-029"></a>
 ## IDEA-029: Route inspection, diagnostics and useful activity history
@@ -1024,7 +937,8 @@ the candidates reviewed with the maintainer, not every historical planning note.
   processing stage exceeded full scale, with a supported peak magnitude.
 - **Proposal:** Improve engine telemetry and optional inspection to identify the
   first observed overloaded stage and channel, and report above-zero magnitude
-  if measured. Evaluate a longer moving-peak hold only as an optional refinement.
+  if measured. The separate optional moving-peak hold refinement moved to
+  [TWEAK-008](TWEAKS.md#tweak-008) on 2026-10-25; it needs no new telemetry.
 - **Project fit / research:** [Existing meter behavior](NODE_WORKSPACE.md) reports
   node-level overload and caps numerical readings at 0 dBFS; it is sampled
   telemetry, not complete lifetime history. Local evidence only.
@@ -1155,6 +1069,118 @@ the candidates reviewed with the maintainer, not every historical planning note.
   sample microphone mute/volume app. Test simultaneous desktop and external
   changes, reconnects, missing targets, rejected credentials and excessive
   update rates in isolated fixtures before exposing the personal engine.
+
+<a id="idea-050"></a>
+## IDEA-050: Website effects showcase
+
+- **Captured:** 2026-10-26. **Status:** Needs decision; visual exploration
+  requested, implementation and publication not yet selected.
+- **User need:** Help homepage visitors discover the effects VineMix includes
+  and understand what they do, beyond the current routing demonstration.
+- **Placement:** Add a section immediately above **Open source and in beta.**
+  (`.trust#open`), after the use-case section. The maintainer explicitly chose
+  this temporary position rather than requiring it directly after the node story.
+- **Directions being explored:** An **effects shelf**, with native nodes in a
+  horizontally browsable gallery; an **effect spotlight**, with a grouped index
+  and one readable native node; and **example effect chains**, pairing a useful
+  outcome with several connected effects. The chains are illustrative website
+  examples, not a claim that the application already supplies these presets.
+- **Concept images, displayed order:**
+  [1 — effects shelf](../website-redesign/reference-assets/effects-concepts/01-effects-shelf.png),
+  [2 — effect spotlight](../website-redesign/reference-assets/effects-concepts/02-effect-spotlight.png),
+  [3 — example chains](../website-redesign/reference-assets/effects-concepts/03-example-chains.png).
+  These are image-generated layout proposals, not implemented screens. Native
+  control details and cable socket alignment must be corrected from actual
+  application renders in a selected implementation. The live site is unchanged.
+- **Assumptions:** Continue the current dark page, mint accents, IBM Plex type
+  and native node artwork. Keep examples silent. Show genuine current effects;
+  do not imply planned pitch shifting, distortion, plugin hosting or recording.
+- **Evidence:** Existing effects and limitations checked against
+  [the user guide](USER_GUIDE.md#node-library) and local website source
+  on 2026-10-26. Page and native-node screenshots ground the concept images.
+  No external research or usability study has been performed for these layouts.
+- **Scope and tradeoffs:** One responsive homepage section. The shelf shows
+  breadth, the spotlight gives controls more readable space, and the chains
+  explain combinations but repeat some of the preceding routing story. A later
+  implementation needs current native effect renders and accessible selection
+  controls with a static fallback; no audio engine or new DSP is required.
+- **Dependencies:** Existing [scroll story](IDEAS_IMPLEMENTED.md#idea-049) and
+  [website refinements](TWEAKS.md#tweak-009). Image-generated controls are concept
+  illustrations; implementation should use verified native artwork.
+- **Next step:** Review the three independent concept images, choose or refine
+  a direction, then implement the selected section locally.
+
+<a id="idea-051"></a>
+## IDEA-051: Website quick-access header and matching actions
+
+- **Captured:** 2026-10-26. **Status:** Implemented locally after the maintainer
+  selected example 1; visual review pending. No public deployment.
+- **User need:** Make the main sections easy to reach and give the landing
+  actions even dimensions within a coherent header/button design.
+- **Final paired concepts, displayed order:**
+  [1 — quiet frame](../website-redesign/reference-assets/header-button-concepts/01-quiet-frame.png)
+  pairs a minimal ruled header with separate rectangular actions;
+  [2 — floating navigation](../website-redesign/reference-assets/header-button-concepts/02-floating-navigation.png)
+  pairs a floating pill header with rounded actions;
+  [3 — unified toolbar](../website-redesign/reference-assets/header-button-concepts/03-unified-toolbar.png)
+  pairs a full-width toolbar with joined equal-width actions. These three
+  image-generated proposals supersede the earlier two drafts containing a
+  pause button. They illustrate layout, not exact font or spacing measurements.
+- **Selected implementation:** The quiet-frame header uses the existing native
+  VineMix wordmark in white, right-aligned links and a faint bottom rule.
+  **How it works** links to `#sound`, **Setup** to `#setup`, **FAQ** to `#faq`,
+  and **Docs** to the existing user guide. A later request replaces Docs' subdued
+  fill with a white pill, black text and black arrow. A further correction reduces
+  its height from 44 to 36 px, with 13 px text and a 12 px arrow; forced-colour
+  system styling remains. Navigation stays within the hero and scrolls away;
+  the logo now persists separately as described below.
+  At 720 px and below, JavaScript enhances the links into a **Menu** disclosure
+  with a compact panel. Without JavaScript, the compact links remain visible.
+  Escape, outside click, link activation and focus leaving dismiss the panel;
+  breakpoint changes manage keyboard focus. The latest hero uses a single
+  centred Download action using Flow Hover's transparent rest and sweeping white
+  fill, with a stationary download icon/label,
+  replacing the earlier equal pair under
+  [TWEAK-012](TWEAKS.md#tweak-012), and removes its platform/beta note. The removed pause control, dark/mint styling
+  and reader sequence are retained.
+- **Persistent logo extension, 2026-10-26:** The maintainer requested that the
+  header logo smoothly centre as the header leaves view, retract its lettering
+  into the VM symbol like the main hero, and provide a return-to-top link.
+  The same native link now settles into a fixed 44 × 44 px target, centred
+  12 px below the viewport top. The initial circular backing was subsequently
+  rejected; only a tight SVG drop shadow remains, disabled in forced colours. Reverse
+  scrolling restores the expanded logo. Activating it closes the mobile menu
+  and returns to `#top`; ordinary modified links keep their native behavior.
+  Reduced motion uses an instant change after header exit, and no JavaScript
+  retains the expanded logo and native header links. The story and anchor
+  offsets reserve 72 px above content for the persistent mark.
+- **Evidence and scope:** Existing anchors, guide destination and styles were
+  inspected in [homepage source](../website-redesign/src/index.html) and
+  [styles](../website-redesign/src/styles.css) on 2026-10-26. No external design
+  research or usability study was performed for the initial header. The later
+  Download reference is documented in [provenance](../website-redesign/PROVENANCE.md).
+  The selected implementation uses local
+  brand assets rather than the generated image's approximate lettering. The
+  initial fully scrolling header remains part of the design history; the later
+  request makes only the brand persistent, with matching content clearance.
+- **Correction and dependency:** The maintainer separately authorized removing
+  the pause control and fixing the current action sizes; that local refinement
+  is [TWEAK-012](TWEAKS.md#tweak-012). The subsequent explicit selection authorized
+  implementing the quiet-frame header; the other two directions remain history.
+- **Tradeoff:** The quiet frame leaves most attention on the hero;
+  floating navigation has a stronger rounded shape; the toolbar provides a more
+  continuous navigation surface.
+- **Verification and next step:** Initial header build, source, actual-module
+  interaction, bundled-font/layout and served-output checks passed. The later
+  Download/boxed-Docs revision passed build, independent source review,
+  header font-fit calculations and served-output checks. It has no new browser
+  verification. The persistent-logo implementation passed build and all three
+  check suites, including actual-module scroll/lifecycle checks and 72 px story
+  clearance assertions, plus served-output and SVG/unique-ID checks. Browser and native
+  capture connections are unavailable, so visual fidelity remains unverified.
+  See [QA](../website-redesign/QA.md) and
+  [the visual review](../website-redesign/design-qa.md). Capture desktop and phone
+  implementations for comparison, then complete maintainer review.
 
 ## Dependencies within the priority order
 
