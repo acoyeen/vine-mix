@@ -1,0 +1,30 @@
+P Shader by Diego Biaggioni (@digogois2)
+https://21st.dev/@digogois2/components/p-shader
+Generated with the 21st.dev Shader Builder (Orb).
+The component page identifies the license as MIT. Source viewed 2026-10-25
+through the site's normal source-view flow.
+
+VineMix adaptations: selected-preset cleanup, custom palette, dependency-free
+renderer, bounded rendering, shared pause policy, fallback and resource cleanup.
+
+MIT License
+
+Copyright (c) Diego Biaggioni
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.

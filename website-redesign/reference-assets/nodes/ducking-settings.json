@@ -1,0 +1,10 @@
+{
+  "mode": "dynamic",
+  "thresholdDb": -42,
+  "ratio": 8,
+  "attackMs": 10,
+  "releaseMs": 250,
+  "width": 784,
+  "height": 1184,
+  "imageSha256": "7e6a1c8785a8702105356ecfd64fd87e1f660d8d21222deb128f2b61f304daaf"
+}

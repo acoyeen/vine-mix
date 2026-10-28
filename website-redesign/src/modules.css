@@ -1,0 +1,138 @@
+/* Typography, colours and column rhythm follow the existing website. */
+.vm-open {
+  width: 100%;
+  margin-inline: 0;
+  padding-inline: max(var(--gutter), calc((100% - 1120px) / 2));
+  background: #202224;
+  display: grid;
+  grid-template-columns: 1fr 1.1fr;
+  align-items: start;
+  gap: clamp(48px, 7vw, 100px);
+  padding-block: 96px;
+}
+.vm-open h2 {
+  margin: 0;
+  font-size: var(--section-heading-size);
+  line-height: var(--section-heading-leading);
+  letter-spacing: var(--section-heading-tracking);
+  font-weight: var(--section-heading-weight);
+}
+.vm-open p {
+  color: #b1b9b2;
+  font-size: 17px;
+  line-height: 1.6;
+  margin: 10px 0 0;
+  max-width: 46ch;
+}
+.vm-open__intro p { margin-top: 27px; }
+.vm-open__button {
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 54px;
+  max-width: 100%;
+  margin-top: 28px;
+  padding: 12px 20px;
+  overflow: hidden;
+  border: 1px solid #eef1f7;
+  border-radius: 8px;
+  background: transparent;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.2;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.vm-open__button::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: 50%;
+  background: #fff;
+  transform: translate(150%,150%) scale(2.5);
+  transition: transform .5s cubic-bezier(.4,0,.2,1);
+  pointer-events: none;
+}
+.vm-open__button-content {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #fff;
+}
+.vm-open__button-label { position: relative; z-index: 1; font-weight: 600; mix-blend-mode: difference; }
+.vm-open__button-icon {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  flex: 0 0 26px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: transparent;
+  mix-blend-mode: difference;
+}
+.vm-open__button-content img { display: block; flex: none; width: 20px; height: 20px; filter: brightness(0) invert(1); }
+.vm-open__button:is(:hover,:focus-visible)::before { transform: translate(0,0) scale(2.5); }
+.vm-open__button:focus-visible { outline: 2px solid #c7d2eb; outline-offset: 5px; }
+.vm-open__details { padding-top: 7px; }
+.vm-open__details article + article { margin-top: 30px; }
+.vm-open h3 {
+  margin: 0;
+  font-size: 21px;
+  line-height: 1.4;
+  font-weight: 600;
+  letter-spacing: -.02em;
+}
+@media (max-width: 760px) {
+  .vm-open { gap: 38px; grid-template-columns: 1fr 1fr; }
+  .vm-open h3 { font-size: 19px; }
+  .vm-open p { font-size: 16px; }
+}
+@media (max-width: 600px) {
+  .vm-open { grid-template-columns: 1fr; gap: 46px; padding-block: 64px; }
+  .vm-open__intro p { margin-top: 24px; }
+  .vm-open__details { padding-top: 0; }
+  .vm-open__details article + article { margin-top: 30px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .vm-open__button, .vm-open__button::before { transition: none; }
+}
+@media (forced-colors: active) {
+  .vm-open__button::before { display: none; }
+  .vm-open__button-label { color: LinkText; mix-blend-mode: normal; }
+  .vm-open__button-icon { display: none; }
+}
+
+/* One native CanvasGrid covers both demonstrations, including the sticky scene.
+   Transparent descendants share this origin; there is no tiled seam to align. */
+.audio-canvas {
+  background: #000 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20'%3E%3Crect width='1' height='1' fill='%231B1F23' opacity='.8'/%3E%3C/svg%3E") center top / 20px 20px;
+}
+
+/* Spacing separates the native-canvas demonstrations without a divider. */
+vine-mix-pipeline {
+  display: block;
+  /* The canvas heading already reserves clearance for the floating logo. */
+  scroll-margin-top: 0;
+}
+
+vine-mix-pipeline:not(:defined) .pipeline-fallback { padding-block: 128px 112px; }
+.pipeline-fallback h2 {
+  font-size: var(--section-heading-size);
+  font-weight: var(--section-heading-weight);
+  line-height: var(--section-heading-leading);
+  letter-spacing: var(--section-heading-tracking);
+}
+.pipeline-fallback p { margin-top: 24px; }
+
+
+@media (forced-colors: active) {
+  .audio-canvas { background: Canvas; }
+}

@@ -128,6 +128,16 @@ playback; its original playback remains audible. Parallel paths have no automati
 latency compensation. The limiter handles sample peaks without lookahead or
 true-peak detection. Audible recovery and long sessions still need qualification.
 
+## Forks and attribution
+
+Forks and modified versions are welcome. Preserve the full [MIT licence notice](LICENSE),
+which credits acoyeen and identifies VineMix and its website. Please also include
+**"Based on VineMix by acoyeen"** in your About, Credits or Licences screen,
+linking to [vinemix.app](https://vinemix.app) or the
+[original repository](https://github.com/acoyeen/vine-mix).
+See [Crediting VineMix](ATTRIBUTION.md) for the required notices, requested
+in-program acknowledgement and guidance for earlier versions.
+
 ## Build from source
 
 The development project and checkout folder are named `vine-mix`; the product

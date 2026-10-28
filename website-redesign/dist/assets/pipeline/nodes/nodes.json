@@ -1,0 +1,272 @@
+[
+  {
+    "kind": "microphone",
+    "label": "Physical input",
+    "file": "microphone.png",
+    "width": 784,
+    "height": 786,
+    "ports": [
+      {
+        "output": true,
+        "x": 747,
+        "y": 130
+      }
+    ],
+    "meter": {
+      "file": "microphone-meter-full.png",
+      "x": 62,
+      "y": 172,
+      "width": 56,
+      "height": 480,
+      "lanes": [
+        {
+          "x": 6,
+          "y": 14,
+          "width": 16,
+          "height": 462
+        },
+        {
+          "x": 34,
+          "y": 14,
+          "width": 16,
+          "height": 462
+        }
+      ]
+    }
+  },
+  {
+    "kind": "highPass",
+    "label": "High-pass filter",
+    "file": "highPass.png",
+    "width": 784,
+    "height": 818,
+    "ports": [
+      {
+        "output": false,
+        "x": 37,
+        "y": 586
+      },
+      {
+        "output": true,
+        "x": 747,
+        "y": 130
+      }
+    ],
+    "meter": {
+      "file": "highPass-meter-full.png",
+      "x": 62,
+      "y": 172,
+      "width": 56,
+      "height": 360,
+      "lanes": [
+        {
+          "x": 6,
+          "y": 14,
+          "width": 16,
+          "height": 342
+        },
+        {
+          "x": 34,
+          "y": 14,
+          "width": 16,
+          "height": 342
+        }
+      ]
+    }
+  },
+  {
+    "kind": "denoiser",
+    "label": "Denoiser",
+    "file": "denoiser.png",
+    "width": 784,
+    "height": 968,
+    "ports": [
+      {
+        "output": false,
+        "x": 37,
+        "y": 736
+      },
+      {
+        "output": true,
+        "x": 747,
+        "y": 130
+      }
+    ],
+    "meter": {
+      "file": "denoiser-meter-full.png",
+      "x": 62,
+      "y": 172,
+      "width": 56,
+      "height": 510,
+      "lanes": [
+        {
+          "x": 6,
+          "y": 14,
+          "width": 16,
+          "height": 492
+        },
+        {
+          "x": 34,
+          "y": 14,
+          "width": 16,
+          "height": 492
+        }
+      ]
+    }
+  },
+  {
+    "kind": "expander",
+    "label": "Expander",
+    "file": "expander.png",
+    "width": 928,
+    "height": 1058,
+    "ports": [
+      {
+        "output": false,
+        "x": 37,
+        "y": 826
+      },
+      {
+        "output": true,
+        "x": 891,
+        "y": 130
+      }
+    ],
+    "meter": {
+      "file": "expander-meter-full.png",
+      "x": 62,
+      "y": 172,
+      "width": 56,
+      "height": 600,
+      "lanes": [
+        {
+          "x": 6,
+          "y": 14,
+          "width": 16,
+          "height": 582
+        },
+        {
+          "x": 34,
+          "y": 14,
+          "width": 16,
+          "height": 582
+        }
+      ]
+    }
+  },
+  {
+    "kind": "compressor",
+    "label": "Compressor",
+    "file": "compressor.png",
+    "width": 928,
+    "height": 1058,
+    "ports": [
+      {
+        "output": false,
+        "x": 37,
+        "y": 826
+      },
+      {
+        "output": true,
+        "x": 891,
+        "y": 130
+      }
+    ],
+    "meter": {
+      "file": "compressor-meter-full.png",
+      "x": 62,
+      "y": 172,
+      "width": 56,
+      "height": 600,
+      "lanes": [
+        {
+          "x": 6,
+          "y": 14,
+          "width": 16,
+          "height": 582
+        },
+        {
+          "x": 34,
+          "y": 14,
+          "width": 16,
+          "height": 582
+        }
+      ]
+    }
+  },
+  {
+    "kind": "eq",
+    "label": "Equaliser",
+    "file": "eq.png",
+    "width": 1312,
+    "height": 1418,
+    "ports": [
+      {
+        "output": false,
+        "x": 37,
+        "y": 1186
+      },
+      {
+        "output": true,
+        "x": 1275,
+        "y": 130
+      }
+    ],
+    "meter": {
+      "file": "eq-meter-full.png",
+      "x": 62,
+      "y": 172,
+      "width": 56,
+      "height": 960,
+      "lanes": [
+        {
+          "x": 6,
+          "y": 14,
+          "width": 16,
+          "height": 942
+        },
+        {
+          "x": 34,
+          "y": 14,
+          "width": 16,
+          "height": 942
+        }
+      ]
+    }
+  },
+  {
+    "kind": "virtualOutput",
+    "label": "Virtual output",
+    "file": "virtualOutput.png",
+    "width": 784,
+    "height": 714,
+    "ports": [
+      {
+        "output": false,
+        "x": 37,
+        "y": 578
+      }
+    ],
+    "meter": {
+      "file": "virtualOutput-meter-full.png",
+      "x": 62,
+      "y": 172,
+      "width": 56,
+      "height": 352,
+      "lanes": [
+        {
+          "x": 6,
+          "y": 14,
+          "width": 16,
+          "height": 334
+        },
+        {
+          "x": 34,
+          "y": 14,
+          "width": 16,
+          "height": 334
+        }
+      ]
+    }
+  }
+]

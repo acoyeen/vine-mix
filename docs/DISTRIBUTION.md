@@ -22,6 +22,13 @@ including commercial distribution, subject to its terms. Keep its copyright
 and permission notice in copies or substantial portions of that material.
 Third-party components retain their own terms and notices alongside it.
 
+The copyright notice was expanded on 28 October 2026 to identify VineMix and
+`https://vinemix.app` alongside acoyeen. Preserve the complete notice supplied
+with the source you use. [Crediting VineMix](../ATTRIBUTION.md) explains the MIT
+requirement and requests a short acknowledgement in modified programs. The
+requested interface placement is not an additional licence condition. Earlier
+releases keep their original notices and permissions.
+
 The repository excludes local build tools, downloaded archives, compiled
 packages, user settings, activation backups and historical design captures.
 Those folders can contain private endpoint identifiers, process names, machine

@@ -6,6 +6,11 @@ See the [implementation plan and evidence](BRANDING_IMPLEMENTATION_PLAN.md).
 
 ## Naming
 
+For independent forks, see [Crediting VineMix](../ATTRIBUTION.md). A short text
+acknowledgement and original-project link are the requested attribution; keeping
+the logo or naming a fork VineMix is not required. The visual conventions below
+describe the official product.
+
 Use **VineMix**, without a space, in product copy, accessibility text, release
 titles and documentation. Use `vine-mix` for the repository, Codex project and
 checkout folder. Language-specific names retain their normal syntax, including
