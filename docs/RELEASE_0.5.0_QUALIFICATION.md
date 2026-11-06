@@ -36,6 +36,15 @@ The final quiet 30-Distortion routing-fade test measured **4.8399 ms p99** again
 the 5-ms quantum (3.8794-ms median). This passes the measured budget with limited
 margin; the separate RNNoise capacity diagnostic below remains a recorded limit.
 
+**Subsequent capacity failure:** the documentation-only main commit's
+[cloud run](https://github.com/acoyeen/vine-mix/actions/runs/42155431986) failed
+the same 30-Distortion routing-fade gate at **5.3432-ms median / 9.6201-ms p99**.
+The native source and tests were unchanged; the earlier release cloud run measured
+3.8406 / 3.9621 ms and passed. Every other suite and the preceding 460 creative
+checks passed. This is host-dependent processing capacity, with a median already
+over budget; it is not dismissed as a single outlier. The failed evidence and
+released source/assets are preserved. See [ISSUE-027](KNOWN_ISSUES.md#issue-027).
+
 The Release desktop suite passed **15,354 checks**, produced **328 previews**
 and reported **zero binding errors**. The focused documentation run passed
 **225 checks / 22 captures**, including normal/minimum windows and 96/192 DPI.
@@ -103,6 +112,28 @@ hosting settings and domain routing were preserved. The
 [website cutover record](../website-redesign/HOSTING.md#050-beta-release-cutover--6-november-2026)
 contains deployment identity and scope. No browser/computer-use automation was used.
 
+## Local installation
+
+The exact published Setup installed 0.5.0 successfully through the trusted
+Windows-shell path with optional driver installation disabled. All **37 payload
+files**, the installed inventory, Windows registration and shortcuts were
+verified. The engine used the same physical settings file, retained the saved
+configuration and restored every previously running route. Frames advanced
+through 8 seconds of engine observation, followed by 8 seconds with the actual
+shortcut-launched UI. Workspace and preference files were unchanged; no volumes
+were adjusted and no settings backup or package rollback was needed.
+
+A separate read-only audit confirmed both process identities and hashes,
+all **41 installed files**, **36 inventory entries** and **3 shortcuts**.
+The successful installation and withheld first attempt were archived privately
+with every copied evidence file rehashed.
+
+The private installer wrapper first withheld activation before stopping any app
+because its cold child-process list produced an invalid query. The correction
+passed **32 isolated recovery checks** and **7 real read-only checks under the
+trusted shell** before the successful retry. Complete previous-package,
+registration, shortcut and settings backups remain outside the checkout.
+
 ## Reproduce the offline checks
 
 From Windows 11 x64 with PowerShell 7:
@@ -119,6 +150,23 @@ standalone checks run against the exact final packages; see
 [installer verification](../installer/README.md#verification) and
 [release publication](../.github/release/README.md).
 
+The post-release CI adjustment adds `-HostedBenchmarkReport` for variable hosted
+workers. It runs every creative benchmark and every correctness/allocation
+assertion, records measured times and `budgetExceeded` separately, and reports
+capacity in the CI summary. It does not change the application or the 5-ms budget.
+The default command above remains strict and fails a measured budget overrun.
+Hosted functional success must not be reported as strict performance qualification.
+
+The test-only policy change passed both hosted-report and default-strict local
+integration: all **19 native suites** and all **8 creative benchmark cases**.
+The final **14 deterministic policy checks** prove strict over-budget rejection,
+accurate report-mode exceedances, and fatal sound/allocation/invalid-evidence
+failures in both modes. The strict follow-up measured 4.3839-ms p99 for the
+30-Distortion routing fade; it does not replace the recorded cloud overrun.
+The creative assertion count changes from 461 to 453 because two timing
+assertions per case become one validity assertion plus explicit budget policy;
+no sound, allocation or transition assertion was removed.
+
 ## Limits
 
 Detached verification does not establish native pointer, Narrator, IME or VR
@@ -129,8 +177,8 @@ machine. Component and signed-worker checks do not establish every complete
 delivered update, health-check, rollback and interruption transaction on a
 separate account.
 
-Distortion-heavy maximum graphs have limited processing margin during routing
-fades. A separate 30-RNNoise diagnostic exceeded the 5-ms processing budget;
+Distortion-heavy maximum graphs can exceed the processing budget during routing
+fades on some hosts. A separate 30-RNNoise diagnostic exceeded the 5-ms budget;
 1- and 4-node cases stayed within it on the test host. See
 [ISSUE-030](KNOWN_ISSUES.md#issue-030) for the actual timings and limits. The
 32-node cap is routing capacity, not a promise for every effect combination.

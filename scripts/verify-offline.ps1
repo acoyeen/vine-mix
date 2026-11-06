@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([switch]$SkipBuild, [switch]$NativeOnly, [string]$ResultDirectory = '', [string]$BuildDirectory = '')
+param([switch]$SkipBuild, [switch]$NativeOnly, [switch]$HostedBenchmarkReport, [string]$ResultDirectory = '', [string]$BuildDirectory = '')
 $ErrorActionPreference = 'Stop'
 $project = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 if (-not $BuildDirectory) { $BuildDirectory = Join-Path $env:LOCALAPPDATA 'VineMix.BuildCache\release\native' }
@@ -19,6 +19,7 @@ $targets = @('VineMix.GraphTests','VineMix.ConfigurationPrecisionTests','VineMix
 $oldPath=$env:PATH; $oldDotnet=$env:DOTNET_ROOT
 $results=[Collections.Generic.List[object]]::new()
 $failure=$null
+$creativeBenchmark=$null
 try {
     $env:PATH="$compiler;$oldPath"; $env:DOTNET_ROOT=Join-Path $project '.tools\dotnet'
     if (-not $SkipBuild) {
@@ -34,12 +35,31 @@ try {
         if (-not (Test-Path -LiteralPath $path)) { throw "Missing verifier: $target" }
         $arguments=@()
         if ($target -eq 'VineMix.QualificationTests') { $arguments=@((Join-Path $ResultDirectory 'configuration-fixtures')) }
+        if ($target -eq 'VineMix.CreativeEffectsTests') {
+            $benchmarkPath=Join-Path $ResultDirectory 'creative-benchmarks.json'
+            $arguments=@($(if ($HostedBenchmarkReport) { '--benchmark-report' } else { '--benchmark-json' }), $benchmarkPath)
+        }
         $timer=[Diagnostics.Stopwatch]::StartNew()
         $output=& $path @arguments 2>&1
         $code=$LASTEXITCODE
         $output | Set-Content -LiteralPath (Join-Path $ResultDirectory ($target+'.txt')) -Encoding utf8
         $results.Add([ordered]@{test=$target;passed=($code -eq 0);exitCode=$code;seconds=[Math]::Round($timer.Elapsed.TotalSeconds,3)})
+        if ($target -eq 'VineMix.CreativeEffectsTests') {
+            $creativeBenchmark=Get-Content -LiteralPath $benchmarkPath -Raw | ConvertFrom-Json
+            $expectedMode=if ($HostedBenchmarkReport) { 'hosted-report' } else { 'strict' }
+            if ($creativeBenchmark.mode -ne $expectedMode -or $creativeBenchmark.budgetUs -ne 5000 -or
+                ($code -eq 0 -and (-not $creativeBenchmark.completed -or -not $creativeBenchmark.functionalChecksPassed -or $creativeBenchmark.cases.Count -ne 8)) -or
+                (-not $HostedBenchmarkReport -and $code -eq 0 -and $creativeBenchmark.budgetExceeded)) {
+                throw 'Creative benchmark evidence does not match the requested policy or complete eight-case coverage.'
+            }
+        }
     }
+    $policyResult=Join-Path $ResultDirectory 'creative-benchmark-policy'
+    $policyOutput=& pwsh -NoProfile -NonInteractive -File (Join-Path $PSScriptRoot 'test-creative-benchmark-policy.ps1') -Verifier (Join-Path $build 'VineMix.CreativeEffectsTests.exe') -ResultDirectory $policyResult 2>&1
+    $policyCode=$LASTEXITCODE
+    $policyOutput | Set-Content -LiteralPath (Join-Path $ResultDirectory 'creative-benchmark-policy.txt') -Encoding utf8
+    $policyReport=Get-Content -LiteralPath (Join-Path $policyResult 'results.json') -Raw | ConvertFrom-Json
+    $results.Add([ordered]@{test='Creative benchmark policy';passed=($policyCode -eq 0 -and $policyReport.passed);checks=$policyReport.checks.Count})
     # These suites use only private synthetic files and distinctly named inert
     # children. The general local-activation suite also launches Explorer and is
     # intentionally excluded from this offline allow-list.
@@ -81,8 +101,22 @@ try {
 } finally {
     $env:PATH=$oldPath; $env:DOTNET_ROOT=$oldDotnet
     $passed=(-not $failure) -and @($results | Where-Object {-not $_.passed}).Count -eq 0
-    [ordered]@{passed=$passed;error=$failure;scope='Synthetic audio, temporary configuration fixtures, fake endpoint inventory, and optional detached UI/private test pipes. No desktop input, real audio devices, production control pipe or personal settings.';tests=$results;resultDirectory=$ResultDirectory} |
-        ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $ResultDirectory 'results.json') -Encoding utf8
+    [ordered]@{passed=$passed;error=$failure;scope='Synthetic audio, temporary configuration fixtures, fake endpoint inventory, and optional detached UI/private test pipes. No desktop input, real audio devices, production control pipe or personal settings.';tests=$results;creativeBenchmarks=$creativeBenchmark;resultDirectory=$ResultDirectory} |
+        ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $ResultDirectory 'results.json') -Encoding utf8
+    if ($env:GITHUB_STEP_SUMMARY -and $creativeBenchmark) {
+        $summary=[Collections.Generic.List[string]]::new()
+        $summary.Add('### Creative-effect benchmark evidence')
+        $summary.Add('')
+        $summary.Add("Mode: **$($creativeBenchmark.mode)**. Functional checks passed: **$($creativeBenchmark.functionalChecksPassed)**. 5 ms budget exceeded: **$($creativeBenchmark.budgetExceeded)**.")
+        $summary.Add('Hosted reporting is not strict timing qualification. This policy skips no workloads; correctness and allocation failures still fail this job and may stop the suite. Default local/release verification retains the strict 5 ms gate.')
+        $summary.Add('')
+        $summary.Add('| Effect | Nodes | Routing fade | Combined median (ms) | Combined p99 (ms) | Reset maximum (ms) | Budget exceeded |')
+        $summary.Add('|---|---:|:---:|---:|---:|---:|:---:|')
+        foreach ($case in $creativeBenchmark.cases) {
+            $summary.Add("| $($case.effect) | $($case.effectCount) | $($case.routingFade) | $($case.combinedMedianUs/1000) | $($case.combinedP99Us/1000) | $($case.resetMaximumUs/1000) | $($case.budgetExceeded) |")
+        }
+        $summary | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Encoding utf8
+    }
     Get-Content -LiteralPath (Join-Path $ResultDirectory 'results.json')
 }
 if (-not $passed) { throw 'Offline verification failed. See the recorded test reports.' }

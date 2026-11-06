@@ -82,8 +82,8 @@ accessibility testing remain incomplete. See the
 
 Per-app capture also leaves the app's original playback audible. Parallel paths
 have no automatic delay compensation, and Distortion uses more processing time
-than most effects. Many neural denoisers can also exceed the audio processing
-budget; 32 nodes is the routing capacity, not a performance guarantee.
+than most effects. Large Distortion or neural-denoiser graphs can exceed the
+audio processing budget; 32 nodes is routing capacity, not a performance guarantee.
 [Known issues](docs/KNOWN_ISSUES.md) records the details.
 
 ## Learn more

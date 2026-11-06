@@ -6,6 +6,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
+#include <fstream>
 #include <iostream>
 #include <limits>
 #include <new>
@@ -27,6 +28,47 @@ namespace {
 using namespace am;
 std::uint64_t checks{};
 void require(bool condition, const std::string& message) { ++checks; if (!condition) throw std::runtime_error(message); }
+struct BudgetExceeded : std::runtime_error { using std::runtime_error::runtime_error; };
+struct BenchmarkPolicy {
+    bool reportOnly{}, budgetExceeded{};
+    Json cases = Json::array();
+    void record(const char* kind, int count, bool fade, double medianUs, double p99Us, double resetUs) {
+        require(std::isfinite(medianUs) && std::isfinite(p99Us) && std::isfinite(resetUs)
+            && medianUs >= 0 && p99Us >= medianUs && resetUs >= 0, "Benchmark measurements must be finite, ordered, nonnegative durations");
+        const bool processingExceeded = p99Us >= 5000, resetExceeded = resetUs >= 5000;
+        budgetExceeded |= processingExceeded || resetExceeded;
+        // Record the original values before a strict failure, never clamp or
+        // replace them with a retry. Hosted reporting changes only disposition.
+        cases.push_back({{"effect", kind}, {"effectCount", count}, {"routingFade", fade},
+            {"combinedMedianUs", medianUs}, {"combinedP99Us", p99Us}, {"resetMaximumUs", resetUs},
+            {"processingBudgetExceeded", processingExceeded}, {"resetBudgetExceeded", resetExceeded},
+            {"budgetExceeded", processingExceeded || resetExceeded}});
+        if (!reportOnly && (processingExceeded || resetExceeded))
+            throw BudgetExceeded("Creative graph exceeds the unchanged strict 5-ms processing/reset budget");
+    }
+};
+template<class Action> int runVerification(BenchmarkPolicy& policy, const std::string& reportPath, Action action) {
+    int code{}; std::string failureKind, error;
+    try { action(); }
+    catch (const BudgetExceeded& failure) { code = 1; failureKind = "budget"; error = failure.what(); }
+    catch (const std::exception& failure) { code = 1; failureKind = "correctness"; error = failure.what(); }
+    trackAllocations = false;
+    if (!reportPath.empty()) {
+        std::ofstream file(std::filesystem::path(std::u8string(reportPath.begin(), reportPath.end())), std::ios::binary);
+        file << Json{{"mode", policy.reportOnly ? "hosted-report" : "strict"}, {"budgetUs", 5000},
+            {"completed", code == 0}, {"functionalChecksPassed", failureKind != "correctness"},
+            {"budgetExceeded", policy.budgetExceeded}, {"failureKind", failureKind}, {"error", error},
+            {"checks", checks}, {"cases", policy.cases}}.dump(2) << '\n';
+        file.close();
+        if (!file) { std::cerr << "FAIL: Cannot write benchmark evidence\n"; return 1; }
+    }
+    if (code) std::cerr << "FAIL after " << checks << " checks: " << error << '\n';
+    else std::cout << "PASS: " << checks << " creative-effect checks; "
+        << (policy.reportOnly ? "hosted benchmark report (not strict timing qualification); " : "strict timing qualification; ")
+        << "budgetExceeded=" << (policy.budgetExceeded ? "true" : "false")
+        << "; synthetic audio only, no devices, engine, live settings or personal workspace.\n";
+    return code;
+}
 // Match Engine::mixLoop's scheduling only. This remains synthetic processing
 // qualification, not an audio-device deadline or live sound-quality test.
 struct TimingSchedule {
@@ -513,7 +555,7 @@ void stateContinuityAndRealtime() {
     for (int i = 0; i < 1000; ++i) { const auto value = effect.process({tiny, -tiny}).wet; tinySilent &= value.left == 0 && value.right == 0; }
     require(tinySilent, "Wet Distortion flushes subnormal excitation before storing oversampling history");
 }
-void maximumGraphTiming(std::string_view only = {}) {
+void maximumGraphTiming(BenchmarkPolicy& policy, std::string_view only = {}) {
     for (const char* kind : {"echo", "distortion"}) for (int effectCount : {4, 30}) for (bool preserveFade : {false, true}) {
         if (!only.empty() && only != kind) continue;
         AudioGraph graph; graph.nodes.push_back(node("input", "virtualInput"));
@@ -562,16 +604,40 @@ void maximumGraphTiming(std::string_view only = {}) {
             << processCycles[80] << ", p99=" << processCycles[158] << "; combined thread cycles median=" << combinedCycles[80] << ", p99=" << combinedCycles[158]
             << "; scheduling=Pro Audio MMCSS with production 5-ms MixClock; two-runtime prepare=" << prepareUs
             << " us; Echo history bytes/runtime=" << GraphProcessor::echoHistoryBytes(plan) << '\n';
-        require(combinedTimes[158] < 5000, "Representative and maximum-size creative graphs including old/new routing fades fit the measured combined synthetic 5-ms budget at p99");
-        require(resetTimes.back() < 5000, "Creative graph reset fits one synthetic quantum without large stack temporaries");
+        policy.record(kind, effectCount, preserveFade, combinedTimes[80], combinedTimes[158], resetTimes.back());
     }
 }
 }
 int main(int argc, char** argv) {
-    try {
-        if (argc == 2 && std::string_view(argv[1]) == "--timing") maximumGraphTiming();
-        else if (argc == 2 && std::string_view(argv[1]) == "--distortion") { distortionSoundAndLatency(); distortionAliasing(); distortionAutomationAndPublication(); maximumGraphTiming("distortion"); }
-        else { persistenceAndValidation(); echoImpulseAndBounds(); echoOutputsAndEdits(); echoDestructiveAdoption(); distortionSoundAndLatency(); distortionAliasing(); distortionAutomationAndPublication(); stateContinuityAndRealtime(); maximumGraphTiming(); }
-        std::cout << "PASS: " << checks << " creative-effect checks; synthetic audio only, no devices, engine, live settings or personal workspace.\n"; return 0;
-    } catch (const std::exception& error) { trackAllocations = false; std::cerr << "FAIL after " << checks << " checks: " << error.what() << '\n'; return 1; }
+    BenchmarkPolicy policy; std::string reportPath, selection, fixture;
+    if (argc == 2 && (std::string_view(argv[1]) == "--timing" || std::string_view(argv[1]) == "--distortion")) selection = argv[1];
+    else if (argc == 3 && !std::string_view(argv[2]).empty()
+        && (std::string_view(argv[1]) == "--benchmark-report" || std::string_view(argv[1]) == "--benchmark-json")) {
+        policy.reportOnly = std::string_view(argv[1]) == "--benchmark-report"; reportPath = argv[2];
+    } else if (argc == 5 && !std::string_view(argv[3]).empty() && !std::string_view(argv[4]).empty()
+        && std::string_view(argv[1]) == "--benchmark-policy-fixture"
+        && (std::string_view(argv[2]) == "strict" || std::string_view(argv[2]) == "report")) {
+        // Inert, deterministic policy regression entry point. It never invokes
+        // the measured benchmark or changes its durations/thresholds.
+        policy.reportOnly = std::string_view(argv[2]) == "report"; fixture = argv[3]; reportPath = argv[4];
+    } else if (argc != 1) { std::cerr << "Unknown creative-test arguments\n"; return 2; }
+    return runVerification(policy, reportPath, [&] {
+        if (!fixture.empty()) {
+            if (fixture == "under") policy.record("fixture", 30, true, 3800, 4999, 20);
+            else if (fixture == "over" || fixture == "functional" || fixture == "allocation") {
+                const bool over = fixture == "over" || policy.reportOnly;
+                policy.record("fixture", 30, true, over ? 5343.2 : 3800, over ? 9620.1 : 4999, 20);
+                if (fixture == "functional") require(false, "Injected audio correctness failure");
+                if (fixture == "allocation") {
+                    const auto before = allocationOperations; trackAllocations = true;
+                    void* allocated = ::operator new(64); ::operator delete(allocated); trackAllocations = false;
+                    require(before == allocationOperations, "Injected real-time allocation failure");
+                }
+            } else if (fixture == "reset") policy.record("fixture", 30, true, 100, 200, 5000);
+            else if (fixture == "invalid") policy.record("fixture", 30, true, 0, std::numeric_limits<double>::quiet_NaN(), 0);
+            else throw std::runtime_error("Unknown benchmark policy fixture");
+        } else if (selection == "--timing") maximumGraphTiming(policy);
+        else if (selection == "--distortion") { distortionSoundAndLatency(); distortionAliasing(); distortionAutomationAndPublication(); maximumGraphTiming(policy, "distortion"); }
+        else { persistenceAndValidation(); echoImpulseAndBounds(); echoOutputsAndEdits(); echoDestructiveAdoption(); distortionSoundAndLatency(); distortionAliasing(); distortionAutomationAndPublication(); stateContinuityAndRealtime(); maximumGraphTiming(policy); }
+    });
 }

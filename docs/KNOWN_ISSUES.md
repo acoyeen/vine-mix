@@ -219,6 +219,23 @@ See [the execution report](IMPLEMENTATION_0.5.0.md) for evidence and remaining w
   and the [execution report](IMPLEMENTATION_0.5.0.md). A synthetic pass does not
   establish hardware dropout-free behavior on every computer.
 
+### Follow-up cloud capacity result — 6 November 2026
+
+The released source's strict cloud run passed the 30-Distortion routing-fade
+benchmark at 3.8406-ms median / 3.9621-ms p99. A later documentation-only main
+commit, with identical native source and tests, failed that same 5-ms gate at
+5.3432-ms median / 9.6201-ms p99. All other suites and the preceding 460 creative
+checks passed. The median itself exceeds budget: this is a real capacity limit
+on that host, not a single scheduling outlier or evidence of a code regression.
+The exact CPU/contention cause is not established. Both complete reports remain
+in private evidence; the failed run is not replaced by retries until green.
+
+The 0.5.0 files and source tag remain unchanged. Hosted CI separates measured
+capacity from correctness; strict 5-ms qualification remains the local default.
+The report mode still executes every creative benchmark and all functional and
+allocation assertions, and exposes each budget overrun explicitly. A passing
+hosted functional run does not mean the measured real-time budget passed.
+
 <a id="issue-026"></a>
 ## ISSUE-026: Echo Time changes replay stored repeat mixtures
 

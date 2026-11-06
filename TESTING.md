@@ -9,6 +9,12 @@ The current native suites and detached desktop checks never substitute for
 clean-machine, actual Explorer/shortcut launch or sustained real-device testing.
 The running personal audio engine must be preserved during ordinary development.
 
+`scripts/verify-offline.ps1` uses strict performance budgets by default. Variable
+hosted CI explicitly uses `-HostedBenchmarkReport`: creative benchmarks still
+run, but measured budget overruns are reported separately from functional and
+allocation failures. Review the benchmark JSON and CI summary; a green hosted
+functional run is not a promise of real-time capacity on every computer.
+
 The previous testing document, including the settings-redirection
 investigation, is retained as a sanitized historical record in
 [the historical testing log](docs/history/TESTING_PRE_BETA1.md). Its older names,
