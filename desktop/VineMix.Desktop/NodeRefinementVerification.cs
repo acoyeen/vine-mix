@@ -37,7 +37,7 @@ internal static class NodeRefinementVerification
         Color Pixel(int index, int channel, double db)
         {
             var lane = meters[index].GetLaneBounds()[channel];
-            var point = meters[index].TranslatePoint(new Point(lane.Left + lane.Width / 2, lane.Bottom - (db + 60) / 60 * lane.Height), root);
+            var point = meters[index].TranslatePoint(new Point(lane.Left + lane.Width / 2, lane.Bottom - 1 - (db + 60) / 60 * (lane.Height - 2)), root);
             var bytes = new byte[4];
             bitmap.CopyPixels(new Int32Rect((int)Math.Floor(point.X), (int)Math.Floor(point.Y), 1, 1), bytes, 4, 0);
             return Color.FromArgb(bytes[3], bytes[2], bytes[1], bytes[0]);
@@ -53,11 +53,13 @@ internal static class NodeRefinementVerification
         require(fadedYellow.R > fadedYellow.B && fadedYellow.G > fadedYellow.B && fadedYellow.R < yellow.R / 2
             && fadedRed.R > fadedRed.G && fadedRed.R < red.R / 2,
             "Actual silent-meter pixels retain faded yellow and red zones rather than an empty black scale.");
+        var approachingRed = Pixel(3, 0, -2);
         require(Near(Pixel(1, 0, -30), green) && Near(Pixel(1, 0, -9), fadedYellow)
-            && Near(Pixel(2, 0, -9), yellow) && Near(Pixel(2, 0, -2), fadedRed) && Near(Pixel(3, 0, -2), red),
-            "Rendered fill lights green, then yellow at -12 dB, then red at -3 dB, leaving unreached areas faded.");
-        require(Near(Pixel(3, 1, -2), fadedRed) && Near(Pixel(3, 0, -2), red),
-            "Stereo meter zones fill independently; a loud left channel does not illuminate the quieter right channel's red zone.");
+            && Near(Pixel(2, 0, -9), yellow) && Near(Pixel(2, 0, -2), fadedRed)
+            && approachingRed.R > approachingRed.G && approachingRed.R > fadedRed.R * 2,
+            "Rendered fill follows the fixed green/yellow/red scale, leaving unreached areas faded through the gradient.");
+        require(Near(Pixel(3, 1, -2), fadedRed) && approachingRed.R > fadedRed.R * 2,
+            "Stereo meter gradients fill independently; a loud left channel does not illuminate the quieter right channel's red region.");
         require(meters.All(meter => !meter.IsAnimationRunning) && PresentationSource.FromVisual(root) is null,
             "Colour verification uses detached pixel rendering without timers or native windows.");
         return root;

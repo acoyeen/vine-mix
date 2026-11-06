@@ -97,6 +97,52 @@ void settings(const std::filesystem::path& root) {
         require(Json::parse(exact.dump()).get<Configuration>().revision == revision,
             "Every representable unsigned revision survives JSON without floating-point rounding");
     }
+    const auto rejectsSavedDocument = [&](const Json& document, const char* why) {
+        rejects([&] { validateConfiguration(document.get<Configuration>()); }, why);
+        const auto bytes = document.dump(); write(path, bytes);
+        ConfigurationStore invalid(path); const auto preview = invalid.load();
+        require(invalid.loadState() == "backupAvailable" && !invalid.writable() && preview.revision == 41,
+            "Invalid identity or graph pauses saving and exposes only the read-only backup");
+        rejects([&] { invalid.save(current); }, "Unresolved malformed workspace cannot be overwritten");
+        require(read(path) == bytes && read(path.string() + ".bak") == backup,
+            "Rejected identity or graph preserves original and backup bytes exactly");
+    };
+    for (const auto& channel : std::array<Json, 11>{Json(-2), Json(256), Json(4294967295ull), Json(std::numeric_limits<std::uint64_t>::max()),
+        Json(1.9), Json(-1.0), Json(1.0), Json("1"), Json(true), Json(nullptr), Json(1e30)}) {
+        auto invalid = Json(current); invalid["graph"]["nodes"][0]["device"]["channel"] = channel;
+        rejectsSavedDocument(invalid, "Device channel must not wrap or truncate into a different valid channel");
+        invalid = Json(current); invalid["microphones"][0]["channel"] = channel;
+        rejectsSavedDocument(invalid, "Legacy device channel uses the same strict integer boundary");
+    }
+    for (const auto& processId : std::array<Json, 9>{Json(-1), Json(4294967296ull), Json(std::numeric_limits<std::uint64_t>::max()),
+        Json(1.9), Json(1.0), Json("1"), Json(true), Json(nullptr), Json(1e30)}) {
+        auto invalid = Json(current); invalid["graph"]["nodes"][0]["app"]["processId"] = processId;
+        rejectsSavedDocument(invalid, "Application identity must not wrap to another process or truncate a fraction");
+    }
+    for (const auto channel : {-1, 0, 255}) {
+        auto exact = Json(current); exact["graph"]["nodes"][0]["device"]["channel"] = channel;
+        require(exact.get<Configuration>().graph.nodes[0].device.channel == channel, "Valid channel boundaries round-trip unchanged");
+    }
+    for (const auto processId : {std::uint32_t{0}, std::uint32_t{42}, std::numeric_limits<std::uint32_t>::max()}) {
+        auto exact = Json(current); exact["graph"]["nodes"][0]["app"]["processId"] = processId;
+        require(exact.get<Configuration>().graph.nodes[0].app.processId == processId, "Valid process identities round-trip unchanged");
+    }
+    {
+        auto older = Json(current);
+        for (auto& savedNode : older["graph"]["nodes"]) { savedNode.erase("echo"); savedNode.erase("distortion"); }
+        const auto bytes = older.dump(); write(path, bytes);
+        ConfigurationStore previousRelease(path); const auto loaded = previousRelease.load();
+        require(previousRelease.writable() && previousRelease.loadState() == "loaded" && Json(loaded.graph) == Json(current.graph),
+            "Version-2 workspaces without 0.5 creative settings retain every existing node, edge, setting and camera value");
+        require(read(path) == bytes && read(path.string() + ".bak") == backup,
+            "Loading an older version-2 workspace does not rewrite its bytes or backup");
+        auto unknown = Json(current); unknown["graph"]["nodes"][0]["kind"] = "futureEffect";
+        rejectsSavedDocument(unknown, "Unknown future node kinds reject without silently replacing a workspace");
+        unknown = Json(current); unknown["graph"]["edges"][0]["fromPort"] = "futureOutput";
+        rejectsSavedDocument(unknown, "Unknown future output ports reject without silently rewiring audio");
+        unknown = Json(current); unknown["graph"]["edges"][0]["toPort"] = "futureInput";
+        rejectsSavedDocument(unknown, "Unknown future input ports reject without silently rewiring audio");
+    }
     for (const auto version : {std::uint64_t{999}, std::numeric_limits<std::uint64_t>::max()}) {
         auto unsupported = Json(current); unsupported["version"] = version;
         write(path, unsupported.dump());

@@ -15,7 +15,7 @@ internal static class NodeDefaultsVerification
     internal static async Task RunAsync(GraphWorkspace workspace, MixerViewModel mixer, Func<Task> layout, Action<bool, string> require)
     {
         var fixture = UiPreview.CreateSnapshot([]);
-        fixture.Configuration.Graph = new() { Nodes = GraphDefaults.Kinds.Select((kind, index) =>
+        fixture.Configuration.Graph = new() { Nodes = GraphDefaults.Kinds.Where(NodeCatalog.CanCreate).Select((kind, index) =>
             GraphDefaults.NewNode(kind, index * 680, 32)).ToList(), PanX = 45, PanY = 26, Zoom = .75 };
         var graph = fixture.Configuration.Graph;
         GraphNode Node(string kind) => graph.Nodes.Single(node => node.Kind == kind);
@@ -45,6 +45,8 @@ internal static class NodeDefaultsVerification
             node.DeEsser = new() { FrequencyHz = 8500, ThresholdDb = -35, ReductionDb = 16 };
             node.Plosive = new() { FrequencyHz = 230, ThresholdDb = -38, ReductionDb = 18 };
             node.Reverb = new() { Mix = .65, DecaySeconds = 3.5, Damping = .8, PreDelayMs = 60 };
+            node.Echo = new() { TimeMs = 417.125, Repeats = 5, Mix = .375 };
+            node.Distortion = new() { DriveDb = 18.25, ToneHz = 4321.5, Mix = .625, OutputDb = -9.25 };
             node.VoiceColor = new() { Tone = -.65, Ambience = .7 };
         }
         require(GraphDefaults.Validate(graph).Length == 0, "The reset fixture contains valid edited controls, saved assignments, and audio/control connections for all supported node kinds.");
@@ -142,7 +144,7 @@ internal static class NodeDefaultsVerification
 
     private static string Json(GraphConfiguration graph) => JsonSerializer.Serialize(graph, Protocol.Json);
     private static string EffectValues(GraphNode node) => JsonSerializer.Serialize(new
-        { node.EqBands, node.Compressor, node.Ducking, node.DynamicsUiVersion, node.Expander, node.AlignmentDelay, node.Denoiser, node.DeEsser, node.Plosive, node.Reverb, node.VoiceColor }, Protocol.Json);
+        { node.EqBands, node.Compressor, node.Ducking, node.DynamicsUiVersion, node.Expander, node.AlignmentDelay, node.Denoiser, node.DeEsser, node.Plosive, node.Reverb, node.Echo, node.Distortion, node.VoiceColor }, Protocol.Json);
     private static IEnumerable<T> Descendants<T>(DependencyObject root) where T : DependencyObject
     {
         for (int index = 0; index < VisualTreeHelper.GetChildrenCount(root); index++)

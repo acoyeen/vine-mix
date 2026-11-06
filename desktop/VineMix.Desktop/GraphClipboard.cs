@@ -8,7 +8,7 @@ using System.Windows;
 
 namespace VineMix.Desktop;
 
-internal sealed record GraphPaste(IReadOnlyList<GraphNode> Nodes, IReadOnlyList<GraphEdge> Edges, int ClearedAssignments)
+internal sealed record GraphPaste(IReadOnlyList<GraphNode> Nodes, IReadOnlyList<GraphEdge> Edges)
 {
     internal IReadOnlyList<GraphFrame> Frames { get; init; } = [];
 }
@@ -58,7 +58,7 @@ internal static class GraphClipboard
 
     internal static bool TryCreatePaste(string json, GraphConfiguration target, Point anchor, out GraphPaste paste, out string error)
     {
-        paste = new GraphPaste([], [], 0);
+        paste = new GraphPaste([], []);
         error = "The clipboard does not contain a valid VineMix node group.";
         if (string.IsNullOrWhiteSpace(json)) return false;
         try
@@ -101,15 +101,14 @@ internal static class GraphClipboard
             // Deserializing already gives detached copies of all nested settings.
             // Only internal edges were serialized, so no new route reaches an
             // original node. Input copies retain their source identity and own
-            // independent controls. Outputs keep exclusive endpoint ownership;
-            // clear only conflicting output assignments for the user to choose.
+            // independent controls. Output copies retain their destination but
+            // start muted, matching newly created outputs even for connected groups.
             double left = group.Nodes.Min(n => n.X), top = group.Nodes.Min(n => n.Y);
             var reservedNodes = target.Nodes.Concat(group.Nodes).Select(n => n.Id).ToHashSet(StringComparer.Ordinal);
             var reservedEdges = target.Edges.Concat(group.Edges).Select(e => e.Id).ToHashSet(StringComparer.Ordinal);
             var reservedFrames = target.Frames.Concat(source.Frames).Select(frame => frame.Id).ToHashSet(StringComparer.Ordinal);
             var remap = new Dictionary<string, string>(StringComparer.Ordinal);
             var assigned = new List<GraphNode>(target.Nodes);
-            int clearedAssignments = 0;
             foreach (var node in group.Nodes)
             {
                 string originalId = node.Id;
@@ -117,12 +116,7 @@ internal static class GraphClipboard
                 remap.Add(originalId, node.Id);
                 node.X = anchor.X + (node.X - left);
                 node.Y = anchor.Y + (node.Y - top);
-                if (assigned.Any(existing => ConflictingDevice(existing, node)))
-                {
-                    node.Device = new DeviceBinding { Channel = node.Device.Channel };
-                    node.AutoAssignDevice = false;
-                    ++clearedAssignments;
-                }
+                if (node.Kind is "output" or "virtualOutput") node.Muted = true;
                 assigned.Add(node);
             }
             foreach (var edge in group.Edges)
@@ -147,7 +141,7 @@ internal static class GraphClipboard
             if (error.Length > 0) return false;
             error = GraphDefaults.Validate(combined);
             if (error.Length > 0) return false;
-            paste = new GraphPaste(group.Nodes.AsReadOnly(), group.Edges.AsReadOnly(), clearedAssignments)
+            paste = new GraphPaste(group.Nodes.AsReadOnly(), group.Edges.AsReadOnly())
                 { Frames = source.Frames.AsReadOnly() };
             return true;
         }
@@ -199,16 +193,7 @@ internal static class GraphClipboard
             var copiedNodes = additions.Nodes.Select(node => node.Copy()).ToList();
             var copiedEdges = additions.Edges.Select(edge => edge.Copy()).ToList();
             var copiedFrames = additions.Frames.Select(frame => frame.Copy()).ToList();
-            var assigned = new List<GraphNode>(target.Nodes);
-            foreach (var node in copiedNodes)
-            {
-                if (assigned.Any(existing => ConflictingDevice(existing, node)))
-                {
-                    node.Device = new DeviceBinding { Channel = node.Device.Channel };
-                    node.AutoAssignDevice = false;
-                }
-                assigned.Add(node);
-            }
+            var assigned = new List<GraphNode>(target.Nodes); assigned.AddRange(copiedNodes);
             var combined = new GraphConfiguration
             {
                 Nodes = assigned, Edges = [.. target.Edges, .. copiedEdges],
@@ -236,13 +221,6 @@ internal static class GraphClipboard
         string value;
         do { value = Guid.NewGuid().ToString("N"); } while (!reserved.Add(value));
         return value;
-    }
-
-    private static bool ConflictingDevice(GraphNode first, GraphNode second)
-    {
-        bool render = (first.Kind is "output" or "virtualOutput") && (second.Kind is "output" or "virtualOutput");
-        return render && ((second.Device.Id.Length > 0 && first.Device.Id == second.Device.Id)
-            || (second.Device.StableId.Length > 0 && first.Device.StableId == second.Device.StableId));
     }
 
     private static string ValidateValues(GraphConfiguration graph)
@@ -324,7 +302,7 @@ internal static class GraphClipboard
         {
             string[] fields = ["id", "kind", "name", "x", "y", "gainDb", "muted", "device", "app", "bypass", "collapsed", "balance", "eqBands", "compressor"];
             if (node.ValueKind != JsonValueKind.Object) return false;
-            foreach (var optional in new[] { "controlMultiplier", "mono", "autoAssignDevice", "denoiser", "deEsser", "plosive", "reverb", "voiceColor", "expander", "alignmentDelay", "dynamicsUiVersion", "ducking", "stereoWidth", "panPosition", "crossfadePosition", "crossfadeCurve" })
+            foreach (var optional in new[] { "controlMultiplier", "mono", "autoAssignDevice", "denoiser", "deEsser", "plosive", "reverb", "echo", "distortion", "voiceColor", "expander", "alignmentDelay", "dynamicsUiVersion", "ducking", "stereoWidth", "panPosition", "crossfadePosition", "crossfadeCurve" })
                 if (node.TryGetProperty(optional, out _)) fields = [.. fields, optional];
             if (!Properties(node, fields)) return false;
             if (!Properties(node.GetProperty("device"), "id", "stableId", "name", "channel")
@@ -354,6 +332,13 @@ internal static class GraphClipboard
             if (node.TryGetProperty("deEsser", out var deEsser) && !Properties(deEsser, "frequencyHz", "thresholdDb", "reductionDb")) return false;
             if (node.TryGetProperty("plosive", out var plosive) && !Properties(plosive, "frequencyHz", "thresholdDb", "reductionDb")) return false;
             if (node.TryGetProperty("reverb", out var reverb) && !Properties(reverb, "mix", "decaySeconds", "damping", "preDelayMs")) return false;
+            if (node.TryGetProperty("echo", out var echo))
+            {
+                if (echo.ValueKind != JsonValueKind.Object) return false;
+                string[] echoFields = ["timeMs", "repeats", "mix", "feedback"];
+                if (!Properties(echo, echoFields.Where(field => echo.TryGetProperty(field, out _)).ToArray())) return false;
+            }
+            if (node.TryGetProperty("distortion", out var distortion) && !Properties(distortion, "driveDb", "toneHz", "mix", "outputDb")) return false;
             if (node.TryGetProperty("voiceColor", out var voiceColor) && !Properties(voiceColor, "tone", "ambience")) return false;
             if (node.TryGetProperty("expander", out var expander) && !Properties(expander, "mode", "thresholdDb", "ratio", "attackMs", "holdMs", "releaseMs", "rangeDb", "hysteresisDb")) return false;
             if (node.TryGetProperty("alignmentDelay", out var alignmentDelay) && !Properties(alignmentDelay, "samples")) return false;

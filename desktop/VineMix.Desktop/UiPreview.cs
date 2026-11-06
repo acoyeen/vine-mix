@@ -7,7 +7,7 @@ namespace VineMix.Desktop;
 /// <summary>Explicitly inert design fixtures. These identifiers never reach WASAPI or the pipe.</summary>
 internal static class UiPreview
 {
-    /// <summary>Sanitized three-node starter, using only synthetic endpoints and telemetry.</summary>
+    /// <summary>Sanitized voice starter, using only synthetic endpoints and telemetry.</summary>
     public static MixerSnapshot CreateBetaSnapshot(bool configured = false)
     {
         var configuration = new MixerConfiguration { Version = 2, Revision = 1, Graph = GraphDefaults.Fresh() };
@@ -31,8 +31,10 @@ internal static class UiPreview
         }
         var status = new EngineStatus { AudioFrames = configured ? 48000UL : 0 };
         foreach (var node in configuration.Graph.Nodes)
-            status.Nodes.Add(new() { Id = node.Id, Channels = node == input ? 1 : 2,
-                Path = new() { EndpointId = node.Device.Id, State = configured ? "Running" : "Unassigned", Channels = node == input ? 1 : 2, Rate = 48000 } });
+            status.Nodes.Add(new() { Id = node.Id, Channels = 1,
+                Path = new() { EndpointId = node.Device.Id,
+                    State = configured ? "Running" : node.Kind is "microphone" or "output" or "virtualOutput" ? "Unassigned" : "Waiting",
+                    Channels = 1, Rate = 48000 } });
         return new() { Configuration = configuration, Endpoints = endpoints, Status = status,
             SettingsPath = "Sanitized preview · no settings file", LogPath = "Sanitized preview · no audio log" };
     }

@@ -89,9 +89,10 @@ internal static class VirtualDevicePresentationVerification
             && mixer.GraphConfig.Nodes.Single(n => n.Id == duplicateId) is { GainDb: -12, Muted: true, Device.Channel: 0 },
             "Shared virtual input controls remain independent in the workspace.");
         string duplicateOutputId = workspace.Spawn("virtualOutput", new(840, 450)); await layout();
-        require(!VirtualDeviceBindings.IsAssigned(mixer.GraphConfig.Nodes.Single(n => n.Id == duplicateOutputId).Device)
-            && DeviceMenu(duplicateOutputId).Items.OfType<MenuItem>().All(i => !i.IsEnabled),
-            "A second virtual output still cannot claim a render endpoint already owned by another output.");
+        require(VirtualDeviceBindings.IsAssigned(mixer.GraphConfig.Nodes.Single(n => n.Id == duplicateOutputId).Device)
+            && mixer.GraphConfig.Nodes.Single(n => n.Id == duplicateOutputId).Muted
+            && DeviceMenu(duplicateOutputId).Items.OfType<MenuItem>().Single() is { IsEnabled: true, IsChecked: true },
+            "A second virtual output automatically shares the destination and starts muted with an available device menu.");
         var physicalMenu = new ContextMenu(); workspace.PopulateNodeMenu(physicalMenu, micId, () => { });
         require(!physicalMenu.Items.OfType<MenuItem>().Any(i => (string?)i.Header == "Troubleshooting"),
             "The virtual-device troubleshooting menu does not replace physical device selection.");
@@ -134,9 +135,9 @@ internal static class VirtualDevicePresentationVerification
         ChooseDevice(output1, render); await layout();
         ChooseDevice(output2, render); await layout();
         require(mixer.GraphConfig.Nodes.Single(n => n.Id == output1).Device.Id == render
-            && !VirtualDeviceBindings.IsAssigned(mixer.GraphConfig.Nodes.Single(n => n.Id == output2).Device)
-            && Picker(output2).SelectedItem is EndpointChoice { Id: "", StableId: "" },
-            "The physical output picker still refuses a duplicate render endpoint and restores its unassigned selection.");
+            && mixer.GraphConfig.Nodes.Single(n => n.Id == output2).Device.Id == render
+            && Picker(output2).SelectedItem is EndpointChoice choice && choice.Id == render,
+            "Both physical output pickers retain the same render endpoint on independent output nodes.");
         var app = fixture.Applications.First();
         foreach (string id in new[] { app1, app2 })
         {

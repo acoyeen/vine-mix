@@ -204,11 +204,30 @@ internal static class NamedFrameVerification
             "Clicking a group background without moving creates no redundant undo step.");
 
         mixer.Edit(configuration => configuration.Graph.Zoom = .3); await layout();
-        require(workspace.FrameViews[id].TitleScreenFontSize >= 15
+        require(workspace.FrameViews[id].HeaderVisible
+            && Math.Abs(workspace.FrameViews[id].TitleScreenFontSize - 24 * .3) < .001
             && workspace.FrameBounds(id).Contains(NodeBounds(gain.Id))
             && workspace.FrameBounds(id).Contains(NodeBounds(compressor.Id)),
-            "At 30 percent zoom the group title remains at least 15 screen DIPs and still reserves space above every member.");
+            "At 30 percent zoom the group heading scales with its fixed world-space header and still reserves space above every member.");
         capture?.Invoke("named-frames-overview-30-percent.png");
+        Rect stableBounds = workspace.FrameBounds(id);
+        foreach (double zoom in new[] { .25, .1 })
+        {
+            mixer.SetCanvasView(Graph().PanX, Graph().PanY, zoom); mixer.RefreshPreviewTelemetry(); await layout();
+            require(!workspace.FrameViews[id].HeaderVisible && workspace.FrameBounds(id) == stableBounds,
+                $"At {zoom:P0}, group heading and header disappear without expanding into neighbouring nodes.");
+            capture?.Invoke($"named-frames-simplified-{zoom * 100:0}-percent.png");
+        }
+        workspace.SelectFrame(id);
+        require(workspace.TryRenameSelectionShortcut(Key.F2, ModifierKeys.None, workspace), "F2 can access a selected group whose header was simplified away.");
+        await layout();
+        require(workspace.FrameViews[id].IsRenaming && workspace.FrameViews[id].HeaderVisible && Graph().Zoom >= .6,
+            "Group rename reveals its header at readable zoom before entering the draft.");
+        mixer.SetCanvasView(Graph().PanX, Graph().PanY, .1); mixer.RefreshPreviewTelemetry(); await layout();
+        require(workspace.FrameViews[id].HeaderVisible && workspace.FrameViews[id].IsRenaming,
+            "A group rename draft stays visible when zooming out.");
+        workspace.FrameViews[id].CancelRename(); await layout();
+        require(!workspace.FrameViews[id].HeaderVisible, "The group header simplifies again once its rename draft is cancelled.");
         // Additional visual evidence for the centered group heading across
         // the full canvas zoom range.
         foreach (double zoom in new[] { 1d, 2d })

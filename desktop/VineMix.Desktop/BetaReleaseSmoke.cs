@@ -30,7 +30,10 @@ internal static class BetaReleaseSmoke
             var credits = CreditsContent.Create(() => { }, _ => { });
             credits.Measure(new Size(640, 580)); credits.Arrange(new Rect(0, 0, 640, 580)); credits.UpdateLayout();
             var notices = DistributionNotices.FileNames.Select(name => new { name, sha256 = DistributionNotices.Hash(name) }).ToArray();
-            bool passed = model.GraphConfig.Nodes.Count == 3 && model.GraphConfig.Edges.Count == 2
+            bool passed = model.GraphConfig.Nodes.Count == 7 && model.GraphConfig.Edges.Count == 6
+                && model.GraphConfig.Nodes.Where(n => n.Kind is "output" or "virtualOutput").All(n => n.Muted)
+                && model.GraphConfig.Nodes.Single(n => n.Kind == "output").GainDb == -24
+                && model.GraphConfig.Nodes.Single(n => n.Kind == "denoiser").Denoiser.Algorithm == "rnnoise"
                 && model.GraphConfig.Nodes.Where(n => n.Kind is "microphone" or "output").All(n => !VirtualDeviceBindings.IsAssigned(n.Device))
                 && DistributionNotices.ReadText("LICENSE").Contains("Copyright (c) 2026 acoyeen (VineMix, https://vinemix.app)", StringComparison.Ordinal)
                 && DistributionNotices.ReadText("ATTRIBUTION.md").Contains("not additional MIT licence conditions", StringComparison.Ordinal);

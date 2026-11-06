@@ -9,6 +9,15 @@ using System.Text;
 using Microsoft.Win32.SafeHandles;
 namespace VineMix {
     public static class DesktopDataContext {
+        [DllImport("kernel32.dll", EntryPoint="QueryFullProcessImageNameW", CharSet=CharSet.Unicode, SetLastError=true)]
+        private static extern bool QueryFullProcessImageName(SafeProcessHandle process, uint flags, StringBuilder path, ref int length);
+        public static string ReadImagePath(SafeProcessHandle process) {
+            var path = new StringBuilder(32768);
+            int length = path.Capacity;
+            if (!QueryFullProcessImageName(process, 0, path, ref length))
+                throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+            return System.IO.Path.GetFullPath(path.ToString());
+        }
         [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)]
         private static extern uint GetFinalPathNameByHandleW(SafeFileHandle file, StringBuilder path, uint capacity, uint flags);
         public static string Resolve(SafeFileHandle file) {
@@ -53,26 +62,108 @@ function Assert-DesktopDataContext([string]$SettingsPath) {
     }
 }
 
-function Test-DesktopControllerCandidate($Process, [string]$ExpectedPath, [int]$Session, [DateTime]$Started) {
+function Get-DesktopProcessImagePath($Process) {
+    Initialize-DesktopDataContext
+    [VineMix.DesktopDataContext]::ReadImagePath($Process.SafeHandle)
+}
+
+function Read-DesktopProcessIdentity($Process) {
+    # Bind before reading any identity fields. The Process owns this handle until
+    # disposed, so a recycled PID cannot redirect later inspection or rollback.
+    $identity = [pscustomobject]@{Id=$null; StartTime=$null; Path=$null; SessionId=$null}
+    $field = 'handle'; $nativeError = 0
     try {
+        $null = $Process.SafeHandle
         $Process.Refresh()
-        if ($Process.HasExited) { return $false }
-        if ($Process.Path -ine $ExpectedPath -or $Process.SessionId -ne $Session -or
-            $Process.StartTime.ToUniversalTime() -lt $Started) {
-            # The normalization launcher can exit between HasExited and Path.
-            # PowerShell's Path property may then return null without throwing.
-            # Only an exited process may be skipped; a live mismatch still fails.
-            $Process.Refresh()
-            if ($Process.HasExited) { return $false }
-            throw 'An unexpected controller instance appeared while reopening the application.'
+        if ($Process.HasExited) { return [pscustomobject]@{State='Exited';Identity=$null;Field=$null;NativeError=0} }
+        $field = 'process-id'; $identity.Id = $Process.Id
+        $field = 'start-time'; $identity.StartTime = $Process.StartTime
+        $field = 'session'; $identity.SessionId = $Process.SessionId
+        $field = 'image-path'; $identity.Path = Get-DesktopProcessImagePath $Process
+        $Process.Refresh()
+        if ($Process.HasExited) { return [pscustomobject]@{State='Exited';Identity=$null;Field=$null;NativeError=0} }
+        if (-not [string]::IsNullOrWhiteSpace($identity.Path)) {
+            return [pscustomobject]@{State='Identified';Identity=$identity;Field=$null;NativeError=0}
         }
-        return $true
-    } catch [System.ComponentModel.Win32Exception], [InvalidOperationException] {
+    } catch {
+        $failure = $_.Exception
+        while ($failure.InnerException) { $failure = $failure.InnerException }
+        if ($failure -isnot [ComponentModel.Win32Exception] -and $failure -isnot [InvalidOperationException]) { throw }
+        if ($failure -is [ComponentModel.Win32Exception]) { $nativeError = $failure.NativeErrorCode }
         $exited = $false
         try { $Process.Refresh(); $exited = $Process.HasExited } catch { }
-        if ($exited) { return $false }
-        throw 'A running controller could not be identified safely while reopening the application.'
+        if ($exited) { return [pscustomobject]@{State='Exited';Identity=$null;Field=$null;NativeError=0} }
     }
+    [pscustomobject]@{State='Unidentified';Identity=$identity;Field=$field;NativeError=$nativeError}
+}
+
+function Get-DesktopControllerCandidate($Process, [string]$ExpectedPath, [int]$Session, [DateTime]$Started) {
+    $observation = Read-DesktopProcessIdentity $Process
+    if ($observation.State -eq 'Exited') { return $observation }
+    $identity = $observation.Identity
+    # Reject a positively known mismatch even if another field is unavailable.
+    $mismatch = if ($null -ne $identity.SessionId -and $identity.SessionId -ne $Session) { 'session' }
+        elseif ($null -ne $identity.StartTime -and $identity.StartTime.ToUniversalTime() -lt $Started) { 'start-time' }
+        elseif (-not [string]::IsNullOrWhiteSpace($identity.Path) -and $identity.Path -ine $ExpectedPath) { 'image-path' }
+    if ($mismatch) { throw "An unexpected controller instance appeared while reopening the application (identity field: $mismatch)." }
+    return $observation
+}
+
+function Test-DesktopControllerCandidate($Process, [string]$ExpectedPath, [int]$Session, [DateTime]$Started) {
+    $observation = Get-DesktopControllerCandidate $Process $ExpectedPath $Session $Started
+    if ($observation.State -eq 'Unidentified') {
+        throw "A running controller could not be identified safely (identity field: $($observation.Field); native error: $($observation.NativeError))."
+    }
+    $observation.State -eq 'Identified'
+}
+
+function Test-DesktopWorkspaceReady($Process) {
+    try {
+        $Process.MainWindowHandle -ne 0 -and $Process.Responding -and $Process.WaitForInputIdle(0) -and
+            [VineMix.DesktopDataContext]::IsWorkspaceWindow($Process.MainWindowHandle, $Process.Id)
+    } catch [ComponentModel.Win32Exception], [InvalidOperationException] { $false }
+}
+
+function Wait-DesktopController($Launcher, [string]$ExpectedPath, [int]$Session, [DateTime]$Started,
+        [Diagnostics.Stopwatch]$Timer, [int]$TimeoutMilliseconds, [bool]$ShortcutLaunch, [scriptblock]$OnVerifiedProcess) {
+    $name = [IO.Path]::GetFileNameWithoutExtension($ExpectedPath)
+    do {
+        $Launcher.Refresh()
+        # Explorer can exit after handing the shortcut to its existing shell.
+        if (-not $ShortcutLaunch -and $Launcher.HasExited -and $Launcher.ExitCode -ne 0) {
+            throw "The desktop controller launcher exited with code $($Launcher.ExitCode)."
+        }
+        $candidates = @(Get-Process -Name $name -ErrorAction SilentlyContinue)
+        $selected = $null; $unidentified = $null
+        try {
+            $live = @()
+            foreach ($process in $candidates) {
+                $observation = Get-DesktopControllerCandidate $process $ExpectedPath $Session $Started
+                if ($observation.State -eq 'Identified') { $live += [pscustomobject]@{Process=$process;Identity=$observation.Identity} }
+                elseif ($observation.State -eq 'Unidentified') { $unidentified = $observation }
+            }
+            # An unknown candidate also prevents uniqueness being established.
+            # Never register it for stopping or recovery while waiting to retry.
+            if ($live.Count -eq 1 -and $null -eq $unidentified) {
+                $process = $live[0].Process
+                if ($OnVerifiedProcess) { & $OnVerifiedProcess $live[0].Identity }
+                if (Test-DesktopWorkspaceReady $process) {
+                    $selected = $process
+                    return $process
+                }
+            }
+        } finally {
+            foreach ($process in $candidates) {
+                if (-not [object]::ReferenceEquals($process, $selected)) { $process.Dispose() }
+            }
+        }
+        $remaining = $TimeoutMilliseconds - $Timer.ElapsedMilliseconds
+        if ($remaining -gt 0) { Start-Sleep -Milliseconds ([Math]::Min(100, $remaining)) }
+    } while ($Timer.ElapsedMilliseconds -lt $TimeoutMilliseconds)
+    if ($null -ne $unidentified) {
+        throw "A running controller remained unidentified at the startup deadline (identity field: $($unidentified.Field); native error: $($unidentified.NativeError)). No unidentified process was registered for rollback."
+    }
+    throw 'The desktop controller did not open one responsive workspace window before the startup deadline.'
 }
 
 function Start-DesktopController {
@@ -111,40 +202,6 @@ function Start-DesktopController {
         $launcher = Start-Process -FilePath $expected -WorkingDirectory $directory -PassThru
     }
     try {
-        do {
-            $launcher.Refresh()
-            # Explorer can exit after handing the shortcut to its existing shell.
-            # The verified workspace window below is the authority in that case.
-            if (-not $ShortcutPath -and $launcher.HasExited -and $launcher.ExitCode -ne 0) {
-                throw "The desktop controller launcher exited with code $($launcher.ExitCode)."
-            }
-            $candidates = @(Get-Process -Name $name -ErrorAction SilentlyContinue)
-            $selected = $null
-            try {
-                $live = @()
-                foreach ($process in $candidates) {
-                    if (Test-DesktopControllerCandidate $process $expected $session $started) { $live += $process }
-                }
-                if ($live.Count -eq 1) {
-                    $process = $live[0]
-                    if ($OnVerifiedProcess) {
-                        & $OnVerifiedProcess ([pscustomobject]@{Id=$process.Id;StartTime=$process.StartTime;Path=$process.Path;SessionId=$process.SessionId})
-                    }
-                    try {
-                        if ($process.MainWindowHandle -ne 0 -and $process.Responding -and $process.WaitForInputIdle(0) -and
-                            [VineMix.DesktopDataContext]::IsWorkspaceWindow($process.MainWindowHandle, $process.Id)) {
-                            $selected = $process
-                            return $process
-                        }
-                    } catch [System.ComponentModel.Win32Exception], [InvalidOperationException] { }
-                }
-            } finally {
-                foreach ($process in $candidates) {
-                    if (-not [object]::ReferenceEquals($process, $selected)) { $process.Dispose() }
-                }
-            }
-            if ($timer.ElapsedMilliseconds -lt $TimeoutMilliseconds) { Start-Sleep -Milliseconds 100 }
-        } while ($timer.ElapsedMilliseconds -lt $TimeoutMilliseconds)
-        throw 'The desktop controller did not open one responsive workspace window before the startup deadline.'
+        Wait-DesktopController $launcher $expected $session $started $timer $TimeoutMilliseconds ([bool]$ShortcutPath) $OnVerifiedProcess
     } finally { $launcher.Dispose() }
 }

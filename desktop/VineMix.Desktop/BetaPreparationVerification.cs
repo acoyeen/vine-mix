@@ -78,8 +78,26 @@ internal static class BetaPreparationVerification
             Refuse(() => WorkspaceMigration.Run(bad,[source],_ => null), "A damaged migration journal gives a recoverable startup error without writing defaults.");
         }
         var fresh = GraphDefaults.Fresh();
-        require(fresh.Nodes.Count == 3 && fresh.Edges.Count == 2 && fresh.Nodes.Count(n => n.Kind == "microphone") == 1
-            && fresh.Nodes.Where(n => n.Kind is "output" or "virtualOutput").All(n => n.Muted), "Fresh workspace has the required conservative three-node fanout.");
+        require(fresh.Nodes.Select(node => node.Kind).SequenceEqual(new[] { "microphone", "highPass", "denoiser", "expander", "compressor", "output", "virtualOutput" })
+            && fresh.Edges.Count == 6 && GraphDefaults.Validate(fresh).Length == 0,
+            "Fresh workspace contains the complete valid seven-node voice starter.");
+        require(fresh.Edges.Select(edge => (edge.From, edge.To)).SequenceEqual(new[] {
+                ("starter-input", "starter-high-pass"), ("starter-high-pass", "starter-denoiser"),
+                ("starter-denoiser", "starter-expander"), ("starter-expander", "starter-compressor"),
+                ("starter-compressor", "starter-listening-output"), ("starter-compressor", "starter-virtual-output") })
+            && fresh.Edges.All(edge => edge.Kind == "audio" && edge.FromPort == "audio" && edge.ToPort == "audio" && !edge.Muted && edge.GainDb == 0),
+            "The starter cleans speech before dynamics and fans the same processed audio out to both outputs.");
+        require(fresh.Nodes.Where(node => node.Kind is "output" or "virtualOutput").All(node => node.Muted)
+            && fresh.Nodes.Single(node => node.Kind == "output").GainDb == -24
+            && fresh.Nodes.Where(node => node.Kind is "microphone" or "output").All(node => !node.AutoAssignDevice && !VirtualDeviceBindings.IsAssigned(node.Device))
+            && fresh.Nodes.Single(node => node.Kind == "virtualOutput").AutoAssignDevice,
+            "Fresh outputs remain muted, listening starts at minus24 dB, physical devices require selection and virtual binding policy is retained.");
+        require(fresh.Nodes.Single(node => node.Kind == "denoiser").Denoiser.Algorithm == "rnnoise"
+            && fresh.Nodes.Single(node => node.Kind == "denoiser").Denoiser.RnnoiseMix == 1
+            && fresh.Nodes.Single(node => node.Kind == "highPass").EqBands is [{ Type: "highPass", FrequencyHz: 80 }]
+            && fresh.Nodes.Single(node => node.Kind == "compressor").DynamicsUiVersion == 1
+            && fresh.Nodes.All(node => !node.Bypass),
+            "Starter effects use the existing new-node defaults, including RNNoise and the current compressor controls.");
         var cable = fresh.Nodes.Single(n => n.Kind == "virtualOutput");
         cable.AutoAssignDevice = false;
         var restored = JsonSerializer.Deserialize<GraphConfiguration>(JsonSerializer.Serialize(fresh,Protocol.Json),Protocol.Json)!;

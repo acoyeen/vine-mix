@@ -1,6 +1,6 @@
 # Current beta qualification
 
-**Current qualification:** [0.4.0 Beta](RELEASE_0.4.0_QUALIFICATION.md).
+**Current qualification:** [0.5.0 Beta](RELEASE_0.5.0_QUALIFICATION.md).
 The Beta 5 results below are retained as historical release evidence.
 
 Target: **0.3.0-beta.5 / 0.3.0 · Beta 5**, Windows 11 x64.

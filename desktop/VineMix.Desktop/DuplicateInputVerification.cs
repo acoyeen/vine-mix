@@ -55,6 +55,40 @@ internal static class DuplicateInputVerification
             require(!menu.Items.OfType<MenuItem>().Any(i => Equals(i.Header, "Duplicate input")) && !workspace.DuplicateInput(output.Id),
                 "Duplicate input is unavailable for output nodes.");
         }
+        foreach (string kind in new[] { "output", "virtualOutput" })
+        {
+            var originalOutput = GraphDefaults.NewNode(kind, 400, 32);
+            originalOutput.Name = "Shared destination";
+            originalOutput.Device = new() { Id = "example-render", StableId = "example-render-stable", Name = "Example destination" };
+            originalOutput.GainDb = -6; originalOutput.Muted = false;
+            var input = GraphDefaults.NewNode("microphone", 32, 32);
+            var fixture = UiPreview.CreateSnapshot([]);
+            fixture.Configuration.Graph = new() { Nodes = [input, originalOutput],
+                Edges = [new() { Id = "existing-output-route", From = input.Id, To = originalOutput.Id }] };
+            fixture.Status.Nodes = [];
+            mixer.ApplyPreviewSnapshot(fixture); await layout();
+            string original = JsonSerializer.Serialize(mixer.GraphConfig, Protocol.Json);
+            var menu = new ContextMenu(); workspace.PopulateNodeMenu(menu, originalOutput.Id, () => { });
+            var duplicate = menu.Items.OfType<MenuItem>().Single(i => Equals(i.Header, "Duplicate output"));
+            require(duplicate.IsEnabled, kind + " exposes Duplicate output in its context menu.");
+            duplicate.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent)); await layout();
+            var copy = mixer.GraphConfig.Nodes.Single(n => n.Kind == kind && n.Id != originalOutput.Id);
+            require(copy.Name == "Shared destination copy" && copy.Device.Id == originalOutput.Device.Id
+                && copy.Device.StableId == originalOutput.Device.StableId && copy.GainDb == -6 && copy.Muted
+                && !ReferenceEquals(copy.Device, mixer.GraphConfig.Nodes.Single(n => n.Id == originalOutput.Id).Device)
+                && mixer.GraphConfig.Edges.Count == 1 && workspace.SelectedNodeIds.SequenceEqual([copy.Id]),
+                kind + " duplicate retains an independent destination/Level binding, starts muted and disconnected, and is selected.");
+            require(mixer.Undo() && JsonSerializer.Serialize(mixer.GraphConfig, Protocol.Json) == original
+                && mixer.Redo() && mixer.GraphConfig.Nodes.Single(n => n.Id == copy.Id).Device.Id == originalOutput.Device.Id,
+                kind + " duplicate undo/redo restores the same identity and shared binding without a history conflict.");
+            workspace.NodeChanged(copy.Id, n => { n.Muted = false; n.GainDb = -12; });
+            require(mixer.GraphConfig.Nodes.Single(n => n.Id == originalOutput.Id) is { GainDb: -6, Muted: false },
+                kind + " duplicate Level/mute edits leave the first output unchanged.");
+            require(workspace.DuplicateOutput(originalOutput.Id)
+                && mixer.GraphConfig.Nodes.Any(n => n.Name == "Shared destination copy 2" && n.Muted),
+                kind + " repeated duplication remains independently named and muted.");
+            if (kind == "output") { workspace.FitAll(); await layout(); capture("duplicate-output-nodes.png"); }
+        }
         foreach (string name in new[] { new string('é', 128), string.Concat(Enumerable.Repeat("🎙", 64)) })
         {
             var unicode = UiPreview.CreateSnapshot([]); var input = GraphDefaults.NewNode("microphone", 0, 0); input.Name = name;

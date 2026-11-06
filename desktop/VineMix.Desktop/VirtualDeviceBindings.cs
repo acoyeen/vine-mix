@@ -26,17 +26,6 @@ internal static class VirtualDeviceBindings
         => binding.Id.Length > 0 && binding.Id == endpoint.Id
             || binding.StableId.Length > 0 && binding.StableId == endpoint.StableId;
 
-    internal static bool IsUsed(GraphConfiguration graph, string nodeId, Endpoint endpoint)
-    {
-        var node = graph.Nodes.FirstOrDefault(n => n.Id == nodeId);
-        // Sources can feed independent input nodes. A render endpoint still has
-        // one output owner so separate node workers cannot contend for it.
-        if (node?.Kind is not ("output" or "virtualOutput")) return false;
-        return graph.Nodes.Any(other => other.Id != nodeId
-            && (other.Kind is "output" or "virtualOutput")
-            && Same(other.Device, endpoint));
-    }
-
     internal static IReadOnlyList<Assignment> FindAutomaticAssignments(GraphConfiguration graph, IReadOnlyList<Endpoint> endpoints)
     {
         var assignments = new List<Assignment>();
@@ -49,8 +38,6 @@ internal static class VirtualDeviceBindings
                 && (e.Id.Length > 0 || e.StableId.Length > 0)).Take(2).ToArray();
             if (candidates.Length != 1) continue;
             var endpoint = candidates[0];
-            if (IsUsed(graph, node.Id, endpoint)
-                || (node.Kind == "virtualOutput" && assignments.Any(a => a.Kind == node.Kind && Same(a.Binding, endpoint)))) continue;
             assignments.Add(new(node.Id, node.Kind, endpoint.Id, endpoint.StableId, endpoint.Name));
         }
         return assignments;
@@ -63,8 +50,9 @@ internal static class VirtualDeviceBindings
         {
             var node = graph.Nodes.FirstOrDefault(n => n.Id == assignment.NodeId && n.Kind == assignment.Kind);
             // Pending edits can be rebased over a newer configuration. Do not
-            // replace an intervening manual choice or claim an occupied output.
-            if (node is null || !node.AutoAssignDevice || IsAssigned(node.Device) || IsUsed(graph, node.Id, assignment.Endpoint)) continue;
+            // replace an intervening manual choice. Several logical outputs may
+            // share a destination; the engine owns its single render stream.
+            if (node is null || !node.AutoAssignDevice || IsAssigned(node.Device)) continue;
             node.Device = assignment.Binding;
             changed++;
         }

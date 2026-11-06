@@ -36,7 +36,7 @@ internal static class WorkspaceChromeVerification
         require(mixer.EditHistory.Entries.Count == firstParameterCount + 1 && mixer.EditHistory.Entries[0].Description.StartsWith("Adjusted "), "Continuous parameter adjustments coalesce in history while still updating the audio controls.");
         var menu = workspace.CreateAddMenu(new(20,20));
         var groups = menu.Items.OfType<MenuItem>().Where(i => i.Items.Count > 0).ToArray();
-        require(groups.Select(g => (string)g.Header).SequenceEqual(NodeCatalog.Categories.Select(c => c.Title)), "Add menu exposes the five ordered node categories.");
+        require(groups.Select(g => (string)g.Header).SequenceEqual(NodeCatalog.Categories.Select(c => c.Title)), "Add menu exposes the ordered node categories.");
         require(groups.SelectMany(g => g.Items.OfType<MenuItem>()).Count() == NodeCatalog.Categories.Sum(category => category.Kinds.Count)
             && groups.All(g => g.Icon is not null)
             && groups.SelectMany(g => g.Items.OfType<MenuItem>()).All(item => !Equals(item.Header, "Reroute") && !Equals(item.Header, "Gain")),
@@ -44,7 +44,7 @@ internal static class WorkspaceChromeVerification
         var search = ((Grid)((MenuItem)menu.Items[0]).Header).Children.OfType<TextBox>().Single();
         search.Text = "effects";
         require(groups.All(g => g.Visibility == Visibility.Collapsed) && menu.Items.OfType<MenuItem>().Count(i => i.Visibility == Visibility.Visible && i.Icon is not null)
-                == NodeCatalog.Categories.Single(category => category.Title == "Effects").Kinds.Count,
+                == NodeCatalog.Categories.Where(category => category.HeaderBrushKey == "NodeProcessorHeaderBrush").Sum(category => category.Kinds.Count),
             "Search includes category names and displays every matching effect directly.");
         search.Text = "no such node";
         require(menu.Items.OfType<MenuItem>().Any(i => Equals(i.Header, "No matching nodes") && i.Visibility == Visibility.Visible), "Add search reports an empty result explicitly.");

@@ -7,10 +7,12 @@
 namespace am {
 enum class GraphKind { microphone, virtualInput, appInput, mix, gain, output, virtualOutput, control,
     eq, tone, compressor, pan, mono, reroute, highPass, lowPass, denoiser, deEsser, plosive, reverb, voiceColor, expander, alignmentDelay, limiter, ducking, gate,
-    channelSwap, stereoWidth, stereoPan, crossfade, stereoCombine, stereoSplit };
-enum class GraphPort { audio, left, right, a, b };
+    channelSwap, stereoWidth, stereoPan, crossfade, stereoCombine, stereoSplit, echo, distortion };
+enum class GraphPort { audio, left, right, a, b, wet };
 bool isSource(GraphKind kind) noexcept;
 bool isSink(GraphKind kind) noexcept;
+inline constexpr std::size_t echoHistoryFrames = sampleRate * 2 * 8 + 2;
+inline constexpr std::size_t maximumPendingEchoHistoryBytes = 256 * 1024 * 1024;
 
 struct GraphPlan {
     struct Biquad { double b0 = 1, b1{}, b2{}, a1{}, a2{}; bool operator==(const Biquad&) const = default; };
@@ -43,6 +45,8 @@ struct GraphPlan {
         DeEsserSettings deEsser{};
         PlosiveSettings plosive{};
         ReverbSettings reverb{};
+        EchoSettings echo{};
+        DistortionSettings distortion{};
         VoiceColorSettings voiceColor{};
         double voiceColorGain = 1;
         bool operator==(const Node&) const = default;
@@ -88,14 +92,21 @@ public:
         // Actual dynamics state, independent of output level/make-up gain.
         float gainReductionDb{}, detectorDb = -96;
     };
-    void process(const GraphPlan& plan, const Inputs& inputs) noexcept;
+    // The engine defers sink clipping until all logical outputs targeting a
+    // physical endpoint have been summed. Standalone callers keep the bounded
+    // single-sink contract unless they explicitly aggregate device outputs.
+    void process(const GraphPlan& plan, const Inputs& inputs, bool deferSinkClipping = false) noexcept;
     std::span<const Frame> output(std::size_t index) const noexcept { return buffers_[index]; }
     const Meter& meter(std::size_t index) const noexcept { return meters_[index]; }
     void reset() noexcept;
     // Only the audio thread copies ramp state when adopting an already-built
     // plan. IDs survive reordering; unchanged paths retain their exact level.
     void inherit(const GraphProcessor& old, const GraphPlan& before, const GraphPlan& after) noexcept;
+    void adopt(GraphProcessor& old, const GraphPlan& before, const GraphPlan& after, bool preserveFade) noexcept;
+    static std::size_t echoHistoryBytes(const GraphPlan& plan) noexcept;
 private:
+    void inheritState(const GraphProcessor& old, const GraphPlan& before, const GraphPlan& after,
+        GraphProcessor* transferred, bool preserveFade) noexcept;
     struct Ramp {
         float current{}, target{}, step{};
         std::uint32_t remaining{};
@@ -116,6 +127,8 @@ private:
         Ramp width{}, position{}, fadePosition{}, fadeCurve{};
     };
     std::array<std::array<Frame, quantumFrames>, maximumGraphNodes> buffers_{};
+    std::array<std::array<Frame, quantumFrames>, maximumGraphNodes> wetBuffers_{};
+    Frame routedOutput(const GraphPlan::Edge& edge, std::size_t frame) const noexcept;
     std::array<Ramp, maximumGraphNodes> nodeRamps_{};
     std::array<Ramp, maximumGraphEdges> edgeRamps_{};
     std::array<Meter, maximumGraphNodes> meters_{};

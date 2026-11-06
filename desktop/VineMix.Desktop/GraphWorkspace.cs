@@ -50,7 +50,7 @@ public sealed partial class GraphWorkspace : UserControl
     private readonly Button _zoomReset = new() { Width = 62, Height = 26, MinHeight = 26, Padding = new Thickness(4, 1, 4, 1), Margin = new Thickness(4, 0, 4, 0), FontSize = 13, ToolTip = NodeToolTip.Create("Reset zoom", "Restores 100% canvas zoom") };
     private readonly TextBlock _countText = new() { Name = "WorkspaceNodeCount", HorizontalAlignment = HorizontalAlignment.Center,
         VerticalAlignment = VerticalAlignment.Center, TextAlignment = TextAlignment.Center, FontSize = 13 };
-    private static readonly double[] ZoomStops = [.3, .4, .5, .6, .75, .9, 1, 1.1, 1.25, 1.5, 1.75, 2];
+    private static readonly double[] ZoomStops = GraphCanvasPolicy.ZoomStops;
     private readonly Border _empty;
     private readonly Button _add;
     private readonly Button _delete;
@@ -91,7 +91,6 @@ public sealed partial class GraphWorkspace : UserControl
     private int _wheelRemainder;
     private double _displayedZoom = double.NaN;
     private Point? _previewFrom, _previewTo;
-    private string? _previewBrushKey;
     private static readonly DoubleCollection MutedWireDashes = CreateMutedWireDashes();
 
     // In-memory render diagnostics: no timers, settings, or engine access.
@@ -131,8 +130,8 @@ public sealed partial class GraphWorkspace : UserControl
     private readonly bool _useSystemClipboard;
     private string? _practiceClipboard;
     private readonly List<ContextMenu> _practiceMenus = [];
-    internal bool HasActiveGesture => _pendingSocket is not null || _dragged is not null
-        || _boxSelecting || _cutting || _panButton is not null || _socketDragging || _lockedLayoutGestureStart is not null;
+    internal bool HasActiveGesture => KeyboardNudgeActive || _pendingSocket is not null || _dragged is not null
+        || _boxSelecting || _cutting || _panButton is not null || _socketDragging || _lockedLayoutGestureStart is not null || _minimap.IsDragging;
     internal bool ClosePracticeMenus()
     {
         bool closed = false;
@@ -223,15 +222,17 @@ public sealed partial class GraphWorkspace : UserControl
         _feedbackCountdown.RenderTransform = _feedbackCountdownScale;
         footer.Children.Add(footerBorder); footer.Children.Add(_footerStatusHost); footer.Children.Add(_feedbackContent); footer.Children.Add(_feedbackCountdown);
         Grid.SetRow(footer, 2); root.Children.Add(footer);
+        InitializeMinimap(root);
         Content = root;
         _viewport.PreviewMouseWheel += OnWheel; _viewport.PreviewMouseLeftButtonDown += CanvasPreviewMouseLeftButtonDown; _viewport.MouseDown += CanvasMouseDown; _viewport.MouseMove += CanvasMouseMove; _viewport.MouseUp += CanvasMouseUp; _viewport.MouseLeave += (_, _) => { if (_pendingSocket is null) SetSnapSocket(null); }; _viewport.LostMouseCapture += (_, _) => HandleCaptureLoss();
         _viewport.PreviewMouseRightButtonDown += CanvasPreviewMouseRightButtonDown;
         _viewport.PreviewMouseRightButtonUp += CanvasPreviewMouseRightButtonUp;
         _viewport.ContextMenuOpening += (_, args) => { if (_suppressContextMenu && args.CursorLeft >= 0) args.Handled = true; };
         PreviewKeyDown += WorkspaceKeyDown;
+        InitializeKeyboardNavigation();
         _feedbackTimer.Tick += (_, _) => ResumeFeedbackCountdown();
         Loaded += (_, _) => { if (_loaded) return; _loaded = true; _mixer.GraphChanged += GraphChanged; _mixer.PropertyChanged += ModelPropertyChanged; ConsoleTheme.Changed += ThemeChanged; Refresh(); ResumeFeedbackCountdown(); };
-        _viewport.SizeChanged += (_, _) => QueueInitialFrame();
+        _viewport.SizeChanged += (_, _) => { QueueInitialFrame(); RefreshMinimap(); };
         Unloaded += (_, _) => { CancelActiveGesture(); StopFeedbackCountdown(); _loaded = false; _mixer.GraphChanged -= GraphChanged; _mixer.PropertyChanged -= ModelPropertyChanged; ConsoleTheme.Changed -= ThemeChanged; };
         DismissMessage();
         AutomationProperties.SetName(this, "Audio routing canvas");
@@ -246,10 +247,11 @@ public sealed partial class GraphWorkspace : UserControl
     }
     internal static Button Button(string text, string tooltip) => new() { Content = text, ToolTip = tooltip, MinHeight = 26, Height = 26, Padding = new Thickness(10, 2, 10, 2), FontSize = 13 };
     private Point VisibleCenter() => ToWorld(new Point(_viewport.ActualWidth * .45, _viewport.ActualHeight * .35));
-    private Point ToWorld(Point point) => new((point.X - _panX) / _zoom, (point.Y - _panY) / _zoom);
+    private Point ToWorld(Point point) => new GraphCanvasView(_panX, _panY, _zoom).ToWorld(point);
     private void GraphChanged(object? sender, EventArgs args) => Refresh();
     private void ModelPropertyChanged(object? sender, PropertyChangedEventArgs args)
     {
+        if (args.PropertyName == nameof(MixerViewModel.ShowMinimap)) RefreshMinimap();
         if (args.PropertyName == nameof(MixerViewModel.ShowActionNotifications)
             && !_mixer.ShowActionNotifications && !_feedbackIsError) DismissMessage();
         if (args.PropertyName == nameof(MixerViewModel.IsLayoutLocked))
@@ -270,7 +272,7 @@ public sealed partial class GraphWorkspace : UserControl
             else if (_feedbackIsModelWarning) DismissMessage();
         }
     }
-    private void ThemeChanged(object? sender, EventArgs args) { _grid.InvalidateVisual(); Refresh(); ResumeFeedbackCountdown(); }
+    private void ThemeChanged(object? sender, EventArgs args) { _grid.InvalidateVisual(); _minimap.InvalidateVisual(); Refresh(); ResumeFeedbackCountdown(); }
 
     private void Refresh()
     {
@@ -278,8 +280,9 @@ public sealed partial class GraphWorkspace : UserControl
         try
         {
             var graph = Graph;
+            InvalidateKeyboardNudge(graph);
             bool wireAnchorsChanged = false;
-            if (!HasCanvasPanGesture && _dragged is null && !_boxSelecting) { _panX = double.IsFinite(graph.PanX) ? graph.PanX : 20; _panY = double.IsFinite(graph.PanY) ? graph.PanY : 20; _zoom = Math.Clamp(double.IsFinite(graph.Zoom) ? graph.Zoom : 1, .3, 2); ApplyTransform(); }
+            if (!HasCanvasPanGesture && !_minimap.IsDragging && _dragged is null && !_boxSelecting) { _panX = double.IsFinite(graph.PanX) ? graph.PanX : 20; _panY = double.IsFinite(graph.PanY) ? graph.PanY : 20; _zoom = GraphCanvasPolicy.ClampZoom(graph.Zoom); ApplyTransform(); }
             foreach (var missing in _nodes.Keys.Where(id => graph.Nodes.All(n => n.Id != id)).ToArray()) { _world.Children.Remove(_nodes[missing]); _nodes.Remove(missing); _selectedNodes.Remove(missing); _dragOrigins.Remove(missing); wireAnchorsChanged = true; }
             foreach (var node in graph.Nodes)
             {
@@ -287,26 +290,27 @@ public sealed partial class GraphWorkspace : UserControl
                 {
                     _world.Children.Remove(previous); _nodes.Remove(node.Id); wireAnchorsChanged = true;
                 }
-                if (!_nodes.TryGetValue(node.Id, out var view)) { view = new GraphNodeView(this, node); _nodes.Add(node.Id, view); _world.Children.Add(view); view.SetViewScale(_zoom); wireAnchorsChanged = true; }
+                if (!_nodes.TryGetValue(node.Id, out var view)) { view = new GraphNodeView(this, node); view.SizeChanged += (_, _) => RefreshMinimap(); _nodes.Add(node.Id, view); _world.Children.Add(view); view.SetViewScale(_zoom); wireAnchorsChanged = true; }
                 view.Apply(node, _mixer.GraphStatus.FirstOrDefault(s => s.Id == node.Id), _selectedNodes.Contains(node.Id));
-                if (!_dragOrigins.ContainsKey(node.Id))
+                if (!_dragOrigins.ContainsKey(node.Id) && !_keyboardNudgeOrigins.ContainsKey(node.Id))
                 {
                     if (Canvas.GetLeft(view) != node.X) { Canvas.SetLeft(view, node.X); wireAnchorsChanged = true; }
                     if (Canvas.GetTop(view) != node.Y) { Canvas.SetTop(view, node.Y); wireAnchorsChanged = true; }
                 }
             }
             ApplyNodeStacking();
-            foreach (var missing in _wires.Keys.Where(id => graph.Edges.All(e => e.Id != id)).ToArray()) { _cables.Children.Remove(_wires[missing].Visible); _cables.Children.Remove(_wires[missing].Hit); _cables.Children.Remove(_wires[missing].Outline); _wires.Remove(missing); if (_selectedEdge == missing) _selectedEdge = null; }
+            foreach (var missing in _wires.Keys.Where(id => graph.Edges.All(e => e.Id != id)).ToArray()) { _cables.Children.Remove(_wires[missing].Visible); _cables.Children.Remove(_wires[missing].Hit); _cables.Children.Remove(_wires[missing].Outline); _cables.Children.Remove(_wires[missing].Marker); _wires.Remove(missing); if (_selectedEdge == missing) _selectedEdge = null; }
             foreach (var edge in graph.Edges)
             {
                 if (!_wires.ContainsKey(edge.Id))
                 {
                     var visible = new System.Windows.Shapes.Path { IsHitTestVisible = false, StrokeThickness = 2.5 };
+                    var marker = new System.Windows.Shapes.Path { IsHitTestVisible = false, Focusable = false, Stretch = Stretch.None };
                     var outline = new System.Windows.Shapes.Path { IsHitTestVisible = false, StrokeThickness = 4.5 }; outline.SetResourceReference(Shape.StrokeProperty, "NodeCanvasBrush");
                     var hit = new System.Windows.Shapes.Path { Stroke = Brushes.Transparent, StrokeThickness = 14, Cursor = Cursors.Hand,
                         Stretch = Stretch.None, UseLayoutRounding = false, SnapsToDevicePixels = false };
                     string id = edge.Id; hit.MouseLeftButtonDown += (_, e) => WirePressed(id, e); hit.MouseRightButtonDown += (_, e) => { SelectEdge(id); ShowEdgeMenu(hit, id); e.Handled = true; };
-                    _cables.Children.Add(outline); _cables.Children.Add(visible); _cables.Children.Add(hit); _wires.Add(id, new(visible, hit, outline));
+                    _cables.Children.Add(outline); _cables.Children.Add(visible); _cables.Children.Add(marker); _cables.Children.Add(hit); _wires.Add(id, new(visible, hit, outline, marker));
                     wireAnchorsChanged = true;
                 }
                 var wire = _wires[edge.Id];
@@ -328,6 +332,7 @@ public sealed partial class GraphWorkspace : UserControl
         }
         finally { _syncing = false; }
         QueueInitialFrame();
+        RefreshMinimap();
     }
     private void QueueInitialFrame()
     {
@@ -339,132 +344,6 @@ public sealed partial class GraphWorkspace : UserControl
             if (!_mixer.NeedsInitialFrame || !_mixer.CanEdit || _nodes.Count == 0 || _viewport.ActualWidth <= 0 || _viewport.ActualHeight <= 0) return;
             FitAll(); _mixer.InitialFrameCompleted();
         }), System.Windows.Threading.DispatcherPriority.Loaded);
-    }
-    private void ApplyTransform()
-    {
-        // Render transforms run after layout rounding. Align the translation
-        // to the current monitor's device pixels as well, including at 100%.
-        var dpi = VisualTreeHelper.GetDpi(this);
-        _panX = Math.Round(_panX * dpi.DpiScaleX) / dpi.DpiScaleX;
-        _panY = Math.Round(_panY * dpi.DpiScaleY) / dpi.DpiScaleY;
-        var matrix = new Matrix(_zoom, 0, 0, _zoom, _panX, _panY);
-        if (_viewTransform.Matrix != matrix) { _viewTransform.Matrix = matrix; ViewTransformUpdates++; }
-        _grid.SetView(_panX, _panY, _zoom);
-        if (_displayedZoom != _zoom)
-        {
-            _displayedZoom = _zoom; _zoomReset.Content = $"{_zoom * 100:0}%";
-            AutomationProperties.SetHelpText(_zoomReset, $"Current zoom {_zoom * 100:0} percent. Activate to return to 100 percent.");
-            foreach (var view in _nodes.Values) view.SetViewScale(_zoom);
-            foreach (var pair in _wires) SetWireWidth(pair.Key, pair.Value);
-            RefreshFrames();
-        }
-        if (_snapSocket is not null) SetSnapSocket(IsCurrentSocket(_snapSocket) ? _snapSocket : null);
-    }
-    private void PersistView()
-    {
-        double x = _panX, y = _panY, z = _zoom;
-        if (Graph.PanX == x && Graph.PanY == y && Graph.Zoom == z) return;
-        _mixer.SetCanvasView(x, y, z);
-    }
-    private void ZoomAt(Point anchor, double zoom)
-    {
-        double next = Math.Clamp(zoom, .3, 2);
-        if (_zoom == next) return;
-        var world = ToWorld(anchor); _zoom = next; _panX = anchor.X - world.X * _zoom; _panY = anchor.Y - world.Y * _zoom; ApplyTransform(); PersistView();
-    }
-    internal void ResetZoom() { _wheelRemainder = 0; ZoomAt(new Point(_viewport.ActualWidth / 2, _viewport.ActualHeight / 2), 1); }
-    private void StepZoom(Point anchor, int steps)
-    {
-        // Deliberate stops always include 100%; repeated input does not drift
-        // through arbitrary fractional scales that make small text hard to read.
-        double next = _zoom;
-        for (int step = 0; step < Math.Min(Math.Abs((long)steps), ZoomStops.Length); step++)
-            next = steps > 0
-                ? ZoomStops.FirstOrDefault(value => value > next + .0001, ZoomStops[^1])
-                : ZoomStops.LastOrDefault(value => value < next - .0001, ZoomStops[0]);
-        ZoomAt(anchor, next);
-    }
-    internal void ApplyWheelDelta(Point anchor, int delta)
-    {
-        if (delta == 0) return;
-        // High-resolution wheels can report a fraction of the standard 120
-        // units per notch. Accumulate them instead of zooming a whole step for
-        // every tiny event; a multi-notch event is applied in one transform.
-        if (Math.Sign(delta) != Math.Sign(_wheelRemainder)) _wheelRemainder = 0;
-        long accumulated = (long)_wheelRemainder + delta;
-        int steps = (int)Math.Clamp(accumulated / 120, -ZoomStops.Length, ZoomStops.Length);
-        _wheelRemainder = (int)(accumulated % 120);
-        if (steps != 0) StepZoom(anchor, steps);
-    }
-    public void FitAll()
-    {
-        _wheelRemainder = 0;
-        if (_nodes.Count == 0) { _panX = 20; _panY = 20; _zoom = 1; ApplyTransform(); PersistView(); return; }
-        double availableWidth = Math.Max(0, _viewport.ActualWidth - 64), availableHeight = Math.Max(0, _viewport.ActualHeight - 54);
-        // Every node has fixed world-space dimensions at every zoom. Settle any
-        // pending control changes once, then fit those bounds.
-        _world.UpdateLayout();
-        var bounds = Rect.Empty;
-        foreach (var view in _nodes.Values)
-        {
-            view.Measure(new Size(view.Width, double.PositiveInfinity));
-            bounds.Union(new Rect(Canvas.GetLeft(view), Canvas.GetTop(view), view.Width, view.DesiredSize.Height));
-        }
-        var nodeBounds = bounds;
-        for (int pass = 0; pass < 4; pass++)
-        {
-            _zoom = Math.Clamp(Math.Min(availableWidth / bounds.Width, availableHeight / bounds.Height), .3, 1);
-            bounds = IncludeFrameBounds(nodeBounds, _zoom, _nodes.Keys);
-        }
-        _panX = (_viewport.ActualWidth - bounds.Width * _zoom) / 2 - bounds.Left * _zoom;
-        _panY = (_viewport.ActualHeight - bounds.Height * _zoom) / 2 - bounds.Top * _zoom;
-        ApplyTransform(); PersistView();
-    }
-    private bool CanFrameSelection => _dragged is null && _lockedLayoutGestureStart is null && !HasCanvasPanGesture && !_boxSelecting && !_cutting
-        && _pendingSocket is null && !_socketDragging && !IsFrameSelectionPointerBusy(Mouse.Captured) && !_mixer.EditHistory.HasGestureEdit;
-    internal bool CanOpenNodeSearch => CanFrameSelection;
-    internal bool FindAndFrameNode(string id)
-    {
-        if (!CanFrameSelection || _viewport.ActualWidth <= 0 || _viewport.ActualHeight <= 0
-            || !Graph.Nodes.Any(node => node.Id == id) || !_nodes.TryGetValue(id, out var view)) return false;
-        _world.UpdateLayout();
-        if (view.RenderSize.Width <= 0 || view.RenderSize.Height <= 0) return false;
-        SelectNode(id);
-        return FrameSelection();
-    }
-    // A menu may retain capture while invoking its command. That capture is
-    // navigation, unlike a captured dial, selector, slider or canvas gesture.
-    internal static bool IsFrameSelectionPointerBusy(IInputElement? captured) => captured is not (null or MenuBase or MenuItem);
-    internal bool FrameSelection()
-    {
-        if (!CanFrameSelection) return false;
-        var selected = _selectedNodes.Where(id => Graph.Nodes.Any(node => node.Id == id))
-            .Select(id => _nodes.GetValueOrDefault(id)).OfType<GraphNodeView>().ToArray();
-        if (selected.Length == 0) { SetMessage("Select one or more nodes to frame."); return false; }
-        if (_viewport.ActualWidth <= 0 || _viewport.ActualHeight <= 0) return false;
-        // Settle layout before using the rendered controls, including taller
-        // processors and nodes whose controls have just changed size.
-        _world.UpdateLayout();
-        var bounds = Rect.Empty;
-        foreach (var view in selected)
-        {
-            double x = Canvas.GetLeft(view), y = Canvas.GetTop(view);
-            if (!double.IsFinite(x) || !double.IsFinite(y) || view.RenderSize.Width <= 0 || view.RenderSize.Height <= 0) continue;
-            bounds.Union(new Rect(new Point(x, y), view.RenderSize));
-        }
-        if (bounds.IsEmpty) return false;
-        _wheelRemainder = 0;
-        double availableWidth = Math.Max(0, _viewport.ActualWidth - 64), availableHeight = Math.Max(0, _viewport.ActualHeight - 54);
-        var nodeBounds = bounds;
-        for (int pass = 0; pass < 4; pass++)
-        {
-            _zoom = Math.Clamp(Math.Min(availableWidth / bounds.Width, availableHeight / bounds.Height), .3, 1);
-            bounds = IncludeFrameBounds(nodeBounds, _zoom, _selectedNodes);
-        }
-        _panX = (_viewport.ActualWidth - bounds.Width * _zoom) / 2 - bounds.Left * _zoom;
-        _panY = (_viewport.ActualHeight - bounds.Height * _zoom) / 2 - bounds.Top * _zoom;
-        ApplyTransform(); PersistView();
-        return true;
     }
     internal bool TryFrameSelectionShortcut(Key key, ModifierKeys modifiers, DependencyObject? focused)
     {
@@ -484,7 +363,7 @@ public sealed partial class GraphWorkspace : UserControl
     }
     private void OnWheel(object sender, MouseWheelEventArgs args)
     {
-        if (_dragged is not null || _lockedLayoutGestureStart is not null || _boxSelecting || HasCanvasPanGesture || _cutting || _socketDragging) { args.Handled = true; return; }
+        if (_dragged is not null || _lockedLayoutGestureStart is not null || _boxSelecting || HasCanvasPanGesture || _minimap.IsDragging || _cutting || _socketDragging) { args.Handled = true; return; }
         var anchor = args.GetPosition(_viewport);
         DependencyObject? source = args.OriginalSource as DependencyObject, hovered = Mouse.DirectlyOver as DependencyObject;
         bool openDropDown = _nodes.Values.Any(node => node.HasOpenDropDown);
@@ -664,6 +543,8 @@ public sealed partial class GraphWorkspace : UserControl
     }
     private void SetNodeSelection(IEnumerable<string> ids, bool raiseNewlySelected = true, bool promoteWholeSelection = false)
     {
+        FinishKeyboardNudge();
+        if (!_pipelineSelecting) { ClosePipelineChoices(); _pipelineReturnEdges.Clear(); }
         bool hadFrame = _selectedFrame is not null;
         _selectedFrame = null;
         var next = ids.Where(id => Graph.Nodes.Any(node => node.Id == id)).ToHashSet();
@@ -728,10 +609,12 @@ public sealed partial class GraphWorkspace : UserControl
     }
     internal static (string Title, string Route, string State, string Purpose) DescribeConnection(GraphConfiguration graph, GraphEdge edge)
     {
-        string from = graph.Nodes.FirstOrDefault(node => node.Id == edge.From)?.Name ?? "Missing source";
-        string to = graph.Nodes.FirstOrDefault(node => node.Id == edge.To)?.Name ?? "Missing destination";
-        if (edge.FromPort != "audio") from += " · " + GraphDefaults.PortLabel(edge.FromPort);
-        if (edge.ToPort != "audio") to += " · " + GraphDefaults.PortLabel(edge.ToPort);
+        var source = graph.Nodes.FirstOrDefault(node => node.Id == edge.From);
+        var destination = graph.Nodes.FirstOrDefault(node => node.Id == edge.To);
+        string from = source?.Name ?? "Missing source";
+        string to = destination?.Name ?? "Missing destination";
+        if (edge.FromPort != "audio") from += " · " + GraphDefaults.PortLabel(edge.FromPort, source?.Kind);
+        if (edge.ToPort != "audio") to += " · " + GraphDefaults.PortLabel(edge.ToPort, destination?.Kind);
         string gain = (edge.GainDb > 0 ? "+" : "") + edge.GainDb.ToString("G", CultureInfo.InvariantCulture) + " dB";
         return edge.Kind switch
         {
@@ -794,6 +677,7 @@ public sealed partial class GraphWorkspace : UserControl
     }
     internal void BeginNodeMove(string id, Point viewportStart, bool detach = false, bool bringAnchorToFront = true)
     {
+        FinishKeyboardNudge();
         if (!_nodes.TryGetValue(id, out var node) || !RequireLayoutEdit()) return;
         if (!_selectedNodes.Contains(id)) SelectNode(id);
         BringNodesToFront(_selectedNodes, bringAnchorToFront ? id : null);
@@ -822,6 +706,7 @@ public sealed partial class GraphWorkspace : UserControl
             if (_nodes.TryGetValue(id, out var view)) { Canvas.SetLeft(view, origin.X + delta.X); Canvas.SetTop(view, origin.Y + delta.Y); }
         UpdateWires();
         SetInsertionEdge(!_movingFrame && !_detachOnDrop && _dragOrigins.Count == 1 ? FindInsertionCandidate(_dragged.Id) : null);
+        RefreshMinimap();
     }
     internal void FinishNodeMove(bool cancel = false)
     {
@@ -1170,6 +1055,8 @@ public sealed partial class GraphWorkspace : UserControl
     }
     internal void CancelActiveGesture()
     {
+        FinishKeyboardNudge(cancel: true); ClosePipelineChoices();
+        _minimap.EndPan(cancel: true);
         if (_cutting) FinishCableCut(cancel: true);
         CancelCable(); FinishGesture(cancel: true);
     }
@@ -1230,9 +1117,9 @@ public sealed partial class GraphWorkspace : UserControl
     private void UpdateWireAppearance(GraphEdge edge, WireVisual wire)
     {
         string id = edge.Id;
+        wire.Muted = edge.Muted;
         bool highlighted = id == _selectedEdge || id == _insertionEdge || id == _inputLinkCandidate || _cutEdges.ContainsKey(id);
-        string brushKey = highlighted ? "NodeSelectedBrush" : edge.Muted ? "ConsoleMutedBrush" : edge.Kind == "control" ? "NodeControlBrush" : edge.Kind == "sidechain" ? "NodeSidechainBrush" : "NodeAudioBrush";
-        if (wire.BrushKey != brushKey) { wire.BrushKey = brushKey; wire.Visible.SetResourceReference(Shape.StrokeProperty, brushKey); }
+        PaintWire(edge, wire, highlighted);
         wire.Visible.Opacity = highlighted ? 1 : edge.Muted ? .4 : edge.Kind == "control" ? .75 : .95;
         var visibility = _rewireOriginal?.Id == id ? Visibility.Hidden : Visibility.Visible;
         wire.Visible.Visibility = wire.Hit.Visibility = wire.Outline.Visibility = visibility;
@@ -1241,6 +1128,17 @@ public sealed partial class GraphWorkspace : UserControl
     }
     private void WorkspaceKeyDown(object sender, KeyEventArgs args)
     {
+        if (TryMinimapGestureKey(args.Key)) { args.Handled = true; return; }
+        if (KeyboardNudgeActive && args.Key is Key.LeftShift or Key.RightShift) return;
+        if (TryCanvasArrow(args.Key, Keyboard.Modifiers, Keyboard.FocusedElement as DependencyObject, args.IsRepeat))
+        { args.Handled = true; return; }
+        FinishKeyboardNudge();
+        if (TryKeyboardZoom(args.Key, Keyboard.Modifiers, Keyboard.FocusedElement as DependencyObject))
+        { args.Handled = true; return; }
+        if (TryPipelineShortcut(args.Key, Keyboard.Modifiers, Keyboard.FocusedElement as DependencyObject))
+        { args.Handled = true; return; }
+        if (TryRenameSelectionShortcut(args.Key, Keyboard.Modifiers, Keyboard.FocusedElement as DependencyObject))
+        { args.Handled = true; return; }
         // Alt chords arrive as Key.System in WPF. Normalize only for alignment;
         // the existing canvas shortcuts keep their original key semantics.
         Key alignmentKey = args.Key == Key.System ? args.SystemKey : args.Key;
@@ -1251,11 +1149,16 @@ public sealed partial class GraphWorkspace : UserControl
         if (TryHistoryShortcut(args.Key, Keyboard.Modifiers, Keyboard.FocusedElement as DependencyObject))
         { args.Handled = true; return; }
         if (IsEditingControl(Keyboard.FocusedElement as DependencyObject)) return;
-        if (args.Key == Key.Escape) { CancelActiveGesture(); SetMessage("Gesture cancelled."); args.Handled = true; return; }
+        if (args.Key == Key.Escape)
+        {
+            bool hadGesture = HasActiveGesture;
+            CancelActiveGesture();
+            if (hadGesture) SetMessage("Gesture cancelled.");
+            args.Handled = true; return;
+        }
         if (_dragged is not null || _lockedLayoutGestureStart is not null || HasCanvasPanGesture || _boxSelecting || _cutting || _socketDragging) return;
         if (args.Key is Key.Delete or Key.Back) { DeleteSelection(); args.Handled = true; }
         else if (args.Key == Key.G && Keyboard.Modifiers == ModifierKeys.Control) { CreateFrameFromSelection(); args.Handled = true; }
-        else if (args.Key == Key.F2 && _selectedFrame is string frameId) { BeginFrameRename(frameId); args.Handled = true; }
         else if (args.Key == Key.C && Keyboard.Modifiers == ModifierKeys.Control) { CopyToClipboard(); args.Handled = true; }
         else if (args.Key == Key.V && Keyboard.Modifiers == ModifierKeys.Control) { PasteFromClipboard(); args.Handled = true; }
         else if (args.Key == Key.A && Keyboard.Modifiers == ModifierKeys.Control) { SetNodeSelection(Graph.Nodes.Select(n => n.Id), promoteWholeSelection: true); args.Handled = true; }
@@ -1305,7 +1208,7 @@ public sealed partial class GraphWorkspace : UserControl
         if (_mixer.IsLayoutLocked) { RequireLayoutEdit(); return false; }
         if (!_mixer.CanEdit) { SetMessage("Wait for the audio engine before pasting nodes.", isError: true); return false; }
         if (!GraphClipboard.TryCreatePaste(payload, Graph, worldAnchor, out var paste, out string error)) { SetMessage(error, isError: true); return false; }
-        return ApplyPaste(paste, $"Pasted {paste.Nodes.Count} {(paste.Nodes.Count == 1 ? "node" : "nodes")}." + (paste.ClearedAssignments > 0 ? $" Choose a device for {paste.ClearedAssignments} copied {(paste.ClearedAssignments == 1 ? "output" : "outputs")}; the originals keep their assignments." : " Drag a selected header to position the group."));
+        return ApplyPaste(paste, $"Pasted {paste.Nodes.Count} {(paste.Nodes.Count == 1 ? "node" : "nodes")}." + (paste.Nodes.Any(n => n.Kind is "output" or "virtualOutput") ? " Copied outputs keep their devices and start muted." : " Drag a selected header to position the group."));
     }
     private bool ApplyPaste(GraphPaste paste, string message)
     {
@@ -1319,11 +1222,16 @@ public sealed partial class GraphWorkspace : UserControl
         return true;
     }
     internal bool DuplicateInput(string id)
+        => DuplicateEndpoint(id, output: false);
+    internal bool DuplicateOutput(string id)
+        => DuplicateEndpoint(id, output: true);
+    private bool DuplicateEndpoint(string id, bool output)
     {
         if (_mixer.IsLayoutLocked) { RequireLayoutEdit(); return false; }
-        if (!_mixer.CanEdit) { SetMessage("Wait for the audio engine before duplicating an input.", isError: true); return false; }
+        if (!_mixer.CanEdit) { SetMessage("Wait for the audio engine before duplicating a node.", isError: true); return false; }
         var node = Graph.Nodes.FirstOrDefault(n => n.Id == id);
-        if (node is null || node.Kind is not ("microphone" or "virtualInput" or "appInput")) return false;
+        if (node is null || (output ? node.Kind is not ("output" or "virtualOutput")
+            : node.Kind is not ("microphone" or "virtualInput" or "appInput"))) return false;
         var position = new Point(node.X + 384, node.Y + 32);
         while (Graph.Nodes.Any(n => Math.Abs(n.X - position.X) < 16 && Math.Abs(n.Y - position.Y) < 16))
             position += new Vector(32, 40);
@@ -1345,7 +1253,9 @@ public sealed partial class GraphWorkspace : UserControl
             number++;
         } while (Graph.Nodes.Any(n => string.Equals(n.Name, copyName, StringComparison.OrdinalIgnoreCase)));
         paste.Nodes[0].Name = copyName;
-        return ApplyPaste(paste, "Input duplicated with its own controls. Connect the new node to build another branch.");
+        return ApplyPaste(paste, output
+            ? "Output duplicated with its own controls. Connect the new node, then unmute it when ready."
+            : "Input duplicated with its own controls. Connect the new node to build another branch.");
     }
     private void CopyToClipboard()
     {
@@ -1493,11 +1403,17 @@ public sealed partial class GraphWorkspace : UserControl
                 ToolTip = NodeToolTip.Create("Duplicate input", "Use the same source in another part of the graph", "Copies its controls; starts without connections") };
             duplicate.Click += (_, _) => DuplicateInput(id); menu.Items.Add(duplicate);
         }
+        if (node?.Kind is "output" or "virtualOutput")
+        {
+            var duplicate = new MenuItem { Header = "Duplicate output", IsEnabled = _mixer.CanEditLayout && _selectedNodes.Count == 1 && Graph.Nodes.Count < 32,
+                ToolTip = NodeToolTip.Create("Duplicate output", "Send another branch to the same destination", "Copies its controls; starts muted and without connections") };
+            duplicate.Click += (_, _) => DuplicateOutput(id); menu.Items.Add(duplicate);
+        }
         menu.Items.Add(new Separator());
         var detach = new MenuItem { Header = "Detach node (reconnect)", InputGestureText = "Alt+drag", IsEnabled = _mixer.CanEditLayout && _selectedNodes.Count == 1,
             ToolTip = NodeToolTip.Create("Detach node", "Reconnects the surrounding audio path", "Keeps this node and its settings") };
         detach.Click += (_, _) => DetachNode(id); menu.Items.Add(detach);
-        var renameItem = new MenuItem { Header = "Rename", IsEnabled = _mixer.CanEdit && _selectedNodes.Count == 1 };
+        var renameItem = new MenuItem { Header = "Rename", InputGestureText = "F2", IsEnabled = _mixer.CanEdit && _selectedNodes.Count == 1 };
         renameItem.Click += (_, _) => rename(); menu.Items.Add(renameItem);
         var reset = new MenuItem { Header = "Reset node to defaults", IsEnabled = _mixer.CanEdit && _selectedNodes.Count == 1,
             ToolTip = node?.Kind is "output" or "virtualOutput"
@@ -1525,9 +1441,8 @@ public sealed partial class GraphWorkspace : UserControl
             .OrderBy(e => e.State != "Active").ThenBy(e => e.Name))
         {
             bool selected = VirtualDeviceBindings.Same(node.Device, endpoint);
-            bool used = VirtualDeviceBindings.IsUsed(Graph, node.Id, endpoint);
-            var item = new MenuItem { Header = endpoint.Name + (used ? " · already used" : endpoint.State != "Active" ? " · " + endpoint.State : ""),
-                IsCheckable = true, IsChecked = selected, IsEnabled = !used };
+            var item = new MenuItem { Header = endpoint.Name + (endpoint.State != "Active" ? " · " + endpoint.State : ""),
+                IsCheckable = true, IsChecked = selected };
             var binding = new DeviceBinding { Id = endpoint.Id, StableId = endpoint.StableId, Name = endpoint.Name, Channel = -1 };
             item.Click += (_, _) =>
             {
@@ -1535,8 +1450,7 @@ public sealed partial class GraphWorkspace : UserControl
                 _mixer.Edit(c =>
                 {
                     var current = c.Graph.Nodes.FirstOrDefault(n => n.Id == node.Id);
-                    if (current is not null && VirtualDeviceBindings.Matches(current.Kind, endpoint)
-                        && !VirtualDeviceBindings.IsUsed(c.Graph, current.Id, endpoint)) current.Device = binding.Copy();
+                    if (current is not null && VirtualDeviceBindings.Matches(current.Kind, endpoint)) current.Device = binding.Copy();
                 });
             };
             devices.Items.Add(item);
@@ -1703,6 +1617,7 @@ public sealed partial class GraphWorkspace : UserControl
             var geometry = Cable(start, end); paths.Visible.Data = geometry; paths.Outline.Data = geometry;
             UpdateHitGeometry(paths);
             paths.From = start; paths.To = end; paths.Points = CablePoints(start, end); WireGeometryBuilds++;
+            UpdateWireAppearance(edge, paths);
         }
         UpdatePreview();
     }
@@ -1729,12 +1644,10 @@ public sealed partial class GraphWorkspace : UserControl
         Socket? nearest = null;
         double closest = SocketSnapRadius * SocketSnapRadius;
         foreach (var node in _nodes.Values)
-            foreach (string kind in new[] { "audio", "control", "sidechain" })
-                foreach (bool output in new[] { false, true })
-                foreach (string port in new[] { "audio", "left", "right", "a", "b" })
+            foreach (var socket in node.Sockets)
                 {
-                    var socket = node.FindSocket(kind, output, port);
-                    if (socket is null || socket == pending || socket.Visibility != Visibility.Visible || pending is not null && !CompatibleSockets(pending, socket)) continue;
+                    if (socket == pending || socket.Visibility != Visibility.Visible || !socket.IsHitTestVisible || !socket.IsEnabled
+                        || pending is not null && !CompatibleSockets(pending, socket)) continue;
                     Point world = SocketPosition(socket);
                     double distance = (new Point(world.X * _zoom + _panX, world.Y * _zoom + _panY) - viewportPoint).LengthSquared;
                     if (distance > closest) continue;
@@ -1777,8 +1690,7 @@ public sealed partial class GraphWorkspace : UserControl
         foreach (var edge in Graph.Edges.Where(e => e.Kind == "audio"))
         {
             if (!_wires.TryGetValue(edge.Id, out var wire) || wire.From is not Point from || wire.To is not Point to) continue;
-            double reach = Math.Max(70, Math.Abs(to.X - from.X) * .48);
-            var first = new Point(from.X + reach, from.Y); var second = new Point(to.X - reach, to.Y);
+            var (first, second) = CableControls(from, to);
             int steps = Math.Clamp((int)Math.Ceiling(((first - from).Length + (second - first).Length + (to - second).Length) * _zoom / 12), 16, 256);
             Point previous = from;
             double distance = double.PositiveInfinity;
@@ -1819,10 +1731,7 @@ public sealed partial class GraphWorkspace : UserControl
         {
             var edge = Graph.Edges.FirstOrDefault(e => e.Id == changed);
             if (edge is null || !_wires.TryGetValue(changed, out var wire)) continue;
-            wire.BrushKey = changed == _selectedEdge || changed == _insertionEdge ? "NodeSelectedBrush" : edge.Muted ? "ConsoleMutedBrush" : edge.Kind == "control" ? "NodeControlBrush" : edge.Kind == "sidechain" ? "NodeSidechainBrush" : "NodeAudioBrush";
-            wire.Visible.SetResourceReference(Shape.StrokeProperty, wire.BrushKey);
-            wire.Visible.Opacity = changed == _insertionEdge ? 1 : edge.Muted ? .4 : edge.Kind == "control" ? .75 : .95;
-            SetWireWidth(changed, wire);
+            UpdateWireAppearance(edge, wire);
         }
         if (id is not null) SetMessage("Release to insert this node into the highlighted cable. Escape cancels.");
         else if (old is not null) SetMessage("");
@@ -1839,25 +1748,28 @@ public sealed partial class GraphWorkspace : UserControl
             if (_pendingSocket is not null) CancelCable();
             ClearPreview(); return;
         }
-        string previewKind = _rewireOriginal?.Kind ?? (_pendingSocket.Output ? _snapSocket?.Kind ?? _pendingSocket.Kind : _pendingSocket.Kind);
-        string brushKey = previewKind == "control" ? "NodeControlBrush" : previewKind == "sidechain" ? "NodeSidechainBrush" : "NodeAudioBrush";
-        if (_previewBrushKey != brushKey) { _previewWire.SetResourceReference(Shape.StrokeProperty, brushKey); _previewBrushKey = brushKey; }
         Point socket = SocketPosition(_pendingSocket);
         Point target = _snapSocket is not null ? SocketPosition(_snapSocket) : _pointer;
         Point start = _pendingSocket.Output ? socket : target, end = _pendingSocket.Output ? target : socket;
+        var source = _pendingSocket.Output ? _pendingSocket : _snapSocket;
+        var destination = _pendingSocket.Output ? _snapSocket : _pendingSocket;
+        string sourceKey = source?.ColourBrushKey ?? _pendingSocket.ColourBrushKey;
+        string destinationKey = destination?.ColourBrushKey ?? _pendingSocket.ColourBrushKey;
+        var paint = new CablePaintKey(start, end, SocketColor(sourceKey), SocketColor(destinationKey));
+        if (_previewPaint != paint) { _previewWire.Stroke = CableBrush(start, end, paint.Source, paint.Destination); _previewPaint = paint; }
         if (SameAnchor(_previewFrom, start) && SameAnchor(_previewTo, end)) return;
         _previewWire.Data = Cable(start, end); _previewFrom = start; _previewTo = end;
     }
     private bool IsCurrentSocket(Socket socket) => _nodes.TryGetValue(socket.NodeId, out var node)
         && ReferenceEquals(node.FindSocket(socket.Kind, socket.Output, socket.Port), socket);
-    private static Geometry Cable(Point from, Point to)
+    internal static Geometry Cable(Point from, Point to)
     {
-        double reach = Math.Max(70, Math.Abs(to.X - from.X) * .48);
+        var (first, second) = CableControls(from, to);
         var geometry = new StreamGeometry();
         using (var drawing = geometry.Open())
         {
             drawing.BeginFigure(from, false, false);
-            drawing.BezierTo(new Point(from.X + reach, from.Y), new Point(to.X - reach, to.Y), to, true, false);
+            drawing.BezierTo(first, second, to, true, false);
         }
         geometry.Freeze(); return geometry;
     }
@@ -1871,6 +1783,7 @@ public sealed partial class GraphWorkspace : UserControl
     }
     private void SetWireWidth(string id, WireVisual wire)
     {
+        UpdateCableMarker(wire);
         double width = id == _selectedEdge || id == _insertionEdge || id == _inputLinkCandidate || _cutEdges.ContainsKey(id) ? 3 / _zoom : Math.Max(2.5, 1.6 / _zoom);
         if (wire.Visible.StrokeThickness != width) wire.Visible.StrokeThickness = width;
         if (wire.Outline.StrokeThickness != width + 2 / _zoom) wire.Outline.StrokeThickness = width + 2 / _zoom;
@@ -1901,14 +1814,17 @@ public sealed partial class GraphWorkspace : UserControl
     }
     private static DoubleCollection CreateMutedWireDashes() { var dashes = new DoubleCollection([2, 3]); dashes.Freeze(); return dashes; }
     private readonly record struct ConnectionDetailKey(string From, string To, string SourceName, string TargetName, string Kind, double GainDb, bool Muted, string FromPort, string ToPort);
-    private sealed class WireVisual(System.Windows.Shapes.Path visible, System.Windows.Shapes.Path hit, System.Windows.Shapes.Path outline)
+    private sealed class WireVisual(System.Windows.Shapes.Path visible, System.Windows.Shapes.Path hit, System.Windows.Shapes.Path outline, System.Windows.Shapes.Path marker)
     {
         public System.Windows.Shapes.Path Visible { get; } = visible;
         public System.Windows.Shapes.Path Hit { get; } = hit;
         public System.Windows.Shapes.Path Outline { get; } = outline;
+        public System.Windows.Shapes.Path Marker { get; } = marker;
+        public bool Muted;
         public Point? From, To;
         public IReadOnlyList<Point> Points = [];
-        public string SourceId = "", TargetId = "", Kind = "", SourcePort = "audio", TargetPort = "audio", BrushKey = "";
+        public string SourceId = "", TargetId = "", Kind = "", SourcePort = "audio", TargetPort = "audio";
+        public CablePaintKey? Paint;
         public ConnectionDetailKey? DetailKey;
     }
     private static T? FindParent<T>(DependencyObject? current) where T : DependencyObject
@@ -1916,10 +1832,9 @@ public sealed partial class GraphWorkspace : UserControl
         while (current is not null) { if (current is T result) return result; current = current is Visual || current is System.Windows.Media.Media3D.Visual3D ? VisualTreeHelper.GetParent(current) : LogicalTreeHelper.GetParent(current); }
         return null;
     }
-    private static IReadOnlyList<Point> CablePoints(Point from, Point to)
+    internal static IReadOnlyList<Point> CablePoints(Point from, Point to)
     {
-        double reach = Math.Max(70, Math.Abs(to.X - from.X) * .48);
-        var a = new Point(from.X + reach, from.Y); var b = new Point(to.X - reach, to.Y);
+        var (a, b) = CableControls(from, to);
         int steps = Math.Clamp((int)Math.Ceiling(((a - from).Length + (b - a).Length + (to - b).Length) / 6), 24, 512);
         var points = new Point[steps + 1];
         for (int i = 0; i <= steps; i++)
@@ -1938,6 +1853,7 @@ public sealed partial class GraphWorkspace : UserControl
         public string Kind { get; }
         public string Port { get; }
         public bool Output { get; }
+        internal string ColourBrushKey { get; }
         internal void SetCollapsed(bool collapsed)
         {
             // Keep adjacent input hit regions disjoint, including after WPF
@@ -1948,6 +1864,8 @@ public sealed partial class GraphWorkspace : UserControl
         public Socket(GraphWorkspace owner, string id, string kind, bool output, string port = "audio")
         {
             NodeId = id; Kind = kind; Port = port; Output = output; Width = 24; Height = 20; MinHeight = 0; Padding = new Thickness(0); Background = Brushes.Transparent; BorderThickness = new Thickness(0);
+            string? nodeKind = owner.Graph.Nodes.FirstOrDefault(node => node.Id == id)?.Kind;
+            ColourBrushKey = SocketBrushKey(kind, output, port, nodeKind);
             // The border's centre can fall between layout pixels. Keep the
             // glyph and cable anchored to that same point at every zoom.
             UseLayoutRounding = false; SnapsToDevicePixels = false;
@@ -1968,13 +1886,21 @@ public sealed partial class GraphWorkspace : UserControl
                         && LinkedLevelControl.HasLegacyConnection(owner.Graph, targetNode)
                         ? "Existing link retained; use Mix for new level control."
                         : "Connect a Linked control to scale this node's level.")
-                : kind == "sidechain" ? NodeToolTip.Create("Trigger", "Uses incoming audio to trigger ducking.")
-                : output ? NodeToolTip.Create(port == "audio" ? "Audio output" : GraphDefaults.PortLabel(port) + " output", port == "audio"
-                    ? "Carries this node's audio to connected audio or trigger inputs" : "Carries this channel as an independent mono signal")
-                    : NodeToolTip.Create(port == "audio" ? "Audio input" : GraphDefaults.PortLabel(port) + " input", port is "left" or "right"
+                : kind == "sidechain" ? NodeToolTip.Create("Trigger",
+                    owner.Graph.Nodes.FirstOrDefault(node => node.Id == id)?.Kind is "gate" or "expander"
+                        ? "Controls detection without being mixed into the main audio. With no cable, this node detects its own input."
+                        : "Uses incoming audio to trigger ducking.",
+                    "A connected silent or unavailable source is a silent trigger.")
+                : output ? NodeToolTip.Create(port == "audio" ? "Audio output" : GraphDefaults.PortLabel(port, nodeKind) + " output", port == "audio"
+                    ? "Carries this node's audio to connected audio or trigger inputs"
+                    : port == "wet" ? nodeKind == "echo"
+                        ? "Echoes only, independent of Mix. Route to Reverb to add space to the repeats; preserves stereo."
+                        : "Reverb only, independent of Mix; preserves the effect's stereo signal"
+                    : "Carries this channel as an independent mono signal")
+                    : NodeToolTip.Create(port == "audio" ? "Audio input" : GraphDefaults.PortLabel(port, nodeKind) + " input", port is "left" or "right"
                         ? "Combines incoming channels to mono and places them on this stereo side"
                         : port is "a" or "b" ? "Carries this stereo source into the crossfade" : "Combines audio from connected outputs");
-            AutomationProperties.SetName(this, (output ? "Output" : "Input") + " " + (kind == "sidechain" ? "Trigger" : port == "audio" ? kind : GraphDefaults.PortLabel(port)) + " socket");
+            AutomationProperties.SetName(this, (output ? "Output" : "Input") + " " + (kind == "sidechain" ? "Trigger" : port == "audio" ? kind : GraphDefaults.PortLabel(port, nodeKind)) + " socket");
             AutomationProperties.SetItemStatus(this, "Not connected");
             PreviewMouseLeftButtonDown += (_, e) => owner.SocketPressed(this, e);
             Click += (_, _) => { if (!owner.RequireLayoutEdit()) return; if (owner._pendingSocket is null) { owner._pendingSocket = this; owner.SetMessage("Choose a matching socket to complete the connection."); } else if (owner._pendingSocket != this) owner.Connect(owner._pendingSocket, this); };
@@ -1993,7 +1919,7 @@ public sealed partial class GraphWorkspace : UserControl
         }
         private void UpdateHighlight()
         {
-            string colour = Kind == "control" ? "NodeControlBrush" : Kind == "sidechain" ? "NodeSidechainBrush" : "NodeAudioBrush";
+            string colour = ColourBrushKey;
             _shape.SetResourceReference(Shape.FillProperty, IsConnected ? colour : "NodeCanvasBrush");
             _shape.SetResourceReference(Shape.StrokeProperty,
                 IsKeyboardFocused || IsConnectionHighlighted || IsMouseOver ? "NodeSelectedBrush" : IsConnected ? "NodeCanvasBrush" : colour);

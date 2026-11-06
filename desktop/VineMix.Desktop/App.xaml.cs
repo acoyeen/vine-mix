@@ -49,6 +49,21 @@ public partial class App : Application
             return;
         }
 #if VINEMIX_VERIFICATION
+        int keyboard = Array.FindIndex(e.Args, arg => arg.Equals("--verify-workspace-keyboard", StringComparison.OrdinalIgnoreCase));
+        if (keyboard >= 0)
+        {
+            try { Shutdown(keyboard + 1 < e.Args.Length ? await KeyboardNavigationVerification.RunDetachedAsync(e.Args[keyboard + 1]) : 1); }
+            catch (Exception error) { Debug.WriteLine(error); Shutdown(1); }
+            return;
+        }
+        if (e.Args.Contains("--verify-configuration-boundary", StringComparer.OrdinalIgnoreCase))
+        {
+            // Inert fixture runner, before preferences, singleton and engine
+            // startup. It never shows a window or connects to the user engine.
+            try { Shutdown(ConfigurationBoundaryVerification.Run(e.Args)); }
+            catch (Exception error) { Debug.WriteLine(error); Shutdown(1); }
+            return;
+        }
         if (e.Args.Contains("--render-design", StringComparer.OrdinalIgnoreCase)
             || e.Args.Contains("--render-beta-docs", StringComparer.OrdinalIgnoreCase))
         {
@@ -104,6 +119,8 @@ public partial class App : Application
         }
 #endif
         if (e.Args.Any(arg => arg.Equals("--render-design", StringComparison.OrdinalIgnoreCase)
+            || arg.Equals("--verify-configuration-boundary", StringComparison.OrdinalIgnoreCase)
+            || arg.Equals("--verify-workspace-keyboard", StringComparison.OrdinalIgnoreCase)
             || arg.Equals("--render-beta-docs", StringComparison.OrdinalIgnoreCase)
             || arg.Equals("--preview", StringComparison.OrdinalIgnoreCase) || arg.Equals("--verify-ui", StringComparison.OrdinalIgnoreCase)))
         { Shutdown(2); return; }

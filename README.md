@@ -1,172 +1,113 @@
 # VineMix
 
-VineMix is an audio mixer for **Windows 11 x64**. Connect a microphone or an app to
-headphones and a virtual microphone by drawing cables between nodes. Add effects
-when you need them; each output has its own level and mute.
+**Your audio, connected.** VineMix is a free, open-source audio mixer for
+Windows 11 x64. Connect microphones, apps and effects with cables, then send
+your mix to headphones, a recording app or a virtual microphone.
 
-**0.4.0 · Beta** is an MIT-licensed open-source beta.
-Download the [Windows installer](https://github.com/acoyeen/vine-mix/releases/download/v0.4.0-beta/VineMix-0.4.0-beta-Setup-x64.exe)
-or [standalone EXE](https://github.com/acoyeen/vine-mix/releases/download/v0.4.0-beta/VineMix-0.4.0-beta-Standalone-x64.exe).
-The [release page](https://github.com/acoyeen/vine-mix/releases/tag/v0.4.0-beta)
-includes checksums, matching source and release notes.
-0.4.0 Beta adds named groups, stereo mixing tools, clearer Level controls and
-offline credits; see the [release notes](docs/releases/0.4.0-beta.md).
-See [the current qualification results](docs/RELEASE_0.4.0_QUALIFICATION.md),
-[the beta test guide](docs/BETA_TESTER_GUIDE.md) and [testing status](TESTING.md)
-for current limitations.
+**[Download 0.5.0 Beta](https://github.com/acoyeen/vine-mix/releases/tag/v0.5.0-beta)**
+· [Setup](https://github.com/acoyeen/vine-mix/releases/download/v0.5.0-beta/VineMix-0.5.0-beta-Setup-x64.exe)
+· [Standalone EXE](https://github.com/acoyeen/vine-mix/releases/download/v0.5.0-beta/VineMix-0.5.0-beta-Standalone-x64.exe)
+· [What's new](docs/releases/0.5.0-beta.md)
 
-![VineMix configured starter with example devices and both outputs muted](docs/images/workspace.png)
+![VineMix's voice starter, with example devices and both outputs muted](docs/images/workspace.png)
 
-The screenshot uses a silent, simulated workspace. “Example USB Microphone” and
-“Example Headphones” are placeholders; device names on your computer will differ.
+*Actual app controls rendered with silent example devices. Your device names will differ.*
+
+## Make a mix that fits you
+
+- **Build your own signal path.** Capture a microphone, a running app or a
+  virtual cable. Branch, combine and process audio with 32 node types.
+- **Shape your sound.** Clean up speech, adjust tone and dynamics, or add
+  Reverb, Echo and Distortion. Separate effect outputs let you process a tail
+  without changing the original voice.
+- **Control each destination.** Send different mixes to headphones and other
+  apps, with independent levels and mute. Multiple output nodes can share a device.
+- **Keep bigger graphs manageable.** Groups, Find, keyboard navigation, Undo/Redo
+  and an optional minimap help you move around. Zooming out simplifies the nodes.
+
+Audio processing runs locally. VineMix supports up to 32 nodes and 96 connections.
 
 ## Get started
 
-Choose a download from the release page:
+1. Install **Setup**, or open the **Standalone EXE** in File Explorer. Both
+   include the required .NET runtime.
+2. Choose your microphone on **Microphone** and headphones on **Listening output**.
+3. Both outputs start muted. Start with low headphone volume, then unmute
+   Listening output when ready and adjust its Level gradually.
+4. For a virtual microphone, use a compatible Virtual Audio Cable driver. Once
+   **Virtual output** is connected to **Line 1**, choose its recording endpoint
+   as the microphone in your chat or recording app, then unmute that output.
 
-- **Setup** installs VineMix and shortcuts for your Windows account. It can offer
-  optional virtual audio drivers when missing. Missing eligible drivers start
-  selected; clear them if you do not need virtual routes. Accept their
-  separate terms only if they fit your use.
-- **Standalone EXE** needs no app installation. Open the supplied EXE in File
-  Explorer; its bundled app files are prepared automatically. Install optional
-  virtual audio drivers separately if you need them.
+New workspaces start with this connected voice chain:
 
-The app includes its .NET runtime. Driver installation can require administrator
-permission and a Windows restart. The current app and Setup are unsigned; verify
-the file's checksum against the matching release checksum. A signature on a third-party driver
-installer does not sign VineMix.
+**Microphone → High-pass filter → Denoiser → Expander → Compressor → Outputs**
 
-1. Open VineMix from its shortcut, or open the standalone EXE in File Explorer.
-2. In **Physical input**, choose your microphone. In **Listening output**, choose
-   headphones. The starter contains these two nodes plus **Virtual output**, with
-   the microphone already connected to both outputs.
-3. Both outputs start **muted**; Listening output starts at **−24 dB**. Start with
-   low headphone volume. Unmute Listening output when you are ready to listen,
-   then adjust it gradually. Headphones help avoid microphone feedback.
-4. To send the mix to a chat or recording app, install a suitable VAC driver,
-   wait for Virtual output to connect to **Line 1 (Virtual Audio Cable)**, then
-   select the **Line 1** recording device as that app's microphone. Unmute Virtual
-   output when ready. Its mute is separate from your headphone mute.
+The defaults are a starting point—adjust them for your voice. Existing workspaces
+keep their nodes, levels and devices when you update.
 
-The starter is shown below before you select any devices:
+![The fresh seven-node workspace before choosing devices](docs/images/first-run.png)
 
-![VineMix fresh three-node starter with unassigned devices and muted outputs](docs/images/first-run.png)
+Physical microphone and headphone routes need no virtual audio driver. Setup
+offers missing optional drivers with separate consent; clear any you do not need.
+Driver terms differ from VineMix's MIT licence, including VAC Lite's usage limits.
+See [installation and drivers](docs/INSTALLATION_AND_UPDATES.md).
 
-Physical microphone and headphone routes work without virtual audio drivers.
-For a **Virtual Desktop microphone**, connect the headset, enable its microphone
-passthrough, and check **Windows Settings → System → Sound → Input**. Select that
-Windows microphone in VineMix's **Physical input** node. Existing virtual or
-streamed microphones do not require the bundled cables. See
-[device troubleshooting](docs/DEVICE_VISIBILITY.md) if it is missing.
-For headset playback, choose its Windows playback device in **Listening output**.
-Streamed outputs, including Virtual Desktop, do not require a bundled cable.
+## A few useful controls
 
-[VB-CABLE](https://vb-audio.com/Cable/) is used for a virtual input:
-apps play to **CABLE Input**, which VineMix receives from **CABLE Output**.
-[VAC](https://vac.muzychenko.net/en/download.htm) supplies the virtual output:
-VineMix sends to **Line 1** playback and other apps record from **Line 1**.
-**VAC Lite is limited to private home use without income generation**; see its
-[licence](https://vac.muzychenko.net/en/license.txt). The app's MIT licence does
-not change driver terms. Driver information was checked on 21 October 2026.
+| Action | Control |
+| --- | --- |
+| Add or connect nodes | **Add**, then drag between sockets |
+| Zoom / fit the graph | Mouse wheel or **Ctrl++ / Ctrl+−** / **Home** |
+| Pan | Middle-drag, or arrows with canvas focus and nothing selected |
+| Move selected nodes | Arrow keys; **Shift** for smaller steps |
+| Follow a pipeline | **Ctrl+Tab / Ctrl+Shift+Tab** |
+| Move between controls | **Tab / Shift+Tab** |
+| Enter an exact dial value | Focus the dial and type; **Enter** applies |
+| Find / rename | **Ctrl+F** / **F2** with one node or group selected |
+| Undo / redo | **Ctrl+Z / Ctrl+Y** |
+| Help | **F1** |
 
-## Everyday use
+Changes save automatically. Closing the window keeps audio running in the tray;
+use **Quit VineMix** in Settings or the tray menu to stop it.
+**Settings → Check for updates** offers verified downloads and an explicit
+**Install and restart** action. Updating briefly pauses audio.
 
-- Use **Add** to create another input, effect or output. Drag from one audio
-  socket to another to connect them. Green cables carry audio; lavender cables
-  are Ducking triggers.
-- The wheel zooms the workspace, middle-drag pans, and **Home** fits everything.
-  **Ctrl+Z** undoes an edit; **Ctrl+F** finds a node. **F1** opens Help & shortcuts.
-- The top-right padlock protects node positions and connections: red and closed
-  means locked; muted grey and open means unlocked. Node selection outlines stay
-  hidden while locked. Sound controls still work.
-- Changes save automatically. Closing the window keeps audio running in the tray.
-  **Quit VineMix** at the bottom of Settings or in the tray menu saves and stops
-  the app and audio engine. If saving fails, retry, save a recovery copy, cancel
-  quitting or explicitly quit without saving.
-- **Settings → What's new?** reopens bundled release highlights. After an
-  update, they appear once when the workspace is ready and you are not editing.
-- Select nodes and press **Ctrl+G** to group them; **F2** renames a group.
-  **About VineMix → Credits and licences** opens the project notices offline.
-- Red device text means a selected device is unavailable. Reconnect it, check
-  Windows sound settings, then use **Settings → Retry assigned devices**.
-  **Restart audio engine** briefly interrupts audio and reconnects saved routes.
-- For a report, open **Settings → About VineMix** and copy the full version
-  information. Follow the [beta test guide](docs/BETA_TESTER_GUIDE.md).
-- **Settings → Check for updates** checks public GitHub releases. When a verified
-  update is available, choose **Download update**, then **Install and restart**.
-  Audio pauses for installation. Automatic checks can be switched off in Settings;
-  they never install without your choice. If checking fails, retry later or use
-  the GitHub release page for a manual update.
-  **Upgrading from Beta 2–4:** older packages have an update metadata defect.
-  For a dependable recovery, use **Quit VineMix**, then run 0.4.0 Beta Setup against
-  the existing installation without uninstalling. Standalone users should quit
-  and replace their launcher with the 0.4.0 Beta standalone EXE. Beta 3 and Beta 4
-  are not required intermediate steps. See the
-  [update investigation](docs/UPDATE_INVESTIGATION_2026-10-24.md).
+## About this beta
 
-Settings, backups and logs live in `%LOCALAPPDATA%\VineMix`. An upgrade from the
-older AudioMixer name copies your existing workspace and preferences and keeps
-the originals. If conflicting old copies exist, choose the workspace you intend
-to use. If a workspace cannot load, a recovery banner offers Retry, Restore
-backup or Start fresh while preserving originals. See
-[recovery and updates](docs/BETA_TESTER_GUIDE.md#recovery).
+The app and Setup are not Windows Authenticode signed. Checksums and signed
+update metadata are included on the release page. Automated checks cover
+processing, editing, recovery and packages; hardware, long-session and broader
+accessibility testing remain incomplete. See the
+[0.5.0 qualification record](docs/RELEASE_0.5.0_QUALIFICATION.md).
 
-## More information
+Per-app capture also leaves the app's original playback audible. Parallel paths
+have no automatic delay compensation, and Distortion uses more processing time
+than most effects. Many neural denoisers can also exceed the audio processing
+budget; 32 nodes is the routing capacity, not a performance guarantee.
+[Known issues](docs/KNOWN_ISSUES.md) records the details.
 
-- [Beta installation, updates, recovery and reports](docs/BETA_TESTER_GUIDE.md)
-- [User guide and controls](docs/USER_GUIDE.md)
-- [Application audio capture](docs/APP_AUDIO.md)
-- [Device visibility and recovery](docs/DEVICE_VISIBILITY.md)
-- [Effects and limitations](docs/EFFECTS_RESEARCH.md)
-- [Development ideas](docs/IDEAS.md)
-- [0.4.0 Beta release plan](docs/RELEASE_0.4.0_BETA.md)
-- [Known issues](docs/KNOWN_ISSUES.md)
-- [UI and behaviour tweaks](docs/TWEAKS.md)
+## Learn more
+
+- [User guide](docs/USER_GUIDE.md) and [installation, updates and recovery](docs/BETA_TESTER_GUIDE.md)
+- [Device troubleshooting](docs/DEVICE_VISIBILITY.md) and [application capture](docs/APP_AUDIO.md)
 - [Changelog](CHANGELOG.md), [testing](TESTING.md) and [contributing](CONTRIBUTING.md)
-- [Third-party credits](THIRD_PARTY_NOTICES.md) and [distribution conditions](docs/DISTRIBUTION.md)
-
-VineMix supports up to 32 nodes and 96 connections. The 0.4.0 Beta creation menu
-offers 30 node types, including six new mixing utilities. Processing stays local.
-Per-app capture copies an app's
-playback; its original playback remains audible. Parallel paths have no automatic
-latency compensation. The limiter handles sample peaks without lookahead or
-true-peak detection. Audible recovery and long sessions still need qualification.
-
-## Forks and attribution
-
-Forks and modified versions are welcome. Preserve the full [MIT licence notice](LICENSE),
-which credits acoyeen and identifies VineMix and its website. Please also include
-**"Based on VineMix by acoyeen"** in your About, Credits or Licences screen,
-linking to [vinemix.app](https://vinemix.app) or the
-[original repository](https://github.com/acoyeen/vine-mix).
-See [Crediting VineMix](ATTRIBUTION.md) for the required notices, requested
-in-program acknowledgement and guidance for earlier versions.
+- [Third-party notices](THIRD_PARTY_NOTICES.md) and [distribution conditions](docs/DISTRIBUTION.md)
 
 ## Build from source
 
-The development project and checkout folder are named `vine-mix`; the product
-name is **VineMix**. Clone `https://github.com/acoyeen/vine-mix.git` and run the
-commands below from the `vine-mix` folder.
-
-Developers need Windows 11 x64 and PowerShell 7. The first build downloads pinned
-project-local tools and dependencies:
+Use Windows 11 x64 and PowerShell 7. Clone the `vine-mix` repository, then run:
 
 ```powershell
 pwsh -File .\scripts\build.ps1
-```
-
-The staged application is under `artifacts\VineMix-<version>-Installed`. To keep an existing package
-separate, use `-PackageDirectory` with a new directory. See the
-[installer guide](installer/README.md) for Setup and distribution requirements.
-Generated build caches and raw verification evidence default to
-`%LOCALAPPDATA%\VineMix.BuildCache`, outside the checkout.
-
-```powershell
 pwsh -File .\scripts\verify-offline.ps1
 ```
 
-Offline checks use synthetic audio, simulated devices and temporary data; they do
-not establish hardware or audible reliability. The release package excludes the
-verification executable. The [MIT licence](LICENSE) covers the original app;
-third-party components retain their own licences and notices.
+The first build downloads pinned local tools. The app is staged under
+`artifacts\VineMix-<version>-Installed`; generated caches and raw test evidence
+stay outside the checkout. Offline tests use synthetic audio and temporary data.
+See the [installer guide](installer/README.md) for packaging.
+
+VineMix is [MIT licensed](LICENSE). Forks are welcome; preserve its licence
+notice and third-party notices. Please also credit **“Based on VineMix by acoyeen”**
+in your app, with a link to [vinemix.app](https://vinemix.app).
+[Attribution guidance](ATTRIBUTION.md) explains the required notices and requested acknowledgement.

@@ -1,24 +1,25 @@
 # VineMix beta test guide
 
-For **0.4.0-beta**, displayed as **0.4.0 · Beta**. Updated 28 October 2026.
+For **0.5.0-beta**, displayed as **0.5.0 · Beta**. Updated 6 November 2026.
 VineMix is an MIT-licensed open-source beta for **Windows 11 x64**.
 Download a version from [GitHub Releases](https://github.com/acoyeen/vine-mix/releases).
-The [current qualification record](RELEASE_0.4.0_QUALIFICATION.md) separates completed
+The [current qualification record](RELEASE_0.5.0_QUALIFICATION.md) separates completed
 checks from pending scenarios. Use the files and checksums attached to the
 matching published release.
 
 ## Choose a package
 
-**Existing Beta 1–4 users:** use **Quit VineMix**, then install 0.4.0 Beta over the
-existing folder, or replace the standalone launcher. Do not uninstall or delete
-your workspace. Updates to older packages can roll back because of a metadata
-defect; 0.4.0 Beta retains its correction. No intermediate beta is needed. See the
+**Older installations:** Beta 1–6 and the original, uncorrected 0.4.0 build should
+use **Quit VineMix**, then install 0.5.0 Beta over the existing folder, or replace
+the standalone launcher. Do not uninstall or delete your workspace. Older
+updaters can roll back because of metadata or process-identity defects.
+Corrected 0.4.0 installations can use the in-app update. No intermediate beta is needed. See the
 [upgrade guidance](INSTALLATION_AND_UPDATES.md).
 
 | Download | How to use it |
 | --- | --- |
-| `VineMix-0.4.0-beta-Setup-x64.exe` | Installs the app and shortcuts for your account; can offer missing optional drivers. |
-| `VineMix-0.4.0-beta-Standalone-x64.exe` | Open the supplied EXE in File Explorer. Its bundled app files are prepared automatically; drivers are installed separately. |
+| `VineMix-0.5.0-beta-Setup-x64.exe` | Installs the app and shortcuts for your account; can offer missing optional drivers. |
+| `VineMix-0.5.0-beta-Standalone-x64.exe` | Open the supplied EXE in File Explorer. Its bundled app files are prepared automatically; drivers are installed separately. |
 
 You do not need to install .NET. The standalone EXE includes the app and runtime;
 it does not register an app installation. Setup installs under
@@ -46,14 +47,14 @@ official vendors' information and packages:
 | Receive audio sent to a virtual playback device | [VB-CABLE](https://vb-audio.com/Cable/): send from the other app to **CABLE Input (VB-Audio Virtual Cable)**; VineMix captures **CABLE Output**. |
 | Give another app the mixed audio as a microphone | [Virtual Audio Cable](https://vac.muzychenko.net/en/download.htm): VineMix sends to **Line 1 (Virtual Audio Cable)** playback; select **Line 1** recording in the other app. |
 
-Start with both driver boxes **unchecked** if you already have your microphone
-and headphones available in Windows. For a Virtual Desktop microphone, connect
+Setup preselects missing eligible drivers; clear both boxes if you only need your
+existing microphone and headphones. For a Virtual Desktop microphone, connect
 the headset and enable its microphone passthrough. Confirm the device appears in
 **Windows Settings → System → Sound → Input**, then select it on **Physical input**.
 That node also accepts virtual and streamed recording devices; the optional
 bundled cables are not prerequisites. For streamed headset playback, choose its
 Windows playback endpoint in **Listening output**. Actual Virtual Desktop
-headset sound, reconnect and sustained-use validation remain pending for Beta 5.
+headset sound, reconnect and sustained-use validation remain incomplete.
 
 Setup offers original driver installers only when it detects the corresponding
 package is missing. A disabled or unplugged endpoint is not a reason to install a
@@ -72,10 +73,10 @@ The trial VAC package is different from Lite and adds a voice reminder after
 
 1. Open VineMix from its installed shortcut or through File Explorer. Do not use
    a developer render or verification executable as your personal mixer.
-2. The fresh workspace has exactly three nodes: **Physical input**, **Virtual
-   output**, and **Listening output**. Two cables connect the input to the outputs.
-   Your physical devices are unassigned. Both outputs are muted, with Listening
-   output at −24 dB.
+2. The fresh workspace has seven nodes: **Microphone → High-pass filter →
+   Denoiser → Expander → Compressor**, connected to **Listening output** and
+   **Virtual output**. Your physical devices are unassigned. Both outputs are
+   muted, with Listening output at −24 dB. Existing workspaces are preserved.
 3. Choose the microphone and headphones explicitly. Use headphones at a low
    volume, then unmute Listening output and increase it gradually. Mute again
    before changing a route you are unsure about.
@@ -176,7 +177,7 @@ recovery** before normal editing or audio starts:
 - **Retry** checks the existing files again after a temporary problem is resolved.
 - **Restore backup** uses the available backup and preserves the current files.
 - **Start fresh · preserve originals** archives existing files, then creates the
-  muted three-node starter. It does not silently replace a failed workspace.
+  muted seven-node starter. It does not silently replace a failed workspace.
 
 Recovery preserves originals in a timestamped `settings.json.recovery-…` folder
 inside the data folder. If the buttons cannot complete recovery, keep those files

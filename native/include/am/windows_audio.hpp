@@ -25,8 +25,9 @@ private:
 };
 
 // Capture workers produce stereo 48 kHz frames; render workers consume them.
-// Every output gets its own queue so one disconnected output cannot block or
-// consume frames belonging to another output. No default-device substitution.
+// Every resolved output endpoint gets its own queue. Logical outputs sharing
+// that endpoint are summed by Engine before one write; unrelated destinations
+// never block or consume each other's frames. No default-device substitution.
 class AudioWorker {
 public:
     AudioWorker(bool capture, bool microphone, std::shared_ptr<FrameQueue> queue,

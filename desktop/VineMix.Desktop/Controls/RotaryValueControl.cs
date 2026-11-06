@@ -33,6 +33,18 @@ internal class RotaryValueControl : StackPanel
     internal double NormalizedValue => Normalize(_range.Value);
     internal bool HasVisibleKeyboardFocus => _face.Focused;
     internal bool HasPendingEntry => _entryDirty || _entryInvalid;
+    internal Rect OverviewFaceBounds
+    {
+        get
+        {
+            if (_face.ActualWidth <= 0 || _face.ActualHeight <= 0) return Rect.Empty;
+            var bounds = new Rect(_face.TranslatePoint(new Point(), this), _face.RenderSize);
+            // The painted disk has radius 27 in the face's 86-unit coordinate
+            // system; the surrounding space belongs to its arc and tick marks.
+            bounds.Inflate(-bounds.Width * 16 / 86, -bounds.Height * 16 / 86);
+            return bounds;
+        }
+    }
     // Align labels and values across a mixed-size row without enlarging the
     // secondary dial itself. Rows containing only secondary dials stay compact.
     internal void SetDialRowHeight(double height) => _dialSlot.Height = height;
@@ -195,6 +207,12 @@ internal class RotaryValueControl : StackPanel
         _range.PreviewKeyDown += (_, e) =>
         {
             if (AdjustWithKey(e.Key)) e.Handled = true;
+        };
+        _range.PreviewTextInput += (_, e) =>
+        {
+            // Text composition retains keyboard-layout and number-pad input.
+            // A selected node or a hovered dial is not a typing target.
+            if (_range.IsKeyboardFocused && TryBeginDirectEntry(e.Text, Keyboard.Modifiers)) e.Handled = true;
         };
         _range.GotKeyboardFocus += (_, _) => { _face.Focused = true; _face.InvalidateVisual(); };
         _range.LostKeyboardFocus += (_, _) => { StopAdjustment(); _face.Focused = false; _face.InvalidateVisual(); };
@@ -360,6 +378,28 @@ internal class RotaryValueControl : StackPanel
         _entry.ToolTip = _entryHelp;
     }
 
+    internal bool TryBeginDirectEntry(string text, ModifierKeys modifiers)
+    {
+        if (!IsEnabled || !_range.IsEnabled || !_entry.IsEnabled || _entry.IsReadOnly
+            || (modifiers & ~ModifierKeys.Shift) != ModifierKeys.None || string.IsNullOrEmpty(text)) return false;
+        var number = CultureInfo.CurrentCulture.NumberFormat;
+        bool digits = true;
+        foreach (char character in text) digits &= character is >= '0' and <= '9';
+        if (!digits && text != "-" && text != "−" && text != number.NegativeSign
+            && text != number.NumberDecimalSeparator) return false;
+
+        StopAdjustment();
+        _entry.Focus();
+        // Replace the old readout (including its unit), retaining the first
+        // composed character as a draft. Only the existing commit path writes.
+        _entry.SelectAll();
+        _entry.SelectedText = text;
+        _entry.CaretIndex = _entry.Text.Length;
+        _entryInvalid = false; RefreshEntryBorder(); RefreshEntryAccessibility();
+        _entry.ToolTip = _entryHelp;
+        return true;
+    }
+
     internal bool TryCancelPracticeInteraction()
     {
         bool active = _dragging || HasPendingEntry
@@ -416,7 +456,7 @@ internal class RotaryValueControl : StackPanel
     {
         _range.ToolTip = NodeToolTip.Create(_label, _description);
         AutomationProperties.SetHelpText(_range,
-            $"{Format(_minimum)} to {Format(_maximum)}. Drag vertically; Shift for fine adjustment. Arrow keys adjust; Page Up and Page Down adjust by {Format(_largeChange)}. Home or double-click resets to {Format(_defaultValue)}.");
+            $"{Format(_minimum)} to {Format(_maximum)}. Drag vertically; Shift for fine adjustment. Arrow keys adjust; Page Up and Page Down adjust by {Format(_largeChange)}. Type a number to edit its exact value. Home or double-click resets to {Format(_defaultValue)}.");
         RefreshEntryAccessibility();
         _entryHelp = EntryHelp();
         _entry.ToolTip = _entryHelp;

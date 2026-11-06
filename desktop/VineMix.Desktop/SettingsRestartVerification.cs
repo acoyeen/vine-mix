@@ -223,7 +223,7 @@ internal static class SettingsRestartVerification
             if (command == "configure")
             {
                 if (configuration is null || revision != _configuration.Revision)
-                    return Task.FromResult(new ProtocolResponse { Ok = false, Error = "Detached fixture revision mismatch." });
+                    return Task.FromResult(new ProtocolResponse { Ok = false, ErrorCode = "revision_conflict", Error = "Detached fixture revision mismatch." });
                 _configuration = configuration.Copy(); _configuration.Revision++;
             }
             else if (command != "snapshot") throw new InvalidOperationException("Unexpected command in detached restart fixture: " + command);

@@ -11,23 +11,58 @@
 #include <atomic>
 #include <chrono>
 #include <cmath>
+#include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <map>
+#include <malloc.h>
+#include <new>
 #include <sstream>
 #include <stdexcept>
 extern "C" std::uint64_t am_speex_memory_operations(void);
 
+// Allocation accounting is local to the actual mixer thread and enabled only
+// around an audited quantum. Control/worker threads keep their normal heaps.
+thread_local bool auditHeap{};
+thread_local std::uint64_t quantumHeapOperations{};
+void* operator new(std::size_t size) { if (auditHeap) ++quantumHeapOperations; if (auto p = std::malloc(size ? size : 1)) return p; throw std::bad_alloc(); }
+void* operator new[](std::size_t size) { return ::operator new(size); }
+void operator delete(void* p) noexcept { if (auditHeap) ++quantumHeapOperations; std::free(p); }
+void operator delete[](void* p) noexcept { ::operator delete(p); }
+void operator delete(void* p, std::size_t) noexcept { ::operator delete(p); }
+void operator delete[](void* p, std::size_t) noexcept { ::operator delete(p); }
+void* operator new(std::size_t size, std::align_val_t alignment) {
+    if (auditHeap) ++quantumHeapOperations;
+    if (auto p = _aligned_malloc(size ? size : 1, static_cast<std::size_t>(alignment))) return p;
+    throw std::bad_alloc();
+}
+void* operator new[](std::size_t size, std::align_val_t alignment) { return ::operator new(size, alignment); }
+void operator delete(void* p, std::align_val_t) noexcept { if (auditHeap) ++quantumHeapOperations; _aligned_free(p); }
+void operator delete[](void* p, std::align_val_t alignment) noexcept { ::operator delete(p, alignment); }
+void operator delete(void* p, std::size_t, std::align_val_t alignment) noexcept { ::operator delete(p, alignment); }
+void operator delete[](void* p, std::size_t, std::align_val_t alignment) noexcept { ::operator delete(p, alignment); }
+
 namespace test {
 std::atomic<int> created{}, live{}, duplicates{}, render1{}, render2{}, renderB{};
 std::atomic<float> heard1{}, heard2{}, heardB{};
+std::atomic<std::uint64_t> renderedFrames1{};
 std::atomic<bool> output1Available{true}, output2Available{true};
 std::atomic<bool> failNextConfiguration{};
 std::atomic<int> workerWakeMilliseconds{5};
+std::atomic<bool> holdMixerBoundary{}, mixerBoundaryParked{};
+std::atomic<unsigned> mixerBoundaryPermits{};
+std::atomic<std::uint64_t> mixerBoundaryVisits{};
+std::atomic<bool> captureOutput{}, measureQuanta{};
+std::array<float, am::quantumFrames * 8> outputTrace{};
+std::atomic<std::size_t> outputTraceCount{}, measuredCount{};
+std::array<double, 4096> quantumMilliseconds{};
+std::atomic<std::uint64_t> measuredHeapOperations{};
+LARGE_INTEGER measurementFrequency{};
 std::mutex portsMutex;
 std::map<std::string, int> openPorts;
-// Set only before constructing a fixture engine, and cleared after destruction.
-// The catalog remains immutable while its maintenance thread can read it.
+std::mutex catalogMutex;
+// Most fixtures use the baseline catalog; reconnect tests replace an explicit
+// catalog under this mutex while the real maintenance thread is running.
 std::vector<am::Endpoint> catalogEndpoints;
 std::map<std::string, std::string> configuredTransports;
 void check(bool condition, const char* reason) { if (!condition) throw std::runtime_error(reason); }
@@ -44,12 +79,72 @@ template<class Predicate> bool eventually(Predicate predicate) {
     for (int attempt = 0; attempt < 100; ++attempt) { if (predicate()) return true; wait(10); }
     return predicate();
 }
+struct ReleaseMixerBoundary {
+    ~ReleaseMixerBoundary() { captureOutput = false; measureQuanta = false; holdMixerBoundary = false; }
+};
 }
 namespace am {
+// This seam is compiled only into the synthetic lifecycle target. It pauses
+// outside the engine's locks and before publication/adoption, never hardware.
+void engineLifecycleBoundary() {
+    if (!test::holdMixerBoundary.load()) return;
+    ++test::mixerBoundaryVisits;
+    test::mixerBoundaryParked.store(true);
+    while (test::holdMixerBoundary.load() && test::mixerBoundaryPermits.load() == 0) test::wait(1);
+    if (test::holdMixerBoundary.load()) --test::mixerBoundaryPermits;
+    test::mixerBoundaryParked.store(false);
+}
+thread_local LARGE_INTEGER quantumStart{};
+void engineLifecycleQuantumBegin() {
+    auditHeap = test::measureQuanta.load(std::memory_order_acquire);
+    quantumHeapOperations = 0;
+    if (auditHeap) QueryPerformanceCounter(&quantumStart);
+}
+void engineLifecycleQuantumEnd() {
+    if (!auditHeap) return;
+    auditHeap = false;
+    LARGE_INTEGER end{}; QueryPerformanceCounter(&end);
+    const auto index = test::measuredCount.load(std::memory_order_relaxed);
+    test::measuredHeapOperations.fetch_add(quantumHeapOperations, std::memory_order_relaxed);
+    if (index < test::quantumMilliseconds.size()) {
+        test::quantumMilliseconds[index] = 1000. * (end.QuadPart - quantumStart.QuadPart) / test::measurementFrequency.QuadPart;
+        test::measuredCount.store(index + 1, std::memory_order_release);
+    }
+}
+void engineLifecycleOutput(std::string_view endpoint, std::span<const Frame> frames) {
+    if (!test::captureOutput.load(std::memory_order_acquire) || endpoint != "out1") return;
+    auto count = test::outputTraceCount.load(std::memory_order_relaxed);
+    for (const auto frame : frames) if (count < test::outputTrace.size()) test::outputTrace[count++] = frame.left;
+    test::outputTraceCount.store(count, std::memory_order_release);
+}
+struct EngineLifecycleAccess {
+    struct State { std::size_t retained; std::uint64_t prepared, active, revision; };
+    static State state(Engine& engine) {
+        std::lock_guard lock(engine.configurationMutex_);
+        return {engine.runtimes_.size(), engine.nextGeneration_, engine.activeGeneration_.load(), engine.configuration_.revision};
+    }
+    static void retire(Engine& engine) {
+        std::lock_guard lock(engine.configurationMutex_); engine.retire();
+    }
+    static void refreshOutputs(Engine& engine) {
+        std::lock_guard lock(engine.configurationMutex_); engine.refreshOutputPorts();
+    }
+};
 struct DeviceCatalog::Impl {};
 DeviceCatalog::DeviceCatalog() : impl_(std::make_unique<Impl>()) {}
 DeviceCatalog::~DeviceCatalog() = default;
-std::vector<Endpoint> DeviceCatalog::enumerate() const { return test::catalogEndpoints; }
+std::vector<Endpoint> DeviceCatalog::enumerate() const {
+    std::lock_guard lock(test::catalogMutex);
+    if (!test::catalogEndpoints.empty()) return test::catalogEndpoints;
+    std::vector<Endpoint> result;
+    for (const auto* id : {"out1", "out2", "out-virtual-one", "out-virtual-two", "out-app-one", "virtual-out"}) {
+        Endpoint endpoint; endpoint.id = id; endpoint.stableId = "stable-" + endpoint.id;
+        endpoint.direction = "render"; endpoint.state = "Active"; endpoint.channels = 2; endpoint.rate = 48000;
+        endpoint.transport = endpoint.id == "virtual-out" ? "vacLite" : "physical";
+        result.push_back(std::move(endpoint));
+    }
+    return result;
+}
 std::uint64_t DeviceCatalog::generation() const noexcept { return 0; }
 void DeviceCatalog::refresh() noexcept {}
 struct AudioWorker::Impl {
@@ -69,7 +164,7 @@ struct AudioWorker::Impl {
                 const bool ready = !current.empty() && (current != "out1" || test::output1Available.load())
                     && (current != "out2" || test::output2Available.load());
                 if (ready && capture) {
-                    frames.fill({current == "virtual-in" ? .2f : .3f, .1f});
+                    frames.fill(current == "mic-negative" ? Frame{-.3f, -.1f} : Frame{current == "virtual-in" ? .2f : .3f, .1f});
                     test::refillCapture(*queue, frames);
                 }
                 if (ready && !capture) {
@@ -81,7 +176,7 @@ struct AudioWorker::Impl {
                         const auto count = queue->pop(frames);
                         if (!count) break;
                         const float heard = frames[count - 1].left;
-                        if (current == "out1") { test::heard1.store(heard); ++test::render1; }
+                        if (current == "out1") { test::heard1.store(heard); ++test::render1; test::renderedFrames1 += count; }
                         if (current == "out2") { test::heard2.store(heard); ++test::render2; }
                         if (current == "virtual-out") { test::heardB.store(heard); ++test::renderB; }
                     }
@@ -160,6 +255,109 @@ std::vector<ApplicationInfo> enumerateAudioApplications() { return {}; }
 }
 
 namespace test {
+void echoPendingBudget(const std::filesystem::path& directory) {
+    using namespace am;
+    check(live == 0 && catalogEndpoints.empty(), "Echo budget fixture starts without another worker or catalog");
+    const auto path = directory / "echo-budget-settings.json";
+    auto config = defaultConfiguration(); config.graph.nodes.clear(); config.graph.edges.clear();
+    GraphNode source; source.id = "budget-input"; source.kind = "microphone"; source.device.id = "mic-a";
+    GraphNode sink; sink.id = "budget-output"; sink.kind = "output"; sink.device.id = "out1";
+    config.graph.nodes = {source, sink};
+    for (int i = 0; i < 30; ++i) {
+        GraphNode echo; echo.id = "budget-echo-" + std::to_string(i); echo.kind = "echo";
+        echo.echo = {20, 8, .25}; config.graph.nodes.push_back(echo);
+        config.graph.edges.push_back({"budget-in-" + std::to_string(i), source.id, echo.id});
+        config.graph.edges.push_back({"budget-out-" + std::to_string(i), echo.id, sink.id, "audio", -40});
+    }
+    { std::ofstream saved(path, std::ios::binary); saved << Json(config).dump(); }
+    auto bytes = [&] { std::ifstream file(path, std::ios::binary); std::ostringstream text; text << file.rdbuf(); return text.str(); };
+    {
+        Engine engine(path);
+        // Release a paused fixture before Engine's destructor joins its mixer,
+        // including every assertion/exception path.
+        struct ReleaseBoundary {
+            ~ReleaseBoundary() { holdMixerBoundary.store(false); mixerBoundaryPermits.store(0); }
+        } releaseBoundary;
+        engine.start();
+        check(eventually([&] { return EngineLifecycleAccess::state(engine).active > 0; }),
+            "Thirty Echo nodes can start and become the settled active runtime");
+        mixerBoundaryPermits.store(0); holdMixerBoundary.store(true);
+        check(eventually([] { return mixerBoundaryParked.load(); }), "The synthetic mixer pauses at a publication boundary");
+        EngineLifecycleAccess::retire(engine);
+        const auto settled = EngineLifecycleAccess::state(engine);
+        check(settled.retained == 1, "The settled maximum Echo graph owns one retained runtime");
+        const int existingWorkers = created;
+        config.graph.nodes[2].echo.mix = .3;
+        engine.configure(config, config.revision); ++config.revision;
+        const auto accepted = EngineLifecycleAccess::state(engine);
+        check(accepted.prepared == settled.prepared + 1 && accepted.active == settled.active && accepted.retained == 2
+            && accepted.revision == config.revision,
+            "The pending-memory cap permits one complete thirty-Echo successor while the active graph remains retained");
+        auto rejectWithoutCommit = [&](Configuration candidate) {
+            const auto before = EngineLifecycleAccess::state(engine);
+            const auto saved = bytes(); const auto snapshot = engine.snapshot()["configuration"];
+            bool rejected = false;
+            try { engine.configure(candidate, config.revision); }
+            catch (const std::runtime_error& error) { rejected = std::string(error.what()).find("still applying Echo changes") != std::string::npos; }
+            const auto after = EngineLifecycleAccess::state(engine);
+            check(rejected && after.prepared == before.prepared && after.retained == before.retained
+                && after.active == before.active && after.revision == before.revision && bytes() == saved
+                && engine.snapshot()["configuration"] == snapshot && created == existingWorkers,
+                "A second queued maximum Echo edit fails the pre-allocation budget guard without publication, persistence, revision or worker changes");
+        };
+        auto next = config; next.graph.nodes[3].echo.mix = .4;
+        rejectWithoutCommit(next);
+        config.graph.nodes[0].x += 10;
+        engine.configure(config, config.revision); ++config.revision;
+        check(EngineLifecycleAccess::state(engine).prepared == accepted.prepared
+            && engine.snapshot()["configuration"]["graph"]["nodes"][0]["x"] == config.graph.nodes[0].x,
+            "Canvas-only saves remain available while the pending Echo budget is full and preserve the accepted audio configuration");
+        auto stepQuantum = [&] {
+            const auto previous = mixerBoundaryVisits.load(); ++mixerBoundaryPermits;
+            check(eventually([&] { return mixerBoundaryVisits.load() > previous && mixerBoundaryParked.load(); }),
+                "Exactly one synthetic audio quantum can advance before the next held boundary");
+        };
+        stepQuantum();
+        check(EngineLifecycleAccess::state(engine).active == accepted.prepared,
+            "The accepted same-topology Echo successor is acknowledged only after its audio quantum");
+        EngineLifecycleAccess::retire(engine);
+        check(EngineLifecycleAccess::state(engine).retained == 1,
+            "Control-thread retirement releases the replaced maximum Echo runtime after adoption");
+        // Changing a cable identity requests the real two-quantum topology fade.
+        // Both old/new processors must remain alive after its first quantum.
+        config.graph.nodes[3].echo.mix = .4; config.graph.edges[0].id = "budget-rewired-input";
+        engine.configure(config, config.revision); ++config.revision;
+        const auto fading = EngineLifecycleAccess::state(engine);
+        check(fading.prepared == accepted.prepared + 1 && fading.revision == config.revision,
+            "Retrying the previously rejected Echo edit succeeds after adoption frees its pending budget");
+        stepQuantum();
+        EngineLifecycleAccess::retire(engine);
+        const auto halfway = EngineLifecycleAccess::state(engine);
+        check(halfway.active == accepted.prepared && halfway.retained == 2,
+            "Retirement cannot free either graph while the old Echo output is still fading");
+        next = config; next.graph.nodes[4].echo.mix = .5;
+        rejectWithoutCommit(next);
+        stepQuantum();
+        check(EngineLifecycleAccess::state(engine).active == fading.prepared,
+            "The generation acknowledgement advances only after the complete old-graph fade");
+        EngineLifecycleAccess::retire(engine);
+        check(EngineLifecycleAccess::state(engine).retained == 1,
+            "Old fading Echo buffers are retired on the control thread after their final audio use");
+        config = next;
+        engine.configure(config, config.revision); ++config.revision;
+        check(engine.snapshot()["configuration"] == Json(config),
+            "The latest accepted configuration remains exact after a rejected edit and a successful retry");
+        stepQuantum();
+        check(EngineLifecycleAccess::state(engine).active == EngineLifecycleAccess::state(engine).prepared,
+            "The final retried Echo edit reaches the mixer");
+        holdMixerBoundary.store(false);
+        check(eventually([] { return !mixerBoundaryParked.load(); }), "The synthetic boundary guard releases cleanly");
+        engine.stop();
+        check(live == 0 && created == existingWorkers, "Echo budgeting/adoption preserves workers and closes them on explicit fixture shutdown");
+    }
+    for (const auto* suffix : {"", ".bak", ".new", ".established"}) std::filesystem::remove(path.string() + suffix);
+    std::cout << "PASS Echo budget: thirty-node successor acceptance, pending-only rejection before commit, canvas-only saving, deterministic adoption/retry, and active/fading retention with synthetic workers\n";
+}
 void streamedMicrophones(const std::filesystem::path& directory) {
     using namespace am;
     check(live == 0 && catalogEndpoints.empty(), "Streamed-input fixture must start without another catalog or worker");
@@ -303,8 +501,13 @@ void streamedOutputs(const std::filesystem::path& directory) {
                 "Listening output still rejects capture and dedicated routing cable endpoints without changing the live graph");
         }
         auto duplicate = config; duplicate.graph.nodes[2].device = config.graph.nodes[1].device;
-        bool rejected{}; try { engine.configure(duplicate, config.revision); } catch (const std::exception&) { rejected = true; }
-        check(rejected && duplicates == initialDuplicates, "A streamed render endpoint retains single-output ownership");
+        engine.configure(duplicate, config.revision); ++duplicate.revision;
+        check(eventually([&] { return std::abs(heard1.load() - .375f) < .003f; }) && duplicates == initialDuplicates,
+            "Two streamed output nodes sum their independent levels through one render worker");
+        config.revision = duplicate.revision;
+        engine.configure(config, config.revision); ++config.revision;
+        check(eventually([&] { return std::abs(heard1.load() - .075f) < .003f && std::abs(heard2.load() - .3f) < .003f; }),
+            "Retargeting one shared output restores its independent device without losing its sibling");
         check(Json(ConfigurationStore(path).load()) == Json(config),
             "The actual persisted workspace contains streamed input/output identities, routes, gain and independent output state");
         engine.stop(); check(live == 0, "Streamed-output stop releases every synthetic worker");
@@ -320,9 +523,80 @@ void streamedOutputs(const std::filesystem::path& directory) {
     }
     catalogEndpoints.clear();
     for (const auto* suffix : {"", ".bak", ".new", ".established"}) std::filesystem::remove(path.string() + suffix);
-    std::cout << "PASS streamed outputs: real engine graph rendering through synthetic workers, level/mute isolation, loss/return, duplicate/cable rejection, persistence and full reopen; no live endpoints opened\n";
+    std::cout << "PASS streamed outputs: real engine graph rendering through synthetic workers, level/mute isolation, loss/return, shared destination summing, incompatible cable rejection, persistence and full reopen; no live endpoints opened\n";
 }
 
+void freshVoiceStarter(const std::filesystem::path& directory) {
+    using namespace am;
+    check(live == 0, "Fresh voice starter begins without another synthetic engine");
+    const auto path = directory / "fresh-voice-starter.json";
+    auto expected = defaultConfiguration();
+    const auto read = [&] { std::ifstream file(path, std::ios::binary); std::ostringstream bytes; bytes << file.rdbuf(); return bytes.str(); };
+    {
+        ConfigurationStore fresh(path);
+        check(fresh.loadState() == "new" && Json(fresh.load()) == Json(expected) && fresh.loadState() == "new"
+            && fresh.writable() && !std::filesystem::exists(path),
+            "A genuinely absent settings store yields the voice starter without writing or marking an existing workspace");
+        Engine engine(path);
+        check(engine.snapshot()["configuration"] == Json(expected) && engine.snapshot()["settingsState"] == "new",
+            "First-run engine snapshot exposes the exact native seven-node voice starter");
+        engine.start();
+        check(engine.snapshot()["status"]["nodes"].size() == 7 && !std::filesystem::exists(path),
+            "The fresh voice pipeline prepares successfully without automatically persisting or assigning devices");
+        {
+            std::lock_guard lock(portsMutex);
+            check(std::all_of(openPorts.begin(), openPorts.end(), [](const auto& entry) { return entry.second == 0; }),
+                "A fresh native workspace opens no assigned endpoint, including when example devices are available");
+        }
+        // Synthetic endpoints only: even after explicit assignment both starter
+        // routes must produce exact silence until the user unmutes an output.
+        expected.graph.nodes[0].device.id = "mic-a";
+        expected.graph.nodes[5].device.id = "out1";
+        expected.graph.nodes[6].device.id = "virtual-out";
+        const int beforeListening = render1, beforeVirtual = renderB;
+        engine.configure(expected, expected.revision); ++expected.revision;
+        check(eventually([&] { return render1 > beforeListening && renderB > beforeVirtual && heard1 == 0 && heardB == 0; }),
+            "Both explicitly assigned starter outputs remain silent with the complete RNNoise/dynamics pipeline active");
+        expected.graph.nodes[0].name = "Saved microphone choice";
+        expected.graph.nodes[3].expander.thresholdDb = -43.5;
+        expected.graph.nodes[4].x += 13.25;
+        expected.graph.panX = -80.25; expected.graph.zoom = .73;
+        engine.configure(expected, expected.revision); ++expected.revision;
+        engine.stop(); check(live == 0, "Fresh voice starter releases every synthetic worker");
+    }
+    const auto savedBytes = read();
+    {
+        Engine reopened(path); reopened.start();
+        check(reopened.snapshot()["configuration"] == Json(expected) && read() == savedBytes,
+            "Reopening preserves chosen devices, effect settings, names and camera instead of rebuilding the new starter");
+        reopened.stop();
+    }
+    // Even an unchanged-looking previous starter is an existing version-2
+    // workspace. Stable starter IDs are never a signal to upgrade its graph.
+    Configuration previous;
+    auto microphone = defaultConfiguration().graph.nodes[0]; microphone.name = "Physical input";
+    auto virtualOutput = defaultConfiguration().graph.nodes[6]; virtualOutput.x = 480; virtualOutput.y = 48;
+    auto listening = defaultConfiguration().graph.nodes[5]; listening.x = 480; listening.y = 420;
+    previous.graph.nodes = {microphone, virtualOutput, listening};
+    previous.graph.edges = {{"starter-virtual-route", microphone.id, virtualOutput.id}, {"starter-listening-route", microphone.id, listening.id}};
+    previous.revision = 97;
+    ConfigurationStore(path).save(previous);
+    const auto previousBytes = read();
+    {
+        Engine existing(path); existing.start();
+        check(existing.snapshot()["configuration"] == Json(previous) && existing.snapshot()["status"]["nodes"].size() == 3
+            && read() == previousBytes,
+            "The previous three-node starter loads byte-preserved rather than receiving the new voice-processing chain");
+        existing.stop();
+    }
+    previous.graph.nodes.clear(); previous.graph.edges.clear(); ++previous.revision;
+    ConfigurationStore(path).save(previous); const auto emptyBytes = read();
+    check(Json(ConfigurationStore(path).load()) == Json(previous) && read() == emptyBytes,
+        "An intentionally empty saved version-2 workspace stays empty instead of triggering first-run defaults");
+    check(live == 0, "Starter persistence fixtures leave no synthetic workers running");
+    for (const auto* suffix : {"", ".bak", ".new", ".established"}) std::filesystem::remove(path.string() + suffix);
+    std::cout << "PASS fresh voice starter: missing-store first run, exact muted listening/virtual rendering, saved edits/reopen, prior three-node starter and intentionally empty workspace preservation; synthetic workers only\n";
+}
 void defaultSettings(const std::filesystem::path& directory) {
     using namespace am;
     check(live == 0, "Default-settings fixture must start without another engine's workers");
@@ -526,11 +800,10 @@ void duplicateSources(const std::filesystem::path& path) {
         engine.configure(config, config.revision); ++config.revision;
         check(created == beforeCreated + 10 && duplicates == beforeDuplicates,
             "Returning a source copy to its shared capture must reuse the original worker");
-        auto invalid = config; invalid.graph.nodes.push_back(config.graph.nodes[5]); invalid.graph.nodes.back().id = "duplicate-sink";
-        bool rejected = false;
-        try { engine.configure(invalid, config.revision); } catch (const std::exception&) { rejected = true; }
-        check(rejected && engine.snapshot()["configuration"]["revision"] == config.revision,
-            "Duplicate sinks must remain rejected without changing the committed graph");
+        auto repeated = config; repeated.graph.nodes.push_back(config.graph.nodes[5]); repeated.graph.nodes.back().id = "duplicate-sink";
+        engine.configure(repeated, config.revision); ++repeated.revision;
+        check(duplicates == beforeDuplicates, "A repeated sink reuses its existing endpoint worker");
+        config.revision = repeated.revision; engine.configure(config, config.revision); ++config.revision;
         engine.stop(); check(live == 0, "Shared-source shutdown leaked or double-owned a worker");
     }
     const int beforeRestart = created;
@@ -545,6 +818,237 @@ void duplicateSources(const std::filesystem::path& path) {
         }), "Independent shared-source settings and routes did not survive restart");
         reopened.stop(); check(live == 0, "Restarted shared-source fixture leaked workers");
     }
+}
+void repeatedOutputs(const std::filesystem::path& directory) {
+    using namespace am;
+    check(live == 0 && catalogEndpoints.empty(), "Repeated-output fixture starts without another engine");
+    const auto path = directory / "repeated-output-settings.json";
+    const int beforeDuplicates = duplicates;
+    auto endpoint = [](const char* id, const char* stable, const char* transport = "physical") {
+        Endpoint value; value.id = id; value.stableId = stable; value.name = "Example output";
+        value.direction = "render"; value.state = "Active"; value.transport = transport;
+        value.channels = 2; value.rate = sampleRate; return value;
+    };
+    catalogEndpoints = {endpoint("out1", "stable-one"), endpoint("out2", "stable-two"), endpoint("virtual-out", "stable-vac", "vacLite")};
+    auto config = defaultConfiguration(); config.graph.nodes.clear(); config.graph.edges.clear();
+    GraphNode source; source.id = "source"; source.kind = "microphone"; source.device.id = "mic-a";
+    GraphNode negative = source; negative.id = "negative"; negative.device.id = "mic-negative";
+    GraphNode first; first.id = "first"; first.kind = "output"; first.device = {"out1", "stable-one", "Example output", -1};
+    GraphNode second = first; second.id = "second"; second.device.id = "old-output-alias"; second.gainDb = -6.0206;
+    GraphNode independent = first; independent.id = "independent"; independent.device = {"out2", "stable-two", "Example other output", -1};
+    GraphNode virtualFirst = first; virtualFirst.id = "virtual-first"; virtualFirst.kind = "virtualOutput";
+    virtualFirst.device = {"virtual-out", "stable-vac", "Example virtual output", -1};
+    GraphNode virtualSecond = virtualFirst; virtualSecond.id = "virtual-second"; virtualSecond.device.id.clear(); virtualSecond.gainDb = -6.0206;
+    config.graph.nodes = {source, negative, first, second, independent, virtualFirst, virtualSecond};
+    for (const auto* id : {"first", "second", "independent", "virtual-first", "virtual-second"})
+        config.graph.edges.push_back({std::string("route-") + id, "source", id});
+    ConfigurationStore(path).save(config);
+    output1Available = output2Available = true;
+    {
+        const int beforeCreated = created;
+        Engine engine(path); engine.start();
+        ReleaseMixerBoundary releaseBoundary;
+        auto commit = [&] { engine.configure(config, config.revision); ++config.revision; };
+        auto close = [](float actual, float expected) { return std::abs(actual - expected) < .003f; };
+        check(eventually([&] { return close(heard1, .45f) && close(heard2, .3f) && close(heardB, .45f); }),
+            "Fresh repeated exact/stable listening and exclusive virtual outputs sum all logical contributions");
+        check(created == beforeCreated + 5 && duplicates == beforeDuplicates,
+            "Two captures and three resolved devices open exactly five workers, including one exclusive virtual renderer");
+        const int workers = created;
+        {
+            std::lock_guard lock(portsMutex);
+            check(openPorts["out1"] == 1 && openPorts["virtual-out"] == 1 && openPorts["old-output-alias"] == 0,
+                "Workers are owned by resolved exact endpoint IDs, never unresolved saved aliases");
+        }
+        const auto startFrames = engine.snapshot()["status"]["audioFrames"].get<std::uint64_t>();
+        const auto renderedBefore = renderedFrames1.load(); wait(120);
+        const auto elapsedFrames = engine.snapshot()["status"]["audioFrames"].get<std::uint64_t>() - startFrames;
+        const auto deliveredFrames = renderedFrames1.load() - renderedBefore;
+        check(deliveredFrames + quantumFrames * 4 >= elapsedFrames && deliveredFrames <= elapsedFrames + quantumFrames * 4,
+            "A shared endpoint receives one quantum per engine quantum, not one queue write per output node");
+        config.graph.nodes[2].muted = true; commit();
+        check(eventually([&] { return close(heard1, .15f) && close(heard2, .3f) && close(heardB, .45f); }),
+            "Muting one repeated output changes only its contribution");
+        config.graph.nodes[2].muted = false; config.graph.nodes[2].gainDb = config.graph.nodes[3].gainDb = 6.0206; commit();
+        check(eventually([&] {
+            auto snapshot = engine.snapshot(); const auto& a = snapshot["status"]["nodes"][2]; const auto& b = snapshot["status"]["nodes"][3];
+            return close(heard1, 1.f) && a["clipped"] == true && b["clipped"] == true
+                && close(a["peakLeft"].get<float>(), .6f) && close(b["peakLeft"].get<float>(), .6f);
+        }), "Aggregate overload clips once and marks every contributing output while independent meters remain at their own levels");
+        config.graph.nodes[2].gainDb = 12; config.graph.nodes[3].gainDb = 6.0206;
+        config.graph.edges[1].from = "negative"; commit();
+        const float cancellation = .3f * std::pow(10.f, 12.f / 20.f) - .3f * std::pow(10.f, 6.0206f / 20.f);
+        check(eventually([&] { return close(heard1, cancellation); }),
+            "Opposing contributions cancel before final clipping instead of clipping the louder branch independently");
+        config.graph.nodes[2].gainDb = 0; config.graph.nodes[3].gainDb = -6.0206;
+        config.graph.edges[1].from = "source"; commit();
+        check(eventually([&] { return close(heard1, .45f); }), "Shared output recovers after overload and cancellation edits");
+        // Keep the mixer parked while multiple prepared graphs retain workers.
+        holdMixerBoundary = true;
+        check(eventually([&] { return mixerBoundaryParked.load(); }), "Park the synthetic mixer before burst output edits");
+        try {
+            for (int edit = 0; edit < 12; ++edit) {
+                config.graph.nodes[3].device = edit % 2 ? second.device : independent.device;
+                commit();
+            }
+        } catch (...) { holdMixerBoundary = false; throw; }
+        holdMixerBoundary = false;
+        check(eventually([&] { return close(heard1, .45f) && close(heard2, .3f); }) && created == workers && duplicates == beforeDuplicates,
+            "Burst A/B/A retargets reuse active/prepared/retained endpoint workers and restore every contribution once");
+        holdMixerBoundary = true;
+        check(eventually([&] { return mixerBoundaryParked.load(); }), "Park before measuring the exact shared-output deletion fade");
+        config.graph.nodes.erase(config.graph.nodes.begin() + 3);
+        std::erase_if(config.graph.edges, [](const auto& edge) { return edge.to == "second"; }); commit();
+        outputTraceCount = 0; captureOutput = true; mixerBoundaryPermits = 2;
+        check(eventually([&] { return outputTraceCount.load(std::memory_order_acquire) >= 480 && mixerBoundaryParked.load() && mixerBoundaryPermits == 0; }),
+            "Capture both real engine quanta of the routing crossfade");
+        captureOutput = false;
+        for (std::size_t frame = 0; frame < 480; ++frame) {
+            const double expected = .45 + (.3 - .45) * static_cast<double>(frame + 1) / 480.;
+            check(std::abs(outputTrace[frame] - expected) < .000002,
+                "Deleting a shared output fades the aggregate linearly without a doubled, dropped or normalized contribution");
+        }
+        holdMixerBoundary = false;
+        check(eventually([&] { return close(heard1, .3f) && close(heardB, .45f); }) && created == workers,
+            "Deleting one repeated output preserves the remaining output and shared worker");
+        config.graph.nodes.insert(config.graph.nodes.begin() + 3, second);
+        config.graph.edges.push_back({"route-second", "source", "second"}); commit();
+        check(eventually([&] { return close(heard1, .45f); }) && created == workers,
+            "Recreating a repeated output rejoins the existing stream without count-based attenuation");
+        // Two saved aliases and an explicit second endpoint now converge on
+        // one physical endpoint. Reconciliation must not open it a second time.
+        const auto savedBefore = Json(config);
+        const auto savedBytes = [&] { std::ifstream file(path, std::ios::binary); std::ostringstream bytes; bytes << file.rdbuf(); return bytes.str(); };
+        const auto beforeBytes = savedBytes();
+        output1Available = false;
+        {
+            std::lock_guard lock(catalogMutex);
+            catalogEndpoints[0].state = "Disabled";
+            catalogEndpoints[1].stableId = "stable-one";
+        }
+        EngineLifecycleAccess::refreshOutputs(engine);
+        check(eventually([&] { return close(heard2, .75f); }) && duplicates == beforeDuplicates && created == workers,
+            "Reconnect alias convergence sums all three logical outputs through the already-open target stream");
+        check(engine.snapshot()["configuration"] == savedBefore && Json(ConfigurationStore(path).load()) == savedBefore && savedBytes() == beforeBytes,
+            "Device reconciliation changes no saved binding, revision, control or settings bytes");
+        {
+            std::lock_guard lock(catalogMutex);
+            catalogEndpoints[0].state = "Active";
+            catalogEndpoints[1].stableId = "stable-two";
+        }
+        output1Available = true; EngineLifecycleAccess::refreshOutputs(engine);
+        check(eventually([&] { return close(heard1, .45f) && close(heard2, .3f); }) && duplicates == beforeDuplicates,
+            "Exact endpoint return separates the shared destinations again with one worker per physical device");
+        // A stable-only choice is ambiguous if two active endpoints claim it.
+        config.graph.nodes[3].device.id.clear(); commit();
+        {
+            std::lock_guard lock(catalogMutex); catalogEndpoints[1].stableId = "stable-one";
+        }
+        EngineLifecycleAccess::refreshOutputs(engine);
+        check(eventually([&] {
+            auto snapshot = engine.snapshot(); return close(heard1, .3f) && close(heard2, .3f)
+                && snapshot["status"]["nodes"][3]["path"]["state"] == "Waiting"
+                && snapshot["status"]["nodes"][3]["path"]["reason"] == "device_unavailable"
+                && snapshot["status"]["nodes"][3]["path"]["message"].get<std::string>().find("Several devices") != std::string::npos;
+        }), "Ambiguous stable-only output stays silent with guidance while exact choices remain audible");
+        {
+            std::lock_guard lock(catalogMutex); catalogEndpoints[1].stableId = "stable-two";
+        }
+        EngineLifecycleAccess::refreshOutputs(engine);
+        check(eventually([&] { return close(heard1, .45f); }) && duplicates == beforeDuplicates,
+            "Resolving ambiguity rejoins the existing exact worker without a duplicate stream");
+        // Unassigned, missing, disabled and incompatible returned devices keep
+        // existing status contracts while an independent sibling stays live.
+        auto checkPath = [&](const char* state, const char* reason, const char* message) {
+            check(eventually([&] {
+                const auto snapshot = engine.snapshot(); const auto& pathState = snapshot["status"]["nodes"][3]["path"];
+                return pathState["state"] == state && pathState["reason"] == reason && pathState["message"] == message;
+            }), "Repeated output retains its expected unavailable-device state, reason and guidance");
+        };
+        config.graph.nodes[3].device = {}; commit();
+        checkPath("Unassigned", "", "");
+        config.graph.nodes[3].device = {"missing-output", "", "Example missing output", -1}; commit();
+        checkPath("Waiting", "device_unavailable", "Waiting for device");
+        {
+            std::lock_guard lock(catalogMutex);
+            auto disabled = endpoint("missing-output", "missing-stable"); disabled.state = "Disabled"; catalogEndpoints.push_back(disabled);
+        }
+        EngineLifecycleAccess::refreshOutputs(engine);
+        checkPath("Waiting", "device_disabled", "Device disabled in Windows Sound settings");
+        {
+            std::lock_guard lock(catalogMutex);
+            catalogEndpoints.back().state = "Active"; catalogEndpoints.back().transport = "vacLite";
+        }
+        EngineLifecycleAccess::refreshOutputs(engine);
+        checkPath("Error", "", "Choose a listening device here; use Virtual output for VAC");
+        check(eventually([&] { return close(heard1, .3f); }) && duplicates == beforeDuplicates,
+            "A wrong-role returned endpoint does not open a shared-mode stream or interrupt the valid shared sibling");
+        config.graph.nodes[3].device = second.device; commit();
+        check(eventually([&] { return close(heard1, .45f); }), "Restoring a valid repeated binding rejoins the original renderer");
+        engine.stop(); check(live == 0, "Repeated-output shutdown releases all shared and unresolved workers");
+    }
+    {
+        Engine reopened(path); reopened.start();
+        check(eventually([&] { return std::abs(heard1.load() - .45f) < .003f && std::abs(heardB.load() - .45f) < .003f; })
+                && duplicates == beforeDuplicates,
+            "Saved repeated listening and exclusive virtual outputs reopen through one worker per resolved device");
+        reopened.stop(); check(live == 0, "Reopened repeated outputs leave no worker ownership behind");
+    }
+    catalogEndpoints.clear();
+    for (const auto* suffix : {"", ".bak", ".new", ".established"}) std::filesystem::remove(path.string() + suffix);
+    std::cout << "PASS repeated outputs: shared exact/stable listening and exclusive virtual streams, independent levels/mute, aggregate clipping and cancellation, one queue write, burst retarget/delete/recreate, alias convergence/return/ambiguity, persistence and shutdown; synthetic workers only\n";
+}
+void maximumRepeatedOutputWork(const std::filesystem::path& directory) {
+    using namespace am;
+    check(live == 0 && catalogEndpoints.empty(), "Maximum repeated-output fixture starts without another engine");
+    const auto path = directory / "maximum-repeated-output-settings.json";
+    auto config = defaultConfiguration(); config.graph.nodes.clear(); config.graph.edges.clear();
+    GraphNode source; source.id = "source"; source.kind = "microphone"; source.device.id = "mic-a";
+    config.graph.nodes.push_back(source);
+    for (std::size_t i = 1; i < maximumGraphNodes; ++i) {
+        GraphNode output; output.id = "out-" + std::to_string(i); output.kind = "output"; output.device.id = "out1"; output.gainDb = -40;
+        config.graph.edges.push_back({"route-" + std::to_string(i), source.id, output.id}); config.graph.nodes.push_back(std::move(output));
+    }
+    ConfigurationStore(path).save(config);
+    const int beforeCreated = created, beforeDuplicates = duplicates;
+    {
+        Engine engine(path); engine.start();
+        ReleaseMixerBoundary releaseBoundary;
+        const float expected = .3f * .01f * 31;
+        check(eventually([&] { return std::abs(heard1.load() - expected) < .00001f; }) && created == beforeCreated + 2,
+            "Maximum 32-node graph sums 31 independent outputs through exactly one render worker");
+        holdMixerBoundary = true;
+        check(eventually([&] { return mixerBoundaryParked.load(); }), "Park before enabling real-engine allocation and timing accounting");
+        QueryPerformanceFrequency(&measurementFrequency);
+        measuredCount = 0; measuredHeapOperations = 0; measureQuanta = true; holdMixerBoundary = false;
+        auto waitForQuanta = [](std::size_t count) {
+            for (int attempt = 0; attempt < 600 && measuredCount.load(std::memory_order_acquire) < count; ++attempt) wait(5);
+            check(measuredCount.load(std::memory_order_acquire) >= count, "Audited real-engine quanta progress within the bounded timeout");
+        };
+        waitForQuanta(100);
+        const auto lastNode = config.graph.nodes.back(); const auto lastEdge = config.graph.edges.back();
+        config.graph.nodes.pop_back(); config.graph.edges.pop_back(); engine.configure(config, config.revision); ++config.revision;
+        waitForQuanta(200);
+        config.graph.nodes.push_back(lastNode); config.graph.edges.push_back(lastEdge); engine.configure(config, config.revision); ++config.revision;
+        waitForQuanta(400);
+        holdMixerBoundary = true;
+        check(eventually([&] { return mixerBoundaryParked.load(); }), "Finish timing after a complete real engine quantum");
+        measureQuanta = false;
+        const auto count = measuredCount.load(std::memory_order_acquire);
+        std::vector<double> timings(quantumMilliseconds.begin(), quantumMilliseconds.begin() + count);
+        const auto heapOperations = measuredHeapOperations.load();
+        holdMixerBoundary = false;
+        std::sort(timings.begin(), timings.end());
+        const double p50 = timings[timings.size() / 2], p99 = timings[(timings.size() - 1) * 99 / 100];
+        std::cout << "Maximum shared outputs: " << count << " actual engine quanta; p50=" << p50 << " ms; p99=" << p99
+            << " ms; maximum=" << timings.back() << " ms; C++ heap operations=" << heapOperations << '\n';
+        check(heapOperations == 0, "Actual engine processing, aggregate output dispatch and routing adoption allocate/free no C++ heap memory");
+        check(p99 < 5., "Maximum repeated-output actual engine p99 stays within its 5 ms quantum in this run");
+        check(eventually([&] { return std::abs(heard1.load() - expected) < .00001f; }) && duplicates == beforeDuplicates,
+            "Maximum graph remains correctly summed after audited delete/recreate routing fades");
+        engine.stop(); check(live == 0, "Maximum repeated-output fixture releases both workers");
+    }
+    for (const auto* suffix : {"", ".bak", ".new", ".established"}) std::filesystem::remove(path.string() + suffix);
 }
 void ownershipLocks() {
     using namespace am;
@@ -627,6 +1131,11 @@ void persistenceProtocol(const std::filesystem::path& directory) {
             {"command", "configure"}, {"expectedRevision", initial.revision}, {"configuration", edited}}.dump());
         const auto previous = engine.snapshot()["configuration"];
         const int workers = created;
+        auto stale = request; stale["expectedRevision"] = initial.revision - 1;
+        const auto conflict = server.handle(stale);
+        check(!conflict.value("ok", true) && conflict.value("errorCode", "") == "revision_conflict"
+            && engine.snapshot()["configuration"] == previous && read(path) == committed && created == workers,
+            "A real stale configure has a stable conflict code and changes no saved state or synthetic workers");
         for (const bool lockPrimary : {false, true}) {
             const auto lockedPath = lockPrimary ? path : std::filesystem::path(path.wstring() + L".new");
             struct FileLock { HANDLE value; ~FileLock() { if (value != INVALID_HANDLE_VALUE) CloseHandle(value); } } locked{
@@ -1084,19 +1593,23 @@ int main() {
         }
         const auto sharedPath = directory / "shared-settings.json";
         test::duplicateSources(sharedPath);
+        test::freshVoiceStarter(directory);
         test::defaultSettings(directory);
         test::relativeSettings(directory);
         test::ownershipLocks();
         test::recovery(directory);
         test::streamedMicrophones(directory);
         test::streamedOutputs(directory);
+        test::repeatedOutputs(directory);
+        test::maximumRepeatedOutputWork(directory);
         test::controlProtocol(directory);
         test::persistenceProtocol(directory);
+        test::echoPendingBudget(directory);
         for (const auto& fixture : {path, sharedPath})
             for (const auto& suffix : {"", ".bak", ".new", ".established"}) std::filesystem::remove(fixture.string() + suffix);
         std::filesystem::remove(directory / "engine.log"); std::filesystem::remove(directory / "engine.log.previous");
         std::filesystem::remove(directory);
-        std::cout << "PASS: actual engine survived 301 graph commits, Core Dynamics and measured Voice Color output changes/live persistence without worker restart, canvas-only saves without DSP rebuilds, concurrent snapshots, measured EQ spectrum lifecycle, topology fades, rapid device rebinding, isolated output loss/rejoin, retirement, restart and failed-start cleanup; fresh and saved duplicate microphone/virtual/app sources share capture with independent controls/routes while output uniqueness remains enforced; implicit default-path startup and full quit/reopen preserve a custom v2 workspace independently of launch directory. Synthetic worker stubs only.\n";
+        std::cout << "PASS: actual engine survived 301 graph commits, Core Dynamics and measured Voice Color output changes/live persistence without worker restart, canvas-only saves without DSP rebuilds, concurrent snapshots, measured EQ spectrum lifecycle, topology fades, rapid device rebinding, isolated output loss/rejoin, retirement, restart and failed-start cleanup; fresh and saved repeated inputs share capture while repeated outputs sum through one stream per resolved endpoint; implicit default-path startup and full quit/reopen preserve a custom v2 workspace independently of launch directory. Synthetic worker stubs only.\n";
         return 0;
     } catch (const std::exception& error) { std::cerr << "FAIL: " << error.what() << '\n'; return 1; }
 }

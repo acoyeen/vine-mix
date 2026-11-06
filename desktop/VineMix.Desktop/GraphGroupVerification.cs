@@ -358,17 +358,18 @@ internal static class GraphGroupVerification
         var appConflict = Node("appInput", "existing-app", 0, 0); appConflict.App = new() { ExecutablePath = app.App.ExecutablePath.ToUpperInvariant() };
         var existing = new GraphConfiguration { Nodes = [captureConflict, renderConflict, appConflict] };
         string existingBefore = JsonSerializer.Serialize(existing, Protocol.Json);
-        require(GraphClipboard.TryCreatePaste(bindings, existing, new(100, 100), out var conflicted, out _) && conflicted.ClearedAssignments == 1,
-            "Pasting retains shared capture and app sources while clearing only the conflicting output assignment.");
+        require(GraphClipboard.TryCreatePaste(bindings, existing, new(100, 100), out var conflicted, out _),
+            "Pasting retains shared capture, app and output bindings.");
         require(conflicted.Nodes.Single(node => node.Kind == "microphone") is { Device.Id: "capture-device", Device.StableId: "capture-stable", Device.Channel: 3, GainDb: -7, Mono: true }
-            && conflicted.Nodes.Single(node => node.Kind == "output") is { Device.Id: "", Device.StableId: "", Muted: false }
+            && conflicted.Nodes.Single(node => node.Kind == "output") is { Muted: true } copiedOutput
+            && copiedOutput.Device.Id == output.Device.Id && copiedOutput.Device.StableId == output.Device.StableId
             && conflicted.Nodes.Single(node => node.Kind == "appInput") is { App.ProcessId: 123, App.ExecutablePath: "C:\\Preview\\Player.exe" }
             && conflicted.Nodes.Single(node => node.Kind == "virtualInput") is { Device.Id: "capture-device", Device.Channel: 1, GainDb: -3, Muted: true },
-            "Copies preserve all three input source bindings, Mono, channel selection, gain and mute independently of output ownership.");
+            "Copies preserve input controls and every device binding while newly copied outputs start muted.");
         require(JsonSerializer.Serialize(existing, Protocol.Json) == existingBefore
             && mic.Device.Id == "capture-device" && app.App.ProcessId == 123,
-            "Resolving clipboard assignment conflicts never changes any original node or endpoint binding.");
-        require(GraphClipboard.TryCreatePaste(bindings, new(), new(100, 100), out var distinct, out _) && distinct.ClearedAssignments == 0
+            "Preparing a shared-device paste never changes any original node or endpoint binding.");
+        require(GraphClipboard.TryCreatePaste(bindings, new(), new(100, 100), out var distinct, out _)
             && distinct.Nodes.Single(node => node.Kind == "microphone").Device.Id == mic.Device.Id
             && distinct.Nodes.Single(node => node.Kind == "output").Device.StableId == output.Device.StableId
             && distinct.Nodes.Single(node => node.Kind == "appInput").App.ProcessId == app.App.ProcessId,
@@ -401,9 +402,10 @@ internal static class GraphGroupVerification
             && existing.Nodes.Single(node => node.Id == distinct.Nodes.Single(node => node.Kind == "microphone").Id).Device.Id == mic.Device.Id
             && existing.Nodes.Single(node => node.Id == distinct.Nodes.Single(node => node.Kind == "appInput").Id).App.ExecutablePath == app.App.ExecutablePath
             && existing.Nodes.Single(node => node.Id == distinct.Nodes.Single(node => node.Kind == "virtualInput").Id).Device.Id == virtualInput.Device.Id
-            && existing.Nodes.Single(node => node.Id == distinct.Nodes.Single(node => node.Kind == "output").Id).Device.Id == ""
+            && existing.Nodes.Single(node => node.Id == distinct.Nodes.Single(node => node.Kind == "output").Id).Device.Id == output.Device.Id
+            && existing.Nodes.Single(node => node.Id == distinct.Nodes.Single(node => node.Kind == "output").Id).Muted
             && distinct.Nodes.Single(node => node.Kind == "microphone").Device.Id == mic.Device.Id,
-            "Paste replay retains shared input assignments, clears only a newly conflicting output and preserves its IDs and queued template.");
+            "Paste replay retains shared input/output assignments, muted copied outputs, IDs and its queued template.");
     }
 
     private static GraphNode Node(string kind, string id, double x, double y)

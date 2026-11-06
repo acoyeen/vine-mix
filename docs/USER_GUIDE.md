@@ -5,17 +5,29 @@ Create sources, processing chains and destinations on a resizable node canvas, w
 settings inside each node. The C++ engine handles audio in a separate process;
 the WPF desktop handles editing, telemetry and tray behavior.
 
+This guide describes **0.5.0 Beta**. See the
+[release notes](releases/0.5.0-beta.md) for changes and the
+[qualification record](RELEASE_0.5.0_QUALIFICATION.md) for tested scope and limits.
+
 For the current beta, installation, first-session setup, driver
 terms, manual updates and reporting, start with the
 [beta tester guide](BETA_TESTER_GUIDE.md). The version beside the connection dot
 identifies the beta; **Settings → About VineMix** provides copyable full release
 and build information.
 
-A fresh workspace contains exactly **Physical input**, **Virtual output** and
-**Listening output**, with two cables from the input. Choose your physical
-microphone and headphones explicitly. Both outputs start muted; Listening output
-starts at −24 dB. A recognized VAC virtual output can bind automatically while
-remaining muted. Existing saved workspaces retain their graph and assignments.
+A fresh workspace contains a ready-connected voice chain: **Microphone →
+High-pass filter → Denoiser → Expander → Compressor**, followed by separate
+cables to **Listening output** and **Virtual output**. The seven nodes have
+consistent gaps to keep cables visible, with the two outputs stacked on the
+right. The initial view fits the setup to the window.
+
+Choose your physical microphone and headphones explicitly. Both outputs start
+muted; Listening output starts at −24 dB. A recognized VAC virtual output can
+bind automatically while remaining muted. The Denoiser starts with RNNoise,
+which adds 30 ms of processing delay, including in bypass. Adjust the cleanup
+and dynamics controls to your microphone and voice. Existing saved workspaces
+retain their graph, controls, view and assignments; this starter applies to a
+new workspace or an explicitly chosen **Start fresh** recovery action.
 
 ## Node library
 
@@ -24,13 +36,14 @@ remaining muted. Existing saved workspaces retain their graph and assignments.
   Stereo Combine and Stereo Split; a linked control adjusts several levels together.
 - **Processing:** interactive EQ with up to eight bands, High-pass, Low-pass,
   Low / Mid / High tone controls, Voice Color, Compressor, Limiter, Ducking,
-  Expander, Gate, Alignment Delay, denoiser, de-esser, plosive remover and reverb.
+  Expander, Gate, Alignment Delay, Denoiser, De-esser, Plosive remover, Reverb,
+  Echo and Distortion.
 - **Outputs:** physical or streamed listening output and VAC Lite virtual microphone output.
 
-The 0.4.0 Beta creation menu contains **30 node types**. Mix acts as a volume control with
+The creation menu contains **32 node types**. Mix acts as a volume control with
 one incoming connection and combines sound when several connections arrive.
 Gain / Multiply and Reroute are no longer offered for creation; existing saved
-nodes still work, bringing the compatible engine library to 32 types.
+nodes still work, bringing the compatible engine library to 34 types.
 
 **Level control** inputs appear on nodes with dedicated **Level** knobs:
 Physical input, Virtual input, Running app, Mix, Listening output and Virtual
@@ -72,7 +85,10 @@ parallel-path delay compensation. Missing inputs remain silent rather than
 automatically selecting the other source.
 
 The graph supports up to **32 nodes and 96 connections**. Sources can feed several
-destinations, and each listening output has independent buffering and recovery.
+destinations, and each distinct output device has independent buffering and recovery.
+This is routing capacity, not a guarantee for every effect combination. Large
+collections of Distortion or RNNoise nodes need more processing time. When
+several branches need the same cleanup, place one Denoiser before the split.
 New outputs start muted; physical outputs require explicit selection. Existing A/B routes migrate with their
 saved levels, mutes, devices and disabled sends.
 
@@ -83,6 +99,16 @@ and connect each copy wherever it fits your graph. Level, mute and Mono remain
 independent per node, and duplication supports Undo/Redo. Copy/paste also retains
 input assignments. If you route several copies into one destination, their audio
 adds together.
+
+Several output nodes can also use the same listening device or virtual output.
+Each keeps its own Level, mute and incoming connections; their audio is added
+together before being sent to the device. Right-click **Duplicate output** to
+place another copy nearby. It keeps the destination and controls, and starts
+muted without connections. Pasted outputs also retain their devices and start
+muted. Muting or deleting one output leaves the others working. Repeating the
+same signal through several outputs increases its level; VineMix does not
+automatically turn down the combined mix. Each node meters its own path, while
+output clipping can also indicate overload in their combined device mix.
 
 Unavailable inputs and outputs gently flash their existing device/app name red and have a
 faint red outer glow, with a red warning triangle above the volume meter.
@@ -108,7 +134,7 @@ The virtual input automatically binds the **CABLE Output** recording endpoint;
 the virtual output binds the **Line 1** playback endpoint. Apps send sound to
 **CABLE Input**, and Discord/games receive the mix through the **Line 1** recording
 device. Automatic assignment requires a single eligible, active endpoint. Multiple
-virtual inputs can share it; output devices remain assigned to one output node.
+virtual inputs can share it, and multiple output nodes can share a destination.
 Saved selections stay assigned while absent.
 For duplicate devices or a driver reinstall, right-click the virtual node and use
 **Troubleshooting → Reassign device**.
@@ -116,24 +142,36 @@ For duplicate devices or a driver reinstall, right-click the virtual node and us
 Use **Add**, **Shift+A**, or **F3** to search. Drag a header or unused node space to move it; connect
 matching sockets by dragging or clicking them. Middle-drag pans, the wheel zooms
 over every node control (open dropdowns and menus keep their own scrolling)
-through fixed stops, and **Home** fits the graph. Select one or more nodes and
+through fixed stops from **10% to 200%**, and **Home** fits the graph. Select one or more nodes and
 press **F**, or right-click a selected node and choose **Frame selection**, to
 focus that part of the graph. Click the zoom percentage or
 press **Ctrl+0** to return to 100%. Select a cable or node and press **Delete** to remove
-it. Nodes stay expanded. Audio sockets are round; shared-control
-sockets are square; detector-only sidechain sockets are diamonds. Every scalar
-numeric parameter uses the shared dial control. Related effect controls form
+it. Zooming out progressively simplifies node details while keeping their size,
+position and cable anchors fixed. Zoom in to edit hidden controls and connections;
+an active edit is kept visible. Audio sockets are round; shared-control
+sockets are square; detector-only sidechain sockets are diamonds. Reverb's Wet
+output and Echo's Echo output are light blue and retain the round audio shape. Ordinary
+cables blend from their output socket colour to their input socket colour;
+matching colours remain solid. Selection and muted styling still identify
+those states. A small stationary dot marks each enabled cable's midpoint while
+node details are visible, and hides with simplified nodes. Disabled cables have
+no marker. Markers remain underneath
+nodes, so their presence or absence in a gap can help trace where a cable goes.
+Every scalar numeric parameter uses the shared dial control. Related effect controls form
 compact groups, with persistent labels, values and units. Drag up/down, hold
-Shift for fine adjustment, or click the number and type an exact value. Enter,
+Shift for fine adjustment, or click the number and type an exact value. When a
+dial has keyboard focus, typing a digit, minus sign or your locale's decimal
+separator also starts exact entry, retaining the first character. Selecting a
+node alone does not start an edit. The saved value stays unchanged until commit. Enter,
 Tab, Shift+Tab or clicking away applies a valid value. Invalid text stays visible
 with a validation outline and is not applied; correct it or cancel the edit.
 Right-click the value for **Apply value** or **Cancel edit**; Escape also cancels.
 Each dial and its value box has its own Tab stop. Double-click or Home resets the focused dial; EQ frequency
 resets to the selected band's reset anchor. Arrow keys adjust the focused dial,
 and Page Up/Down make larger changes. Focus remains visible. Decimal precision
-is retained, and sample counts accept whole numbers only. The wheel zooms the
+is retained, and sample and repeat counts accept whole numbers only. The wheel zooms the
 canvas without changing parameters. Essential dial instructions remain visible
-inside nodes. Selectors, action buttons, toggles and passive readouts have
+in the workspace footer. Selectors, action buttons, toggles and passive readouts have
 separate shapes and positions; the EQ graph and Voice Color pad remain interactive.
 Tooltips describe each control's purpose or current state. Mouse and keyboard
 instructions are in **Settings → Help & shortcuts**. Open **Settings** at the top
@@ -142,6 +180,27 @@ device recovery.
 Search stays at the top. Separators group workspace controls first, audio tools
 second, app startup and updates third, then Help, What's new? and About. Quit
 remains separate at the bottom. Activity sits directly after Find node.
+
+The bottom-right **minimap** is shown by default and displays the graph and the part currently visible.
+Click it to centre the canvas there, or drag to pan. Turn off
+**Settings → Show minimap** to hide it; this saved interface preference does not
+change audio or the graph. Panning and zooming do not immediately write audio settings.
+
+With canvas keyboard focus, arrow keys nudge selected nodes; hold **Shift** for
+finer movement. With nothing selected, arrows pan instead. Layout lock prevents
+nudging selected nodes; it does not turn that action into panning. A held arrow
+is one undoable move; use Undo to reverse it. Controls keep their own arrows.
+**Ctrl++ / Ctrl+-** zoom around the centre of the canvas. The shared plus/equal
+key works with or without Shift; numpad plus and minus work too. Focused editors
+and controls retain their own keys.
+**Ctrl+Tab** follows an audio pipeline forward and **Ctrl+Shift+Tab** goes back,
+including muted routes. At a branch, choose a named node and port; at an endpoint,
+navigation stays put. The destination is brought into view at a readable zoom.
+Valid numeric drafts commit before travel; invalid drafts stay available for
+correction or Escape. **Tab/Shift+Tab** retain ordinary control traversal.
+**F2** renames exactly one selected node or group; multiple or empty selections
+are ignored. Node renaming remains available under layout lock; group renaming
+requires an unlocked layout.
 
 Physical device dropdowns show available devices by default. Under
 **Settings → Audio device visibility**, optionally show disabled, disconnected
@@ -204,8 +263,8 @@ Click the heading or an exposed area of the group background to select it;
 drag either to move all its members together. Nodes and cables keep their own
 controls. Hold **Shift** or **Ctrl** while dragging the group background to
 box-select nodes, or use middle-drag or **Space+drag** to pan. The frame automatically
-fits the member nodes as they move or change size; its title stays readable down
-to 30% zoom. Double-click the title, or select the frame and press **F2**, to
+fits the member nodes as they move or change size. Double-click the title, or
+select only that frame and press **F2**, to
 rename it. **Enter** applies the name, **Escape** cancels, and clicking elsewhere
 applies it. Right-click the heading or exposed background for **Group color** and choose Sage, Teal, Blue,
 Violet, Rose, Amber or Slate. **Ungroup (keep nodes)** removes the frame while
@@ -229,8 +288,10 @@ gesture a click. Middle-drag continues to pan and **Ctrl+right-drag** continues
 to cut cables. The option is off by default and is saved as a workspace UI
 preference; it does not change audio settings.
 
-The Add menu groups nodes into **Inputs, Outputs, Effects, Mixing and Controls**,
-using the same category colours as their headers. Search also accepts a category
+The Add menu groups nodes into **Inputs, Outputs, Effects, Mixing and Controls**.
+Effects contains the full effect library, including Low / Mid / High, Equalizer,
+Reverb, Echo and Distortion, in one menu. Node headers retain their category
+colours. Search also accepts a category
 name. The upper toolbar holds creation, selection, Undo, Redo, Fit and zoom
 controls, with the node count centred beneath the logo. Open **Settings → Activity**
 for session history. Connection status stays in the header; save status is centred in
@@ -320,6 +381,13 @@ audio between phrases, with no mode dropdown. Expander has five dials:
 Threshold, Ratio, Range, Attack and Release. Gate has six: Threshold, Hysteresis,
 Range, Attack, Hold and Release. An older saved Expander in gate mode still
 shows Gate controls and retains its saved settings without conversion.
+Both have an optional **Trigger** input. With no cable, the node detects its own
+Audio input. Connect another source to Trigger to control when the main audio
+opens, without mixing the trigger into that audio. A connected silent, muted or
+unavailable trigger stays silent; removing its cable restores self-detection.
+For example, route music through Gate and a microphone into Trigger to let the
+microphone open the music path. Route the microphone separately if it should
+also be heard.
 
 **Compressor** reduces its own louder audio using Threshold, Ratio, Attack,
 Release and Make-up gain. It has no detector selector or sidechain input.
@@ -337,7 +405,62 @@ with Threshold −30 dBFS and Duck amount 18 dB; Dynamic's Ratio starts at 4:1.
 Switching modes keeps both values, the current gain envelope, node size and
 connections. Trigger audio never joins the audible mix, and the main audio
 never substitutes for a missing trigger. Missing or silent triggers release
-toward unity. Only Ducking accepts a trigger cable.
+toward unity. Gate and Expander also accept Trigger, with the self-detection
+fallback described above; Compressor and Limiter do not.
+
+**Reverb** has two outputs. **Audio** keeps the blend selected by **Mix**;
+**Wet** carries only the reverberation, independently of Mix. Decay, Damping and
+Pre-delay affect both outputs' reverb. Wet preserves the effect's stereo
+reflections, including when fed a mono source. Route dry sound directly to a Mix
+node and Wet through another effect into that Mix to process the reverb separately.
+Bypass returns dry sound on Audio and fades Wet to silence without dry leakage.
+The reverb continues processing incoming audio and advancing its tail during
+bypass; resuming fades in the current result, without
+freezing or restarting the tail.
+
+![Reverb controls and its separate blue Wet output](images/reverb.png)
+
+**Echo** has three controls:
+
+![Echo controls and its separate blue Echo output](images/echo.png)
+
+- **Time** sets the gap between repeats, from 20 to 2000 ms; the default is
+  300 ms. Very short times thicken or colour the voice rather than sounding
+  like separate words. Start around 300 ms for clearly spaced repeats.
+- **Repeats** sets exactly 1–8 copies after the original; the default is 3.
+  Each copy becomes quieter. Repeats can overlap during continuous speech.
+- **Mix** blends the original voice and echoes on the Audio output. At 0%,
+  Audio is original voice only; at 100%, it is echoes only, so nothing is heard
+  until the selected Time has elapsed. Mix does not change the repeat count.
+
+Changing Time or Repeats briefly fades the old echoes and starts fresh, instead
+of replaying the previous tail at a new spacing. Mix changes keep the tail.
+The repeat levels are normalized to prevent buildup inside Echo, and left/right
+channels stay separate.
+
+**Audio** carries the Mix blend. The separate **Echo** output carries only the
+repeats and ignores Mix. To put Reverb only on the echoed aftermath, set Echo's
+Mix to 0%, route **Audio → Mix node**, route **Echo → Reverb → the same Mix node**,
+then send that Mix to your output. Your original voice stays on the first path;
+Reverb receives only repeats. Its own Mix controls how much reverb accompanies
+those repeats. Sending Echo's blended Audio and its Echo branch to the same
+destination can otherwise double up the repeats.
+
+Bypass returns the original voice on Audio and fades the Echo output to silence,
+without dry voice leaking into it. Processing keeps advancing during bypass.
+Earlier development workspaces convert Feedback to an approximate repeat count
+while keeping Time and Mix; old 35% Feedback becomes 5 repeats. This intentionally
+replaces the previous indefinite feedback decay.
+
+**Distortion** ranges from gentle warmth to strong saturation. **Drive** pushes
+the sound into distortion (0–36 dB); **Tone** sets its brightness (500–18000 Hz);
+**Mix** blends clean and distorted sound; **Output** trims the resulting level
+(−24–0 dB). Output applies to the blend, including Mix at zero. Bypass passes the
+original sound without that trim. Processing adds 32 frames at 48 kHz (about
+0.67 ms), also retained at zero Mix and during Bypass to keep its internal paths
+aligned. Parallel routes do not automatically compensate for this delay.
+Drive can increase loudness as well as distortion; use Output to balance the
+result. Bypass may therefore sound louder than a blend with a low Output setting.
 
 **Alignment Delay** offers linked millisecond/sample editing from zero to two
 seconds at 48 kHz. Settings, bypass, reset and copying follow the existing node
@@ -355,23 +478,41 @@ USB path, persistence evidence, and the later listening comparison.
 The interface uses Blender-inspired coloured category headers, grouped dials,
 typed sockets and a black canvas with near-black surfaces. Text uses scalable
 font metrics and grayscale rendering to avoid coloured fringes at fractional
-zoom. Zoom uniformly scales each complete node: controls stay visible and node
-proportions stay fixed. At very small scales the text naturally becomes smaller;
-Ctrl+0 returns to 100%. The meters retain faded green/yellow/red zones which
-fill as audio reaches each range, with smooth falloff. Inputs and outputs have
-**Mute**; every intermediate node has one bottom **Bypass** button, grey when
-off and red when on, with the same label in both states. Bypass skips that node's
-processing and level adjustment while retaining its settings and connections.
+zoom. Node geometry stays fixed while progressively simpler detail makes a
+zoomed-out graph easier to navigate. The 0.5.0 presentation,
+**Quiet Blocks**, keeps plain solid charcoal bodies and category-coloured header
+strips.
+Simplified interiors contain no decorative type symbols, name/control text,
+miniature controls or audio meters. Selection and device-warning indicators remain.
+Node bounds, header height, sockets and cables stay fixed. Use Find to locate a
+node; zooming in restores the full controls, labels and meters. The transition
+near 30% avoids flickering around its boundary and defers simplification during
+active edits; audio processing and retained peaks continue. High contrast uses
+the existing system colours.
+Group headings disappear;
+groups keep fixed world-space bounds instead of expanding as zoom decreases.
+Hidden controls cannot take focus;
+keyboard navigation reveals a node before entering its controls.
+Ctrl+0 returns to 100%. Meters reveal a fixed green-to-yellow-to-red gradient as
+audio rises; the colour at a given level never changes with the fill height.
+The unfilled scale stays subdued. Meters retain their full border, original peak
+indicator and idle cap, with unchanged peak hold/release and a distinct warning
+for actual clipping. High contrast uses
+system colours. Inputs and outputs have
+**Mute**; most intermediate nodes have a bottom **Bypass** button, grey when
+off and red when on. Stereo Split and Stereo Combine have no bypass. Bypass
+removes the audible effect while retaining settings and connections; some
+effects keep processing or preserve their delay so transitions stay aligned.
 Settings no longer include duplicate incoming-send controls.
 The window resizes from
 900 × 580 and includes maximise/restore beside its other caption controls.
-New graphs start at 100% zoom. Existing saved positions and zoom are retained,
+New workspaces fit the starter chain to the window. Existing saved positions and zoom are retained,
 without automatic rearrangement. See
 [the visual implementation notes](BLENDER_NODE_STYLE.md).
 
 Compatible sockets snap within a forgiving screen-space radius. The existing
-port outline brightens without an extra hover circle. Audio ports are matching
-circles centred on the node border; empty ports have coloured outlines and
+port outline brightens without an extra hover circle. Compatible audio ports are
+circles centred on the node border, even when their colours differ. Empty ports have coloured outlines and
 connected ports are filled. Passive node surfaces use the
 ordinary arrow cursor; the move cursor appears only during a drag. Drop an
 unconnected effect or mix onto a highlighted cable to insert it into the path.
@@ -383,6 +524,9 @@ release; **Escape** leaves the original connections intact.
 single incoming path to its destinations. Ambiguous or unrepresentable rewires
 leave the graph unchanged. Hovering previews the target; releasing commits;
 **Escape** cancels. Existing saved cable gains and mutes remain intact.
+Reverb and Echo still insert and detach through their main Audio paths. Detach
+is refused while Reverb's Wet or Echo's Echo output is connected, so the operation
+cannot replace an effect-only branch with dry sound; remove that branch first.
 
 Read the [workspace guide](NODE_WORKSPACE.md) for node behavior, architecture,
 migration and the Blender/TouchDesigner references behind this direction.
@@ -440,7 +584,7 @@ the app, press Escape or choose Close to dismiss them; an update installation
 already in progress stays protected. **About VineMix** follows **What's new?**
 in the help section, above the separately grouped **Quit VineMix**.
 
-After building, open **`artifacts/VineMix-0.4.0-beta-Installed/VineMix.exe`** through
+After building, open **`artifacts/VineMix-0.5.0-beta-Installed/VineMix.exe`** through
 File Explorer. The native engine
 is alongside it, and the package includes the .NET desktop runtime. Closing the
 window hides it to the tray; choose **Quit VineMix** at the bottom of Settings or

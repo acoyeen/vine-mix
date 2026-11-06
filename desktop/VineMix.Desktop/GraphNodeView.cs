@@ -16,11 +16,12 @@ using VineMix.Desktop.Controls;
 
 namespace VineMix.Desktop;
 
-internal sealed class GraphNodeView : Border
+internal sealed partial class GraphNodeView : Border
 {
     private readonly GraphWorkspace _owner;
     private readonly string _kind;
     private readonly Grid _root = new();
+    private readonly Border _headerFace;
     private readonly StackPanel _body = new();
     private readonly Grid _content = new() { Margin = new Thickness(12, 7, 12, 10) };
     private readonly StackPanel _inputs = new() { Margin = new Thickness(0, 3, 0, 7) };
@@ -158,7 +159,7 @@ internal sealed class GraphNodeView : Border
         TextOptions.SetTextRenderingMode(this, TextRenderingMode.Grayscale);
         SetResourceReference(BackgroundProperty, "ConsolePanelBrush"); SetResourceReference(BorderBrushProperty, "NodeOutlineBrush");
         _root.RowDefinitions.Add(new() { Height = new GridLength(32) });
-        _root.RowDefinitions.Add(new() { Height = new GridLength(node.Kind == "stereoSplit" ? 56 : GraphDefaults.HasAudioOutput(node.Kind) || node.Kind == "control" ? 28 : 0) });
+        _root.RowDefinitions.Add(new() { Height = new GridLength(node.Kind is "stereoSplit" or "reverb" or "echo" ? 56 : GraphDefaults.HasAudioOutput(node.Kind) || node.Kind == "control" ? 28 : 0) });
         _root.RowDefinitions.Add(new() { Height = GridLength.Auto }); _root.RowDefinitions.Add(new() { Height = GridLength.Auto });
         _root.RowDefinitions.Add(new() { Height = GridLength.Auto });
         var header = new Grid { Cursor = Cursors.Arrow, ToolTip = NodeDescription(_gatePresentation ? "gate" : node.Kind) };
@@ -167,24 +168,28 @@ internal sealed class GraphNodeView : Border
             var staticHelp = DuckingDescription("static"); var dynamicHelp = DuckingDescription("dynamic");
             _effectUpdates.Add(n => header.ToolTip = n.Ducking.Mode == "dynamic" ? dynamicHelp : staticHelp);
         }
-        var headerFace = new Border { CornerRadius = new CornerRadius(4, 4, 0, 0), Child = header }; headerFace.SetResourceReference(BackgroundProperty, HeaderBrushKey);
+        _headerFace = new Border { CornerRadius = new CornerRadius(4, 4, 0, 0), Child = header }; _headerFace.SetResourceReference(BackgroundProperty, HeaderBrushKey);
         _title = GraphWorkspace.Text(node.Name, 15, true); _title.Margin = new Thickness(12, 0, 12, 0); _title.VerticalAlignment = VerticalAlignment.Center;
         _title.TextTrimming = TextTrimming.CharacterEllipsis; _title.TextWrapping = TextWrapping.NoWrap; header.Children.Add(_title);
         _rename = new TextBox { Visibility = Visibility.Collapsed, Margin = new Thickness(10, 2, 5, 2), FontSize = 14, MaxLength = 80, Padding = new Thickness(3, 0, 3, 0) }; header.Children.Add(_rename);
         _rename.LostKeyboardFocus += (_, _) => CommitRename();
         _rename.PreviewKeyDown += (_, e) => { if (e.Key == Key.Enter) { CommitRename(); e.Handled = true; } else if (e.Key == Key.Escape) { _rename.Visibility = Visibility.Collapsed; e.Handled = true; } };
         AutomationProperties.SetName(_rename, "Node name");
-        header.MouseLeftButtonDown += (_, e) => { if (_rename.IsKeyboardFocusWithin || !IsNodeDragSurface(e.OriginalSource as DependencyObject)) return; if (e.ClickCount == 2) { _rename.Text = _node.Name; _rename.Visibility = Visibility.Visible; _rename.Focus(); _rename.SelectAll(); e.Handled = true; } else _owner.BeginDrag(this, e); };
-        _root.Children.Add(headerFace);
-        if (node.Kind == "stereoSplit")
+        header.MouseLeftButtonDown += (_, e) => { if (_rename.IsKeyboardFocusWithin || !IsNodeDragSurface(e.OriginalSource as DependencyObject)) return; if (e.ClickCount == 2) { BeginRename(); e.Handled = true; } else _owner.BeginDrag(this, e); };
+        _root.Children.Add(_headerFace);
+        if (node.Kind is "stereoSplit" or "reverb" or "echo")
         {
             _outputRow = new Grid();
             _outputRow.RowDefinitions.Add(new() { Height = new GridLength(28) });
             _outputRow.RowDefinitions.Add(new() { Height = new GridLength(28) });
-            var left = PortRow("Left · mono", true); var right = PortRow("Right · mono", true);
+            bool effect = node.Kind is "reverb" or "echo";
+            var left = PortRow(effect ? "Audio" : "Left · mono", true);
+            var right = PortRow(effect ? GraphDefaults.PortLabel("wet", node.Kind) : "Right · mono", true);
+            if (node.Kind == "reverb") right.ToolTip = "Reverb only, independent of Mix. Bypass returns dry sound on Audio and fades Wet to silence. The reverb keeps advancing while bypassed.";
+            if (node.Kind == "echo") right.ToolTip = "Echoes only, independent of Mix. Route to Reverb to add space to just the repeats. Bypass fades this output to silence without dry sound.";
             _outputRow.Children.Add(left); Grid.SetRow(right, 1); _outputRow.Children.Add(right);
             Grid.SetRow(_outputRow, 1); _root.Children.Add(_outputRow);
-            AddSocket("audio", true, left, "left"); AddSocket("audio", true, right, "right");
+            AddSocket("audio", true, left, effect ? "audio" : "left"); AddSocket("audio", true, right, effect ? "wet" : "right");
         }
         else if (GraphDefaults.HasAudioOutput(node.Kind) || node.Kind == "control")
         {
@@ -200,7 +205,9 @@ internal sealed class GraphNodeView : Border
         else if (GraphDefaults.HasAudioInput(node.Kind)) { var row = PortRow(node.Kind == "stereoSplit" ? "Stereo" : "Audio", false); _inputs.Children.Add(row); AddSocket("audio", false, row); }
         if (GraphDefaults.HasSidechainInput(node))
         {
-            var row = PortRow("Trigger", false); _inputs.Children.Add(row); AddSocket("sidechain", false, row);
+            var row = PortRow("Trigger", false);
+            if (node.Kind is "gate" or "expander") row.ToolTip = "Optional detector-only audio. No cable uses this node's Audio input; a connected silent or unavailable source stays silent.";
+            _inputs.Children.Add(row); AddSocket("sidechain", false, row);
         }
         if (_hasLevelInput)
         {
@@ -245,8 +252,6 @@ internal sealed class GraphNodeView : Border
                     try { ApplyChoices(_node); } finally { _applying = false; }
                     return;
                 }
-                if (VirtualDeviceBindings.IsUsed(_owner.Graph, Id, new Endpoint { Id = choice.Id, StableId = choice.StableId }))
-                { _owner.SetMessage("That output device already has a node. Connect another cable to that output node to combine the audio.", isError: true); _choiceEndpoints = null; _applying = true; try { ApplyChoices(_node); } finally { _applying = false; } return; }
                 var binding = choice.Binding(-1);
                 _owner.NodeChanged(Id, n => { n.Device = binding.Copy(); n.AutoAssignDevice = VirtualDeviceBindings.IsAssigned(binding); });
             };
@@ -398,12 +403,20 @@ internal sealed class GraphNodeView : Border
         ContextMenuOpening += (_, e) =>
         {
             if (GraphWorkspace.IsTextEditor(e.OriginalSource as DependencyObject)) return;
-            _owner.PopulateNodeMenu(context, Id, () => { _rename.Text = _node.Name; _rename.Visibility = Visibility.Visible; _rename.Focus(); _rename.SelectAll(); });
+            _owner.PopulateNodeMenu(context, Id, BeginRename);
         };
         AutomationProperties.SetName(this, node.Name + " node");
         if (AvailabilityDeviceElement is FrameworkElement source) ToolTipService.SetShowOnDisabled(source, true);
     }
 
+
+    internal void BeginRename()
+    {
+        if (!_owner.Mixer.CanEdit || !_owner.RevealNodeForControls(Id)) return;
+        _rename.Text = _node.Name; _rename.Visibility = Visibility.Visible;
+        if (PresentationSource.FromVisual(this) is not null) _rename.Focus();
+        _rename.SelectAll();
+    }
 
     internal bool CancelPracticeRename()
     {
@@ -444,13 +457,15 @@ internal sealed class GraphNodeView : Border
         "denoiser" => NodeToolTip.Create("Denoiser", "SpeexDSP: faster, lighter cleanup.", "RNNoise: more delay, usually cleaner speech.", "20/30 ms is added node delay."),
         "deEsser" => NodeToolTip.Create("De-esser", "Tames harsh S and SH sounds", "Acts above the threshold"),
         "plosive" => NodeToolTip.Create("Plosive remover", "Tames low P and B thumps", "Acts above the threshold"),
-        "reverb" => NodeToolTip.Create("Reverb", "Adds room-like decay", "Mix · Blends dry sound and reverb"),
+        "reverb" => NodeToolTip.Create("Reverb", "Adds room-like decay", "Audio · Mix blends dry sound and reverb", "Wet · Reverb only, independent of Mix", "Bypass · Audio passes dry sound; Wet fades to silence", "The reverb tail keeps advancing while bypassed"),
+        "echo" => NodeToolTip.Create("Echo", "Adds a chosen number of fading echoes", "Time · Gap before and between echoes", "Repeats · Echoes after the original sound", "Mix · 0% original only; 100% echoes only", "Audio · The Mix blend", "Echo output · Echoes only, independent of Mix", "Changing Time or Repeats smoothly restarts the echoes"),
+        "distortion" => NodeToolTip.Create("Distortion", "Adds warmth through to stronger distortion", "Drive · Strength of the distortion", "Tone · Brightness of the distorted sound", "Mix · Original and distorted sound", "Output · Final level adjustment", "Adds 0.67 ms delay, including Mix 0% and bypass"),
         "voiceColor" => NodeToolTip.Create("Voice Color", "Warm / Bright · Tone", "Natural / Broadcast · Character", "Body, clarity and controlled thickening", "Bottom centre · Neutral"),
         "compressor" => NodeToolTip.Create("Compressor", "Reduces its own louder passages", "Ratio controls reduction above threshold"),
         "limiter" => NodeToolTip.Create("Limiter", "Sample-peak ceiling · No lookahead", "Bypass removes limiting", "Later gain can exceed this ceiling"),
         "ducking" => DuckingDescription("static"),
-        "expander" => NodeToolTip.Create("Expander", "Reduces quieter passages below the threshold", "Ratio · Reduction below threshold", "Range · Maximum attenuation"),
-        "gate" => NodeToolTip.Create("Gate", "Closes below the threshold", "Hold · Keeps the gate open briefly", "Hysteresis · Separate closing threshold", "Range · Maximum attenuation"),
+        "expander" => NodeToolTip.Create("Expander", "Reduces quieter passages below the threshold", "Trigger · Optional detector-only input; otherwise uses Audio", "Ratio · Reduction below threshold", "Range · Maximum attenuation"),
+        "gate" => NodeToolTip.Create("Gate", "Closes below the threshold", "Trigger · Optional detector-only input; otherwise uses Audio", "Hold · Keeps the gate open briefly", "Hysteresis · Separate closing threshold", "Range · Maximum attenuation"),
         "alignmentDelay" => NodeToolTip.Create("Alignment Delay", "Delay one path to align it with another", "48 samples = 1 ms · Up to 2 seconds", "Bypass · Undelayed audio"),
         "reroute" => NodeToolTip.Create("Reroute", "A junction for organizing cables"),
         _ => NodeCatalog.Title(kind)
@@ -459,15 +474,6 @@ internal sealed class GraphNodeView : Border
         mode == "dynamic" ? "Lowers the audio more as the trigger sound gets louder above the threshold."
             : "Lowers the audio by a set amount when the trigger sound crosses the threshold.",
         "Trigger audio is detector only", "Stereo linked");
-    internal void SetViewScale(double scale)
-    {
-        // Zoom belongs to the canvas transform. Never resize fonts, rows,
-        // borders or sockets here: all details scale together as one node.
-        double next = Math.Clamp(double.IsFinite(scale) ? scale : 1, .3, 2);
-        if (_viewScale == next) return;
-        _viewScale = next;
-        UpdateInteractionAdornments();
-    }
     private static Border GrabArea() => new() { Background = Brushes.Transparent, Cursor = Cursors.Arrow };
     private void UpdateInteractionAdornments()
     {
@@ -475,7 +481,8 @@ internal sealed class GraphNodeView : Border
         // screen-space sizes stay useful without resizing the node contents.
         _selectionOutline.StrokeThickness = 2 / _viewScale;
         _availabilityWarningGlow.ViewScale = _viewScale;
-        double top = HeaderGrabTopPadding / _viewScale, side = HeaderGrabSidePadding / _viewScale;
+        double grabScale = Math.Max(.3, _viewScale);
+        double top = HeaderGrabTopPadding / grabScale, side = HeaderGrabSidePadding / grabScale;
         double width = Math.Max(0, ActualWidth), headerHeight = _root.RowDefinitions[0].Height.Value + 2;
         Canvas.SetLeft(_grabTop, -BorderThickness.Left - side); Canvas.SetTop(_grabTop, -BorderThickness.Top - top);
         _grabTop.Width = width + side * 2; _grabTop.Height = top;
@@ -509,6 +516,7 @@ internal sealed class GraphNodeView : Border
         else if (_socketLayoutDirty) { _socketLayoutDirty = false; _owner.UpdateWires(); }
     }
     public GraphWorkspace.Socket? FindSocket(string kind, bool output, string port = "audio") => _sockets.FirstOrDefault(s => s.Kind == kind && s.Output == output && s.Port == port);
+    internal IReadOnlyList<GraphWorkspace.Socket> Sockets => _sockets;
     internal bool IsNodeDragSurface(DependencyObject? current)
     {
         while (current is not null)
@@ -552,6 +560,7 @@ internal sealed class GraphNodeView : Border
         try
         {
             _node = node; _title.Text = node.Name;
+            AutomationProperties.SetName(this, node.Name + " node");
             foreach (var socket in _sockets)
                 socket.SetConnected(_owner.Graph.Edges.Any(edge => socket.Output
                     ? edge.From == Id && edge.FromPort == socket.Port && (socket.Kind == "audio" ? edge.Kind is "audio" or "sidechain" : edge.Kind == socket.Kind)
@@ -560,8 +569,8 @@ internal sealed class GraphNodeView : Border
             _multiplier?.SetValue(LinkedLevelControl.GetPercent(node));
             if (_legacyMultiplierValue is not null)
                 _legacyMultiplierValue.Text = $"Saved multiplier {LinkedLevelControl.GetPercent(node):0.###}%";
-            // The legacy Collapsed setting remains serialized, but nodes now
-            // always present their complete controls and normal port positions.
+            // Legacy collapse remains serialized; detail levels preserve the
+            // full node's geometry and never rearrange socket anchors.
             _body.IsEnabled = _owner.Mixer.CanEdit;
             if (_effectToggle is not null) _effectToggle.IsEnabled = _owner.Mixer.CanEdit;
             if (_mute is not null)
@@ -584,6 +593,9 @@ internal sealed class GraphNodeView : Border
             _status.Text = !_owner.Mixer.CanEdit ? "Audio engine unavailable" : deviceNode && status?.Path.State != "Running" ? pathLabel + (node.Muted ? " · muted" : "") : legacyMuted ? "Muted · click Bypass to restore audio" : node.Muted ? "Muted" : status?.Clipped == true ? "Clipping · lower the level" : node.Bypass ? "Bypassed · audio passes through" : status?.Path.State == "Running" ? deviceNode ? "Connected" : "Processing" : node.Kind == "control" ? "Linked volume" : node.Kind == "mix" ? "Adds all incoming audio" : "Ready";
             _status.Foreground = ConsoleTheme.Get(status?.Clipped == true && !node.Muted ? "ConsoleAlertTextBrush" : "ConsoleMutedBrush");
             object? statusHelp = status?.Path.Message;
+            if (status?.Clipped == true && node.Kind is "output" or "virtualOutput")
+                statusHelp = NodeToolTip.Create("Output clipping", "This path or the combined device output exceeded its available level",
+                    "Outputs sharing a device add together. Lower the contributing levels.");
             // Preserve the status row's geometry when an endpoint reconnects,
             // clipping clears or a mute changes. Only its ink disappears.
             _status.Visibility = _virtualDevice is not null || !_owner.Mixer.CanEdit || legacyMuted || deviceNode && status?.Path.State != "Running" || status?.Clipped == true && !node.Muted ? Visibility.Visible : Visibility.Hidden;
@@ -601,7 +613,6 @@ internal sealed class GraphNodeView : Border
                 {
                     var matches = _owner.Mixer.Endpoints.Where(e => VirtualDeviceBindings.Matches(node.Kind, e)).ToArray();
                     _status.Text = matches.Length == 0 ? node.Kind == "virtualInput" ? "Waiting for VB-CABLE" : "Waiting for VAC Lite"
-                        : matches.All(e => VirtualDeviceBindings.IsUsed(_owner.Graph, node.Id, e)) ? "Device already has a node"
                         : matches.All(e => e.State != "Active") ? "Waiting for device"
                         : "Choose device · right-click";
                 }
@@ -631,9 +642,11 @@ internal sealed class GraphNodeView : Border
             ApplyChoices(node);
             ApplyAvailability(node, status);
             foreach (var update in _effectUpdates) update(node);
-            _eqPlot?.ApplySpectrum(status?.SpectrumDb, status?.SpectrumFrame ?? 0, status?.SpectrumRevision ?? 0,
-                fresh: _owner.Mixer.CanEdit && status?.Path.State == "Running");
+            if (_detailLevel == NodeDetailLevel.Full)
+                _eqPlot?.ApplySpectrum(status?.SpectrumDb, status?.SpectrumFrame ?? 0, status?.SpectrumRevision ?? 0,
+                    fresh: _owner.Mixer.CanEdit && status?.Path.State == "Running");
             SetSelected(selected);
+            RefreshDetailPresentation();
         }
         finally { _applying = false; }
     }
@@ -688,12 +701,7 @@ internal sealed class GraphNodeView : Border
         var notice = node.Kind is "output" or "virtualOutput"
             ? OutputAvailability.Evaluate(node, status, _owner.Mixer.Endpoints, _owner.Mixer.CanEdit)
             : InputAvailability.Evaluate(node, status, _owner.Mixer.Endpoints, _owner.Mixer.Applications, _owner.Mixer.CanEdit);
-        string pathMessage = status?.Path.Message ?? "";
-        // Older engine diagnostics use microphone privacy wording for every
-        // E_ACCESSDENIED, including playback. Keep output help accurate.
-        if (node.Kind is "output" or "virtualOutput" && status?.Path.State == "AccessDenied"
-            && pathMessage == "Microphone access blocked; check Windows microphone privacy settings")
-            pathMessage = "Output access blocked; check Windows sound device settings";
+        string pathMessage = StatusReasons.Detail(node, status?.Path);
         bool changed = notice != _availabilityNotice;
         // Keep the original selector and layout. Availability is conveyed by
         // its existing device text, with detail available on hover/accessibility.
@@ -735,7 +743,7 @@ internal sealed class GraphNodeView : Border
         }
         Color red = (ConsoleTheme.Get("ConsoleMeterHighBrush") as SolidColorBrush)?.Color ?? Colors.IndianRed;
         Color normal = (ConsoleTheme.Get("ConsoleTextBrush") as SolidColorBrush)?.Color ?? Colors.White;
-        bool reduced = _owner.Mixer.ReducedAnimation || !SystemParameters.ClientAreaAnimation;
+        bool reduced = _detailLevel != NodeDetailLevel.Full || _owner.Mixer.ReducedAnimation || !SystemParameters.ClientAreaAnimation;
         bool changed = _availabilityPulseRed != red || _availabilityPulseNormal != normal || _availabilityPulseReduced != reduced;
         if (changed || (!reduced && _availabilityPulseClock is null))
         {
@@ -1004,6 +1012,22 @@ internal sealed class GraphNodeView : Border
             StartDialGroup(2);
             EffectNumber("Max reduction", 0, 24, 1, "dB", n => n.Plosive.ReductionDb, (n, v) => n.Plosive.ReductionDb = v);
         }
+        if (kind == "echo")
+        {
+            EffectNumber("Time", 20, 2000, 1, "ms", n => n.Echo.TimeMs, (n, v) => n.Echo.TimeMs = v, true, primary: true);
+            EffectNumber("Repeats", 1, 8, 1, "", n => n.Echo.Repeats, (n, v) => n.Echo.Repeats = (int)v, integer: true);
+            StartDialGroup(2);
+            EffectNumber("Mix", 0, 100, 1, "%", n => n.Echo.Mix * 100, (n, v) => n.Echo.Mix = v / 100);
+            AddNote("0% Original only · 100% Echoes only");
+        }
+        if (kind == "distortion")
+        {
+            EffectNumber("Drive", 0, 36, .1, "dB", n => n.Distortion.DriveDb, (n, v) => n.Distortion.DriveDb = v, primary: true);
+            EffectNumber("Tone", 500, 18000, 10, "Hz", n => n.Distortion.ToneHz, (n, v) => n.Distortion.ToneHz = v, true);
+            StartDialGroup(2);
+            EffectNumber("Mix", 0, 100, 1, "%", n => n.Distortion.Mix * 100, (n, v) => n.Distortion.Mix = v / 100);
+            EffectNumber("Output", -24, 0, .1, "dB", n => n.Distortion.OutputDb, (n, v) => n.Distortion.OutputDb = v);
+        }
         if (kind == "reverb")
         {
             EffectNumber("Mix", 0, 100, 1, "%", n => n.Reverb.Mix * 100, (n, v) => n.Reverb.Mix = v / 100, primary: true);
@@ -1182,6 +1206,13 @@ internal sealed class GraphNodeView : Border
         ("reverb", "Decay") => "Sets how long the reverberation lasts.",
         ("reverb", "Damping") => "Softens high frequencies in the reverb tail.",
         ("reverb", "Pre-delay") => "Sets the gap before reverberation begins.",
+        ("echo", "Time") => "Sets the gap before and between echoes. Very short times, such as 20 ms, thicken the sound; longer times separate the repeats. Changing Time smoothly restarts the echoes.",
+        ("echo", "Repeats") => "Sets how many echoes follow the original: 1 gives one echo, 3 gives three. Each repeat is half as strong as the previous one, with the total kept controlled. Changing Repeats smoothly restarts the echoes.",
+        ("echo", "Mix") => "Blends the Audio output: 0% is original sound only; 100% is echoes only. The separate Echo output is always echoes only and ignores Mix.",
+        ("distortion", "Drive") => "Pushes the signal into stronger distortion. Higher values add harmonics and can increase loudness; balance the result with Output.",
+        ("distortion", "Tone") => "Softens high frequencies in the distorted sound. Lower values sound darker.",
+        ("distortion", "Mix") => "Blends original audio with the distorted sound. 0% is original, 100% is distorted; Output applies to both.",
+        ("distortion", "Output") => "Trims the complete blend, including Mix at 0%. Bypass restores the original sound without this trim.",
         ("compressor", "Threshold") => "Sets the level above which louder passages are reduced.",
         ("compressor", "Ratio") => "Sets how strongly audio above the threshold is reduced.",
         ("compressor", "Make-up") => "Adds level after compression to compensate for the reduction.",

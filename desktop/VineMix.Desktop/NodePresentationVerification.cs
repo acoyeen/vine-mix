@@ -28,7 +28,7 @@ internal static class NodePresentationVerification
         var fixture = UiPreview.CreateSnapshot([]);
         fixture.Configuration.Graph = new()
         {
-            Nodes = GraphDefaults.Kinds.Select((kind, index) => GraphDefaults.NewNode(kind, index * 480, 80)).ToList(), Zoom = 1
+            Nodes = GraphDefaults.Kinds.Where(NodeCatalog.CanCreate).Select((kind, index) => GraphDefaults.NewNode(kind, index * 480, 80)).ToList(), Zoom = 1
         };
         fixture.Configuration.Graph.Nodes.Single(node => node.Kind == "eq").EqBands = EqBand.Defaults(); // Populated-to-empty geometry comparison.
         foreach (var node in fixture.Configuration.Graph.Nodes) node.Muted = false;

@@ -39,14 +39,16 @@ GraphKind parseKind(const std::string& kind) {
     if (kind == "deEsser") return GraphKind::deEsser;
     if (kind == "plosive") return GraphKind::plosive;
     if (kind == "reverb") return GraphKind::reverb;
+    if (kind == "echo") return GraphKind::echo;
+    if (kind == "distortion") return GraphKind::distortion;
     if (kind == "voiceColor") return GraphKind::voiceColor;
     if (kind == "expander") return GraphKind::expander;
     if (kind == "gate") return GraphKind::gate;
     if (kind == "alignmentDelay") return GraphKind::alignmentDelay;
     throw std::runtime_error("Unknown node type: " + kind);
 }
-void checkGain(float value) {
-    if (!std::isfinite(value) || value < -60.f || value > 12.f)
+void checkGain(double value) {
+    if (!std::isfinite(value) || value < -60. || value > 12.)
         throw std::runtime_error("Node and cable volumes must be between -60 and +12 dB.");
 }
 void checkId(const std::string& id) {
@@ -73,6 +75,7 @@ bool processor(GraphKind kind) noexcept {
         || AdvancedEffect::supports(kind);
 }
 GraphPort audioPort(GraphKind kind, const std::string& port, bool output) {
+    if (output && (kind == GraphKind::reverb || kind == GraphKind::echo) && port == "wet") return GraphPort::wet;
     if ((output && kind == GraphKind::stereoSplit) || (!output && kind == GraphKind::stereoCombine)) {
         if (port == "left") return GraphPort::left;
         if (port == "right") return GraphPort::right;
@@ -148,7 +151,7 @@ GraphPlan compileGraph(const AudioGraph& graph) {
     if (graph.nodes.size() > maximumGraphNodes || graph.edges.size() > maximumGraphEdges)
         throw std::runtime_error("A canvas supports up to 32 nodes and 96 cables.");
     if (!std::isfinite(graph.panX) || !std::isfinite(graph.panY) || !std::isfinite(graph.zoom)
-        || std::abs(graph.panX) > 100000 || std::abs(graph.panY) > 100000 || graph.zoom < .15 || graph.zoom > 4)
+        || std::abs(graph.panX) > 100000 || std::abs(graph.panY) > 100000 || graph.zoom < .1 || graph.zoom > 4)
         throw std::runtime_error("The canvas position or zoom is invalid.");
     GraphPlan plan;
     plan.nodeCount = graph.nodes.size(); plan.edgeCount = graph.edges.size();
@@ -165,7 +168,7 @@ GraphPlan compileGraph(const AudioGraph& graph) {
             throw std::runtime_error("A node name or position is invalid.");
         plan.nodes[i].id = source.id;
         plan.nodes[i].kind = parseKind(source.kind);
-        plan.nodes[i].gainDb = source.gainDb;
+        plan.nodes[i].gainDb = static_cast<float>(source.gainDb);
         if (!std::isfinite(source.controlMultiplier) || (source.controlMultiplier != -1 && (source.controlMultiplier < 0 || source.controlMultiplier > 2)))
             throw std::runtime_error("Linked control multiplier must be between 0 and 200 percent.");
         plan.nodes[i].controlMultiplier = static_cast<float>(source.controlMultiplier);
@@ -190,10 +193,18 @@ GraphPlan compileGraph(const AudioGraph& graph) {
         range(source.reverb.decaySeconds, .1, 5, "Reverb decay must be between 0.1 and 5 seconds.");
         range(source.reverb.damping, 0, 1, "Reverb damping must be between 0 and 1.");
         range(source.reverb.preDelayMs, 0, 100, "Reverb pre-delay must be between 0 and 100 ms.");
+        range(source.echo.timeMs, 20, 2000, "Echo time must be between 20 and 2000 ms.");
+        range(source.echo.repeats, 1, 8, "Echo repeats must be a whole number between 1 and 8.");
+        range(source.echo.mix, 0, 1, "Echo mix must be between 0 and 100 percent.");
+        range(source.distortion.driveDb, 0, 36, "Distortion drive must be between 0 and 36 dB.");
+        range(source.distortion.toneHz, 500, 18000, "Distortion tone must be between 500 and 18000 Hz.");
+        range(source.distortion.mix, 0, 1, "Distortion mix must be between 0 and 100 percent.");
+        range(source.distortion.outputDb, -24, 0, "Distortion output must be between -24 and 0 dB.");
         range(source.voiceColor.tone, -1, 1, "Voice Color tone must be between -1 (Warm) and +1 (Bright).");
         range(source.voiceColor.ambience, 0, 1, "Voice Color character must be between 0 (Natural) and 1 (Broadcast).");
         plan.nodes[i].denoiser = source.denoiser; plan.nodes[i].deEsser = source.deEsser;
         plan.nodes[i].plosive = source.plosive; plan.nodes[i].reverb = source.reverb;
+        plan.nodes[i].echo = source.echo; plan.nodes[i].distortion = source.distortion;
         plan.nodes[i].voiceColor = source.voiceColor;
         const auto& expander = source.expander;
         if (expander.mode != "expander" && expander.mode != "gate") throw std::runtime_error("Unknown Expander / Gate mode.");
@@ -333,10 +344,11 @@ GraphPlan compileGraph(const AudioGraph& graph) {
         } else if (sidechain) {
             fromPort = audioPort(fromKind, source.fromPort, true);
             if (source.toPort != "audio") throw std::runtime_error("A trigger cable cannot select a programme input.");
-            if ((!isSource(fromKind) && !processor(fromKind)) || toKind != GraphKind::ducking)
-                throw std::runtime_error("A sidechain connects an audio source or effect to a Ducking trigger.");
+            if ((!isSource(fromKind) && !processor(fromKind))
+                || (toKind != GraphKind::ducking && toKind != GraphKind::expander && toKind != GraphKind::gate))
+                throw std::runtime_error("A sidechain connects an audio source or effect to a Ducking, Gate or Expander trigger.");
             auto& detector = plan.nodes[to->second].sidechainEdge;
-            if (detector >= 0) throw std::runtime_error("A Ducking node can have one trigger cable.");
+            if (detector >= 0) throw std::runtime_error("A dynamics node can have one trigger cable.");
             detector = static_cast<int>(i);
         } else {
             fromPort = audioPort(fromKind, source.fromPort, true);
@@ -349,7 +361,7 @@ GraphPlan compileGraph(const AudioGraph& graph) {
         // Explicit separators prevent collisions even when an ID contains a dash.
         const auto connection = source.kind + '\0' + source.from + '\0' + source.fromPort + '\0' + source.to + '\0' + source.toPort;
         if (!connections.insert(connection).second) throw std::runtime_error("These nodes are already connected.");
-        plan.edges[i] = {source.id, from->second, to->second, control, sidechain, source.gainDb, source.muted, fromPort, toPort};
+        plan.edges[i] = {source.id, from->second, to->second, control, sidechain, static_cast<float>(source.gainDb), source.muted, fromPort, toPort};
         ++indegrees[to->second];
     }
     std::array<std::size_t, maximumGraphNodes> ready{};
@@ -382,7 +394,10 @@ GraphChannels graphSignalChannels(const GraphPlan& plan, const GraphChannels& ca
                 if (!node.bypass && node.fadePosition == 1 && edge.toPort == GraphPort::a) continue;
             }
             auto upstream = channels[edge.from];
-            if (upstream != 0 && edge.fromPort != GraphPort::audio) upstream = 1;
+            if (upstream != 0 && (edge.fromPort == GraphPort::left || edge.fromPort == GraphPort::right)) upstream = 1;
+            // Reverb creates stereo reflections even from mono. Mix and bypass
+            // describe its main output, not the independent Wet signal layout.
+            if (upstream != 0 && edge.fromPort == GraphPort::wet && plan.nodes[edge.from].kind == GraphKind::reverb) upstream = 2;
             unknown = unknown || upstream == 0;
             channels[i] = std::max(channels[i], upstream);
         }
@@ -424,6 +439,11 @@ bool sameGraphTopology(const GraphPlan& a, const GraphPlan& b) noexcept {
 
 GraphProcessor::GraphProcessor() = default;
 GraphProcessor::~GraphProcessor() = default;
+std::size_t GraphProcessor::echoHistoryBytes(const GraphPlan& plan) noexcept {
+    std::size_t count{};
+    for (std::size_t i = 0; i < plan.nodeCount; ++i) if (plan.nodes[i].kind == GraphKind::echo) ++count;
+    return count * echoHistoryFrames * sizeof(Frame);
+}
 void GraphProcessor::prepare(const GraphPlan& plan) {
     for (std::size_t i = 0; i < maximumGraphNodes; ++i) {
         advanced_[i].reset();
@@ -440,7 +460,11 @@ float GraphProcessor::Ramp::next() noexcept {
     else if (remaining) current += step;
     return current;
 }
-void GraphProcessor::process(const GraphPlan& plan, const Inputs& inputs) noexcept {
+Frame GraphProcessor::routedOutput(const GraphPlan::Edge& edge, std::size_t frame) const noexcept {
+    return edge.fromPort == GraphPort::wet ? wetBuffers_[edge.from][frame]
+        : selectedOutput(buffers_[edge.from][frame], edge.fromPort);
+}
+void GraphProcessor::process(const GraphPlan& plan, const Inputs& inputs, bool deferSinkClipping) noexcept {
     meters_ = {};
     for (std::size_t i = 0; i < plan.nodeCount; ++i) {
         const auto& node = plan.nodes[i];
@@ -496,6 +520,7 @@ void GraphProcessor::process(const GraphPlan& plan, const Inputs& inputs) noexce
             : settledFade ? crossfadeWeights(effect.fadePosition.current, effect.fadeCurve.current) : std::array<double, 2>{};
         for (std::size_t frame = 0; frame < quantumFrames; ++frame) {
             double left{}, right{}, bLeft{}, bRight{};
+            Frame effectWet{};
             if (source && frame < inputs[i].size()) {
                 left = clean(inputs[i][frame].left); right = clean(inputs[i][frame].right);
             }
@@ -503,7 +528,7 @@ void GraphProcessor::process(const GraphPlan& plan, const Inputs& inputs) noexce
                 const auto edge = node.incoming[n];
                 const auto gain = edgeRamps_[edge].next();
                 const auto& route = plan.edges[edge];
-                const auto sample = selectedOutput(buffers_[route.from][frame], route.fromPort);
+                const auto sample = routedOutput(route, frame);
                 if (node.kind == GraphKind::stereoCombine) {
                     const double channel = (static_cast<double>(sample.left) + sample.right) * .5 * gain;
                     if (route.toPort == GraphPort::left) left += channel;
@@ -565,7 +590,7 @@ void GraphProcessor::process(const GraphPlan& plan, const Inputs& inputs) noexce
                 if (node.sidechainEdge >= 0) {
                     const auto edge = static_cast<std::size_t>(node.sidechainEdge);
                     const auto detectorGain = edgeRamps_[edge].next();
-                    const auto detector = selectedOutput(buffers_[plan.edges[edge].from][frame], plan.edges[edge].fromPort);
+                    const auto detector = routedOutput(plan.edges[edge], frame);
                     triggerPeak = std::max(std::abs(static_cast<double>(detector.left)), std::abs(static_cast<double>(detector.right))) * detectorGain;
                 }
                 // Detector-only audio never joins the programme. Fixed 5 ms
@@ -608,9 +633,20 @@ void GraphProcessor::process(const GraphPlan& plan, const Inputs& inputs) noexce
                 const auto weights = settledFade ? settledWeights : crossfadeWeights(effect.fadePosition.next(), effect.fadeCurve.next());
                 left = left * weights[0] + bLeft * weights[1]; right = right * weights[0] + bRight * weights[1];
             } else if (advanced_[i]) {
-                const auto processed = advanced_[i]->process({bounded(left, false), bounded(right, false)});
+                Frame detector{};
+                const Frame* externalDetector = nullptr;
+                if (node.sidechainEdge >= 0) {
+                    const auto edge = static_cast<std::size_t>(node.sidechainEdge);
+                    const auto& route = plan.edges[edge];
+                    const auto sample = routedOutput(route, frame);
+                    const auto detectorGain = edgeRamps_[edge].next();
+                    detector = {bounded(sample.left * detectorGain, false), bounded(sample.right * detectorGain, false)};
+                    externalDetector = &detector;
+                }
+                const auto processed = advanced_[i]->process({bounded(left, false), bounded(right, false)}, externalDetector);
                 left = processed.wet.left; right = processed.wet.right;
                 dryLeft = processed.dry.left; dryRight = processed.dry.right;
+                effectWet = processed.effectWet;
             }
             const double wet = effect.wet.next();
             if (compressorProcessor(node.kind) && !node.limit)
@@ -619,6 +655,13 @@ void GraphProcessor::process(const GraphPlan& plan, const Inputs& inputs) noexce
                 minimumCompressionGain = std::min(minimumCompressionGain, 1 + (effect.duckingGain - 1) * wet);
             left = dryLeft + (left - dryLeft) * wet; right = dryRight + (right - dryRight) * wet;
             const auto gain = nodeRamps_[i].next(); left *= gain; right *= gain;
+            if (node.kind == GraphKind::reverb || node.kind == GraphKind::echo) {
+                // Keep the network advancing with current input during mute or
+                // bypass, exactly as the existing Audio path does. Resume the
+                // current tail through the usual ramps; never freeze/replay it.
+                // Wet fades to silence on bypass and can never contain dry.
+                wetBuffers_[i][frame] = {bounded(effectWet.left * wet * gain, false), bounded(effectWet.right * wet * gain, false)};
+            }
             if (!std::isfinite(left) || !std::isfinite(right)) { left = right = 0; effect.filters = {}; effect.previousFilters = {}; }
             if (compressorProcessor(node.kind) && node.limit && !node.bypass) {
                 // Zero-lookahead sample-peak limiter. Measure the actual stereo
@@ -652,7 +695,7 @@ void GraphProcessor::process(const GraphPlan& plan, const Inputs& inputs) noexce
             meters_[i].peakRight = std::max(meters_[i].peakRight, static_cast<float>(std::min(std::abs(right), 1.0)));
             meters_[i].peak = std::max(meters_[i].peakLeft, meters_[i].peakRight);
             meters_[i].clipped = meters_[i].clipped || peak > 1.0;
-            buffers_[i][frame] = {bounded(left, sink), bounded(right, sink)};
+            buffers_[i][frame] = {bounded(left, sink && !deferSinkClipping), bounded(right, sink && !deferSinkClipping)};
         }
         if (dynamicsAudible) {
             if (compressorProcessor(node.kind) || node.kind == GraphKind::ducking) {
@@ -668,15 +711,25 @@ void GraphProcessor::process(const GraphPlan& plan, const Inputs& inputs) noexce
     }
 }
 void GraphProcessor::reset() noexcept {
-    nodeRamps_ = {}; edgeRamps_ = {}; buffers_ = {}; meters_ = {}; effects_ = {};
+    nodeRamps_ = {}; edgeRamps_ = {}; buffers_ = {}; wetBuffers_ = {}; meters_ = {}; effects_ = {};
     for (auto& effect : advanced_) if (effect) effect->reset();
 }
 void GraphProcessor::inherit(const GraphProcessor& old, const GraphPlan& before, const GraphPlan& after) noexcept {
+    inheritState(old, before, after, nullptr, false);
+}
+void GraphProcessor::adopt(GraphProcessor& old, const GraphPlan& before, const GraphPlan& after, bool preserveFade) noexcept {
+    inheritState(old, before, after, &old, preserveFade);
+}
+void GraphProcessor::inheritState(const GraphProcessor& old, const GraphPlan& before, const GraphPlan& after,
+    GraphProcessor* transferred, bool preserveFade) noexcept {
     for (std::size_t i = 0; i < after.nodeCount; ++i)
         for (std::size_t j = 0; j < before.nodeCount; ++j)
             if (after.nodes[i].id == before.nodes[j].id && after.nodes[i].kind == before.nodes[j].kind) {
                 nodeRamps_[i] = old.nodeRamps_[j]; effects_[i] = old.effects_[j];
-                if (advanced_[i] && old.advanced_[j]) advanced_[i]->inherit(*old.advanced_[j]);
+                if (advanced_[i] && old.advanced_[j]) {
+                    if (transferred) advanced_[i]->adopt(*transferred->advanced_[j], preserveFade);
+                    else advanced_[i]->inherit(*old.advanced_[j]);
+                }
                 if (filterProcessor(after.nodes[i].kind) && after.nodes[i].eq != before.nodes[j].eq) {
                     effects_[i].previousEq = before.nodes[j].eq;
                     effects_[i].previousEqCount = before.nodes[j].eqCount;

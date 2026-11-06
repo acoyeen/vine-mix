@@ -38,8 +38,8 @@ struct Expander {
         floor.set(std::pow(10., -s.rangeDb / 20)); hysteresis.set(std::pow(10., -s.hysteresisDb / 20));
         holdSamples.set(s.holdMs * 48); gateMix.set(s.mode == "gate" ? 1 : 0);
     }
-    Frame process(Frame input) noexcept {
-        const double peak = std::max(std::abs(input.left), std::abs(input.right));
+    Frame process(Frame input, Frame detector) noexcept {
+        const double peak = std::max(std::abs(detector.left), std::abs(detector.right));
         // Stereo-linked peak detector: fast enough to reopen on speech onset,
         // with a 20ms decay so waveform zero crossings cannot chatter the gate.
         constexpr double detectorAttack = .9591894571091382; // 0.5ms
@@ -84,6 +84,228 @@ struct AlignmentDelay {
         }
         position = (position + 1) % capacity;
         return result;
+    }
+};
+struct Echo {
+    static constexpr std::size_t capacity = echoHistoryFrames, transition = 480;
+    // Allocate and touch the complete buffer during control-thread preparation.
+    // Reset is logical; no 6-MB clear or copy belongs on the audio thread.
+    std::unique_ptr<Frame[]> history = std::make_unique<Frame[]>(capacity);
+    std::size_t position{}, valid{};
+    double current{}, requested{};
+    int repeats = 3, requestedRepeats = 3;
+    unsigned restarting{}, captureFade{};
+    bool configured{};
+    Smooth mix;
+    std::array<double, 8> weights{};
+    std::array<Frame, transition> retiredWet{};
+    std::size_t retiredPosition{}, retiredCount{};
+    bool retired{};
+    void applyRequested() noexcept {
+        current = requested; repeats = requestedRepeats;
+        double weight = .5 / (1 - std::ldexp(1., -repeats));
+        for (int tap = 0; tap < repeats; ++tap, weight *= .5) weights[tap] = weight;
+    }
+    void configure(const EchoSettings& setting) noexcept {
+        requested = setting.timeMs * sampleRate / 1000;
+        requestedRepeats = setting.repeats;
+        if (!configured) { applyRequested(); configured = true; }
+        mix.set(setting.mix);
+    }
+    Frame read(double delay) const noexcept {
+        const auto whole = static_cast<std::size_t>(delay);
+        const double fraction = delay - whole;
+        const auto first = (position + capacity - whole) % capacity;
+        const auto second = (first + capacity - 1) % capacity;
+        const Frame a = whole <= valid ? history[first] : Frame{};
+        const Frame b = whole + 1 <= valid ? history[second] : Frame{};
+        return {static_cast<float>(a.left * (1 - fraction) + b.left * fraction),
+            static_cast<float>(a.right * (1 - fraction) + b.right * fraction)};
+    }
+    Frame taps(std::size_t future = 0) const noexcept {
+        double left{}, right{};
+        for (int tap = 0; tap < repeats; ++tap) {
+            const auto value = read(current * (tap + 1) - future);
+            left += value.left * weights[tap]; right += value.right * weights[tap];
+        }
+        return {static_cast<float>(left), static_cast<float>(right)};
+    }
+    bool requestedChange() const noexcept { return current != requested || repeats != requestedRepeats; }
+    AdvancedEffect::Result process(Frame input) noexcept {
+        Frame delayed{};
+        if (retired) {
+            if (retiredPosition < retiredCount) delayed = retiredWet[retiredPosition++];
+        } else {
+            // Finite taps read only original input, never earlier repeats.
+            // Time/count edits fade the old tail, coalesce the latest request,
+            // then discard its validity. No moving tap can replay old audio.
+            if (!restarting && requestedChange()) restarting = transition;
+            delayed = taps();
+            if (restarting) {
+                const double gain = static_cast<double>(--restarting) / transition;
+                delayed.left = static_cast<float>(delayed.left * gain);
+                delayed.right = static_cast<float>(delayed.right * gain);
+                if (!restarting) {
+                    applyRequested(); valid = position = 0; captureFade = transition;
+                }
+            }
+            const double excitation = captureFade ? 1 - static_cast<double>(--captureFade) / transition : 1;
+            history[position] = {static_cast<float>(denormal(input.left * excitation)),
+                static_cast<float>(denormal(input.right * excitation))};
+            position = (position + 1) % capacity; valid = std::min(valid + 1, capacity - 1);
+        }
+        const double amount = mix.next();
+        return {{static_cast<float>(input.left * (1 - amount) + delayed.left * amount),
+            static_cast<float>(input.right * (1 - amount) + delayed.right * amount)}, input, delayed};
+    }
+    void copyScalars(const Echo& previous) noexcept {
+        position = previous.position; valid = previous.valid; current = previous.current; requested = previous.requested;
+        repeats = previous.repeats; requestedRepeats = previous.requestedRepeats;
+        restarting = previous.restarting; captureFade = previous.captureFade; configured = previous.configured;
+        mix = previous.mix; weights = previous.weights;
+        retired = previous.retired; retiredPosition = previous.retiredPosition; retiredCount = previous.retiredCount;
+        if (retired) retiredWet = previous.retiredWet;
+    }
+    void inherit(const Echo& previous) noexcept {
+        copyScalars(previous);
+        // Only initialized input belongs to the logical history. Preserve the
+        // const-copy contract for offline comparisons of both continuations.
+        const auto begin = (position + capacity - valid) % capacity;
+        const auto first = std::min(valid, capacity - begin);
+        std::copy_n(previous.history.get() + begin, first, history.get() + begin);
+        std::copy_n(previous.history.get(), valid - first, history.get());
+    }
+    void adopt(Echo& previous, bool preserveFade) noexcept {
+        copyScalars(previous);
+        if (preserveFade) {
+            // The engine fades an old graph for 480 frames. Echo's shortest
+            // delay is 960 frames, so that entire wet continuation depends on
+            // old history alone. Cache it before transferring the long buffer;
+            // the old processor still mixes its live dry input/Mix each frame.
+            const auto fade = previous.restarting ? previous.restarting : previous.requestedChange() ? transition : 0;
+            for (std::size_t i = 0; i < transition; ++i) {
+                Frame wet = fade && i + 1 >= fade ? Frame{} : previous.taps(i);
+                const double gain = fade ? static_cast<double>(fade - std::min(i + 1, static_cast<std::size_t>(fade))) / transition : 1;
+                previous.retiredWet[i] = {static_cast<float>(wet.left * gain), static_cast<float>(wet.right * gain)};
+            }
+        }
+        history.swap(previous.history);
+        previous.retired = true; previous.retiredPosition = 0; previous.retiredCount = preserveFade ? transition : 0;
+    }
+    void reset() noexcept {
+        valid = position = 0; current = requested = 0; repeats = requestedRepeats = 3;
+        restarting = captureFade = 0; configured = retired = false;
+        retiredPosition = retiredCount = 0; mix = {};
+    }
+};
+struct Distortion {
+    // Original implementation of conventional FIR interpolation/nonlinear
+    // processing/decimation. No third-party DSP source is incorporated.
+    // References reviewed 2026-11-05: JUCE's Oversampling documentation
+    // (https://docs.juce.com/master/classjuce_1_1dsp_1_1Oversampling.html) and
+    // Bilbao et al., Antiderivative Antialiasing for Memoryless Nonlinearities
+    // (https://www.research.ed.ac.uk/files/34115216/bilbao_pdf.pdf).
+    // Fixed 8x processing reduces aliasing; it does not eliminate it.
+    static constexpr std::size_t factor = 8, taps = 257, inputTaps = 33, latency = 32;
+    std::array<double, taps> filter{};
+    std::array<std::array<double, factor>, inputTaps> interpolation{};
+    std::array<Frame, inputTaps> inputHistory{};
+    // Mirrored storage makes both sides of the symmetric FIR contiguous;
+    // there is no wrap branch or modulus inside its multiply/accumulate loop.
+    std::array<Frame, taps * 2> shapedHistory{};
+    std::array<Frame, latency> dryHistory{};
+    std::size_t shapedPosition{}, dryPosition{};
+    std::array<double, 2> dcInput{}, dcOutput{}, toneState{};
+    Smooth drive, toneG, mix, output;
+    Distortion() noexcept {
+        // Construct coefficients once, on the preparation thread. Blackman
+        // windowed low-pass at 0.0525 of the 384-kHz processing rate. Its
+        // deliberately bounded transition band precedes base-rate Nyquist.
+        double sum{};
+        for (std::size_t i = 0; i < taps; ++i) {
+            const double x = static_cast<double>(i) - (taps - 1) / 2;
+            const double sinc = x == 0 ? .105 : std::sin(2 * std::numbers::pi * .0525 * x) / (std::numbers::pi * x);
+            const double phase = 2 * std::numbers::pi * i / (taps - 1);
+            filter[i] = sinc * (.42 - .5 * std::cos(phase) + .08 * std::cos(2 * phase));
+            sum += filter[i];
+        }
+        for (auto& coefficient : filter) coefficient /= sum;
+        for (std::size_t phase = 0; phase < factor; ++phase)
+            for (std::size_t sample = 0; sample < inputTaps; ++sample) {
+                const auto tap = sample * factor + phase;
+                interpolation[sample][phase] = tap < taps ? filter[tap] * factor : 0;
+            }
+    }
+    void configure(const DistortionSettings& setting) noexcept {
+        drive.set(std::pow(10., setting.driveDb / 20));
+        toneG.set(std::tan(std::numbers::pi * setting.toneHz / sampleRate));
+        mix.set(setting.mix); output.set(std::pow(10., setting.outputDb / 20));
+    }
+    AdvancedEffect::Result process(Frame input) noexcept {
+        std::move_backward(inputHistory.begin(), inputHistory.end() - 1, inputHistory.end());
+        // Keep subnormal float samples out of the oversampling histories;
+        // the separately delayed dry path retains its exact input values.
+        inputHistory[0] = {static_cast<float>(denormal(input.left)), static_cast<float>(denormal(input.right))};
+        const double boost = drive.next();
+        // Compute independent interpolation phases together. Keeping several
+        // short accumulation chains in flight avoids one long dependent FIR
+        // chain for each high-rate sample without changing tap order.
+        std::array<std::array<double, 2>, factor> up{};
+        for (std::size_t sample = 0; sample < inputTaps; ++sample)
+            for (std::size_t phase = 0; phase < factor; ++phase) {
+                up[phase][0] += interpolation[sample][phase] * inputHistory[sample].left;
+                up[phase][1] += interpolation[sample][phase] * inputHistory[sample].right;
+            }
+        double left{}, right{};
+        for (std::size_t phase = 0; phase < factor; ++phase) {
+            const Frame shaped{static_cast<float>(std::tanh(up[phase][0] * boost)), static_cast<float>(std::tanh(up[phase][1] * boost))};
+            shapedHistory[shapedPosition] = shapedHistory[shapedPosition + taps] = shaped;
+            // Decimate phase zero: the two 128-high-rate-frame filter delays
+            // add to exactly 32 input frames, not a fractional phase offset.
+            if (phase == 0) {
+                // Linear-phase coefficients are symmetric. Pair mirrored
+                // history samples to halve multiplications at the one phase
+                // we retain, while preserving the full anti-alias filter.
+                const auto recent = shapedPosition + taps, oldest = shapedPosition + 1;
+                // Four independent sums hide multiply/add dependency latency.
+                // Only double-precision addition order changes; coefficients,
+                // all 257 taps, oversampling and phase alignment stay intact.
+                std::array<std::array<double, 2>, 4> sums{};
+                for (std::size_t tap = 0; tap < taps / 2; tap += sums.size())
+                    for (std::size_t lane = 0; lane < sums.size(); ++lane) {
+                        const auto index = tap + lane;
+                        sums[lane][0] += filter[index] * (static_cast<double>(shapedHistory[recent - index].left) + shapedHistory[oldest + index].left);
+                        sums[lane][1] += filter[index] * (static_cast<double>(shapedHistory[recent - index].right) + shapedHistory[oldest + index].right);
+                    }
+                for (const auto& sum : sums) { left += sum[0]; right += sum[1]; }
+                left += filter[taps / 2] * shapedHistory[recent - taps / 2].left;
+                right += filter[taps / 2] * shapedHistory[recent - taps / 2].right;
+            }
+            shapedPosition = (shapedPosition + 1) % taps;
+        }
+        constexpr double dcPole = .9973854300793629; // 20 Hz at 48 kHz.
+        const double g = toneG.next(), amount = mix.next(), trim = output.next();
+        const auto colour = [&](double value, std::size_t channel) {
+            const double high = denormal((1 + dcPole) * .5 * (value - dcInput[channel]) + dcPole * dcOutput[channel]);
+            dcInput[channel] = value; dcOutput[channel] = high;
+            const double band = (high - toneState[channel]) * g / (1 + g);
+            const double low = band + toneState[channel];
+            toneState[channel] = denormal(low + band);
+            return low;
+        };
+        left = colour(left, 0); right = colour(right, 1);
+        const Frame dry = dryHistory[dryPosition];
+        dryHistory[dryPosition] = input; dryPosition = (dryPosition + 1) % latency;
+        // Output trims the entire effect blend, even at Mix=0. Result.dry is
+        // untrimmed and equally delayed, so graph Bypass stays transparent.
+        return {{static_cast<float>((dry.left + (left - dry.left) * amount) * trim),
+            static_cast<float>((dry.right + (right - dry.right) * amount) * trim)}, dry};
+    }
+    void reset() noexcept {
+        inputHistory.fill({}); shapedHistory.fill({}); dryHistory.fill({});
+        shapedPosition = dryPosition = 0;
+        dcInput.fill(0); dcOutput.fill(0); toneState.fill(0);
+        drive = {}; toneG = {}; mix = {}; output = {};
     }
 };
 struct SpeexDenoise {
@@ -392,7 +614,8 @@ struct Reverb {
     std::size_t prePosition{};
     Smooth mix, damping, preSamples;
     std::array<std::array<Smooth, 8>, 2> feedback;
-    Frame process(Frame input) noexcept {
+    struct Output { Frame mixed, wet; };
+    Output process(Frame input) noexcept {
         predelay[prePosition] = input;
         const double delay = preSamples.next();
         const auto whole = static_cast<std::size_t>(delay);
@@ -437,8 +660,9 @@ struct Reverb {
             }
             result[side] = value;
         }
-        return {static_cast<float>(input.left * (1-amount) + result[0] * amount),
-            static_cast<float>(input.right * (1-amount) + result[1] * amount)};
+        return {{static_cast<float>(input.left * (1-amount) + result[0] * amount),
+            static_cast<float>(input.right * (1-amount) + result[1] * amount)},
+            {static_cast<float>(result[0]), static_cast<float>(result[1])}};
     }
 };
 }
@@ -448,6 +672,8 @@ struct AdvancedEffect::State {
     std::unique_ptr<Reverb> reverb;
     std::unique_ptr<VoiceColor> voiceColor;
     std::unique_ptr<AlignmentDelay> alignmentDelay;
+    std::unique_ptr<Echo> echo;
+    std::unique_ptr<Distortion> distortion;
     Expander expander;
     BandReduction band;
     DenoiserSettings denoiserSettings;
@@ -457,18 +683,23 @@ struct AdvancedEffect::State {
     VoiceColorSettings voiceColorSettings;
     ExpanderSettings expanderSettings;
     AlignmentDelaySettings alignmentDelaySettings;
+    EchoSettings echoSettings;
+    DistortionSettings distortionSettings;
     bool configured{};
     explicit State(GraphKind value) : kind(value) {
         if (kind == GraphKind::denoiser) denoise = std::make_unique<Denoise>();
         else if (kind == GraphKind::reverb || kind == GraphKind::voiceColor) reverb = std::make_unique<Reverb>();
         if (kind == GraphKind::voiceColor) voiceColor = std::make_unique<VoiceColor>();
         if (kind == GraphKind::alignmentDelay) alignmentDelay = std::make_unique<AlignmentDelay>();
+        if (kind == GraphKind::echo) echo = std::make_unique<Echo>();
+        if (kind == GraphKind::distortion) distortion = std::make_unique<Distortion>();
         band.high = kind == GraphKind::deEsser;
     }
 };
 bool AdvancedEffect::supports(GraphKind kind) noexcept {
     return kind == GraphKind::denoiser || kind == GraphKind::deEsser || kind == GraphKind::plosive
-        || kind == GraphKind::reverb || kind == GraphKind::voiceColor || kind == GraphKind::expander || kind == GraphKind::gate || kind == GraphKind::alignmentDelay;
+        || kind == GraphKind::reverb || kind == GraphKind::voiceColor || kind == GraphKind::expander || kind == GraphKind::gate || kind == GraphKind::alignmentDelay
+        || kind == GraphKind::echo || kind == GraphKind::distortion;
 }
 AdvancedEffect::AdvancedEffect(GraphKind kind) : state_(std::make_unique<State>(kind)) {}
 AdvancedEffect::~AdvancedEffect() = default;
@@ -476,14 +707,18 @@ void AdvancedEffect::configure(const GraphPlan::Node& node) noexcept {
     if (state_->configured && state_->denoiserSettings == node.denoiser && state_->deEsserSettings == node.deEsser
         && state_->plosiveSettings == node.plosive && state_->reverbSettings == node.reverb
         && state_->voiceColorSettings == node.voiceColor && state_->expanderSettings == node.expander
-        && state_->alignmentDelaySettings == node.alignmentDelay) return;
+        && state_->alignmentDelaySettings == node.alignmentDelay && state_->echoSettings == node.echo
+        && state_->distortionSettings == node.distortion) return;
     const bool firstConfiguration = !state_->configured;
     state_->denoiserSettings = node.denoiser; state_->deEsserSettings = node.deEsser;
     state_->plosiveSettings = node.plosive; state_->reverbSettings = node.reverb; state_->configured = true;
+    state_->echoSettings = node.echo; state_->distortionSettings = node.distortion;
     state_->voiceColorSettings = node.voiceColor;
     state_->expanderSettings = node.expander; state_->alignmentDelaySettings = node.alignmentDelay;
     if (state_->kind == GraphKind::expander || state_->kind == GraphKind::gate) { state_->expander.configure(node.expander); return; }
     if (state_->alignmentDelay) { state_->alignmentDelay->configure(node.alignmentDelay.samples); return; }
+    if (state_->echo) { state_->echo->configure(node.echo); return; }
+    if (state_->distortion) { state_->distortion->configure(node.distortion); return; }
     if (state_->voiceColor) state_->voiceColor->configure(node);
     if (state_->denoise) {
         state_->denoise->configure(node.denoiser, firstConfiguration);
@@ -504,13 +739,22 @@ void AdvancedEffect::configure(const GraphPlan::Node& node) noexcept {
         state_->band.threshold.set(std::pow(10., threshold / 20)); state_->band.floor.set(std::pow(10., -reduction / 20));
     }
 }
-AdvancedEffect::Result AdvancedEffect::process(Frame input) noexcept {
+AdvancedEffect::Result AdvancedEffect::process(Frame input, const Frame* detector) noexcept {
     input.left = static_cast<float>(clean(input.left)); input.right = static_cast<float>(clean(input.right));
     if (state_->denoise) return state_->denoise->process(input);
     if (state_->alignmentDelay) return {state_->alignmentDelay->process(input), input};
-    if (state_->kind == GraphKind::expander || state_->kind == GraphKind::gate) return {state_->expander.process(input), input};
-    if (state_->voiceColor) return {state_->reverb->process(state_->voiceColor->process(input)), input};
-    return {state_->reverb ? state_->reverb->process(input) : state_->band.process(input), input};
+    if (state_->echo) return state_->echo->process(input);
+    if (state_->distortion) return state_->distortion->process(input);
+    if (state_->kind == GraphKind::expander || state_->kind == GraphKind::gate) {
+        const Frame signal = detector ? Frame{static_cast<float>(clean(detector->left)), static_cast<float>(clean(detector->right))} : input;
+        return {state_->expander.process(input, signal), input};
+    }
+    if (state_->voiceColor) return {state_->reverb->process(state_->voiceColor->process(input)).mixed, input};
+    if (state_->reverb) {
+        const auto result = state_->reverb->process(input);
+        return {result.mixed, input, result.wet};
+    }
+    return {state_->band.process(input), input};
 }
 void AdvancedEffect::inherit(const AdvancedEffect& previous) noexcept {
     if (state_->kind != previous.state_->kind) return;
@@ -518,18 +762,29 @@ void AdvancedEffect::inherit(const AdvancedEffect& previous) noexcept {
     if (state_->reverb) *state_->reverb = *previous.state_->reverb;
     if (state_->voiceColor) *state_->voiceColor = *previous.state_->voiceColor;
     if (state_->alignmentDelay) *state_->alignmentDelay = *previous.state_->alignmentDelay;
+    if (state_->echo) state_->echo->inherit(*previous.state_->echo);
+    if (state_->distortion) *state_->distortion = *previous.state_->distortion;
     state_->expander = previous.state_->expander;
     state_->band = previous.state_->band;
     state_->denoiserSettings = previous.state_->denoiserSettings; state_->deEsserSettings = previous.state_->deEsserSettings;
     state_->plosiveSettings = previous.state_->plosiveSettings; state_->reverbSettings = previous.state_->reverbSettings;
     state_->voiceColorSettings = previous.state_->voiceColorSettings;
     state_->expanderSettings = previous.state_->expanderSettings; state_->alignmentDelaySettings = previous.state_->alignmentDelaySettings;
+    state_->echoSettings = previous.state_->echoSettings; state_->distortionSettings = previous.state_->distortionSettings;
     state_->configured = previous.state_->configured;
+}
+void AdvancedEffect::adopt(AdvancedEffect& previous, bool preserveFade) noexcept {
+    if (state_->kind != previous.state_->kind) return;
+    if (!state_->echo) { inherit(previous); return; }
+    state_->echo->adopt(*previous.state_->echo, preserveFade);
+    state_->echoSettings = previous.state_->echoSettings; state_->configured = previous.state_->configured;
 }
 void AdvancedEffect::reset() noexcept {
     if (state_->denoise) state_->denoise->reset();
     if (state_->reverb) *state_->reverb = {};
     if (state_->voiceColor) *state_->voiceColor = {};
+    if (state_->echo) state_->echo->reset();
+    if (state_->distortion) state_->distortion->reset();
     if (state_->alignmentDelay) {
         // Avoid a 768KiB temporary on the realtime thread's stack.
         state_->alignmentDelay->history.fill({}); state_->alignmentDelay->position = 0;

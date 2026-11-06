@@ -1,4 +1,70 @@
-# Audio Mixer — readable Blender nodes and graphical EQ
+# VineMix — Quiet Blocks at low zoom
+
+## 5 November 2026 — selected concept 1
+
+**Scope:** implement the selected empty, solid low-detail node bodies in the
+existing desktop application. Keep normal node geometry, category headers,
+connections, interaction and full-detail restoration. This is an interface
+refinement for unreleased 0.5.0 work, not a website/prototype or a release audit.
+
+**Source visual:** the first displayed generated concept, Quiet Blocks,
+`%CODEX_HOME%/generated_images/<chat>/exec-7a77052b-abbc-4148-ac46-0f9ad06080c8.png`.
+**Implementation evidence:** private
+`%TEMP%/VineMix-050-quiet-blocks-<run>/quiet-blocks-workspace-25.png` and
+`quiet-blocks-high-contrast-25.png`; the evidence pointer is
+`%TEMP%/VineMix-050-quiet-blocks-evidence.txt`. Personal absolute paths and raw
+captures remain outside the checkout.
+
+**Viewport/state:** a neutral eight-node, six-connection example in two rows,
+at 25% zoom. The generated concept is 1586 x 992 pixels; the actual detached WPF
+render is 1280 x 800 pixels at 96 DPI (one pixel per desktop DIP). CSS dimensions
+do not apply. Both full views were opened together in one comparison input,
+alongside the high-contrast render. Compare composition at the same overall
+display size; do not interpret the generated illustration's enlarged nodes as a
+request to resize the existing nodes or move their ports.
+
+**Findings:** no actionable P0/P1/P2 differences within the selected treatment.
+
+- **Fonts/typography:** normal toolbar and branding resources are retained;
+  simplified nodes contain no interior or header text. The concept caption is
+  presentation context and is not added to the product.
+- **Spacing/layout:** empty bodies retain their normal measured dimensions,
+  fixed-height coloured strip, socket positions and full-detail space. The
+  concept illustrates larger bodies; retaining actual geometry is intentional.
+  Cables remain attached and the minimap stays in its established corner.
+- **Colours/tokens:** the existing flat `#15181E` panel and category header
+  palette match the selected direction. No symbol ink, interior shapes,
+  gradients or new elevation are added. High contrast retains system colours.
+- **Image/asset quality:** the real app uses its existing branding assets and
+  native controls. There are no new raster images, placeholder artwork or
+  symbols. The concept's generated shading is not a new requested asset.
+- **Copy/content:** nodes have no miniature control text or duplicate names in
+  this mode. Existing help, selection and availability feedback are retained;
+  full-detail names and controls are unchanged.
+
+The body interiors and retained strips are clearly visible in the full-view
+comparison; there is no remaining interior typography or artwork requiring a
+focused crop. The separate all-node render/checks cover kind-specific layouts.
+The host uses the actual MainWindow/GraphWorkspace and theme resources without
+showing a native window or injecting input; its resource-only copy omits the
+ComboBox wheel event setter because it is not an interaction test.
+
+**Comparison history:** the first completed visual comparison required no
+product correction. Private render-host startup/resource-loading problems were
+fixed before the final comparison; they are not design iterations. This visual
+pass does not establish physical keyboard/pointer behavior or release readiness.
+
+**Implementation checklist:** selected plain-body treatment compared, normal and
+high-contrast captures reviewed, 195 focused detached checks passed across all
+34 kinds and the existing geometry/zoom/restoration suite. Qualification is
+recorded separately in [implementation evidence](docs/IMPLEMENTATION_0.5.0.md).
+No follow-up visual polish is required for this selection.
+
+**final result: passed**
+
+---
+
+# Historical: Audio Mixer — readable Blender nodes and graphical EQ
 
 > Historical development record. Results and procedures below belong to their
 > named versions; they do not qualify the current beta. See

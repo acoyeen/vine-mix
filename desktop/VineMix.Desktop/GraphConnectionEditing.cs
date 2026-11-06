@@ -85,7 +85,7 @@ internal static class GraphConnectionEditing
     }
 
     internal static bool IsInsertable(GraphNode node)
-        => GraphDefaults.AudioInputPorts(node.Kind) is ["audio"] && GraphDefaults.AudioOutputPorts(node.Kind) is ["audio"];
+        => GraphDefaults.AudioInputPorts(node.Kind) is ["audio"] && GraphDefaults.AudioOutputPorts(node.Kind).Contains("audio");
 
     internal static string InsertionError(GraphConfiguration graph, string nodeId, string edgeId)
     {
@@ -127,6 +127,8 @@ internal static class GraphConnectionEditing
         if (incident.Any(e => e.Kind != "audio")) { error = "This node has a linked control or detector cable. Remove those connections before detaching its audio path; no cables were changed."; return false; }
         var inputs = incident.Where(e => e.To == nodeId).ToArray();
         var outputs = incident.Where(e => e.From == nodeId).ToArray();
+        if (outputs.Any(edge => edge.FromPort != "audio"))
+        { error = "This node has a separate output connected. Remove those cables before detaching its main audio path; no cables were changed."; return false; }
         if (inputs.Length != 1 || outputs.Length == 0)
         { error = "Detach needs exactly one incoming audio cable and at least one outgoing cable; these connections are unchanged."; return false; }
         var added = new List<GraphEdge>();

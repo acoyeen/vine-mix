@@ -206,7 +206,9 @@ public partial class MainWindow : Window
         Action? showHelp = null, Action? findNode = null, Action<string>? showHelpEntry = null, Action? showAbout = null, Action? showUpdates = null,
         Func<System.Threading.Tasks.Task>? quit = null, Action? showWhatsNew = null, Action? showActivity = null)
     {
-        var menu = new ContextMenu { Width = 380, MaxHeight = 560 };
+        // Let the popup use the available screen space. The menu template's
+        // automatic scrollbar still handles smaller work areas.
+        var menu = new ContextMenu { Width = 380 };
         AutomationProperties.SetName(menu, "VineMix settings");
         var find = new MenuItem { Header = "Find node…", InputGestureText = "Ctrl+F",
             ToolTip = "Find a node by name, type, device or app." };
@@ -231,6 +233,8 @@ public partial class MainWindow : Window
         var rightPan = Preference("Right-click drag to pan", nameof(MixerViewModel.RightClickDragToPan),
             "Right-drag empty canvas to pan; release without dragging for its menu.");
         rightPan.ToolTip = NodeToolTip.Create("Right-click drag to pan", "Enables right-button canvas panning");
+        Preference("Show minimap", nameof(MixerViewModel.ShowMinimap),
+            "Show the canvas overview in the bottom-right corner. Click it to centre the view or drag to pan.");
         Preference("Reduce meter animation", nameof(MixerViewModel.ReducedAnimation), "Use less motion in audio meters.");
         Preference("Show action notifications", nameof(MixerViewModel.ShowActionNotifications),
             "Show brief messages after workspace actions.");

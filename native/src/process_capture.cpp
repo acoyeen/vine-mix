@@ -329,10 +329,10 @@ struct ProcessCaptureWorker::Impl {
         if (!stopped.exchange(true)) { SetEvent(stopEvent.get()); SetEvent(controlEvent.get()); }
         if (thread.joinable()) thread.join();
     }
-    void state(std::string status, std::string message = {}, DWORD pid = 0) {
+    void state(std::string status, std::string message = {}, DWORD pid = 0, std::string reason = {}) {
         running.store(status == "Running", std::memory_order_release);
         std::lock_guard lock(mutex);
-        path.state = std::move(status); path.message = std::move(message);
+        path.state = std::move(status); path.message = std::move(message); path.reason = std::move(reason);
         path.endpointId = pid ? "process:" + std::to_string(pid) : std::string{};
         path.channels = pid ? 2 : 0; path.rate = pid ? sampleRate : 0;
     }
@@ -481,7 +481,8 @@ struct ProcessCaptureWorker::Impl {
             else {
                 bool ambiguous{};
                 const auto pid = resolve(selection, ambiguous);
-                if (!pid) state("Waiting", ambiguous ? "Several instances are running; select the app again" : "Waiting for application");
+                if (!pid) state("Waiting", ambiguous ? "Several instances are running; select the app again" : "Waiting for application",
+                    0, ambiguous ? "app_instance_ambiguous" : "app_not_found");
                 else {
                     state("Opening", "Opening app audio", *pid);
                     HRESULT result;
@@ -491,7 +492,8 @@ struct ProcessCaptureWorker::Impl {
                     running.store(false, std::memory_order_release); queue->requestClear();
                     if (stopped.load(std::memory_order_relaxed)) break;
                     if (result == S_FALSE) { failures = 0; continue; }
-                    state("Error", failureMessage(result), *pid);
+                    state("Error", failureMessage(result), *pid, result == E_ACCESSDENIED ? "access_denied" :
+                        result == AUDCLNT_E_SERVICE_NOT_RUNNING ? "audio_service_unavailable" : "stream_failure");
                     // Do not accumulate unresolved async activation requests if
                     // Windows never calls back. A deliberate retry can reopen it.
                     delay = result == HRESULT_FROM_WIN32(ERROR_TIMEOUT) ? INFINITE :

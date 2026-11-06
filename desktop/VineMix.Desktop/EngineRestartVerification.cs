@@ -207,7 +207,7 @@ internal static class EngineRestartVerification
                 {
                     ConfigureCalls++;
                     if (RejectConfigure) return new() { Error = "fake save rejected" };
-                    if (revision != Saved.Revision) return new() { Error = "stale revision" };
+                    if (revision != Saved.Revision) return new() { ErrorCode = "revision_conflict", Error = "stale revision" };
                     Saved = configuration!.Copy(); Saved.Revision++;
                     if (LoseConfigureReply) { LoseConfigureReply = false; throw new IOException("fake lost configure reply"); }
                 }

@@ -1,5 +1,10 @@
 # Local control protocol — wire version 1, configuration version 2
 
+This is the current source contract, including **unreleased 0.5.0** changes.
+The published release and build identity remain **0.4.0 Beta**. Wire version 1
+and configuration version 2 are unchanged; this document does not announce a
+new installed or published engine.
+
 The native engine is `VineMix.Engine.exe`; the WPF controller is
 `VineMix.exe`. They communicate using
 `\\.\pipe\VineMix.Control.<current-user-SID>`. The engine restricts the pipe
@@ -22,6 +27,15 @@ are unchanged. The desktop keeps edits and history queued, shows an unsaved
 warning and retries at its existing bounded cadence. Validation failures remain
 permanent rejections. Older clients can ignore the additive field.
 
+The unreleased source also returns `errorCode: "revision_conflict"` for a stale
+`expectedRevision`, using a typed native error rather than matching diagnostic
+wording. The desktop retains queued edits for reconciliation against a fresh
+snapshot; genuine external conflicts still follow the existing history
+invalidation rules. If `errorCode` is absent or empty, compatibility handling
+recognizes only the exact older message
+`Configuration revision conflict. Refresh and retry your change.` Unknown codes
+do not fall back to substring matching on `error`.
+
 Commands:
 
 - `snapshot`: full committed configuration, endpoints, applications and telemetry.
@@ -32,7 +46,9 @@ Commands:
   can still require recovery; inspect `snapshot.settingsState`.
 - `restoreBackup`: preserve the original files, commit the validated backup,
   then activate its routing. The backup can predate recent edits.
-- `startFresh`: preserve originals, then commit the unassigned three-node starter.
+- `startFresh`: preserve originals, then commit the seven-node voice starter:
+  Microphone → High-pass → Denoiser → Expander → Compressor → Listening/Virtual
+  outputs. Physical devices remain unassigned and both outputs muted.
 - `shutdown`: explicit engine shutdown, after the response is sent.
 
 A stale revision is rejected. The controller rebases pending id-based edits on a
@@ -84,7 +100,7 @@ legacy A/B controls expecting a graph change.
 This object is stored under `configuration.graph`, alongside the retained legacy
 fields. IDs are stable and independent of names or positions. Node kinds:
 `microphone`, `virtualInput`, `appInput`, `mix`, `eq`, `tone`, `highPass`, `lowPass`,
-`compressor`, `limiter`, `ducking`, `expander`, `gate`, `alignmentDelay`, `denoiser`, `deEsser`, `plosive`, `reverb`, `voiceColor`, `pan`, `mono`, `output`,
+`compressor`, `limiter`, `ducking`, `expander`, `gate`, `alignmentDelay`, `denoiser`, `deEsser`, `plosive`, `reverb`, `echo`, `distortion`, `voiceColor`, `pan`, `mono`, `output`,
 `virtualOutput`, `control`, `channelSwap`, `stereoWidth`, `stereoPan`, `crossfade`,
 `stereoCombine`, `stereoSplit`. Legacy `gain` and `reroute` remain supported for
 existing graphs and clipboard compatibility, but are absent from the Add menu.
@@ -103,11 +119,27 @@ routing even if a legacy client supplies bypass.
 Edges add `fromPort` and `toPort`, both defaulting to `audio` when omitted.
 Stereo Split exposes `left` and `right` output ports; Stereo Combine accepts
 `left` and `right` input ports; Crossfade accepts `a` and `b` input ports.
-Other audio ports remain `audio`. Control cables keep both fields `audio`;
-sidechain cables use `toPort: audio` and can select a Split output with
-`fromPort`. Port selection participates in duplicate detection and topology.
+Reverb and Echo expose their existing `audio` output plus `wet`; each accepts
+only `audio` as input. Echo labels its `wet` socket **Echo** in the interface.
+Other audio ports remain `audio`. Control cables keep both fields
+`audio`; sidechain cables use `toPort: audio` and may select a Split channel or
+Reverb Wet or Echo's echo-only output with `fromPort`. Port selection
+participates in duplicate detection and topology.
 An extracted Split output is dual mono internally; Combine averages each
 incoming frame before routing it to the selected side. Missing inputs are silent.
+
+Reverb `audio` retains the existing `mix` blend. Its `wet` port carries the same
+reverb network before Mix, affected by Decay, Damping and Pre-delay. It remains
+stereo when the effect produces stereo, including reflections from a mono input;
+alternate output ports are not implicitly mono. The node's meter continues to
+describe Audio; a downstream Wet destination meters the routed Wet signal.
+Bypass crossfades Audio to dry and Wet to silence over the existing 480-sample
+transition, without dry leakage into Wet. Node/control mute silences both outputs
+through the existing level ramp. The network keeps processing incoming audio
+and advancing its tail during bypass/mute; resuming fades in its current result.
+Explicit processor reset clears the tail. Audio-only Reverb routes retain
+insertion/detach behavior; the editor refuses detach while a Wet branch is
+connected, rather than replacing that branch with dry audio.
 
 | Field | Defaults | Ranges |
 |---|---|---|
@@ -115,10 +147,53 @@ incoming frame before routing it to the selected side. Missing inputs are silent
 | `deEsser` | `frequencyHz: 6000, thresholdDb: -24, reductionDb: 9` | 2000–12000 Hz; −60–0 dB; 0–24 dB |
 | `plosive` | `frequencyHz: 150, thresholdDb: -24, reductionDb: 12` | 60–300 Hz; −60–0 dB; 0–24 dB |
 | `reverb` | `mix: 0.2, decaySeconds: 1.2, damping: 0.5, preDelayMs: 15` | 0–1; 0.1–5 s; 0–1; 0–100 ms |
+| `echo` | `timeMs: 300, repeats: 3, mix: 0.25` | 20–2000 ms; integer 1–8; 0–1 |
+| `distortion` | `driveDb: 6, toneHz: 6000, mix: 0.5, outputDb: -6` | 0–36 dB; 500–18000 Hz; 0–1; −24–0 dB |
 | `voiceColor` | `tone: 0, ambience: 0` | −1–1; 0–1 |
 | `expander` | `mode: "expander", thresholdDb: -40, ratio: 2, attackMs: 5, holdMs: 50, releaseMs: 150, rangeDb: 60, hysteresisDb: 3` | Mode `expander` / `gate`; −80–0 dB; 1–20; 0.1–200 ms; 0–1000 ms; 5–2000 ms; 0–80 dB; 0–12 dB |
 | `alignmentDelay` | `samples: 0` | Integer 0–96000, measured at the internal 48 kHz rate |
 | `ducking` | `thresholdDb: -30, amountDb: 18, attackMs: 10, releaseMs: 250, mode: "static", ratio: 4` | −60–0 dBFS; 0–60 dB attenuation; 0.1–200 ms; 5–2000 ms; mode `static` / `dynamic`; ratio 1–20 |
+
+Echo stores independent original-input histories for its channels and produces
+exactly `repeats` delayed copies of each input sample. Copy `k` occurs at
+`k*timeMs`; its weight is `0.5^(k-1) / sum(0.5^j, j=0..repeats-1)`.
+Linear interpolation supports fractional sample times. The main `audio` signal
+is `(1-mix)*dry + mix*echo`; `wet` contains the same echo signal before Mix.
+Echo preserves mono/stereo channel metadata. Its main node meter describes
+Audio; a downstream destination meters the separately routed echo.
+Time/Repeats changes fade the old tail over 480 samples (10 ms), discard its
+history, apply the latest setting and fade fresh input into history over another
+480 samples. Mix changes do not reset history. Ordinary compatible
+graph edits preserve it; processor reset clears it. Bypass fades Audio to dry
+and Echo to silence; node/control mute silences both while processing continues.
+As with Reverb, a connected alternate output prevents destructive detach.
+
+Legacy `echo.feedback` remains a read-only compatibility input, finite in
+0–0.9. Without explicit `repeats`, initialize `count=1, level=feedback` and
+repeat `count++, level*=feedback` while `count<8 && level>=0.01`. This keeps an
+approximate count at or above −40 dB relative to the first repeat, capped at eight:
+0 maps to 1, 0.35 to 5, and 0.9 to 8. Explicit valid `repeats` takes priority,
+but any present legacy `feedback` must still be valid. Missing both fields
+defaults to 3. Canonical writes contain `timeMs`, `repeats`, `mix` only; Time
+and Mix are preserved. This is a deliberate sound-model migration, not an
+exact equivalent to the previous indefinitely decaying feedback loop.
+Desktop/native serialization and activation comparisons share the same rule.
+
+Distortion retains ordinary `audio` ports and uses one oversampled soft-saturation processor, with DC removal and
+Tone filtering on the wet path. Output gain follows the dry/wet blend, so it also
+applies at Mix zero. Bypass uses untrimmed, latency-matched dry audio. Its fixed
+32-frame latency at 48 kHz remains at Mix zero and in Bypass; parallel graph paths
+are not automatically delay-compensated. Missing effect records use the defaults
+above; older engines do not support graphs containing the new node kinds.
+
+Repeated `output` or `virtualOutput` device bindings are permitted in the current
+0.5.0 development source. Nodes retain independent controls and identities;
+resolved endpoint ownership is an engine runtime concern, not a new wire field.
+Each endpoint receives the sum of its logical output buffers, with clipping at
+the final device boundary and combined overload reported on the output nodes.
+Saved bindings are not rewritten when resolving aliases or reconnecting. Device
+role validation still applies. Earlier builds that reject repeated destinations
+cannot load such a graph; do not pair the new desktop with an older engine.
 
 The `gate` kind requires `expander.mode: "gate"`; it shares the Expander settings
 record. Older `expander` nodes already in gate mode retain their kind and settings
@@ -162,7 +237,10 @@ is unchanged. Copy/paste carries the marker and all effect records.
 EQ bands additionally serialize `resetFrequencyHz`: 20–20000 Hz when set, or
 zero for an older band without a reset anchor. It is editor metadata and does
 not alter filter processing. Node `mono` defaults to false. `collapsed` remains
-compatible metadata; the current desktop always shows expanded nodes.
+compatible metadata. Progressive zoom detail is a desktop presentation policy:
+it preserves full node geometry and socket anchors without changing `collapsed`
+or the saved graph. Show minimap is a separately saved interface preference,
+not an audio configuration field.
 
 Connections:
 
@@ -184,16 +262,20 @@ A target accepts one control edge. No edge can reference a missing node,
 duplicate another connection or introduce feedback. Muted audio edges also
 participate in cycle checks.
 
-An edge with `kind: "sidechain"` carries audio only to a Ducking trigger.
+An edge with `kind: "sidechain"` carries detector-only audio to a Trigger input.
 It must originate at an audio-producing source or processor and terminate at
-`ducking`; at most one sidechain edge targets each Ducking node. It is kept
+`ducking`, `gate` or `expander`; at most one sidechain edge targets each node. It is kept
 outside the programme input list, contributes no audible samples, and does not
 change the main signal's channel layout. Sidechain dependencies take part in
 topological ordering and cycle validation even when muted. The same source may
 have distinct audio and sidechain edges to one detector-capable node. Sidechain gain and
 mute use the existing bounded edge fields, without becoming audible sends.
-Trigger detection with no usable sidechain supplies silence. There is no
-automatic main-input fallback. Ducking with a missing/disconnected trigger
+Gate/Expander detect their own input only when no sidechain cable exists.
+A connected silent, muted or unavailable source supplies silence, not fallback;
+removing the cable restores self-detection. Both share the larger absolute
+detector channel while preserving programme stereo balance and their existing
+attack/hold/release behavior. Legacy expander-kind Gate records follow the same rule.
+Ducking always uses its external detector. A missing/disconnected trigger
 releases toward unity. In Static mode, a connected silent trigger lets the
 smoothed detector fall below its closing threshold before release, and zero
 amount targets unity. In Dynamic mode, a trigger at or below Threshold targets
@@ -209,10 +291,19 @@ output node to combine them.
 An application binding persists its exact executable path and a current PID hint.
 
 The graph is bounded to 32 nodes and 96 edges. Numeric values must be finite.
-Node/send gain is -60 to +12 dB. Effect-specific bounds are enforced by the native
+Graph node/cable `gainDb` is -60 to +12 dB and remains a double through native
+configuration parsing, persistence and acknowledgement, matching desktop storage.
+Only compilation to the DSP plan narrows it to float; processing precision and
+the legacy fixed-console gain fields are unchanged. Decimal acknowledgement
+rounding must not appear as an external edit or clear undo history.
+Effect-specific bounds are enforced by the native
 validator and mirrored by editor controls. Channel -1 preserves stereo; a
 nonnegative microphone channel extracts that channel as dual mono. Layout
-coordinates, zoom and labels are also bounded.
+coordinates, zoom and labels are also bounded. Native validation accepts zoom
+from **0.1 to 4**, retaining its historical upper compatibility bound; the desktop
+uses **0.1 to 2** (10–200%). Older versions may reject new low-zoom values or
+Trigger/Wet routes, so configuration version 2 does not guarantee downgrade
+compatibility with those features.
 
 ## Snapshot and telemetry
 
@@ -230,7 +321,7 @@ The snapshot includes:
   `gainReductionDb`, `detectorDb` and `dynamicsFrame`.
 - `settingsPath`, `logPath`, `warning`.
 
-A path contains state, message, endpointId, rate, channels, underruns, overruns,
+A path contains state, message, reason, endpointId, rate, channels, underruns, overruns,
 reconnects and queueMs. Device paths also report periodMs (requested shared
 period or legacy default), bufferMs (allocated WASAPI buffer), targetQueueMs
 and resamplerPendingMs. These are timing diagnostics, not measured round-trip
@@ -239,6 +330,18 @@ latency; queueMs excludes pending resampler input and filter history. See
 Priming, Running, Waiting, Busy, AccessDenied, ServiceUnavailable, Recovering,
 Unsupported and Error. Friendly names do not replace identities. App paths may
 wait for an exact executable to return.
+
+`path.reason` is an additive stable identifier; `message` remains display text.
+Current reasons are `device_disabled`, `device_unavailable`,
+`app_instance_ambiguous`, `app_not_found`, `access_denied`,
+`audio_service_unavailable` and `stream_failure`. Ordinary state transitions,
+including recovery, clear obsolete reasons. Unknown reasons retain general
+state-based handling and do not select behavior by message text. An absent or
+empty reason uses a bounded legacy adapter for the exact old diagnostics
+`Device disabled in Windows Sound settings`,
+`Several instances are running; select the app again`,
+`Windows denied app audio capture`, and `Windows Audio service unavailable`.
+These stream reasons are separate from configure-command `errorCode` values.
 
 The original `status.inputs`, `outputs`, sourcePeaks and A/B peaks remain for
 legacy diagnostics. Node telemetry is authoritative. Clipping flags and peaks

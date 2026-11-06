@@ -372,7 +372,7 @@ internal static class QuitRecoveryVerification
                 ConfigureCalls++; ConfigureEntered.TrySetResult();
                 if (HoldConfigure is not null) await HoldConfigure.Task.WaitAsync(token);
                 if (RejectConfigure) return new() { Error = "Example settings folder is read-only", ErrorCode = "settings_write_failed" };
-                if (configuration is null || revision != Saved.Revision) return new() { Error = "Example stale revision" };
+                if (configuration is null || revision != Saved.Revision) return new() { ErrorCode = "revision_conflict", Error = "Example stale revision" };
                 Saved = configuration.Copy(); Saved.Revision++;
                 if (CancelAfterCommit is not null) { CancelAfterCommit.Cancel(); token.ThrowIfCancellationRequested(); }
                 if (LoseReply) { LoseReply = false; throw new IOException("Example lost configure reply"); }

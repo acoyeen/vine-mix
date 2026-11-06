@@ -71,6 +71,8 @@ public sealed class GraphNode
     public DeEsserSettings DeEsser { get; set; } = new();
     public PlosiveSettings Plosive { get; set; } = new();
     public ReverbSettings Reverb { get; set; } = new();
+    public EchoSettings Echo { get; set; } = new();
+    public DistortionSettings Distortion { get; set; } = new();
     public VoiceColorSettings VoiceColor { get; set; } = new();
     public ExpanderSettings Expander { get; set; } = new();
     public AlignmentDelaySettings AlignmentDelay { get; set; } = new();
@@ -81,6 +83,7 @@ public sealed class GraphNode
         copy.EqBands = EqBands.Select(band => band.Copy()).ToList();
         copy.Compressor = Compressor.Copy(); copy.Ducking = Ducking.Copy(); copy.Denoiser = Denoiser.Copy();
         copy.DeEsser = DeEsser.Copy(); copy.Plosive = Plosive.Copy(); copy.Reverb = Reverb.Copy();
+        copy.Echo = Echo.Copy(); copy.Distortion = Distortion.Copy();
         copy.VoiceColor = VoiceColor.Copy();
         copy.Expander = Expander.Copy(); copy.AlignmentDelay = AlignmentDelay.Copy();
         return copy;
@@ -176,6 +179,22 @@ public sealed class ReverbSettings
     public double Damping { get; set; } = .5;
     public double PreDelayMs { get; set; } = 15;
 }
+[JsonConverter(typeof(EchoSettingsJsonConverter))]
+public sealed class EchoSettings
+{
+    public double TimeMs { get; set; } = 300;
+    public int Repeats { get; set; } = 3;
+    public double Mix { get; set; } = .25;
+    public EchoSettings Copy() => (EchoSettings)MemberwiseClone();
+}
+public sealed class DistortionSettings
+{
+    public double DriveDb { get; set; } = 6;
+    public double ToneHz { get; set; } = 6000;
+    public double Mix { get; set; } = .5;
+    public double OutputDb { get; set; } = -6;
+    public DistortionSettings Copy() => (DistortionSettings)MemberwiseClone();
+}
 public sealed class VoiceColorSettings
 {
     public double Tone { get; set; }
@@ -218,33 +237,45 @@ public static class GraphDefaults
     public static GraphConfiguration Fresh()
     {
         var input = NewNode("microphone", 48, 200);
-        input.Id = "starter-input"; input.Name = "Physical input"; input.AutoAssignDevice = false;
-        var virtualOutput = NewNode("virtualOutput", 480, 48);
+        input.Id = "starter-input"; input.Name = "Microphone"; input.AutoAssignDevice = false;
+        // Equal 95-DIP gaps leave the cables visible while keeping the whole
+        // chain above the full-detail threshold when fitted at minimum width.
+        var highPass = NewNode("highPass", 499, 200); highPass.Id = "starter-high-pass";
+        var denoiser = NewNode("denoiser", 950, 200); denoiser.Id = "starter-denoiser";
+        var expander = NewNode("expander", 1401, 200); expander.Id = "starter-expander";
+        var compressor = NewNode("compressor", 1924, 200); compressor.Id = "starter-compressor";
+        var virtualOutput = NewNode("virtualOutput", 2447, 464);
         virtualOutput.Id = "starter-virtual-output"; virtualOutput.Name = "Virtual output";
-        var listening = NewNode("output", 480, 420);
+        var listening = NewNode("output", 2447, 48);
         listening.Id = "starter-listening-output"; listening.Name = "Listening output"; listening.AutoAssignDevice = false;
         return new()
         {
-            Nodes = [input, virtualOutput, listening],
-            Edges = [new() { Id = "starter-virtual-route", From = input.Id, To = virtualOutput.Id },
-                new() { Id = "starter-listening-route", From = input.Id, To = listening.Id }]
+            PanX = 20, PanY = 20, Zoom = .4,
+            Nodes = [input, highPass, denoiser, expander, compressor, listening, virtualOutput],
+            Edges = [new() { Id = "starter-high-pass-route", From = input.Id, To = highPass.Id },
+                new() { Id = "starter-denoiser-route", From = highPass.Id, To = denoiser.Id },
+                new() { Id = "starter-expander-route", From = denoiser.Id, To = expander.Id },
+                new() { Id = "starter-compressor-route", From = expander.Id, To = compressor.Id },
+                new() { Id = "starter-listening-route", From = compressor.Id, To = listening.Id },
+                new() { Id = "starter-virtual-route", From = compressor.Id, To = virtualOutput.Id }]
         };
     }
     public const int MaximumEqBands = 8;
-    public static readonly string[] Kinds = ["microphone", "virtualInput", "appInput", "mix", "gain", "eq", "tone", "highPass", "lowPass", "compressor", "limiter", "ducking", "pan", "mono", "reroute", "output", "virtualOutput", "control", "denoiser", "deEsser", "plosive", "reverb", "voiceColor", "expander", "gate", "alignmentDelay", "channelSwap", "stereoWidth", "stereoPan", "crossfade", "stereoCombine", "stereoSplit"];
-    public static bool HasAudioInput(string kind) => kind is "mix" or "gain" or "output" or "virtualOutput" or "eq" or "tone" or "highPass" or "lowPass" or "compressor" or "limiter" or "ducking" or "pan" or "mono" or "reroute" or "denoiser" or "deEsser" or "plosive" or "reverb" or "voiceColor" or "expander" or "gate" or "alignmentDelay" or "channelSwap" or "stereoWidth" or "stereoPan" or "crossfade" or "stereoCombine" or "stereoSplit";
-    public static bool HasAudioOutput(string kind) => kind is "microphone" or "virtualInput" or "appInput" or "mix" or "gain" or "eq" or "tone" or "highPass" or "lowPass" or "compressor" or "limiter" or "ducking" or "pan" or "mono" or "reroute" or "denoiser" or "deEsser" or "plosive" or "reverb" or "voiceColor" or "expander" or "gate" or "alignmentDelay" or "channelSwap" or "stereoWidth" or "stereoPan" or "crossfade" or "stereoCombine" or "stereoSplit";
-    public static bool HasSidechainInput(string kind) => kind == "ducking";
+    public static readonly string[] Kinds = ["microphone", "virtualInput", "appInput", "mix", "gain", "eq", "tone", "highPass", "lowPass", "compressor", "limiter", "ducking", "pan", "mono", "reroute", "output", "virtualOutput", "control", "denoiser", "deEsser", "plosive", "reverb", "voiceColor", "expander", "gate", "alignmentDelay", "channelSwap", "stereoWidth", "stereoPan", "crossfade", "stereoCombine", "stereoSplit", "echo", "distortion"];
+    public static bool HasAudioInput(string kind) => kind is "echo" or "distortion" or "mix" or "gain" or "output" or "virtualOutput" or "eq" or "tone" or "highPass" or "lowPass" or "compressor" or "limiter" or "ducking" or "pan" or "mono" or "reroute" or "denoiser" or "deEsser" or "plosive" or "reverb" or "voiceColor" or "expander" or "gate" or "alignmentDelay" or "channelSwap" or "stereoWidth" or "stereoPan" or "crossfade" or "stereoCombine" or "stereoSplit";
+    public static bool HasAudioOutput(string kind) => kind is "echo" or "distortion" or "microphone" or "virtualInput" or "appInput" or "mix" or "gain" or "eq" or "tone" or "highPass" or "lowPass" or "compressor" or "limiter" or "ducking" or "pan" or "mono" or "reroute" or "denoiser" or "deEsser" or "plosive" or "reverb" or "voiceColor" or "expander" or "gate" or "alignmentDelay" or "channelSwap" or "stereoWidth" or "stereoPan" or "crossfade" or "stereoCombine" or "stereoSplit";
+    public static bool HasSidechainInput(string kind) => kind is "ducking" or "expander" or "gate";
     public static bool HasSidechainInput(GraphNode node) => HasSidechainInput(node.Kind);
     public static string[] AudioInputPorts(string kind) => kind switch
     {
         "stereoCombine" => ["left", "right"], "crossfade" => ["a", "b"],
         _ => HasAudioInput(kind) ? ["audio"] : []
     };
-    public static string[] AudioOutputPorts(string kind) => kind == "stereoSplit" ? ["left", "right"] : HasAudioOutput(kind) ? ["audio"] : [];
-    public static string PortLabel(string port) => port switch { "left" => "Left", "right" => "Right", "a" => "A", "b" => "B", _ => "Audio" };
+    public static string[] AudioOutputPorts(string kind) => kind == "stereoSplit" ? ["left", "right"] : kind is "reverb" or "echo" ? ["audio", "wet"] : HasAudioOutput(kind) ? ["audio"] : [];
+    public static string PortLabel(string port, string? nodeKind = null) => port switch { "left" => "Left", "right" => "Right", "a" => "A", "b" => "B", "wet" => nodeKind == "echo" ? "Echo" : "Wet", _ => "Audio" };
     public static string KindLabel(string kind) => kind switch
     {
+        "echo" => "Echo", "distortion" => "Distortion",
         "microphone" => "Microphone", "virtualInput" => "Virtual input", "appInput" => "Running app", "expander" => "Expander", "gate" => "Gate", "alignmentDelay" => "Alignment Delay",
         "mix" => "Mix", "gain" => "Gain", "output" => "Listening output", "virtualOutput" => "Virtual output", "control" => "Linked control",
         "eq" => "Equalizer", "tone" => "Low / Mid / High", "highPass" => "High-pass filter", "lowPass" => "Low-pass filter", "compressor" => "Compressor", "limiter" => "Limiter", "ducking" => "Ducking", "pan" => "Balance", "mono" => "Mono", "reroute" => "Reroute", "denoiser" => "Denoiser", "deEsser" => "De-esser", "plosive" => "Plosive remover", "reverb" => "Reverb", "voiceColor" => "Voice Color", "channelSwap" => "Channel Swap", "stereoWidth" => "Stereo Width", "stereoPan" => "Pan", "crossfade" => "Crossfade", "stereoCombine" => "Stereo Combine", "stereoSplit" => "Stereo Split", _ => kind
@@ -282,6 +313,7 @@ public static class GraphDefaults
         node.EqBands = defaults.EqBands; node.Compressor = defaults.Compressor; node.Ducking = defaults.Ducking;
         node.Denoiser = defaults.Denoiser; node.DeEsser = defaults.DeEsser;
         node.Plosive = defaults.Plosive; node.Reverb = defaults.Reverb;
+        node.Echo = defaults.Echo; node.Distortion = defaults.Distortion;
         node.VoiceColor = defaults.VoiceColor;
         node.Expander = defaults.Expander; node.AlignmentDelay = defaults.AlignmentDelay;
     }
@@ -335,7 +367,7 @@ public static class GraphDefaults
         if (candidate.Kind == "sidechain")
         {
             if (!AudioOutputPorts(from.Kind).Contains(candidate.FromPort) || candidate.ToPort != "audio") return "Choose a valid audio output and trigger socket.";
-            if (!HasAudioOutput(from.Kind) || !HasSidechainInput(to.Kind)) return "Connect an audio output to a Ducking trigger input.";
+            if (!HasAudioOutput(from.Kind) || !HasSidechainInput(to.Kind)) return "Connect an audio output to a Ducking, Gate or Expander trigger input.";
             if (graph.Edges.Any(e => e.Kind == "sidechain" && e.To == to.Id)) return "This node already has a detector cable. Remove that connection first.";
         }
         else if (candidate.Kind != "audio" || !AudioOutputPorts(from.Kind).Contains(candidate.FromPort) || !AudioInputPorts(to.Kind).Contains(candidate.ToPort)) return "Connect an audio output on the right to an audio input on the left.";
@@ -353,7 +385,9 @@ public static class GraphDefaults
     {
         if (graph.Nodes.Count > 32) return "This workspace can contain up to 32 nodes.";
         if (graph.Edges.Count > 96) return "This workspace can contain up to 96 connections.";
-        if (!double.IsFinite(graph.PanX) || !double.IsFinite(graph.PanY) || !double.IsFinite(graph.Zoom) || graph.Zoom is < .3 or > 2) return "The canvas view is invalid.";
+        if (!double.IsFinite(graph.PanX) || !double.IsFinite(graph.PanY) || Math.Abs(graph.PanX) > GraphCanvasPolicy.MaximumPan
+            || Math.Abs(graph.PanY) > GraphCanvasPolicy.MaximumPan || !double.IsFinite(graph.Zoom)
+            || graph.Zoom is < GraphCanvasPolicy.MinimumZoom or > GraphCanvasPolicy.MaximumZoom) return "The canvas view is invalid.";
         if (graph.Nodes.Select(n => n.Id).Distinct().Count() != graph.Nodes.Count || graph.Nodes.Any(n => string.IsNullOrWhiteSpace(n.Id))) return "Node identities must be unique.";
         if (graph.Edges.Select(n => n.Id).Distinct().Count() != graph.Edges.Count || graph.Edges.Any(n => string.IsNullOrWhiteSpace(n.Id))) return "Connection identities must be unique.";
         foreach (var node in graph.Nodes)
@@ -369,6 +403,9 @@ public static class GraphDefaults
                 || node.DeEsser is null || !InRange(node.DeEsser.FrequencyHz, 2000, 12000) || !InRange(node.DeEsser.ThresholdDb, -60, 0) || !InRange(node.DeEsser.ReductionDb, 0, 24)
                 || node.Plosive is null || !InRange(node.Plosive.FrequencyHz, 60, 300) || !InRange(node.Plosive.ThresholdDb, -60, 0) || !InRange(node.Plosive.ReductionDb, 0, 24)
                 || node.Reverb is null || !InRange(node.Reverb.Mix, 0, 1) || !InRange(node.Reverb.DecaySeconds, .1, 5) || !InRange(node.Reverb.Damping, 0, 1) || !InRange(node.Reverb.PreDelayMs, 0, 100)
+                || node.Echo is null || !InRange(node.Echo.TimeMs, 20, 2000) || node.Echo.Repeats is < 1 or > 8 || !InRange(node.Echo.Mix, 0, 1)
+                || node.Distortion is null || !InRange(node.Distortion.DriveDb, 0, 36) || !InRange(node.Distortion.ToneHz, 500, 18000)
+                || !InRange(node.Distortion.Mix, 0, 1) || !InRange(node.Distortion.OutputDb, -24, 0)
                 || node.VoiceColor is null || !InRange(node.VoiceColor.Tone, -1, 1) || !InRange(node.VoiceColor.Ambience, 0, 1)
                 || node.Compressor is null || node.Compressor.Mode is not ("compress" or "limit") || node.Compressor.Detector is not ("internal" or "external")
                 || !InRange(node.Compressor.CeilingDb, -24, 0) || !InRange(node.Compressor.ThresholdDb, -60, 0) || !InRange(node.Compressor.Ratio, 1, 20)

@@ -49,11 +49,9 @@ internal static class InputAvailability
                 return new(AvailabilityNoticeKind.Problem, app ? "APP CAPTURE UNAVAILABLE" : "INPUT UNAVAILABLE",
                     "Choose another capture method");
             case "Error":
-                // App capture currently reports these reasons as Error rather
-                // than separate typed states. Use only its known exact reasons.
-                if (app && path?.Message == "Windows denied app audio capture")
+                if (app && StatusReasons.For(path) == "access_denied")
                     return new(AvailabilityNoticeKind.Problem, "ACCESS BLOCKED", "Check app access, then retry");
-                if (app && path?.Message == "Windows Audio service unavailable")
+                if (app && StatusReasons.For(path) == "audio_service_unavailable")
                     return new(AvailabilityNoticeKind.Problem, "AUDIO SERVICE OFFLINE", "Check the Windows Audio service");
                 return new(AvailabilityNoticeKind.Problem, app ? "APP CAPTURE ERROR" : "INPUT ERROR",
                     "Check this input; retry assigned devices");
@@ -74,7 +72,7 @@ internal static class InputAvailability
     private static AudioAvailability WaitingForDevice(GraphNode node, PathState? path, IReadOnlyList<Endpoint> endpoints)
     {
         // The worker can observe disablement before the UI inventory refresh.
-        if (path?.Message == "Device disabled in Windows Sound settings")
+        if (StatusReasons.For(path) == "device_disabled")
             return new(AvailabilityNoticeKind.Problem, "INPUT DISABLED", "Enable in Windows sound settings");
         // Mirror AudioWorker::resolve: exact active ID, then one unique active
         // stable-ID match, then the exact inactive endpoint. Never choose an
@@ -104,10 +102,10 @@ internal static class InputAvailability
 
     private static AudioAvailability WaitingForApp(GraphNode node, PathState? path, IReadOnlyList<AudioApplication> applications)
     {
-        bool ambiguous = path?.Message == "Several instances are running; select the app again";
+        bool ambiguous = StatusReasons.For(path) == "app_instance_ambiguous";
         // Empty legacy/test reasons can use the same identity-safe chooser rule.
         // An explicit worker reason wins over the less complete app inventory.
-        if (string.IsNullOrWhiteSpace(path?.Message))
+        if (string.IsNullOrEmpty(path?.Reason) && string.IsNullOrWhiteSpace(path?.Message))
         {
             bool SamePath(AudioApplication application) => string.Equals(application.ExecutablePath,
                 node.App.ExecutablePath, StringComparison.OrdinalIgnoreCase);

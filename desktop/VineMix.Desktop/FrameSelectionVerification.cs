@@ -170,8 +170,8 @@ internal static class FrameSelectionVerification
 
             workspace.SelectNode(gain.Id);
             workspace.SelectNodeForPointer(output.Id, ModifierKeys.Shift);
-            require(workspace.FrameSelection() && Camera().M11 == .3 && Camera().M22 == .3,
-                "A selection wider than the available canvas respects the 30 percent minimum zoom.");
+            require(workspace.FrameSelection() && Camera().M11 >= GraphCanvasPolicy.MinimumZoom && Camera().M11 < .3 && Camera().M22 == Camera().M11,
+                "A wide selection can fit below the former 30 percent floor without exceeding the new minimum.");
             RequireCentered("Even an oversized selection remains centered at the bounded minimum zoom.", gain.Id, output.Id);
 
             // Simulate a selection that outlives a configuration change before

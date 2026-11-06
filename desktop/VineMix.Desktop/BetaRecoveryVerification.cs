@@ -18,7 +18,7 @@ internal static class BetaRecoveryVerification
         model.Edit(c => c.Graph.Nodes[0].Name = "Pending local edit");
         require(model.PendingEditCount == 1 && model.CanUndo, "A queued local edit has history before a simulated settings failure.");
         state = "backupAvailable"; model.ApplyPreviewSnapshot(Snapshot());
-        require(model.PendingEditCount == 1 && model.HasSettingsRecovery && model.GraphConfig.Nodes[0].Name == "Physical input",
+        require(model.PendingEditCount == 1 && model.HasSettingsRecovery && model.GraphConfig.Nodes[0].Name == basis.Graph.Nodes[0].Name,
             "Recovery previews the actual backup while retaining pending edits separately.");
         await model.RecoverSettingsAsync("recoveryRetry");
         require(model.PendingEditCount == 1 && model.HasSettingsRecovery && !model.CanEdit,

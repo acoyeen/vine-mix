@@ -163,8 +163,8 @@ internal static class CoreDynamicsVerification
             "A second external sidechain is rejected instead of silently mixing detectors.");
         require(GraphDefaults.ConnectionError(graph, new() { From = triggerTarget.Id, To = a.Id }).Length > 0,
             "Sidechain dependencies participate in cycle detection.");
-        require(GraphDefaults.ConnectionError(graph, new() { From = a.Id, To = c.Id, Kind = "sidechain" }).Length > 0,
-            "Expander rejects detector-only cables.");
+        require(GraphDefaults.ConnectionError(graph, new() { From = a.Id, To = c.Id, Kind = "sidechain" }).Length == 0,
+            "Expander and its legacy Gate presentation accept an optional detector-only cable.");
         require(!GraphConnectionEditing.TryPrepareDetach(graph, triggerTarget.Id, out _, out string detachError) && detachError.Contains("detector"),
             "Detaching a sidechain-dependent node cannot create an automatic audible bridge.");
         var bad = new Action<GraphNode>[] { n => n.Compressor.Mode = "other", n => n.Compressor.Detector = "other", n => n.Compressor.CeilingDb = 1,

@@ -64,24 +64,23 @@ internal static class VirtualDeviceBindingVerification
 
         var duplicates = Graph("virtualInput", "virtualInput", "virtualOutput", "virtualOutput");
         assignments = VirtualDeviceBindings.FindAutomaticAssignments(duplicates, inventory);
-        require(assignments.Count == 3 && VirtualDeviceBindings.Apply(duplicates, assignments) == 3
+        require(assignments.Count == 4 && VirtualDeviceBindings.Apply(duplicates, assignments) == 4
             && duplicates.Nodes[0].Device.Id == receive.Id && duplicates.Nodes[1].Device.Id == receive.Id
             && !ReferenceEquals(duplicates.Nodes[0].Device, duplicates.Nodes[1].Device)
             && duplicates.Nodes[2].Device.Id == send.Id
-            && !VirtualDeviceBindings.IsAssigned(duplicates.Nodes[3].Device),
-            "Multiple virtual inputs share the capture source with separate bindings while only one virtual output reserves the render endpoint.");
+            && duplicates.Nodes[3].Device.Id == send.Id
+            && !ReferenceEquals(duplicates.Nodes[2].Device, duplicates.Nodes[3].Device),
+            "Multiple virtual inputs and outputs share their endpoint with independent binding objects.");
         var occupied = Graph("virtualInput", "virtualOutput", "microphone", "output");
         occupied.Nodes[2].Device = new() { StableId = receive.StableId };
         occupied.Nodes[3].Device = new() { Id = send.Id };
         assignments = VirtualDeviceBindings.FindAutomaticAssignments(occupied, inventory);
-        require(assignments.Count == 1 && assignments[0].NodeId == occupied.Nodes[0].Id
-            && !VirtualDeviceBindings.IsUsed(occupied, occupied.Nodes[0].Id, receive)
-            && !VirtualDeviceBindings.IsUsed(occupied, occupied.Nodes[2].Id, receive)
-            && VirtualDeviceBindings.IsUsed(occupied, occupied.Nodes[1].Id, send),
-            "Physical and virtual inputs can share a source, while a physical output still prevents assigning its render endpoint to a virtual output.");
+        require(assignments.Count == 2 && assignments[0].NodeId == occupied.Nodes[0].Id
+            && assignments[1].NodeId == occupied.Nodes[1].Id && assignments[1].Id == send.Id,
+            "Physical and virtual nodes can share the same source or destination.");
         occupied.Nodes[3].Device = new() { StableId = send.StableId };
-        require(VirtualDeviceBindings.IsUsed(occupied, occupied.Nodes[1].Id, send),
-            "Output ownership also compares stable identity when an endpoint ID is absent.");
+        require(VirtualDeviceBindings.FindAutomaticAssignments(occupied, inventory).Count == 2,
+            "A saved stable-only output binding does not block another output assignment.");
 
         var rebased = Graph("virtualInput");
         assignments = VirtualDeviceBindings.FindAutomaticAssignments(rebased, inventory);
@@ -104,9 +103,9 @@ internal static class VirtualDeviceBindingVerification
         assignments = VirtualDeviceBindings.FindAutomaticAssignments(rebasedOutput, inventory);
         var interveningOutput = GraphDefaults.NewNode("output", 500, 0);
         interveningOutput.Device = new() { StableId = send.StableId }; rebasedOutput.Nodes.Add(interveningOutput);
-        require(VirtualDeviceBindings.Apply(rebasedOutput, assignments) == 0
-            && !VirtualDeviceBindings.IsAssigned(rebasedOutput.Nodes[0].Device),
-            "Rebasing queued output assignment preserves an intervening output owner.");
+        require(VirtualDeviceBindings.Apply(rebasedOutput, assignments) == 1
+            && rebasedOutput.Nodes[0].Device.Id == send.Id && interveningOutput.Device.StableId == send.StableId,
+            "Rebasing queued output assignment permits a shared destination without modifying its existing node.");
 
         using var model = new MixerViewModel(preview: true);
         var snapshot = new MixerSnapshot { Configuration = new() { Version = 2, Graph = Graph("microphone", "output") }, Endpoints = inventory.ToList() };

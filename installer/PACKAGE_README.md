@@ -22,11 +22,12 @@ Quit an older running copy before opening this one.
 For virtual inputs and outputs, keep both missing-driver boxes selected in
 Setup and accept the separate vendor terms. Existing drivers are retained.
 For physical microphone/headphone routing alone, you can clear both boxes. Choose
-your Windows microphone on **Physical input** and headphones on **Listening
-output**. New outputs start muted; check the device and level before unmuting.
+your Windows microphone on **Microphone** and headphones on **Listening
+output**. The starter connects High-pass, Denoiser, Expander and Compressor to
+both outputs. Both start muted; check the device and level before unmuting.
 For a **Virtual Desktop microphone**, connect the headset, enable **Microphone
 passthrough**, confirm it appears in **Windows Settings > System > Sound >
-Input**, then select that device on **Physical input**. Its starter name does not
+Input**, then select that device on **Microphone** (a Physical input node). Its name does not
 limit the picker to physical microphones.
 
 The installer can offer original VB-CABLE and VAC Lite packages if missing;
@@ -40,6 +41,6 @@ Their vendor terms are separate from VineMix's MIT licence. VAC Lite is limited
 to private home use unrelated to income generation. Details and vendor links
 are retained in [the driver notices](SetupSupport/DRIVER-NOTICES.txt).
 
-VineMix is experimental. New outputs start muted; check routing, levels and
-device selection before relying on a setup. The current development installer
+VineMix is in beta. New outputs start muted; check routing, levels and
+device selection before relying on a setup. The current installer
 and application are unsigned.

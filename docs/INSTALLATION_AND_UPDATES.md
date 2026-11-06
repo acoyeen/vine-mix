@@ -1,18 +1,19 @@
 # VineMix installation and updates
 
-Updated 28 October 2026 for **0.4.0 · Beta**. VineMix is an
+Updated 6 November 2026 for **0.5.0 · Beta**. VineMix is an
 MIT-licensed open-source beta for Windows 11 x64. Download versioned packages,
 checksums and matching source from [GitHub Releases](https://github.com/acoyeen/vine-mix/releases).
 See the [beta test guide](BETA_TESTER_GUIDE.md) for installation instructions and
-[current qualification](RELEASE_0.4.0_QUALIFICATION.md) for verification and limits.
+[current qualification](RELEASE_0.5.0_QUALIFICATION.md) for verification and limits.
 
 ## Packages and files
 
-**Upgrading from Beta 2, 3 or 4:** updates to those older packages can roll back
-because of incorrect engine version metadata. 0.4.0 Beta retains the corrected
-metadata and automatic-check scheduling. For recovery, wait for Saved, choose **Quit VineMix**,
-then run 0.4.0 Beta Setup using the existing folder. Do not uninstall first.
-Standalone users should quit and replace their launcher with the 0.4.0 Beta download.
+**Upgrading from Beta 1–6 or the original, uncorrected 0.4.0 build:** older
+updaters can roll back because of metadata or process-identity defects.
+Corrected 0.4.0 installations can use the in-app update. For a manual upgrade,
+wait for Saved, choose **Quit VineMix**,
+then run 0.5.0 Beta Setup using the existing folder. Do not uninstall first.
+Standalone users should quit and replace their launcher with the 0.5.0 Beta download.
 Keep optional drivers unchanged if they already work. Intermediate betas are not
 required. See the [update investigation](UPDATE_INVESTIGATION_2026-10-24.md).
 
@@ -39,7 +40,7 @@ originals before restoring a backup or creating the muted starter.
 
 ## Optional drivers
 
-The 0.4.0 Beta installer selects both missing eligible drivers by
+The 0.5.0 Beta installer selects both missing eligible drivers by
 default, labels their Virtual input/output roles and runs VAC Lite before
 VB-CABLE. Separate vendor consent remains required, and restart guidance says
 to finish VineMix Setup first. Clear either selection if it is not needed;
@@ -59,6 +60,12 @@ complete original vendor packages and their notices; see
 [distribution conditions](DISTRIBUTION.md) and [installer implementation](../installer/README.md).
 
 ## Manual updates and removal
+
+Updating from 0.4.0 preserves existing workspaces. A workspace edited with
+0.5.0-only nodes, ports or lower zoom may not load in an older app. Unsupported
+data enters recovery without being rewritten; do not choose Start fresh to work
+around a downgrade. Reinstall the newer version or deliberately restore a
+compatible backup.
 
 Use **Quit VineMix** at the bottom of Settings or from the tray. It saves first
 and offers retry/recovery/cancel choices if that save fails. Closing the main
@@ -100,7 +107,7 @@ separate from Windows Authenticode signing. If the update service is unavailable
 retry later or use the matching GitHub release for a manual update. The client
 never contains a repository credential.
 
-[Current qualification](BETA_TESTING_CURRENT.md) records the scope of update
+[Current qualification](RELEASE_0.5.0_QUALIFICATION.md) records the scope of update
 checks. Component fixtures do not prove the complete delivered upgrade and
 rollback flow. [Earlier design notes](INSTALLATION_UPDATE_DESIGN_HISTORY.md)
 remain historical research, not current installation instructions.

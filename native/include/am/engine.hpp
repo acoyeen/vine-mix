@@ -7,10 +7,15 @@
 #include <filesystem>
 #include <memory>
 #include <mutex>
+#include <stdexcept>
 #include <thread>
 #include <vector>
 
 namespace am {
+class ConfigurationConflictError : public std::runtime_error {
+public:
+    ConfigurationConflictError() : std::runtime_error("Configuration revision conflict. Refresh and retry your change.") {}
+};
 class Engine {
 public:
     explicit Engine(std::filesystem::path settings = {});
@@ -27,6 +32,9 @@ public:
     void recover(const std::string& action);
     std::vector<Endpoint> endpoints();
 private:
+#ifdef VINEMIX_ENGINE_LIFECYCLE_TESTS
+    friend struct EngineLifecycleAccess;
+#endif
     struct Port;
     struct Meter;
     struct Runtime;
@@ -36,6 +44,7 @@ private:
     void mixLoop();
     void maintenanceLoop();
     void validateEndpoints(const Configuration&);
+    void refreshOutputPorts(); // configurationMutex_ held; no saved-settings edit
     void writeLog(const std::string& message);
     ConfigurationStore store_;
     Configuration configuration_;

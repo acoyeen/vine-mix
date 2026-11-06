@@ -66,13 +66,20 @@ jobs:
           & ./.tools/dotnet/dotnet.exe run --project desktop/VineMix.UpdateWorkerTests -c Release
           if ($LASTEXITCODE) { throw 'Update-worker verification failed.' }
           ./scripts/test-update-release-tools.ps1 -EvidencePath "$PWD/artifacts/ci-verification/release-tools.json"
-      - name: Run synthetic audio and detached desktop checks
-        run: ./scripts/verify-offline.ps1 -ResultDirectory "$PWD/artifacts/ci-verification/offline"
+      - name: Run synthetic audio, production serialization and detached desktop checks
+        run: ./scripts/verify-offline.ps1 -ResultDirectory "$env:RUNNER_TEMP/vinemix-offline-verification" -BuildDirectory "$env:RUNNER_TEMP/vinemix-offline-native"
       - name: Retain verification reports
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: offline-verification
-          path: artifacts/ci-verification
+          path: |
+            artifacts/ci-verification/*.json
+            ${{ runner.temp }}/vinemix-offline-verification/*.json
+            ${{ runner.temp }}/vinemix-offline-verification/*.txt
+            ${{ runner.temp }}/vinemix-offline-verification/ui/*.json
+            ${{ runner.temp }}/vinemix-offline-verification/ui/*.png
+            ${{ runner.temp }}/vinemix-offline-verification/test-controller-identity/results.json
+            ${{ runner.temp }}/vinemix-offline-verification/test-local-ui-activation/results.json
           if-no-files-found: ignore
           retention-days: 14

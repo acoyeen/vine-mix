@@ -72,6 +72,8 @@ Json ControlServer::handle(const Json& request) {
         }
         else if (command == "shutdown") { response["message"] = "Audio engine stopped."; }
         else throw std::runtime_error("Unknown control command.");
+    } catch (const ConfigurationConflictError& error) {
+        response["ok"] = false; response["error"] = error.what(); response["errorCode"] = "revision_conflict";
     } catch (const SettingsWriteError& error) {
         response["ok"] = false; response["error"] = error.what(); response["errorCode"] = "settings_write_failed";
     } catch (const std::exception& error) { response["ok"] = false; response["error"] = error.what(); }

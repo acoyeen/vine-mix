@@ -90,6 +90,7 @@ public sealed class PathState
 {
     public string State { get; set; } = "Unassigned";
     public string Message { get; set; } = "";
+    public string Reason { get; set; } = "";
     public string EndpointId { get; set; } = "";
     public int Rate { get; set; }
     public int Channels { get; set; }

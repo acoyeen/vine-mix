@@ -222,6 +222,115 @@ public static class PackageActivationMutexFixture {
         $comparable.graph.nodes[0].controlMultiplier -eq -1 -and
         $comparable.graph.edges[0].fromPort -ceq 'audio' -and $comparable.graph.edges[0].toPort -ceq 'audio') 'Legacy snapshots receive only documented missing mixing defaults for comparison.'
     Check (($legacyConfiguration | ConvertTo-Json -Depth 20 -Compress) -ceq $legacyJson) 'Compatibility comparison never mutates the original configuration.'
+    $creativeDefaults = @{
+        echo = [pscustomobject][ordered]@{timeMs=300;repeats=3;mix=.25}
+        distortion = [pscustomobject][ordered]@{driveDb=6;toneHz=6000;mix=.5;outputDb=-6}
+    }
+    $explicitDefaults = Clone $comparable
+    foreach ($name in @('echo','distortion')) {
+        $explicitDefaults.graph.nodes[0] | Add-Member -NotePropertyName $name -NotePropertyValue (Clone $creativeDefaults[$name]) -Force
+    }
+    $defaultJson = Get-PackageActivationComparableConfiguration $explicitDefaults | ConvertTo-Json -Depth 20 -Compress
+    Check (($comparable | ConvertTo-Json -Depth 20 -Compress) -ceq $defaultJson) 'Old snapshots and snapshots with explicit default Echo/Distortion records compare equally.'
+    foreach ($name in @('echo','distortion')) {
+        Check (($comparable.graph.nodes[0].$name | ConvertTo-Json -Depth 20 -Compress) -ceq
+            ($creativeDefaults[$name] | ConvertTo-Json -Depth 20 -Compress)) ('Only the exact agreed missing record is supplied: ' + $name + '.')
+        foreach ($value in @($null, [pscustomobject]@{}, 'unexpected', [pscustomobject]@{mix=0}, [pscustomobject]@{futureSetting=17})) {
+            $explicit = Clone $explicitDefaults
+            $explicit.graph.nodes[0].$name = $value
+            $beforeJson = $explicit | ConvertTo-Json -Depth 20 -Compress
+            $normalized = Get-PackageActivationComparableConfiguration $explicit | ConvertTo-Json -Depth 20 -Compress
+            Check ($normalized -ceq $beforeJson -and $normalized -cne $defaultJson) ('Explicit null, partial, custom or unknown ' + $name + ' records remain unchanged and differ from defaults.')
+            Check (($explicit | ConvertTo-Json -Depth 20 -Compress) -ceq $beforeJson) ('Comparison does not mutate an explicit ' + $name + ' record.')
+        }
+    }
+    foreach ($change in @(
+        @{Record='echo';Field='timeMs';Value=301}, @{Record='echo';Field='repeats';Value=4}, @{Record='echo';Field='mix';Value=.26},
+        @{Record='distortion';Field='driveDb';Value=7}, @{Record='distortion';Field='toneHz';Value=6100},
+        @{Record='distortion';Field='mix';Value=.51}, @{Record='distortion';Field='outputDb';Value=-5}
+    )) {
+        $custom = Clone $explicitDefaults
+        $custom.graph.nodes[0].($change.Record).($change.Field) = $change.Value
+        $customJson = $custom | ConvertTo-Json -Depth 20 -Compress
+        $normalized = Get-PackageActivationComparableConfiguration $custom | ConvertTo-Json -Depth 20 -Compress
+        Check ($normalized -ceq $customJson -and $normalized -cne $defaultJson) ('A real creative setting change remains detectable: ' + $change.Record + '.' + $change.Field + '.')
+    }
+    Check (($legacyConfiguration | ConvertTo-Json -Depth 20 -Compress) -ceq $legacyJson) 'Creative compatibility defaults never mutate the original old snapshot.'
+    foreach ($kind in @('echo','mix')) {
+        foreach ($mapping in @(@{Feedback=0;Repeats=1}, @{Feedback=.009999999;Repeats=1},
+            @{Feedback=.01;Repeats=2}, @{Feedback=.099999999;Repeats=2}, @{Feedback=.1;Repeats=3},
+            @{Feedback=.35;Repeats=5}, @{Feedback=.5;Repeats=7}, @{Feedback=.9;Repeats=8})) {
+            $old = Clone $explicitDefaults; $old.graph.nodes[0].kind = $kind
+            $old.graph.nodes[0].echo = [pscustomobject][ordered]@{timeMs=417.125;feedback=$mapping.Feedback;mix=.375}
+            $oldJson = $old | ConvertTo-Json -Depth 20 -Compress
+            $current = Clone $old
+            $current.graph.nodes[0].echo = [pscustomobject][ordered]@{timeMs=417.125;repeats=$mapping.Repeats;mix=.375}
+            $normalized = Get-PackageActivationComparableConfiguration $old
+            Check ((ConvertTo-UiActivationCanonical $normalized) -ceq (ConvertTo-UiActivationCanonical $current)) ('Documented Echo migration matches count ' + $mapping.Repeats + ' for feedback ' + $mapping.Feedback + ' on ' + $kind + '.')
+            Check ((ConvertTo-UiActivationCanonical (Get-PackageActivationComparableConfiguration $normalized)) -ceq (ConvertTo-UiActivationCanonical $normalized)) 'Echo migration runs only once and is idempotent.'
+            Check (($old | ConvertTo-Json -Depth 20 -Compress) -ceq $oldJson) 'Feedback migration leaves the original snapshot untouched.'
+            $current.graph.nodes[0].echo.repeats = if ($mapping.Repeats -eq 8) { 7 } else { $mapping.Repeats + 1 }
+            Check ((ConvertTo-UiActivationCanonical $normalized) -cne (ConvertTo-UiActivationCanonical $current)) 'A different repeat count remains an activation mismatch after migration.'
+        }
+    }
+    for ($repeat = 1; $repeat -le 8; ++$repeat) {
+        $both = Clone $explicitDefaults; $both.graph.nodes[0].echo.repeats = $repeat
+        $both.graph.nodes[0].echo | Add-Member -NotePropertyName feedback -NotePropertyValue .35
+        $bothJson = $both | ConvertTo-Json -Depth 20 -Compress
+        $normalized = Get-PackageActivationComparableConfiguration $both
+        Check ($normalized.graph.nodes[0].echo.repeats -eq $repeat -and !$normalized.graph.nodes[0].echo.PSObject.Properties['feedback']) 'Explicit valid repeats take precedence over valid legacy feedback.'
+        Check (($both | ConvertTo-Json -Depth 20 -Compress) -ceq $bothJson) 'Explicit-count comparison preserves its input snapshot.'
+    }
+    $noCount = Clone $explicitDefaults; $noCount.graph.nodes[0].echo.PSObject.Properties.Remove('repeats')
+    Check ((ConvertTo-UiActivationCanonical (Get-PackageActivationComparableConfiguration $noCount)) -ceq (ConvertTo-UiActivationCanonical $explicitDefaults)) 'A complete Time/Mix record with neither count nor feedback receives the documented three-repeat default.'
+    foreach ($token in @('3.0','3e0','3.5')) {
+        $numeric = Clone $explicitDefaults
+        $numeric.graph.nodes[0].echo = ('{"timeMs":300,"repeats":' + $token + ',"feedback":0.35,"mix":0.25}') | ConvertFrom-Json
+        $numericJson = $numeric | ConvertTo-Json -Depth 20 -Compress
+        $normalized = Get-PackageActivationComparableConfiguration $numeric
+        if ($token -eq '3.5') {
+            Check (($normalized | ConvertTo-Json -Depth 20 -Compress) -ceq $numericJson) 'Fractional repeats retain their mismatch instead of falling back to valid legacy feedback.'
+        } else {
+            Check ((ConvertTo-UiActivationCanonical $normalized) -ceq (ConvertTo-UiActivationCanonical $explicitDefaults) -and
+                !$normalized.graph.nodes[0].echo.PSObject.Properties['feedback']) 'Finite mathematically integral decimal/exponent repeats take precedence and canonicalize to a whole count.'
+        }
+        Check (($numeric | ConvertTo-Json -Depth 20 -Compress) -ceq $numericJson) 'Numeric-count canonicalization never changes its input.'
+    }
+    foreach ($bad in @($null, '0.35', $true, -.001, .901, [pscustomobject]@{}, @(.35))) {
+        foreach ($withCount in @($false,$true)) {
+            $invalid = Clone $explicitDefaults
+            if (!$withCount) { $invalid.graph.nodes[0].echo.PSObject.Properties.Remove('repeats') }
+            $invalid.graph.nodes[0].echo | Add-Member -NotePropertyName feedback -NotePropertyValue $bad
+            $beforeJson = $invalid | ConvertTo-Json -Depth 20 -Compress
+            $normalized = Get-PackageActivationComparableConfiguration $invalid
+            Check (($normalized | ConvertTo-Json -Depth 20 -Compress) -ceq $beforeJson -and
+                (ConvertTo-UiActivationCanonical $normalized) -cne (ConvertTo-UiActivationCanonical $explicitDefaults)) 'Malformed legacy feedback remains a mismatch even when explicit repeats are valid.'
+        }
+    }
+    foreach ($bad in @($null, '3', $true, 0, 9, 2.5, [pscustomobject]@{}, @(3))) {
+        $invalid = Clone $explicitDefaults; $invalid.graph.nodes[0].echo.repeats = $bad
+        $invalid.graph.nodes[0].echo | Add-Member -NotePropertyName feedback -NotePropertyValue .35
+        $beforeJson = $invalid | ConvertTo-Json -Depth 20 -Compress
+        Check (((Get-PackageActivationComparableConfiguration $invalid) | ConvertTo-Json -Depth 20 -Compress) -ceq $beforeJson) 'Invalid explicit repeats cannot be replaced by a valid legacy count.'
+    }
+    foreach ($echo in @([pscustomobject]@{feedback=.35}, [pscustomobject]@{timeMs=300;feedback=.35},
+        [pscustomobject]@{timeMs='300';feedback=.35;mix=.25}, [pscustomobject]@{timeMs=19;feedback=.35;mix=.25},
+        [pscustomobject]@{timeMs=300;feedback=.35;mix=$null}, [pscustomobject]@{timeMs=300;feedback=.35;mix=1.01})) {
+        $invalid = Clone $explicitDefaults; $invalid.graph.nodes[0].echo = $echo
+        $beforeJson = $invalid | ConvertTo-Json -Depth 20 -Compress
+        Check (((Get-PackageActivationComparableConfiguration $invalid) | ConvertTo-Json -Depth 20 -Compress) -ceq $beforeJson) 'Partial or malformed Echo Time/Mix records remain unchanged by migration.'
+    }
+    $unknown = Clone $explicitDefaults
+    $unknown.graph.nodes[0].echo = [pscustomobject]@{timeMs=300;feedback=.35;mix=.25;futureSetting=17}
+    $normalized = Get-PackageActivationComparableConfiguration $unknown
+    $known = Clone $explicitDefaults; $known.graph.nodes[0].echo.repeats = 5
+    Check ($normalized.graph.nodes[0].echo.futureSetting -eq 17 -and
+        (ConvertTo-UiActivationCanonical $normalized) -cne (ConvertTo-UiActivationCanonical $known)) 'Unknown Echo fields survive valid migration and cannot be hidden from activation comparison.'
+    foreach ($change in @(@{Field='timeMs';Value=301}, @{Field='mix';Value=.26})) {
+        $changed = Clone $known; $changed.graph.nodes[0].echo.($change.Field) = $change.Value
+        $unknown.graph.nodes[0].echo.PSObject.Properties.Remove('futureSetting')
+        Check ((ConvertTo-UiActivationCanonical (Get-PackageActivationComparableConfiguration $unknown)) -cne (ConvertTo-UiActivationCanonical $changed)) 'A Time or Mix change remains detectable after feedback migration.'
+    }
     $comparable.graph.nodes[0].controlMultiplier = 0
     Check ((Get-PackageActivationComparableConfiguration $comparable).graph.nodes[0].controlMultiplier -eq 0) 'An explicit zero multiplier retains exact silence in activation comparisons.'
     $comparable.graph.nodes[0].controlMultiplier = 1.5

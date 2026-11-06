@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.5.0-beta — 6 November 2026
+
+- Add Echo with finite repeats and an effect-only Echo output, and Distortion
+  with oversampling, smoothed controls and matched internal path timing.
+- Add Gate/Expander Trigger inputs and Reverb Wet output. Merge effects into one
+  menu and distinguish secondary audio outputs with light-blue sockets.
+- Allow independent output nodes to share a device, summing their signals once
+  at the destination. Duplicated and pasted outputs start muted.
+- Extend zoom to 10–200%, use Quiet Blocks at low zoom, and add a saved optional
+  minimap. Blend cable endpoint colours, refine short curves and add full-detail
+  midpoint markers only to enabled connections.
+- Add pipeline keyboard travel, canvas arrow nudge/pan, keyboard zoom, single-node
+  or group F2 rename and direct typing into focused dials. Refresh accessible names.
+- Smooth meter colours while retaining borders and peak indicators. Correct
+  Settings sizing and decimal Level acknowledgement that could reset Undo/Redo.
+- Start new workspaces with the spaced seven-node voice chain and muted outputs;
+  retain existing saved graphs and settings.
+- Harden restart identity checks and refresh Help, release highlights, screenshots
+  and the front-page guide. See the [release notes](docs/releases/0.5.0-beta.md)
+  and [qualification record](docs/RELEASE_0.5.0_QUALIFICATION.md).
+- Reject malformed channel and process numbers before numeric conversion can
+  silently select a different identity; retain invalid settings and backups for recovery.
+
 ## 0.4.0-beta — 28 October 2026
 
 The [release hub](docs/RELEASE_0.4.0_BETA.md) tracks the combined scope,

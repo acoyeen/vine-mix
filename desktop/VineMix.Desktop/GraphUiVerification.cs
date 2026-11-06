@@ -84,6 +84,9 @@ internal static class GraphUiVerification
                 "Every current source, effect, mix, control and output type can be spawned");
             Require(workspace.Spawn("reroute", new Point(20, 20)).Length == 0 && workspace.Spawn("gain", new Point(20, 20)).Length == 0,
                 "Redundant Gain and Reroute nodes cannot be created from the workspace action.");
+            // All creatable kinds occupy the 32-node limit. Test the two legacy
+            // kinds in place of the new creative kinds in this comparison.
+            workspace.RemoveNode(spawned["echo"]); workspace.RemoveNode(spawned["distortion"]);
             var legacy = GraphDefaults.NewNode("reroute", 40, 40); mixer.Edit(c => c.Graph.Nodes.Add(legacy));
             var legacyGain = GraphDefaults.NewNode("gain", 40, 400); mixer.Edit(c => c.Graph.Nodes.Add(legacyGain)); spawned.Add("gain", legacyGain.Id);
             Require(mixer.GraphConfig.Nodes.Where(n => n.Kind is "output" or "virtualOutput").All(n => n.Muted)
@@ -115,7 +118,7 @@ internal static class GraphUiVerification
             Require(mixer.GraphConfig.Edges.Single(e => e.From == spawned["mix"] && e.To == spawned["virtualOutput"]) is { GainDb: 0, Muted: false }, "Adjusting one outgoing send preserves the other send");
             await Layout(window); workspace.FitAll(); await Layout(window);
             Render(window, Path.Combine(directory, "node-library.png"));
-            Require(Descendants<GraphNodeView>(window).Count() == GraphDefaults.Kinds.Length, "All node types create real inline editor controls");
+            Require(Descendants<GraphNodeView>(window).Count() == mixer.GraphConfig.Nodes.Count, "All nodes in the bounded legacy comparison create real inline editor controls");
             workspace.RemoveNode(spawned["eq"]);
             Require(mixer.GraphConfig.Nodes.All(n => n.Id != spawned["eq"]) && mixer.GraphConfig.Edges.All(e => e.From != spawned["eq"] && e.To != spawned["eq"]), "Removing a node also removes its audio and control connections");
             Require(GraphDefaults.Validate(mixer.GraphConfig).Length == 0, "The edited graph passes structural validation");

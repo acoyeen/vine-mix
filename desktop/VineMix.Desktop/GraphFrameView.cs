@@ -35,6 +35,7 @@ internal sealed class GraphFrameView : Grid
     };
     private Action<string>? _commitRename;
     private double _zoom = 1;
+    private NodeDetailLevel _detailLevel;
     private (string Name, string Color, int Count, double Zoom, bool Selected, bool Locked,
         bool HighContrast, Brush SelectedBrush, Brush TextBrush)? _appearance;
 
@@ -45,8 +46,11 @@ internal sealed class GraphFrameView : Grid
     internal string DisplayedName => _title.Text;
     internal Brush FrameBorderBrush => _outline.BorderBrush;
     internal bool IsRenaming => _rename.Visibility == Visibility.Visible;
-    internal static double HeaderHeight(double zoom) => Math.Max(52, 32 / SafeZoom(zoom));
-    internal static double MinimumWidth(double zoom) => Math.Max(260, 180 / SafeZoom(zoom));
+    internal bool HeaderVisible => _header.Visibility == Visibility.Visible;
+    // A frame never expands in world space merely because the camera zooms out.
+    // Hidden headings retain this reserved geometry, just like node headers.
+    internal static double HeaderHeight(double zoom) => 52;
+    internal static double MinimumWidth(double zoom) => 260;
 
     internal GraphFrameView()
     {
@@ -83,6 +87,7 @@ internal sealed class GraphFrameView : Grid
     internal void Update(string name, string colorKey, int memberCount, double zoom, bool selected, bool locked)
     {
         _zoom = SafeZoom(zoom);
+        RefreshHeaderVisibility();
         var color = GraphFramePalette.Get(colorKey);
         bool highContrast = ConsoleTheme.PreviewHighContrast ?? SystemParameters.HighContrast;
         if (locked && IsRenaming) CancelRename();
@@ -93,8 +98,7 @@ internal sealed class GraphFrameView : Grid
         if (_appearance == appearance) return;
         _appearance = appearance;
         double headerHeight = HeaderHeight(_zoom);
-        double inset = Math.Max(18, 10 / _zoom);
-        double radius = Math.Max(6, 3 / _zoom);
+        const double inset = 18, radius = 6;
         Brush outline = highContrast
             ? selected ? SystemColors.HighlightBrush : SystemColors.WindowTextBrush
             : selected ? selectedBrush : Frozen(color.Accent, 190);
@@ -112,12 +116,12 @@ internal sealed class GraphFrameView : Grid
         _header.Padding = new Thickness(inset, 0, inset, 0);
         Cursor = locked ? Cursors.Arrow : Cursors.SizeAll;
         _title.Text = name;
-        _title.FontSize = Math.Max(24, 15 / _zoom);
+        _title.FontSize = 24;
         _title.Foreground = highContrast ? SystemColors.WindowTextBrush : textBrush;
         string count = memberCount == 1 ? "1 node" : $"{memberCount} nodes";
         _rename.FontSize = _title.FontSize;
-        _rename.Height = headerHeight - 8 / _zoom;
-        _rename.Padding = new Thickness(4 / _zoom, 0, 4 / _zoom, 0);
+        _rename.Height = headerHeight - 8;
+        _rename.Padding = new Thickness(4, 0, 4, 0);
 
         string help = locked
             ? "Layout locked. Right-click for group actions."
@@ -135,6 +139,8 @@ internal sealed class GraphFrameView : Grid
         _commitRename = commit;
         _rename.Text = _title.Text;
         _rename.Visibility = Visibility.Visible;
+        _detailLevel = NodeDetailLevel.Full;
+        RefreshHeaderVisibility();
         _rename.Focus();
         _rename.SelectAll();
     }
@@ -156,11 +162,19 @@ internal sealed class GraphFrameView : Grid
         _commitRename = null;
         string name = _rename.Text.Trim();
         _rename.Visibility = Visibility.Collapsed;
+        RefreshHeaderVisibility();
         if (focusHeader) _header.Focus();
         if (commit) callback?.Invoke(string.IsNullOrEmpty(name) ? "Group" : name);
     }
 
-    private static double SafeZoom(double zoom) => double.IsFinite(zoom) ? Math.Clamp(zoom, .3, 2) : 1;
+    private void RefreshHeaderVisibility()
+    {
+        _detailLevel = GraphNodeDetailPolicy.At(_zoom, _detailLevel, IsRenaming);
+        _header.Visibility = _headerTint.Visibility = _detailLevel == NodeDetailLevel.Full
+            ? Visibility.Visible : Visibility.Hidden;
+    }
+
+    private static double SafeZoom(double zoom) => GraphCanvasPolicy.ClampZoom(zoom);
     private static Brush Frozen(Color color, byte alpha = 255)
     {
         var brush = new SolidColorBrush(Color.FromArgb(alpha, color.R, color.G, color.B));

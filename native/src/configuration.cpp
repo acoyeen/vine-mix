@@ -78,14 +78,32 @@ void migrateLegacyGraph(Configuration& config) {
 Configuration defaultConfiguration() {
     Configuration config;
     GraphNode input; input.id = "starter-input"; input.kind = "microphone";
-    input.name = "Physical input"; input.x = 48; input.y = 200; input.autoAssignDevice = false;
+    input.name = "Microphone"; input.x = 48; input.y = 200; input.autoAssignDevice = false;
+    GraphNode highPass; highPass.id = "starter-high-pass"; highPass.kind = "highPass";
+    highPass.name = "High-pass filter"; highPass.x = 499; highPass.y = 200;
+    highPass.eqBands = {{"highPass", true, 80, 0, .70710678, 0}};
+    GraphNode denoiser; denoiser.id = "starter-denoiser"; denoiser.kind = "denoiser";
+    denoiser.name = "Denoiser"; denoiser.x = 950; denoiser.y = 200;
+    denoiser.denoiser.algorithm = "rnnoise";
+    GraphNode expander; expander.id = "starter-expander"; expander.kind = "expander";
+    expander.name = "Expander"; expander.x = 1401; expander.y = 200;
+    GraphNode compressor; compressor.id = "starter-compressor"; compressor.kind = "compressor";
+    compressor.name = "Compressor"; compressor.x = 1924; compressor.y = 200;
+    compressor.dynamicsUiVersion = 1;
     GraphNode virtualOutput; virtualOutput.id = "starter-virtual-output"; virtualOutput.kind = "virtualOutput";
-    virtualOutput.name = "Virtual output"; virtualOutput.x = 480; virtualOutput.y = 48; virtualOutput.muted = true;
+    virtualOutput.name = "Virtual output"; virtualOutput.x = 2447; virtualOutput.y = 464; virtualOutput.muted = true;
     GraphNode output; output.id = "starter-listening-output"; output.kind = "output";
-    output.name = "Listening output"; output.x = 480; output.y = 420; output.gainDb = -24;
+    output.name = "Listening output"; output.x = 2447; output.y = 48; output.gainDb = -24;
     output.muted = true; output.autoAssignDevice = false;
-    config.graph.nodes = {input, virtualOutput, output};
-    config.graph.edges = {{"starter-virtual-route", input.id, virtualOutput.id}, {"starter-listening-route", input.id, output.id}};
+    // Match GraphDefaults.Fresh, including every retained setting. Only new
+    // stores and an explicit Start fresh adopt this graph; existing version-2
+    // workspaces and version-1 migration keep their own graph unchanged.
+    config.graph.nodes = {input, highPass, denoiser, expander, compressor, output, virtualOutput};
+    config.graph.edges = {{"starter-high-pass-route", input.id, highPass.id},
+        {"starter-denoiser-route", highPass.id, denoiser.id}, {"starter-expander-route", denoiser.id, expander.id},
+        {"starter-compressor-route", expander.id, compressor.id}, {"starter-listening-route", compressor.id, output.id},
+        {"starter-virtual-route", compressor.id, virtualOutput.id}};
+    config.graph.zoom = .4;
     return config;
 }
 
@@ -157,9 +175,6 @@ void validateConfiguration(const Configuration& config) {
     for (const auto& device : config.mainOutputs) checkBinding(device);
     checkBinding(config.virtualInputCapture); checkBinding(config.virtualInputPlayback);
     checkBinding(config.virtualOutputRender); checkBinding(config.virtualOutputCapture);
-    const auto same = [](const DeviceBinding& a, const DeviceBinding& b) {
-        return (!a.id.empty() && a.id == b.id) || (!a.stableId.empty() && a.stableId == b.stableId);
-    };
     for (std::size_t i = 0; i < config.graph.nodes.size(); ++i) {
         const auto& node = config.graph.nodes[i];
         checkBinding(node.device); (void)widen(node.id); (void)widen(node.name); (void)widen(node.app.name);
@@ -168,16 +183,9 @@ void validateConfiguration(const Configuration& config) {
             throw std::runtime_error("The saved application identity is too long.");
         if (node.kind == "appInput" && node.app.processId && node.app.executablePath.empty())
             throw std::runtime_error("Select the application again so its executable identity can be saved safely.");
-        // Input nodes may share capture while retaining independent processing.
-        // Sinks remain exclusive: multiple writers would duplicate audio and
-        // conflict with the direct virtual microphone's exclusive stream.
-        for (std::size_t j = 0; j < i; ++j) {
-            const auto& previous = config.graph.nodes[j];
-            const bool render = node.kind == "output" || node.kind == "virtualOutput";
-            const bool otherRender = previous.kind == "output" || previous.kind == "virtualOutput";
-            if (render && otherRender && same(node.device, previous.device))
-                throw std::runtime_error("This output device already has a node. Connect another cable to that node instead.");
-        }
+        // Repeated logical inputs and outputs retain their own controls. The
+        // engine shares capture and sums output contributions into one stream
+        // per resolved endpoint, including exclusive virtual outputs.
     }
     (void)compileGraph(config.graph);
 }

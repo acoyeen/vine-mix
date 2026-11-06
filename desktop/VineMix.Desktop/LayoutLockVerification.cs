@@ -123,6 +123,7 @@ internal static class LayoutLockVerification
                 "Locking during a node drag cancels its visual preview and restores the original position without a history edit.");
             require(workspace.Spawn("mix", new Point()) == "" && workspace.ConnectNodes("lock-input", "lock-output").Length > 0
                 && !workspace.PasteSelection(copied, new Point(20, 20)) && !workspace.DuplicateInput("lock-input")
+                && !workspace.DuplicateOutput("lock-output")
                 && !workspace.DetachNode("lock-effect"),
                 "Add, connect, paste, duplicate and detach actions consistently refuse locked layout changes.");
             workspace.BeginNodeMove("lock-input", new Point()); workspace.UpdateNodeMove(new Point(40, 40)); workspace.FinishNodeMove();

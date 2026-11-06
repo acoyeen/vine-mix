@@ -15,7 +15,7 @@ internal static class NodeCatalog
         {
             "Inputs" => "Bring sound into the workspace from a microphone, a virtual cable or a running app.",
             "Outputs" => "Send the finished mix to a listening device or to a virtual microphone for another app.",
-            "Effects" => "Shape tone, control loudness, reduce unwanted noise or add space to an audio path.",
+            "Effects" => "Shape tone, dynamics and noise, or add reverb, echoes and distortion.",
             "Mixing" => "Combine, split and blend audio paths, or adjust their stereo position and width.",
             "Controls" => "Scale several node levels together using a linked multiplier.",
             _ => ""
@@ -26,7 +26,7 @@ internal static class NodeCatalog
     [
         new("Inputs", "NodeInputHeaderBrush", ["microphone", "virtualInput", "appInput"]),
         new("Outputs", "NodeOutputHeaderBrush", ["output", "virtualOutput"]),
-        new("Effects", "NodeProcessorHeaderBrush", ["eq", "tone", "voiceColor", "highPass", "lowPass", "compressor", "limiter", "ducking", "expander", "gate", "alignmentDelay", "denoiser", "plosive", "deEsser", "reverb"]),
+        new("Effects", "NodeProcessorHeaderBrush", ["tone", "voiceColor", "highPass", "lowPass", "limiter", "denoiser", "reverb", "echo", "distortion", "eq", "compressor", "ducking", "expander", "gate", "alignmentDelay", "plosive", "deEsser"]),
         new("Mixing", "NodeUtilityHeaderBrush", ["mix", "pan", "mono", "channelSwap", "stereoWidth", "stereoPan", "crossfade", "stereoCombine", "stereoSplit"]),
         new("Controls", "NodeControllerHeaderBrush", ["control"])
     ];
@@ -50,13 +50,15 @@ internal static class NodeCatalog
         "compressor" => "Reduce louder passages of its own audio with threshold, ratio, attack, release and make-up gain.",
         "limiter" => "Limit stereo sample peaks to a ceiling, with no lookahead.",
         "ducking" => "Static ducking lowers by a fixed amount; dynamic ducking follows trigger loudness above threshold. Trigger audio is detector only.",
-        "expander" => "Gradually reduce quiet audio below the threshold using downward expansion.",
-        "gate" => "Reduce quiet audio using a noise gate with hold, range and hysteresis.",
+        "expander" => "Gradually reduce quiet audio below the threshold. An optional Trigger input can detect a separate signal.",
+        "gate" => "Reduce quiet audio with hold, range and hysteresis. An optional Trigger input can detect a separate signal.",
         "alignmentDelay" => "Delay one audio path by a precise number of milliseconds or samples to align it with another.",
         "denoiser" => "Reduce background noise in speech with RNNoise or SpeexDSP. Adds a short processing delay, including when bypassed.",
         "plosive" => "Reduce low-frequency P and B thumps or microphone pops when they exceed a threshold.",
         "deEsser" => "Reduce harsh S and SH sounds when their high-frequency level exceeds a threshold.",
-        "reverb" => "Add a room-like tail and a sense of space, blended with the original sound.",
+        "reverb" => "Add a room-like tail. Audio blends dry sound and reverb; the extra Wet output carries reverb alone, independent of Mix.",
+        "echo" => "Add 1–8 fading echoes. Time sets spacing and Mix blends original sound with echoes on Audio. The separate Echo output carries only echoes, independent of Mix.",
+        "distortion" => "Add warmth or stronger distortion with Drive, Tone, Mix and Output. Adds 0.67 ms delay, including bypass.",
         "mix" => "Combine several incoming audio paths and adjust their shared level, or use one input to control a single branch.",
         "pan" => "Adjust left/right stereo balance by reducing the opposite channel. Centre preserves the original stereo sound.",
         "mono" => "Combine left and right equally and send the same centred sound to both channels.",
@@ -73,7 +75,8 @@ internal static class NodeCatalog
     };
     internal static bool MatchesSearch(string kind, string query)
         => (Title(kind) + " " + kind + " " + CategoryFor(kind).Title + " " + Description(kind)
-            + (kind == "ducking" ? " sidechain music voice trigger" : kind == "control" ? " multiplier volume" : "")).Contains(query, System.StringComparison.OrdinalIgnoreCase);
+            + (kind == "ducking" ? " sidechain music voice trigger" : kind == "control" ? " multiplier volume"
+                : kind == "echo" ? " delay repeats feedback" : kind == "distortion" ? " saturation overdrive warmth" : "")).Contains(query, System.StringComparison.OrdinalIgnoreCase);
     internal static string HeaderBrushKey(string kind) => CategoryFor(kind).HeaderBrushKey;
     internal static Brush HeaderBrush(string kind) => CategoryFor(kind).HeaderBrush;
 }

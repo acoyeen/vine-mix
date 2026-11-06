@@ -118,7 +118,7 @@ internal static class ModelMaintenanceVerification
         foreach (string kind in new[] { "compressor", "limiter", "ducking" })
         {
             var node = GraphDefaults.NewNode(kind, 314, 159);
-            require(NodeCatalog.CanCreate(kind) && NodeCatalog.CategoryFor(kind).Title == "Effects"
+            require(NodeCatalog.CanCreate(kind) && NodeCatalog.CategoryFor(kind).HeaderBrushKey == "NodeProcessorHeaderBrush"
                 && GraphDefaults.HasAudioInput(kind) && GraphDefaults.HasAudioOutput(kind),
                 kind + " is a distinct processing node in the Effects catalogue.");
             require(node.DynamicsUiVersion == (kind == "compressor" ? 1 : 0),

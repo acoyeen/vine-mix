@@ -197,6 +197,28 @@ __declspec(noinline) void physicalAndVirtualOutputMuteIsolation() {
         verify(state[0], state[1], state[2]);
     }
 }
+__declspec(noinline) void deferredEndpointClipping() {
+    AudioGraph graph;
+    graph.nodes = {node("positive", "microphone"), node("negative", "microphone"), node("one", "output"), node("two", "output")};
+    graph.nodes[2].gainDb = graph.nodes[3].gainDb = 6.0206;
+    graph.edges = {{"one", "positive", "one"}, {"two", "negative", "two"}};
+    const auto plan = compileGraph(graph);
+    auto dsp = std::make_unique<GraphProcessor>(); dsp->prepare(plan);
+    std::array<Frame, quantumFrames> positive, negative;
+    positive.fill({.75f, -.75f}); negative.fill({-.5f, .5f});
+    GraphProcessor::Inputs inputs{}; inputs[0] = positive; inputs[1] = negative;
+    for (int block = 0; block < 4; ++block) dsp->process(plan, inputs, true);
+    expectNear(dsp->output(2).back().left, 1.5, 1e-6, "Engine aggregation receives logical sink headroom above full scale");
+    expectNear(dsp->output(2).back().left + dsp->output(3).back().left, .5, 1e-6,
+        "Opposing logical sinks can cancel before the shared endpoint boundary");
+    expectNear(dsp->output(2).back().right + dsp->output(3).back().right, -.5, 1e-6,
+        "Deferred clipping retains independent right-channel cancellation");
+    expect(dsp->meter(2).clipped && dsp->meter(2).peakLeft == 1.f,
+        "A logical sink retains its own overload meter even when its device sum later cancels");
+    dsp->process(plan, inputs);
+    expect(dsp->output(2).back().left == 1.f && dsp->output(2).back().right == -1.f,
+        "Standalone graph processing retains its existing bounded sink contract");
+}
 __declspec(noinline) void transparentBypass() {
     const auto gain = [](double db) { return std::pow(10., db / 20.); };
     for (const char* kind : {"mix", "gain", "eq", "tone", "highPass", "lowPass", "compressor", "limiter", "ducking", "pan", "mono", "reroute"}) {
@@ -352,6 +374,9 @@ __declspec(noinline) void validation() {
     bad = good; bad.nodes[1].eqBands[0].q = 0; rejects([&] { compileGraph(bad); }, "Unstable EQ Q rejected");
     bad = good; bad.nodes[1].compressor.attackMs = 0; rejects([&] { compileGraph(bad); }, "Zero compressor attack rejected");
     bad = good; bad.zoom = 0; rejects([&] { compileGraph(bad); }, "Invalid canvas scale rejected");
+    bad = good; bad.zoom = .1; compileGraph(bad);
+    expect(am::Json(bad).get<am::AudioGraph>().zoom == .1, "Ten percent canvas zoom survives production serialization");
+    bad.zoom = std::nextafter(.1, 0.); rejects([&] { compileGraph(bad); }, "Zoom immediately below ten percent is rejected");
     bad = good; for (int i = 0; i < 32; ++i) bad.nodes.push_back(node(("n" + std::to_string(i)).c_str(), "gain"));
     rejects([&] { compileGraph(bad); }, "Node bound enforced");
     Configuration configuration = defaultConfiguration(); configuration.graph = good;
@@ -371,14 +396,18 @@ __declspec(noinline) void validation() {
     expect(configuration.graph.nodes.back().app.processId == 101, "Different instances of the same application remain selectable");
     configuration.graph = good; configuration.graph.nodes[2].device.id = "same-output";
     configuration.graph.nodes.push_back(node("duplicate-output", "output")); configuration.graph.nodes.back().device.id = "same-output";
-    rejects([&] { validateConfiguration(configuration); }, "Duplicate listening outputs remain rejected");
+    validateConfiguration(configuration);
+    expect(configuration.graph.nodes.size() == 4, "Duplicate listening outputs are valid logical contributions");
     configuration.graph.nodes[2].kind = configuration.graph.nodes.back().kind = "virtualOutput";
-    rejects([&] { validateConfiguration(configuration); }, "Duplicate exclusive virtual outputs remain rejected");
+    validateConfiguration(configuration);
+    expect(configuration.graph.nodes.size() == 4, "Duplicate virtual outputs share one exclusive endpoint in the engine");
     configuration.graph.nodes.back().kind = "output";
-    rejects([&] { validateConfiguration(configuration); }, "Output uniqueness applies across physical and virtual sink kinds");
+    validateConfiguration(configuration);
+    expect(configuration.graph.nodes.size() == 4, "Endpoint transport compatibility is checked against actual device metadata, not duplicate saved IDs");
     configuration.graph.nodes[2].device.id = "old-output"; configuration.graph.nodes.back().device.id = "new-output";
     configuration.graph.nodes[2].device.stableId = configuration.graph.nodes.back().device.stableId = "stable-output";
-    rejects([&] { validateConfiguration(configuration); }, "Output uniqueness preserves matching stable identities after a reinstall");
+    validateConfiguration(configuration);
+    expect(configuration.graph.nodes.size() == 4, "Saved exact/stable aliases may converge on one shared output stream");
     configuration.graph = good; configuration.graph.nodes[0].kind = "appInput"; configuration.graph.nodes[0].app.processId = 100;
     rejects([&] { validateConfiguration(configuration); }, "Bare reusable PID rejected");
 }
@@ -687,27 +716,52 @@ __declspec(noinline) void finiteAndTransitions() {
 std::string contents(const std::filesystem::path& path) { std::ifstream input(path, std::ios::binary); std::ostringstream text; text << input.rdbuf(); return text.str(); }
 __declspec(noinline) void stereoMetersAndMicrophoneMono() {
     const auto defaults = defaultConfiguration();
-    expect(defaults.graph.nodes.size() == 3 && defaults.graph.edges.size() == 2,
-        "Fresh workspace has exactly one physical input and two output routes");
+    expect(defaults.graph.nodes.size() == 7 && defaults.graph.edges.size() == 6,
+        "Fresh workspace has one microphone, four voice processors and two output routes");
     expect(defaults.graph.nodes[0].id == "starter-input" && defaults.graph.nodes[0].kind == "microphone"
-        && defaults.graph.nodes[1].id == "starter-virtual-output" && defaults.graph.nodes[1].kind == "virtualOutput"
-        && defaults.graph.nodes[2].id == "starter-listening-output" && defaults.graph.nodes[2].kind == "output",
-        "Fresh workspace identities and node kinds are stable");
+        && defaults.graph.nodes[1].id == "starter-high-pass" && defaults.graph.nodes[1].kind == "highPass"
+        && defaults.graph.nodes[2].id == "starter-denoiser" && defaults.graph.nodes[2].kind == "denoiser"
+        && defaults.graph.nodes[3].id == "starter-expander" && defaults.graph.nodes[3].kind == "expander"
+        && defaults.graph.nodes[4].id == "starter-compressor" && defaults.graph.nodes[4].kind == "compressor"
+        && defaults.graph.nodes[5].id == "starter-listening-output" && defaults.graph.nodes[5].kind == "output"
+        && defaults.graph.nodes[6].id == "starter-virtual-output" && defaults.graph.nodes[6].kind == "virtualOutput",
+        "Fresh workspace has the agreed voice-chain order and stable identities");
     expect(defaults.graph.nodes[0].x == 48 && defaults.graph.nodes[0].y == 200
-        && defaults.graph.nodes[1].x == 480 && defaults.graph.nodes[1].y == 48
-        && defaults.graph.nodes[2].x == 480 && defaults.graph.nodes[2].y == 420
-        && defaults.graph.panX == 20 && defaults.graph.panY == 20 && defaults.graph.zoom == 1,
+        && defaults.graph.nodes[1].x == 499 && defaults.graph.nodes[1].y == 200
+        && defaults.graph.nodes[2].x == 950 && defaults.graph.nodes[2].y == 200
+        && defaults.graph.nodes[3].x == 1401 && defaults.graph.nodes[3].y == 200
+        && defaults.graph.nodes[4].x == 1924 && defaults.graph.nodes[4].y == 200
+        && defaults.graph.nodes[5].x == 2447 && defaults.graph.nodes[5].y == 48
+        && defaults.graph.nodes[6].x == 2447 && defaults.graph.nodes[6].y == 464
+        && defaults.graph.panX == 20 && defaults.graph.panY == 20 && defaults.graph.zoom == .4,
         "Fresh workspace matches the desktop starter layout and camera");
-    expect(!defaults.graph.nodes[0].muted && defaults.graph.nodes[1].muted && defaults.graph.nodes[2].muted
-        && defaults.graph.nodes[2].gainDb == -24 && !defaults.graph.nodes[0].autoAssignDevice
-        && defaults.graph.nodes[1].autoAssignDevice && !defaults.graph.nodes[2].autoAssignDevice,
+    expect(std::none_of(defaults.graph.nodes.begin(), defaults.graph.nodes.begin() + 5, [](const auto& node) { return node.muted || node.bypass || node.gainDb != 0; })
+        && defaults.graph.nodes[5].muted && defaults.graph.nodes[6].muted
+        && defaults.graph.nodes[5].gainDb == -24 && defaults.graph.nodes[6].gainDb == 0
+        && !defaults.graph.nodes[0].autoAssignDevice && !defaults.graph.nodes[5].autoAssignDevice && defaults.graph.nodes[6].autoAssignDevice,
         "Starter outputs stay muted and physical hardware requires explicit assignment");
+    const auto& highPass = defaults.graph.nodes[1];
+    expect(highPass.eqBands.size() == 1 && highPass.eqBands[0].type == "highPass" && highPass.eqBands[0].enabled
+        && highPass.eqBands[0].frequencyHz == 80 && highPass.eqBands[0].gainDb == 0
+        && highPass.eqBands[0].q == .70710678 && highPass.eqBands[0].resetFrequencyHz == 0,
+        "Starter high-pass uses the existing 80 Hz filter defaults, including reset metadata");
+    expect(defaults.graph.nodes[2].denoiser.algorithm == "rnnoise" && defaults.graph.nodes[2].denoiser.rnnoiseMix == 1
+        && defaults.graph.nodes[2].denoiser.suppressionDb == -18,
+        "Only the fresh Denoiser factory opts into the existing full RNNoise setting");
+    expect(defaults.graph.nodes[3].expander == ExpanderSettings{} && defaults.graph.nodes[4].dynamicsUiVersion == 1
+        && Json(defaults.graph.nodes[4].compressor) == Json(CompressorSettings{}),
+        "Starter dynamics retain normal Expander and current Compressor defaults");
     for (const auto& fresh : defaults.graph.nodes)
         expect(fresh.device.id.empty() && fresh.device.stableId.empty() && fresh.device.channel == -1 && !fresh.mono,
             "Every fresh endpoint is unassigned, stereo and Mono off");
-    expect(defaults.graph.edges[0].from == "starter-input" && defaults.graph.edges[0].to == "starter-virtual-output"
-        && defaults.graph.edges[1].from == "starter-input" && defaults.graph.edges[1].to == "starter-listening-output",
-        "Starter input fans out directly to both output nodes");
+    for (std::size_t i = 0; i < 4; ++i)
+        expect(defaults.graph.edges[i].from == defaults.graph.nodes[i].id && defaults.graph.edges[i].to == defaults.graph.nodes[i + 1].id,
+            "Starter microphone follows every voice processor in the selected order");
+    expect(defaults.graph.edges[4].from == "starter-compressor" && defaults.graph.edges[4].to == "starter-listening-output"
+        && defaults.graph.edges[5].from == "starter-compressor" && defaults.graph.edges[5].to == "starter-virtual-output"
+        && std::all_of(defaults.graph.edges.begin(), defaults.graph.edges.end(), [](const auto& edge) {
+            return edge.kind == "audio" && edge.fromPort == "audio" && edge.toPort == "audio" && edge.gainDb == 0 && !edge.muted;
+        }), "The processed voice branches to both muted outputs with ordinary unity-level audio cables");
     validateConfiguration(defaults);
     auto older = Json(defaults); for (auto& item : older["graph"]["nodes"]) item.erase("autoAssignDevice");
     const auto compatibleDefaults = older.get<Configuration>();
@@ -1166,7 +1220,7 @@ __declspec(noinline) void linkedMultiplier() {
 int main() {
     try {
         SetPriorityClass(GetCurrentProcess(), BELOW_NORMAL_PRIORITY_CLASS);
-        migration(); controls(); physicalAndVirtualOutputMuteIsolation(); transparentBypass(); bypassLevelTransitions(); effects(); validation(); extendedEqualizerAndTone(); transparentFilterCompilation(); standaloneFiltersAndNotch(); finiteAndTransitions(); stereoMetersAndMicrophoneMono(); dynamicsTelemetry(); persistence(); fanoutQueues(); mixingUtilities(); mixingWeightTransitions(); linkedMultiplier();
+        migration(); controls(); physicalAndVirtualOutputMuteIsolation(); deferredEndpointClipping(); transparentBypass(); bypassLevelTransitions(); effects(); validation(); extendedEqualizerAndTone(); transparentFilterCompilation(); standaloneFiltersAndNotch(); finiteAndTransitions(); stereoMetersAndMicrophoneMono(); dynamicsTelemetry(); persistence(); fanoutQueues(); mixingUtilities(); mixingWeightTransitions(); linkedMultiplier();
         std::cout << "PASS: " << assertions << " offline assertions; 64 routing migrations, controls, independent physical/virtual output mutes, transparent intermediate/control bypass, 0..8-band EQ, Low/Mid/High tone, high/low-pass nodes, notch, compressor, stereo meters, microphone Mono, signal channels, validation, transitions, persistence, and bounded fanout. No audio devices were opened.\n";
         return 0;
     } catch (const std::exception& error) { std::cerr << "FAIL after " << assertions << " assertions: " << error.what() << '\n'; return 1; }

@@ -246,15 +246,6 @@ internal sealed class WorkspaceGraphRestore
         }
         error = GraphDefaults.Validate(next);
         if (error.Length > 0) return false;
-        foreach (var node in next.Nodes)
-        {
-            // Input lanes may intentionally share one capture device or app;
-            // only physical/virtual playback sinks must remain exclusive.
-            if (node.Kind is "output" or "virtualOutput"
-                && VirtualDeviceBindings.IsAssigned(node.Device)
-                && VirtualDeviceBindings.IsUsed(next, node.Id, new Endpoint { Id = node.Device.Id, StableId = node.Device.StableId }))
-            { error = $"The device for “{node.Name}” is now used by another node."; return false; }
-        }
         restored = next;
         return true;
     }

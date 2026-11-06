@@ -23,6 +23,43 @@ priorities, decisions and verification limits are retained below; old entries
 link here. This review changes documentation only. Captured items remain
 proposals, and previously local or released work keeps its recorded status.
 
+**Current manual-feedback checkpoint — 2026-11-04:** The maintainer reports F2
+rename/Find by custom name and node type, direct dial entry and Page Up/Down
+working in the installed candidate. These are maintainer-reported results, not
+independently observed checks. The latest meter correction restores the full
+border and original peak indicator, including its idle cap; only the tiny red
+sliver is removed by insetting the gradient 1 DIP inside the border. The correction
+is offline verified and locally integrated: 14,748 detached checks / 314 renders /
+zero binding errors, including 525 focused checks. Guarded
+interface-only activation preserved the same engine identity/hash and unchanged
+settings/preferences through eight seconds without rollback. Maintainer follow-up
+remains pending. The preceding candidate removed the idle strip and
+top border; that interpretation is superseded. Its combined run, including Settings
+([ISSUE-025](KNOWN_ISSUES.md#issue-025)), passed 14,726 detached checks,
+314 renders and zero binding errors. Guarded interface-only integration through
+the trusted shell and actual shortcut passed, preserving the engine identity/hash,
+current configuration and settings/preferences, advancing frames and running
+paths through eight seconds without rollback. Final audit verified all 36 payload
+hashes and matching source/build receipt/installed inventory identity.
+Maintainer follow-up review remains pending.
+The changes remain unreleased 0.5.0 work with the 0.4.0 Beta identity. Related node/group
+heading changes are in [ISSUE-005](KNOWN_ISSUES.md#issue-005), and the darker,
+title-free minimap is in [IDEA-053](IDEAS.md#idea-053). Earlier test counts and
+local integration below describe the earlier baseline, not these new refinements.
+
+**Earlier source and local integration checkpoint — 2026-11-04:** TWEAK-021–023 were
+implemented, offline verified and locally integrated for **unreleased 0.5.0**.
+The final detached run passed 14,583 checks with 305 previews and zero binding
+errors; focused evidence remains in
+the entries below. Release identity/downloads remain 0.4.0 Beta. Authorized
+guarded paired activation passed; the final keyboard correction used an
+interface-only update that preserved the same engine process/hash. Each update
+preserved its then-current saved settings/preferences and newer workspace edits
+between updates. Physical settings and final installed payload/source inventory
+were verified. Actual keyboard/IME/Narrator usability and new-route listening
+remain separate qualification. See the
+[execution report](IMPLEMENTATION_0.5.0.md).
+
 | ID | Tweak | Status |
 | --- | --- | --- |
 | [TWEAK-001](#tweak-001) | Reorder What's New and About in Settings | Released in 0.4.0 Beta |
@@ -45,6 +82,351 @@ proposals, and previously local or released work keeps its recorded status.
 | [TWEAK-018](#tweak-018) | Focused Level control sockets and percentage Linked control | Released in 0.4.0 Beta |
 | [TWEAK-019](#tweak-019) | Short Ducking Trigger label | Released in 0.4.0 Beta |
 | [TWEAK-020](#tweak-020) | Centered text-only group heading | Released in 0.4.0 Beta |
+| [TWEAK-021](#tweak-021) | Smooth green/yellow/red audio-meter gradient | Full-border/peak-indicator restoration offline verified and locally integrated; follow-up review pending; unreleased 0.5.0 |
+| [TWEAK-022](#tweak-022) | F2 renames one selected node or group | Offline/local evidence plus maintainer-reported manual pass; unreleased 0.5.0 |
+| [TWEAK-023](#tweak-023) | Type a value directly from a focused dial | Offline/local evidence plus maintainer-reported manual pass; unreleased 0.5.0 |
+| [TWEAK-024](#tweak-024) | One Effects category | Offline verified and locally integrated; unreleased 0.5.0; earlier split historical |
+| [TWEAK-025](#tweak-025) | Quiet Blocks at low zoom | Offline verified and locally integrated; maintainer follow-up pending; supersedes type symbols |
+| [TWEAK-026](#tweak-026) | Socket-colour cable gradients and full-detail midpoint markers | Offline verified and locally integrated; unreleased 0.5.0 |
+
+<a id="tweak-026"></a>
+## TWEAK-026 Socket-colour cable gradients and full-detail midpoint markers
+
+- **Date:** 2026-11-06. **Status:** Implemented, offline verified and locally integrated; unreleased 0.5.0.
+- **Need:** Make crowded routes easier to trace, especially where a cable passes
+  behind a nearby node and can be mistaken for a connection to that node.
+- **Requested colour behavior:** Give secondary effect audio outputs, including
+  Reverb Wet and Echo Echo, a consistent light blue inspired by the mixing-node
+  palette. Retain the circular audio socket shape. Each cable blends from its
+  source socket colour to its destination socket colour; matching endpoints
+  remain solid. A green Audio output feeding a purple Trigger input therefore
+  produces a green-to-purple cable. Colours follow sockets, not node headers.
+- **Addition:** Show a small circular marker halfway along each enabled, established
+  cable while the canvas shows full node details (nominally 30% zoom and above).
+  Hide markers with simplified nodes. Use the existing detail-transition policy
+  rather than introducing a separately drifting zoom threshold.
+- **Disabled-cable refinement, 2026-11-06 — offline verified and locally integrated:** Hide the
+  midpoint marker when a connection is turned off. Its dashed cable remains
+  visible and selectable; selection, zoom and theme changes must not restore the
+  marker until the connection is enabled again. Re-enabling and undo/redo follow
+  the existing full-detail visibility policy. This supersedes the original dimmed
+  marker on muted cables, without changing node bypass or audio settings.
+  All 110 focused cable checks passed, including disabled selection, zoom, high
+  contrast, retained control edits, re-enabling and undo. The detached screenshot
+  was reviewed. Guarded interface-only installation preserved the running engine
+  and settings; installed payloads and source provenance were verified. See the
+  [integration evidence](IMPLEMENTATION_0.5.0.md#hide-disabled-cable-markers--6-november-2026).
+- **Selected presentation:** The marker is stationary and purely visual, sits on
+  the curve itself, and takes the cable's colour at that point. It is 7.5 canvas
+  DIPs across, scaling with the nodes. Effect returns use `#8EC8E8`; Stereo Split channels remain ordinary
+  green audio. Selection/mute/high contrast retain their meaningful styling.
+- **Slight enlargement, 2026-11-06 — offline verified and locally integrated:** Increase the
+  diameter from 6 to 7.5 canvas DIPs (25%) for a little more visibility. Retain the
+  clarified proportional sizing and all other marker behavior. This supersedes
+  only the diameter in the earlier sizing correction below. Sixty focused checks
+  passed. Guarded interface-only activation preserved the running engine and
+  settings; all installed payloads and source provenance were verified. See the
+  [enlargement evidence](IMPLEMENTATION_0.5.0.md#slightly-larger-midpoint-markers--6-november-2026).
+- **Size correction, 2026-11-06 — offline verified and locally integrated:** The maintainer
+  clarified that dots should stay the same size relative to nodes, shrinking on
+  screen when zooming out. Remove inverse-zoom radius compensation and retain
+  six canvas DIPs at every zoom. This supersedes the initial fixed six-screen-DIP
+  sizing; placement, colours, occlusion and full-detail visibility remain.
+  Sixty focused checks passed, including actual rendered size at 30%, 55%, 100%
+  and 200%. Guarded interface-only activation preserved the running engine and
+  current settings. See the [sizing evidence](IMPLEMENTATION_0.5.0.md#midpoint-sizing-correction--6-november-2026).
+- **Scope/dependencies:** Desktop socket styling and cable presentation, coordinated
+  with existing selection, mute, high contrast, hit testing and zoom detail guards.
+  Preserve audio routing, saved graphs and engine behavior.
+- **Related short-route defect, 2026-11-06:** The maintainer reported tight cables
+  folding back on themselves. [ISSUE-028](KNOWN_ISSUES.md#issue-028) tracks the
+  distance-scaled curve correction; midpoint size and colour choices remain.
+- **Maintainer clarification, 2026-11-06:** Marker visibility is itself the
+  intended informative cue: a marker in the gap between nearby nodes helps
+  suggest a direct connection; its absence can suggest that the cable continues
+  beneath a node to a more distant destination. This is a quality-of-life aid
+  for busier layouts and future nodes with more sockets. Keep normal occlusion;
+  do not relocate covered markers or draw them over node bodies just to keep
+  them visible. This supersedes treating an obscured midpoint as a defect to fix.
+- **Evidence/tradeoffs:** Local source inspection found shared curved cable
+  geometry in `GraphWorkspace.cs` and guarded detail presentation in
+  `GraphNodeView.Detail.cs`. Cables currently render beneath nodes, consistent
+  with the clarified intent. The marker remains a visual aid to tracing routes.
+  ComfyUI is the maintainer's visual reference; its implementation was not copied.
+- **Verification:** 47 focused cable checks cover gradients, actual rendered
+  positions, zoom/edit retention, occlusion, selection/mute/high contrast and
+  unchanged interactions. Full Release-mode detached run: 15,249 checks / 322
+  renders / zero binding errors. World-coordinate circles correct a zoom-offset
+  defect found during screenshot review. Guarded paired integration passed;
+  see the [execution report](IMPLEMENTATION_0.5.0.md#effects-cable-clarity-and-repeated-outputs--6-november-2026).
+- **Next step:** Maintainer visual follow-up and final release qualification.
+
+<a id="tweak-024"></a>
+## TWEAK-024 One Effects category
+
+- **Correction authorized 2026-11-06 — offline verified and locally integrated:** Reunite Simple Effects and
+  Advanced Effects into one flat **Effects** category. All existing effects remain
+  directly available, retaining their header colour and saved kinds. The earlier
+  split below is historical. Nested categories were discussed as an alternative;
+  they are unnecessary for the present library and are not selected.
+- **Current verification:** Shared catalog, creation/search/help and full detached
+  checks pass in the 15,249-check run. Locally integrated with the combined
+  refinement; no release publication. Maintainer review remains separate.
+- **Earlier implementation history:**
+- **Date:** 2026-11-05. **Status:** Implemented, offline verified and locally integrated for unreleased 0.5.0.
+- **Need:** Make quick, focused effects easier to find separately from effects
+  requiring detailed frequency or dynamics setup; Low / Mid / High belongs in
+  Simple Effects while Equalizer belongs in Advanced Effects.
+- **Behavior:** Two sibling Add-menu categories retain the existing effect
+  header colour. Simple: Low / Mid / High, Voice Color, High-pass, Low-pass,
+  Limiter, Denoiser, Reverb, Echo and Distortion. Advanced: Equalizer, Compressor,
+  Ducking, Expander, Gate, Alignment Delay, Plosive and De-esser. Classification
+  describes setup complexity, not processing quality. This mapping beyond the
+  maintainer's tone/EQ example is an implementation choice, open to refinement.
+- **Scope/dependencies:** Shared creation/search/help catalog only; no saved-node
+  conversion or processing changes. Echo and Distortion depend on IDEA-055/002.
+- **Verification:** Shared catalog, creation/search/help and existing availability
+  checks pass in the 15,164-check detached suite. Guarded paired integration passed
+  with settings/preferences and configuration preserved; no release published.
+- **Next step:** Maintainer review and final release documentation/qualification.
+
+<a id="tweak-025"></a>
+## TWEAK-025 Quiet Blocks at low zoom
+
+- **Current selection, 2026-11-05 — implemented, offline verified and locally integrated:**
+  The maintainer selected concept 1, **Quiet Blocks**, after reviewing six
+  alternatives to the bright and dark type symbols. Below the existing roughly
+  30% detail threshold, show plain solid charcoal node bodies (`#15181E` in the
+  normal palette) and the existing category-coloured header strips. Leave the
+  interior free of decorative type symbols, name/control text, miniature control
+  shapes and audio meters. Existing selection and device-warning indicators remain.
+- **Need/behavior:** Reduce visual clutter so the graph's layout, category colours
+  and connections remain prominent at low zoom. Full controls, text and meters
+  reappear when zooming in.
+- **Preserved behavior:** Keep node bounds, header height, socket positions and
+  cables, existing detail hysteresis and active-edit guards. Existing interaction,
+  high-contrast handling and minimap behavior remain; the selected concept adds
+  no hover- or selection-triggered interior content.
+- **Scope/tradeoffs:** A presentation-only refinement across every node kind.
+  Individual types are less explicit at low zoom; normal names and controls
+  remain available at full detail. Quiet Blocks supersedes both symbol colours
+  and the earlier control silhouettes, without changing audio behavior.
+- **Verification:** 195 focused detached checks passed across all 34 real node
+  kinds and the existing zoom, draft and control-reveal suite. Normal/high-contrast
+  main-window screenshots and the actual-node sheet were reviewed. The production
+  build passed with an unchanged engine. See the
+  [execution report](IMPLEMENTATION_0.5.0.md) for this selection's evidence;
+  earlier symbol results below remain historical.
+- **Local integration:** Guarded interface-only activation through the actual
+  shortcut passed eight seconds of observation, preserving the same engine,
+  physical settings, preferences, configuration, advancing frames and running
+  paths without rollback or restart.
+- **Next step:** Maintainer visual follow-up and final release qualification.
+  This remains unreleased 0.5.0 work.
+- **Earlier colour correction, 2026-11-05 — offline verified and locally integrated, now superseded:** The maintainer found
+  white symbols too bright and requests the earlier control-silhouette shade.
+  Use dedicated `NodeSymbolBrush` colour `#0B0D11` against `#15181E` node panels.
+  Keep the refined 128-DIP size, 2.6-unit rounded stroke and current shapes.
+  High contrast retains system foreground. This supersedes the white-colour
+  direction below; minimap, headers and full-detail text are unchanged.
+  Existing checks passed (72 symbol checks plus all 34 real-kind palette/theme,
+  geometry and mode probes); the actual-node 25% screenshot was reviewed.
+  Guarded UI-only integration preserved the same engine and saved settings/
+  preferences/configuration through eight seconds without rollback or restart.
+- **Earlier size/weight refinement, 2026-11-05 — offline verified and locally integrated:** The maintainer found the initial
+  symbols functional but too thin and unrefined. Increase the shared size from
+  112 to 128 world DIPs and the 24-unit drawing stroke from 1.8 to 2.6. Simplify
+  crowded details, keep small gaps open and retain rounded caps/joins. Preserve
+  soft white, coloured headers, node/socket geometry and full-detail behavior.
+  The complete sheet and actual 25%/10% nodes were reviewed. Targeted verification
+  passed 139 symbol/zoom checks plus geometry, interaction, restoration and theme
+  checks across all 34 real node kinds. The production build passed with a
+  byte-identical engine. Guarded UI-only activation preserved the same engine
+  process/start/path/hash and settings/preferences through eight seconds without
+  rollback. Maintainer visual follow-up remains; the initial evidence below
+  describes the earlier version. No engine restart or volume change occurred.
+- **Initial symbol direction, 2026-11-05 — implemented, offline verified and locally integrated, now superseded:** Replace the low-fidelity dial/field shapes with a simple,
+  distinct symbol for each node type, centred below the retained coloured header.
+  The original colour was soft white, followed by the dark correction above;
+  system foreground replaced it in high contrast.
+- **Earlier preserved behavior:** Same low-detail thresholds, edit guards, node sizes and
+  socket positions. Hide controls, text and meters at low detail; hover/Find keep
+  names available. Zooming in restores full controls/meters. No text inside the
+  low-detail node and no minimap redesign are requested.
+- **Correction history:** Supersedes the dark control silhouettes and equal-size
+  dial layout recorded under ISSUE-005. Keep that dated evidence as history.
+- **Earlier symbol scope/tradeoffs:** Original vector symbols for every creatable and legacy
+  kind, including Echo and Distortion; no icon font or dependency. Symbols offer
+  type recognition, while custom names require hover/Find or zooming in.
+- **Initial symbol verification:** Symbol sheet, 25% canvas and normal themed node screenshots
+  reviewed; combined suite passed 15,164 checks/317 renders/zero binding errors.
+  Separate real-node probes cover all 34 kinds, shared 112-DIP size, geometry,
+  sockets, zoom restoration and dynamic high contrast. Guarded paired integration
+  passed without changing configuration/settings/preferences.
+
+<a id="tweak-023"></a>
+## TWEAK-023 Type a value directly from a focused dial
+
+- **Current status, 2026-11-04:** Implemented, offline verified and locally integrated;
+  unreleased 0.5.0. No value changes until the existing draft commit succeeds;
+  incomplete/invalid drafts remain visible, and Escape cancels.
+- **Maintainer-reported manual result, 2026-11-04:** Direct dial entry and Page
+  Up/Down adjustment passed the maintainer's installed-candidate checks. This was
+  not independently observed and does not establish all keyboard layouts, numpad
+  or IME behavior. Page keys remain existing behavior, not a newly added feature.
+- **Implementation evidence, 2026-11-04:** 427 focused
+  detached control checks passed across the new refinement and existing meter,
+  rotary and pointer-entry suites, including localized drafts and validation.
+  Physical keyboard/numpad/IME and live audio were not exercised by those tests.
+  Combined verification: [execution report](IMPLEMENTATION_0.5.0.md). Earlier planning
+  wording below records the request before implementation authorization.
+- **Next step:** Retain the reported result and automated draft regressions;
+  qualify remaining keyboard-layout/numpad/IME cases without computer-use
+  automation. Local integration and the focused manual report do not establish
+  comprehensive native interaction or publication.
+
+### Planning history — 2026-11-04
+
+- **Requested and accepted:** 2026-11-04. **Status at planning:** Planned for 0.5.0.
+  The maintainer agreed to the proposed behaviour and requested adding it to
+  the release plan; implementation remains separate. Related keyboard mapping is in
+  [ISSUE-003](KNOWN_ISSUES.md#issue-003).
+- **Intended change:** When a numeric dial has keyboard focus, typing a number
+  activates that dial's existing manual value field and starts entering the
+  value. Interpret "selected control" as focused numeric control, not merely
+  a selected node or a hovered control. Other controls keep their normal typing.
+- **Proposed details:** The initiating character replaces the selected old value
+  and is retained; subsequent characters append normally. Support number-pad
+  digits, a leading minus and the current locale's decimal separator. Keep the
+  current value until the draft is committed, preserving existing Enter/Tab,
+  focus-loss, invalid-value feedback and Escape behaviour. An incomplete minus
+  or decimal draft must not change audio or be silently discarded. Do not
+  intercept modified shortcuts, dropdown search, disabled controls or existing
+  text-field editing. Ordinary Tab traversal must still be able to leave a node.
+- **Rationale/evidence:** Removes the extra step of focusing the numeric field
+  before precise entry. `RotaryValueControl` already has draft validation,
+  commit/cancel and select-all-on-entry behaviour, but no numeric text-input
+  forwarding from the dial. Page Up/Down larger-step adjustment already exists
+  and should remain unchanged. Source review only; no new runtime verification.
+- **Scope/next step:** Small UI refinement; settle shortcut/focus rules alongside
+  ISSUE-003, then check first-character retention, signed/decimal/localized entry,
+  keyboard layouts, pending validation, undo grouping and no accidental changes
+  before commit. No dependency or audio-processing change is proposed.
+- **Plan audit clarification, 2026-11-04:** Shortcut mappings are now accepted;
+  pending-entry transitions still need qualification. Ctrl+Tab pipeline travel
+  must use the same valid-draft/invalid-draft rules as other navigation and must
+  not discard text. Follow the [release plan](IDEAS.md#release-0-5-0-plan).
+
+<a id="tweak-022"></a>
+## TWEAK-022 F2 renames one selected node or group
+
+- **Current status, 2026-11-04:** Implemented, offline verified and locally integrated;
+  unreleased 0.5.0. Exactly one logical node/group is eligible. Node rename keeps
+  its existing layout-lock permission; group rename still requires unlocked layout.
+- **Maintainer-reported manual result, 2026-11-04:** F2 rename and Find by custom
+  name plus original node type passed the maintainer's checks. This was not
+  independently observed; it does not establish screen-reader announcements or
+  every selection/focus case. Find's dual-name matching is preserved behavior.
+- **Implementation evidence, 2026-11-04:** Implemented alongside pipeline
+  navigation and arrow gestures. Exactly one logical node/group is eligible;
+  empty, multiple and cable-only selections do nothing. Current verification
+  and remaining focus/Narrator limitations are in the
+  [execution report](IMPLEMENTATION_0.5.0.md). Earlier planning notes follow.
+- **Next step:** Retain the reported result and qualify remaining keyboard-focus/
+  Narrator cases, including reduced-detail group rename after ISSUE-005's heading
+  refinement. Guarded local installation passed; broader accessibility stays open.
+
+### Planning history — 2026-11-04
+
+- **Requested and accepted:** 2026-11-04. **Status at planning:** Planned for 0.5.0.
+  Included with the accepted keyboard refinements; implementation has not been
+  requested in this planning conversation.
+- **Intended change:** F2 opens Rename for exactly one selected node or group.
+  With multiple selected items, ignore the key. With no selection or an item
+  without a name, such as a cable, do nothing. Do not introduce batch rename.
+- **Rationale/evidence:** `WorkspaceKeyDown` currently handles F2 only for a
+  selected group; node Rename is available through a context menu. Reuse the
+  existing rename editor and commit/cancel behaviour for consistency.
+- **Scope and assumptions:** Count logical selections: one selected group is one
+  rename target despite its member-node selection. Respect focused text/control
+  editing and existing rename permissions. Do not let the shortcut bypass layout
+  or edit safeguards. No dependencies or external research needed.
+- **Next step:** Specify selection and focus precedence, then verify single-node,
+  single-group, multiple-item, empty and cable-only cases alongside Enter/Escape
+  handling and updated search/accessibility labels. See
+  [ISSUE-003](KNOWN_ISSUES.md#issue-003) for the related keyboard proposals.
+
+<a id="tweak-021"></a>
+## TWEAK-021 Smooth green/yellow/red audio-meter gradient
+
+- **Current status, 2026-11-04:** The maintainer's correction is implemented,
+  offline verified and locally integrated: the complete border and original peak
+  indicator, including its idle cap, are restored. The gradient is inset 1 DIP
+  inside the border to remove only the tiny red sliver, preserving actual clipping
+  and peak hold/history. The latest suite passed 14,748 checks / 314 renders /
+  zero binding errors, including 525 focused checks. Guarded
+  interface-only activation preserved the engine and settings/preferences with
+  no rollback. Maintainer follow-up remains pending; this is unreleased 0.5.0 work.
+  The node meters use a fixed full-scale
+  gradient rather than stretching colours to the current signal height.
+- **Earlier interpretation, now superseded — 2026-11-04:** Remove the inactive/idle
+  clipping strip so a non-clipping meter does not show that extra mark. Preserve
+  the actual clipping indication, its existing timing and detection, gradient,
+  numeric readings, peak behavior and high-contrast support. This is visual
+  cleanup, not removal of the clipping warning or a change to audio levels.
+  This refinement is implemented and locally integrated; actual clipping remains
+  visible. The separate Settings-menu correction is tracked in ISSUE-025.
+- **Earlier top-seam correction and evidence, superseded — 2026-11-04:** A separate pixel
+  regression confirmed that the grey top border beneath the 20%-opacity gradient
+  produced an unintended red-tinted seam: the first row was `#FF54424C`, compared
+  with `#FF321B1C` on the next row. Removing only that top border preserves the
+  side/bottom border and actual clipping cap. Eighteen new pixel checks cover
+  this correction. The final combined suite passed 14,726 checks / 314 renders /
+  zero binding errors. Guarded interface-only activation passed with the engine,
+  current configuration and settings/preferences preserved, and no rollback.
+- **Implementation evidence, 2026-11-04:** Implemented as a cached full-scale
+  gradient, revealed by the current level. Green extends through -18 dBFS,
+  blends into yellow around -9 dBFS, then reaches red near -1.5 dBFS. Clipping,
+  retained peaks, timing, reduced animation and high contrast remain separate.
+  Focused detached pixel/timing tests pass; no running audio settings changed.
+  See [execution report](IMPLEMENTATION_0.5.0.md) for combined qualification.
+- **Next step:** Obtain maintainer follow-up on the restored border, original
+  peak/idle indicator and inset gradient, retaining the qualified clipping,
+  peak-history and high-contrast regressions.
+  Earlier removal tests and integration counts describe the superseded candidate;
+  local integration does not mark it released.
+
+### Planning and research history — 2026-11-04
+
+- **Requested and confirmed:** 2026-11-04. **Status at planning:** Planned. **Target:** 0.5.0.
+  Confirmed as one of the first three planned changes alongside Gate/Expander
+  Trigger inputs and Reverb Wet output in IDEA-052. Implementation has not begun;
+  the current conversation remains feature planning.
+- **Change and rationale:** Replace harsh green/yellow/red boundaries with smooth
+  transitions, retaining an easily readable indication of rising audio level.
+  Assumption: "audio graphs" means the vertical node level meters; EQ response
+  curves and other effect graphs are outside this initial refinement.
+- **Source evidence:** `Controls/StereoNodeMeter.cs` currently draws three solid
+  zones on a -60 to 0 dBFS scale, with boundaries at -12 and -3 dBFS, for both
+  the subdued background and active fill. `Controls/ConsoleTheme.cs` supplies
+  the colours and a system-colour high-contrast fallback.
+- **Proposed behaviour:** Use a fixed full-scale vertical gradient for both the
+  background and fill, revealing it as the level rises. Do not stretch the
+  gradient to the current fill height, which would make quiet signals look red.
+  Keep low levels predominantly green, blend through yellow around the existing
+  warning region, and reach red near the top. Exact transition widths need a
+  visual comparison. Preserve the separate clipping cap and numeric readings;
+  update tooltip wording so colours no longer imply hard thresholds.
+- **Scope and tradeoffs:** Presentation only: preserve peak measurement, meter
+  timing, reduced animation and clipping detection. Retain high-contrast system
+  colours. Softer transitions should reduce visual harshness without weakening
+  overload recognition. No new preference or dependency is proposed.
+- **Research (2026-11-04):** Microsoft's [WPF gradient documentation](https://learn.microsoft.com/en-us/dotnet/desktop/wpf/graphics-multimedia/painting-with-solid-colors-and-gradients-overview)
+  confirms native multi-stop linear gradients. Feasibility is a source-based
+  assessment; no prototype or visual verification has been performed.
+- **Next step:** Compare narrow and broader blends at low, warning and near-full
+  levels, including zoom and high contrast, then choose the transition widths.
+  See [0.5.0 exploration](IDEAS.md#idea-052).
 
 <a id="tweak-001"></a>
 ## TWEAK-001 Settings release links
@@ -1704,6 +2086,12 @@ Earlier linked research is retained, not refreshed by this classification review
 <a id="tweak-020"></a>
 ## TWEAK-020 Centered text-only group heading
 
+- **0.5.0 follow-up, 2026-11-04:** The centred text-only name remains the direction.
+  The maintainer now requests fixed world-space heading geometry and hiding the
+  heading when nodes simplify, so it cannot expand over nearby groups at low
+  zoom. This offline-verified and locally integrated follow-up, with maintainer
+  review pending, is owned by
+  [ISSUE-005](KNOWN_ISSUES.md#issue-005); evidence below is historical.
 - **Requested and corrected:** 2026-10-28. **Target:** local Beta 6. **Status:**
   The superseding text-only heading is implemented and locally integrated on
   2026-10-28; not published. Earlier swatch implementation remains recorded below.

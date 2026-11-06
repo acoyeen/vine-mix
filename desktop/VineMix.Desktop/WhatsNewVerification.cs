@@ -15,7 +15,7 @@ internal static class WhatsNewVerification
     {
         string root = Path.Combine(Path.GetTempPath(), "VineMix-whats-new-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
-        const string old = "0.3.0-beta.1", current = "0.3.0-beta.5", latest = "0.4.0-beta";
+        const string old = "0.3.0-beta.1", current = "0.3.0-beta.5", latest = "0.4.0-beta", release = "0.5.0-beta";
         try
         {
             string path = Path.Combine(root, "updates", "whats-new.json");
@@ -55,6 +55,18 @@ internal static class WhatsNewVerification
             seenLatest.Dismiss(current);
             require(new WhatsNewState(path).PreviousVersion == latest && !seenLatest.Pending(current, true),
                 "Reopening Beta 5 cannot roll back a saved 0.4.0 Beta dismissal or show a downgrade notice.");
+            var releaseHighlights = WhatsNewContent.Since(latest, release);
+            require(seenLatest.Pending(release, true) && releaseHighlights.Count > 0
+                && releaseHighlights.All(item => item.Version == release && !string.IsNullOrWhiteSpace(item.Title)
+                    && !string.IsNullOrWhiteSpace(item.Description) && !item.Description.Contains("http", StringComparison.OrdinalIgnoreCase)),
+                "Updating from 0.4.0 offers only complete bundled plain-text 0.5.0 highlights.");
+            require(WhatsNewContent.Since(current, release).SequenceEqual(latestHighlights.Concat(releaseHighlights))
+                && WhatsNewContent.Since(release, release).Count == 0,
+                "0.5.0 preserves historical highlights in order and adds no notice for the same release.");
+            seenLatest.Dismiss(release);
+            require(new WhatsNewState(path).PreviousVersion == release && !seenLatest.Pending(release, true)
+                && seenLatest.Pending("0.5.1-beta", true),
+                "Dismissing 0.5.0 persists its watermark while a later release remains eligible.");
             string legacy = Path.Combine(root, "legacy", "whats-new.json");
             require(new WhatsNewState(legacy).Pending(current, true) && !new WhatsNewState(legacy).Pending(current, false),
                 "An existing pre-feature workspace gets one transition notice; a fresh workspace does not.");
@@ -80,7 +92,7 @@ internal static class WhatsNewVerification
             && !Ready(captured: true) && !Ready(other: true),
             "Automatic highlights defer background/tray, inactive/minimized windows, health or quit preparation, pending edits, numeric entry, gestures, capture and other dialogs.");
         int closed = 0;
-        var content = MainWindow.CreateWhatsNewContent(WhatsNewContent.Since(old, latest), () => closed++);
+        var content = MainWindow.CreateWhatsNewContent(WhatsNewContent.Since(latest, release), () => closed++);
         var surface = new Border { Width = 580, Height = 560, Child = content };
         surface.SetResourceReference(Border.BackgroundProperty, "ConsoleWindowBrush");
         surface.SetResourceReference(TextBlock.ForegroundProperty, "ConsoleTextBrush");

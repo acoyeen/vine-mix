@@ -50,6 +50,63 @@ struct Runner {
     Frame last() const { return processor->output(1).back(); }
 };
 double db(double gain) { return 20 * std::log10(std::max(gain, 1e-20)); }
+__declspec(noinline) void externalGateAndExpander() {
+    for (const auto& identity : std::array<std::pair<const char*, const char*>, 3>{{{"expander", "expander"}, {"gate", "gate"}, {"expander", "gate"}}}) {
+        auto graph = chain(identity.first);
+        graph.nodes[1].expander = {identity.second, -20, 4, 3, 35, 45, 60, 4};
+        GraphNode key; key.id = "key"; key.kind = "virtualInput"; graph.nodes.push_back(key);
+        auto selfGraph = graph;
+        graph.edges.push_back({"trigger", "key", "effect", "sidechain"});
+        Runner external(graph), self(selfGraph);
+        external.programme.fill({.1f, -.025f}); external.key = external.programme;
+        self.programme = external.programme;
+        bool identical = true;
+        for (int block = 0; block < 200; ++block) {
+            if (block == 50 || block == 120) {
+                const float value = block == 50 ? .001f : .2f;
+                external.programme.fill({value, -value * .25f}); external.key = external.programme;
+                self.programme = external.programme;
+            }
+            external.run(); self.run();
+            for (std::size_t i = 0; i < quantumFrames; ++i)
+                identical = identical && external.processor->output(1)[i].left == self.processor->output(1)[i].left
+                    && external.processor->output(1)[i].right == self.processor->output(1)[i].right;
+        }
+        check(identical, "External detector matching the programme preserves self-detection sample-for-sample through attack, hold and release");
+        external.programme.fill({.04f, -.02f}); external.key.fill({0, .5f}); external.run(200);
+        near(external.last().left, .04, 1e-7, "Right-only stereo trigger opens the main programme without needing left-channel detection");
+        near(external.last().right, -.02, 1e-7, "External trigger preserves linked stereo programme balance");
+        GraphChannels capture{}; capture[0] = 1; capture[2] = 2;
+        check(graphSignalChannels(*external.plan, capture)[1] == 1, "Stereo Trigger does not make a mono programme path stereo");
+        external.programme.fill({}); external.run(10);
+        near(external.last().left, 0, 0, "Loud Trigger audio never enters the main output");
+        near(external.last().right, 0, 0, "Detector-only isolation covers both programme channels");
+        external.programme.fill({.5f, -.25f}); external.key.fill({}); external.run(250);
+        check(external.processor->meter(1).gainReductionDb > 59.9 && std::abs(external.last().left) < .00051,
+            "A connected silent Trigger closes Gate/Expander instead of falling back to the loud programme");
+        external.key.fill({.5f, .5f}); external.graph.edges.back().muted = true; external.update(); external.run(250);
+        check(external.processor->meter(1).gainReductionDb > 59.9,
+            "A muted Trigger cable remains silent detection after its normal cable fade");
+        external.graph.edges.back().muted = false; external.graph.nodes[2].muted = true; external.update(); external.run(250);
+        check(external.processor->meter(1).gainReductionDb > 59.9,
+            "A muted Trigger source remains silent detection after its normal node fade");
+        external.graph.nodes[2].muted = false; external.update(); external.inputs[2] = {}; external.run(250);
+        check(external.processor->meter(1).gainReductionDb > 59.9,
+            "An unavailable source with no supplied frames stays silent while its Trigger cable remains connected");
+        external.graph.edges.pop_back(); external.update(); external.run(250);
+        near(external.last().left, .5, 1e-7, "Removing the Trigger cable restores self-detection without resetting the programme");
+        auto roundtrip = Json(graph).get<AudioGraph>();
+        check(Json(roundtrip) == Json(graph) && compileGraph(roundtrip) == compileGraph(graph),
+            "Old self-detecting graphs and explicit Trigger graphs keep their settings and routing through JSON");
+        auto invalid = graph; invalid.edges.push_back({"second-trigger", "source", "effect", "sidechain"});
+        rejects([&] { compileGraph(invalid); }, "Gate/Expander reject multiple detector cables");
+        invalid = graph; invalid.nodes[2].kind = "gain"; invalid.edges.push_back({"cycle", "effect", "key"});
+        rejects([&] { compileGraph(invalid); }, "Gate/Expander Trigger edges participate in feedback-loop validation");
+        external.graph = graph; external.update(); external.inputs[2] = external.key;
+        allocations = 0; tracking = true; external.run(20); tracking = false;
+        check(allocations == 0, "External Gate/Expander detection allocates and frees nothing while processing");
+    }
+}
 // Keep bounded GraphPlan temporaries in separate test frames. Inlining these
 // independent fixtures into main can exceed Windows' default 1 MiB stack.
 __declspec(noinline) void legacyCompressor() {
@@ -440,7 +497,7 @@ __declspec(noinline) void realtimeBudget() {
 }
 }
 int main() {
-    try { legacyCompressor(); compressorOwnSignal(); limiter("compressor"); limiter("limiter"); ducking(); legacyStaticDucking(); dynamicDucking(); expansion(); delay(); historyAndRealtime(); persistence(); realtimeBudget();
+    try { externalGateAndExpander(); legacyCompressor(); compressorOwnSignal(); limiter("compressor"); limiter("limiter"); ducking(); legacyStaticDucking(); dynamicDucking(); expansion(); delay(); historyAndRealtime(); persistence(); realtimeBudget();
         std::cout << "PASS: " << checks << " focused core dynamics/delay checks; legacy sound, Static/Dynamic ducking/trigger isolation, strict sample peaks, gate/expansion, exact alignment, histories, allocations, JSON/validation.\n"; return 0;
     } catch (const std::exception& e) { tracking = false; std::cerr << "FAIL: " << e.what() << '\n'; return 1; }
 }

@@ -25,6 +25,7 @@ internal class StereoNodeMeter : FrameworkElement
     private double _holdLeft, _holdRight, _lastAdvance, _lastSample, _lastPresentation;
     private double _lastClipSample = double.NegativeInfinity;
     private Brush? _paletteBrush;
+    private Brush? _scaleBrush, _scaleLow, _scaleMid, _scaleHigh;
 
     public double Level => Math.Max(LeftLevel, RightLevel);
     public double LeftLevel { get; private set; }
@@ -50,7 +51,8 @@ internal class StereoNodeMeter : FrameworkElement
         AutomationProperties.SetName(this, "Audio level");
         AutomationProperties.SetLiveSetting(this, AutomationLiveSetting.Off);
         ToolTip = NodeToolTip.Create("Audio level", "Bars · Current channel sample peaks",
-            "Stereo · Separate left and right levels", "Yellow · Above −12 dBFS", "Red · Above −3 dBFS", "Lit cap · Recent clipping");
+            "Stereo · Separate left and right levels", "Green to yellow · Rising level",
+            "Yellow to red · Approaching full scale", "Lit cap · Recent clipping");
         _timer = new DispatcherTimer(DispatcherPriority.Render, Dispatcher);
         _timer.Tick += (_, _) => Advance(Now);
         Loaded += (_, _) =>
@@ -288,6 +290,31 @@ internal class StereoNodeMeter : FrameworkElement
 
     private void ThemeChanged(object? sender, EventArgs args) { _paletteBrush = ConsoleTheme.Get("ConsoleMeterMidBrush"); InvalidateVisual(); }
 
+    private Brush ScaleBrush()
+    {
+        var low = ConsoleTheme.Get("ConsoleMeterLowBrush");
+        var mid = ConsoleTheme.Get("ConsoleMeterMidBrush");
+        var high = ConsoleTheme.Get("ConsoleMeterHighBrush");
+        if (_scaleBrush is not null && ReferenceEquals(low, _scaleLow)
+            && ReferenceEquals(mid, _scaleMid) && ReferenceEquals(high, _scaleHigh)) return _scaleBrush;
+        _scaleLow = low; _scaleMid = mid; _scaleHigh = high;
+        // The high-contrast palette supplies the same system brush throughout.
+        // Keep that brush intact instead of substituting decorative colours.
+        if (ReferenceEquals(low, mid) && ReferenceEquals(mid, high)
+            || low is not SolidColorBrush || mid is not SolidColorBrush || high is not SolidColorBrush)
+            return _scaleBrush = low;
+        var gradient = new LinearGradientBrush
+        {
+            StartPoint = new Point(0, 1), EndPoint = new Point(0, 0),
+            MappingMode = BrushMappingMode.RelativeToBoundingBox
+        };
+        void Stop(Brush brush, double db) => gradient.GradientStops.Add(
+            new GradientStop(((SolidColorBrush)brush).Color, (db - FloorDb) / -FloorDb));
+        Stop(low, FloorDb); Stop(low, -18); Stop(mid, -9); Stop(mid, -6); Stop(high, -1.5); Stop(high, 0);
+        gradient.Freeze();
+        return _scaleBrush = gradient;
+    }
+
     /// <summary>Actual bar bounds, excluding the small clipping indicators.</summary>
     internal Rect[] GetLaneBounds()
     {
@@ -307,6 +334,7 @@ internal class StereoNodeMeter : FrameworkElement
     {
         base.OnRender(drawing);
         var lanes = GetLaneBounds();
+        var scaleBrush = ScaleBrush();
         for (int i = 0; i < lanes.Length; i++)
         {
             var lane = lanes[i];
@@ -324,24 +352,19 @@ internal class StereoNodeMeter : FrameworkElement
             }
             double value = i == 0 ? LeftLevel : RightLevel;
             double db = !Muted && value > 0 ? Math.Clamp(20 * Math.Log10(value), FloorDb, 0) : FloorDb;
-            // The entire scale stays visible at a subdued intensity. The same
-            // colours fill from the bottom as the measured signal reaches them.
+            // Keep both gradient layers inside the complete border. Overlapping
+            // its top row with the translucent scale creates a lighter red seam.
+            // A quiet fill still reveals the fixed scale without stretching it.
+            var scale = new Rect(lane.Left + 1, lane.Top + 1, Math.Max(0, lane.Width - 2), Math.Max(0, lane.Height - 2));
             drawing.PushOpacity(.2);
-            DrawZone(FloorDb, -12, "ConsoleMeterLowBrush", -12);
-            DrawZone(-12, -3, "ConsoleMeterMidBrush", -3);
-            DrawZone(-3, 0, "ConsoleMeterHighBrush", 0);
+            drawing.DrawRectangle(scaleBrush, null, scale);
             drawing.Pop();
-            DrawZone(FloorDb, -12, "ConsoleMeterLowBrush");
-            DrawZone(-12, -3, "ConsoleMeterMidBrush");
-            DrawZone(-3, 0, "ConsoleMeterHighBrush");
-            void DrawZone(double low, double high, string brush, double? fillTo = null)
+            if (db > FloorDb)
             {
-                double end = Math.Min(fillTo ?? db, high);
-                if (end <= low) return;
-                double y = lane.Bottom - (end - FloorDb) / -FloorDb * lane.Height;
-                double fillHeight = (end - low) / -FloorDb * lane.Height;
-                drawing.DrawRectangle(ConsoleTheme.Get(brush), null,
-                    new Rect(lane.Left + 1, y, Math.Max(0, lane.Width - 2), fillHeight));
+                double fillHeight = (db - FloorDb) / -FloorDb * scale.Height;
+                drawing.PushClip(new RectangleGeometry(new Rect(scale.Left, scale.Bottom - fillHeight, scale.Width, fillHeight)));
+                drawing.DrawRectangle(scaleBrush, null, scale);
+                drawing.Pop();
             }
         }
     }

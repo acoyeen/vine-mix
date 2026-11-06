@@ -85,7 +85,7 @@ internal static class AutosaveVerification
         {
             mixer.Edit(c => c.Graph.Nodes[0].GainDb = -6);
             var stale = mixer.PreparePendingConfiguration(baseline);
-            mixer.HandleConfigureResponse(stale, Snapshot(baseline), new() { Error = "Stale revision." }, now);
+            mixer.HandleConfigureResponse(stale, Snapshot(baseline), new() { ErrorCode = "revision_conflict", Error = "Stale revision." }, now);
             require(mixer.PendingEditCount == 1 && mixer.CanUndo && mixer.SaveStatus == "Reconciling changes…"
                 && !mixer.IsPendingSaveDue(now + TimeSpan.FromMilliseconds(99)) && mixer.IsPendingSaveDue(now + TimeSpan.FromMilliseconds(100)),
                 "Revision conflicts keep their existing reconciliation status and bounded retry behavior.");

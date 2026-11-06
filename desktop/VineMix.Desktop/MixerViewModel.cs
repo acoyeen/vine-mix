@@ -95,6 +95,7 @@ public sealed partial class MixerViewModel : Observable, IDisposable
     private bool _connected, _visible = true, _startAtLogin, _reducedAnimation, _rightClickDragToPan;
     private bool _showDisabledAudioDevices, _showDisconnectedAudioDevices, _showAdvancedAudioDevices;
     private bool _showActionNotifications = true;
+    private bool _showMinimap = true;
     private bool? _registeredStartup;
     private string _connectionStatus = "Connecting to the audio engine…", _warning = "", _editError = "", _saveError = "", _startupError = "", _uiError = "", _saveStatus = "", _frameLabel = "Engine offline";
     private string PendingSaveStatus => _saveError.Length > 0 ? "Changes not saved · retrying…" : "Saving changes…";
@@ -150,6 +151,15 @@ public sealed partial class MixerViewModel : Observable, IDisposable
         set
         {
             if (Applying || !Set(ref _rightClickDragToPan, value)) return;
+            SaveUiPreferences();
+        }
+    }
+    public bool ShowMinimap
+    {
+        get => _showMinimap;
+        set
+        {
+            if (Applying || !Set(ref _showMinimap, value)) return;
             SaveUiPreferences();
         }
     }
@@ -212,6 +222,7 @@ public sealed partial class MixerViewModel : Observable, IDisposable
         public bool? ReducedAnimation { get; set; }
         public bool? ShowActionNotifications { get; set; }
         public bool RightClickDragToPan { get; set; }
+        public bool? ShowMinimap { get; set; }
         public bool ShowDisabledAudioDevices { get; set; }
         public bool ShowDisconnectedAudioDevices { get; set; }
         public bool ShowAdvancedAudioDevices { get; set; }
@@ -226,6 +237,7 @@ public sealed partial class MixerViewModel : Observable, IDisposable
         _reducedAnimation = preferences?.ReducedAnimation ?? _reducedAnimation;
         _showActionNotifications = preferences?.ShowActionNotifications ?? true;
         _rightClickDragToPan = preferences?.RightClickDragToPan ?? false;
+        _showMinimap = preferences?.ShowMinimap ?? true;
         _showDisabledAudioDevices = preferences?.ShowDisabledAudioDevices ?? false;
         _showDisconnectedAudioDevices = preferences?.ShowDisconnectedAudioDevices ?? false;
         _showAdvancedAudioDevices = preferences?.ShowAdvancedAudioDevices ?? false;
@@ -237,6 +249,7 @@ public sealed partial class MixerViewModel : Observable, IDisposable
         ReducedAnimation = _reducedAnimation,
         ShowActionNotifications = _showActionNotifications,
         RightClickDragToPan = _rightClickDragToPan,
+        ShowMinimap = _showMinimap,
         ShowDisabledAudioDevices = _showDisabledAudioDevices,
         ShowDisconnectedAudioDevices = _showDisconnectedAudioDevices,
         ShowAdvancedAudioDevices = _showAdvancedAudioDevices,
@@ -534,7 +547,7 @@ public sealed partial class MixerViewModel : Observable, IDisposable
             _editDispatch.DeferRetry(now, TimeSpan.FromSeconds(1));
             SaveStatus = PendingSaveStatus; UpdateWarning();
         }
-        else if (response.Error.Contains("revision", StringComparison.OrdinalIgnoreCase) || response.Error.Contains("stale", StringComparison.OrdinalIgnoreCase))
+        else if (StatusReasons.IsRevisionConflict(response))
         { _editDispatch.DeferRetry(now); SaveStatus = _saveError.Length > 0 ? PendingSaveStatus : "Reconciling changes…"; }
         else RejectPending(batch, basis, response.Error);
     }
@@ -847,8 +860,7 @@ public sealed partial class MixerViewModel : Observable, IDisposable
                 else if (!saved.Ok)
                 {
                     unconfirmed = null;
-                    if (!saved.Error.Contains("revision", StringComparison.OrdinalIgnoreCase)
-                        && !saved.Error.Contains("stale", StringComparison.OrdinalIgnoreCase))
+                    if (!StatusReasons.IsRevisionConflict(saved))
                         throw new IOException("The engine could not save queued changes: " + saved.Error);
                 }
                 current = null;

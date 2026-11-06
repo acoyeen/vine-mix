@@ -7,16 +7,18 @@ First time here?
   Existing drivers are retained. Read and accept the selected drivers' terms.
   If you only need physical microphone/headphone routing, you can clear both
   boxes. You can run Setup again to add a missing driver later.
-  After installation, open VineMix, choose your microphone on Physical input,
-  then choose headphones on Listening output. New outputs start muted; turn up
+  After installation, open VineMix, choose your microphone on Microphone,
+  then choose headphones on Listening output. The starter voice chain passes
+  through High-pass, Denoiser, Expander and Compressor to both outputs.
+  Both outputs start muted; turn up
   and unmute only when you are ready to listen quietly.
 
 Virtual Desktop microphone
   Connect your headset in Virtual Desktop and enable Microphone passthrough.
   Check Windows Settings > System > Sound > Input first. If its microphone is
   listed there, select that same recording device on VineMix's Physical input
-  node. A virtual microphone can be selected there even though the starter node
-  is named Physical input. VB-CABLE and VAC Lite are not prerequisites for it.
+  node, named Microphone in the starter. It also accepts virtual microphones.
+  VB-CABLE and VAC Lite are not prerequisites for it.
   If Windows does not list it, check Virtual Desktop's connection, passthrough
   option and microphone permissions first; installing the bundled cables does
   not create Virtual Desktop's microphone endpoint.

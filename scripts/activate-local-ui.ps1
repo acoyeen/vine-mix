@@ -62,8 +62,7 @@ function SaveEvidence([string]$Name, $Value) {
     $Value | ConvertTo-Json -Depth 80 | Set-Content -LiteralPath (Join-Path $evidence $Name) -Encoding utf8
 }
 function CaptureIdentity($Process) {
-    $null = $Process.Handle # Bind the process object before any later stop.
-    [pscustomobject]@{Id=$Process.Id; StartTime=$Process.StartTime; Path=$Process.Path; SessionId=$Process.SessionId}
+    Get-ActivationProcessIdentity $Process
 }
 function AssertNoUpdate {
     $mutex = $null
@@ -188,14 +187,16 @@ function StartUi {
 
 try {
     $all = @(Get-Process -Name VineMix,VineMix.Engine,AudioMixer,AudioMixer.Engine -ErrorAction SilentlyContinue)
-    if ($all.Count -ne 2 -or @($all | Where-Object { $_.SessionId -ne $session -or $_.Path -notin @($uiPath,$enginePath) }).Count) {
+    $identities = @{}
+    foreach ($process in $all) { $identities[$process.Id] = CaptureIdentity $process }
+    if ($all.Count -ne 2 -or @($identities.Values | Where-Object { $_.SessionId -ne $session -or $_.Path -notin @($uiPath,$enginePath) }).Count) {
         throw 'Expected only the selected installed desktop and engine in this Windows session. No process was stopped.'
     }
-    $oldUi = @($all | Where-Object Path -eq $uiPath)[0]
-    $oldEngine = @($all | Where-Object Path -eq $enginePath)[0]
+    $oldUi = @($all | Where-Object { $identities[$_.Id].Path -eq $uiPath })[0]
+    $oldEngine = @($all | Where-Object { $identities[$_.Id].Path -eq $enginePath })[0]
     if ($null -eq $oldUi -or $null -eq $oldEngine) { throw 'Expected exactly one installed desktop and one installed engine.' }
-    $oldUiIdentity = CaptureIdentity $oldUi
-    $engineIdentity = CaptureIdentity $oldEngine
+    $oldUiIdentity = $identities[$oldUi.Id]
+    $engineIdentity = $identities[$oldEngine.Id]
     $state.Version = (Get-Item -LiteralPath $enginePath).VersionInfo.ProductVersion
     $state.RuntimeHashes = @{}
     foreach ($name in @('libc++.dll','libunwind.dll','libwinpthread-1.dll')) { $state.RuntimeHashes[$name] = Hash (Join-Path $package $name) }

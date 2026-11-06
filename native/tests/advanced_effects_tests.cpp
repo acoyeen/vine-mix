@@ -181,6 +181,123 @@ void reverberation() {
     near(bypass[2400].left,.3,1e-7,"Reverb bypass stays undelayed and removes the tail");
     near(rms(bypass,5000,10000),0,0,"Reverb bypass emits no old wet tail");
 }
+__declspec(noinline) void reverbWetOutput() {
+    auto graph = chain("reverb"); graph.nodes[1].reverb = {0, .7, .2, 25};
+    auto wetGraph = graph; wetGraph.edges[1].fromPort = "wet";
+    std::vector<Frame> impulse(sampleRate * 2); impulse[2400] = {.3f, -.11f};
+    const auto dry = render(graph, impulse), wetAtZero = render(wetGraph, impulse);
+    graph.nodes[1].reverb.mix = 1; const auto mixedAtOne = render(graph, impulse);
+    wetGraph.nodes[1].reverb.mix = .73; const auto wetAtMixed = render(wetGraph, impulse);
+    graph.nodes[1].reverb.mix = .37; const auto blended = render(graph, impulse);
+    bool independent = true, compatible = true, isolated = true;
+    for (std::size_t i = 0; i < impulse.size(); ++i) {
+        independent = independent && wetAtZero[i].left == wetAtMixed[i].left && wetAtZero[i].right == wetAtMixed[i].right;
+        compatible = compatible && std::abs(blended[i].left - (.63 * dry[i].left + .37 * mixedAtOne[i].left)) < 4e-8
+            && std::abs(blended[i].right - (.63 * dry[i].right + .37 * mixedAtOne[i].right)) < 4e-8;
+        isolated = isolated && std::abs(wetAtZero[i].left - mixedAtOne[i].left) < 4e-8
+            && std::abs(wetAtZero[i].right - mixedAtOne[i].right) < 4e-8;
+    }
+    require(independent, "Reverb Wet is sample-identical at zero and nonzero Mix on both stereo channels");
+    require(compatible, "Existing Audio output retains the dry/wet blend selected by Mix");
+    require(isolated && wetAtZero[2400].left == 0 && rms(wetAtZero, 5000, 20000) > .00001,
+        "Wet carries only the reverberated network, with no direct sound even when Mix is zero");
+    const auto firstWet = std::find_if(wetAtZero.begin(), wetAtZero.end(), [](Frame f) { return std::abs(f.left) > 1e-7; });
+    require(firstWet - wetAtZero.begin() == 2400 + 1200 + 1215, "Wet output retains the selected pre-delay and original reflection onset");
+    wetGraph.nodes[1].reverb.preDelayMs = 0; const auto earlyWet = render(wetGraph, impulse);
+    const auto firstEarly = std::find_if(earlyWet.begin(), earlyWet.end(), [](Frame f) { return std::abs(f.left) > 1e-7; });
+    require(firstWet - wetAtZero.begin() - (firstEarly - earlyWet.begin()) == 1200,
+        "Changing Pre-delay moves Wet onset by the requested sample duration independently of Mix");
+    wetGraph.nodes[1].reverb.decaySeconds = .1; const auto shortWet = render(wetGraph, impulse);
+    wetGraph.nodes[1].reverb.decaySeconds = 2; const auto longWet = render(wetGraph, impulse);
+    require(rms(longWet, sampleRate, sampleRate * 2) > rms(shortWet, sampleRate, sampleRate * 2) * 10,
+        "Decay controls the duration of the independent Wet tail");
+    wetGraph.nodes[1].reverb.damping = 0; const auto brightWet = render(wetGraph, impulse);
+    wetGraph.nodes[1].reverb.damping = 1; const auto darkWet = render(wetGraph, impulse);
+    const auto differenceEnergy = [](const std::vector<Frame>& values) {
+        double sum{}; for (std::size_t i = 12001; i < 48000; ++i) { const double d = values[i].left - values[i-1].left; sum += d*d; } return sum;
+    };
+    require(differenceEnergy(darkWet) < differenceEnergy(brightWet), "Damping still softens high-frequency change in the independent Wet tail");
+    GraphChannels capture{}; capture[0] = 1;
+    graph.nodes[1].reverb.mix = 0;
+    require(graphSignalChannels(compileGraph(graph), capture)[2] == 1
+        && graphSignalChannels(compileGraph(wetGraph), capture)[2] == 2,
+        "A mono Reverb at zero Mix retains mono Audio metadata while its independent Wet route is stereo");
+    capture[0] = 2;
+    require(graphSignalChannels(compileGraph(wetGraph), capture)[2] == 2,
+        "An alternate Wet port never collapses a stereo route to mono metadata");
+    auto roundtrip = Json(wetGraph).get<AudioGraph>();
+    require(Json(roundtrip) == Json(wetGraph) && compileGraph(roundtrip) == compileGraph(wetGraph),
+        "Wet socket identity and unchanged Reverb settings survive graph JSON round trips");
+    auto invalid = wetGraph; invalid.nodes[1].kind = "gain";
+    rejects([&] { compileGraph(invalid); }, "Only Reverb exposes a Wet output");
+    invalid = wetGraph; invalid.edges[0].toPort = "wet";
+    rejects([&] { compileGraph(invalid); }, "Wet cannot be used as a Reverb input socket");
+}
+
+__declspec(noinline) void reverbWetTransitions() {
+    auto graph = chain("reverb"); graph.nodes[1].reverb = {.3, 2, .2, 0};
+    graph.nodes.push_back(node("wet-out", "output"));
+    graph.edges.push_back({"wet", "fx", "wet-out", "audio", 0, false, "wet"});
+    auto plan = std::make_unique<GraphPlan>(compileGraph(graph));
+    auto referencePlan = std::make_unique<GraphPlan>(*plan);
+    auto dsp = std::make_unique<GraphProcessor>(), reference = std::make_unique<GraphProcessor>();
+    dsp->prepare(*plan); reference->prepare(*referencePlan);
+    std::array<Frame, quantumFrames> input{}; GraphProcessor::Inputs inputs{}; inputs[0] = input;
+    auto run = [&](int blocks) { for (int b = 0; b < blocks; ++b) { dsp->process(*plan, inputs); reference->process(*referencePlan, inputs); } };
+    auto sameWet = [&] {
+        bool equal = true;
+        for (std::size_t i = 0; i < quantumFrames; ++i)
+            equal = equal && dsp->output(3)[i].left == reference->output(3)[i].left && dsp->output(3)[i].right == reference->output(3)[i].right;
+        return equal;
+    };
+    auto silent = [&](std::size_t index) { return std::all_of(dsp->output(index).begin(), dsp->output(index).end(), [](Frame f) { return f.left == 0 && f.right == 0; }); };
+    run(10); input[0] = {.4f, -.1f}; run(1); input.fill({}); run(20);
+    require(dsp->meter(3).peak > 0 && sameWet(), "Wet has its own downstream stereo meter while Audio keeps the existing combined-output meter");
+    graph.nodes[1].bypass = true; *plan = compileGraph(graph);
+    input.fill({.07f, -.02f});
+    bool fades = true;
+    for (int block = 0; block < 2; ++block) {
+        run(1);
+        for (std::size_t i = 0; i < quantumFrames; ++i) {
+            const double fade = 1 - (block * quantumFrames + i + 1) / 480.;
+            fades = fades && std::abs(dsp->output(3)[i].left - reference->output(3)[i].left * fade) < 1e-7
+                && std::abs(dsp->output(3)[i].right - reference->output(3)[i].right * fade) < 1e-7;
+        }
+    }
+    require(fades, "Bypassing fades both Wet channels over the existing 480-sample transition without adding dry signal");
+    run(2);
+    require(silent(3), "Settled bypass silences Wet with no dry leakage from active programme audio");
+    near(dsp->output(2).back().left, .07, 1e-7, "Audio retains transparent dry bypass while Wet is silent");
+    // Excitation during bypass remains in the advancing network. Both this new
+    // sound and the old tail must resume at their current time, not a frozen one.
+    input.fill({}); run(40); graph.nodes[1].bypass = false; *plan = compileGraph(graph); run(4);
+    require(sameWet() && dsp->meter(3).peak > 0, "Leaving bypass resumes the continuously advancing Wet tail after its normal fade-in");
+    graph.nodes[1].muted = true; *plan = compileGraph(graph); input[0] = {.3f, .05f}; run(1); input.fill({}); run(4);
+    require(silent(2) && silent(3), "Settled mute silences both Audio and Wet through the existing node-level fade");
+    run(20); graph.nodes[1].muted = false; *plan = compileGraph(graph); run(4);
+    require(sameWet(), "Unmuting resumes the current tail without freezing, resetting or replaying the muted interval");
+    auto inherited = std::make_unique<GraphProcessor>(); inherited->prepare(*plan); inherited->inherit(*dsp, *plan, *plan);
+    dsp->process(*plan, inputs); inherited->process(*plan, inputs);
+    require(std::equal(dsp->output(3).begin(), dsp->output(3).end(), inherited->output(3).begin(), [](Frame a, Frame b) { return a.left == b.left && a.right == b.right; }),
+        "Adopting an unchanged plan preserves the separate Wet output and network history exactly");
+    allocationOperations = 0; trackAllocations = true; run(20); trackAllocations = false;
+    require(allocationOperations == 0, "Routing Audio and Wet together allocates and frees nothing in processing");
+    dsp->reset(); input.fill({}); run(20);
+    require(silent(2) && silent(3), "Explicit graph reset clears Wet and Audio tail history");
+
+    auto triggerGraph = chain("reverb"); triggerGraph.nodes[1].reverb = {0, .7, .2, 100};
+    triggerGraph.nodes.push_back(node("gate", "gate"));
+    triggerGraph.edges.push_back({"detector", "fx", "gate", "sidechain", 0, false, "wet"});
+    auto triggerPlan = std::make_unique<GraphPlan>(compileGraph(triggerGraph));
+    auto trigger = std::make_unique<GraphProcessor>(); trigger->prepare(*triggerPlan);
+    for (int i = 0; i < 10; ++i) trigger->process(*triggerPlan, inputs);
+    input[0] = {.5f, .2f}; trigger->process(*triggerPlan, inputs); input.fill({});
+    for (int i = 0; i < 10; ++i) trigger->process(*triggerPlan, inputs);
+    near(trigger->meter(3).detectorDb, -96, .001, "A Wet-to-Trigger cable does not accidentally feed the dry main output into the detector");
+    bool observed = false;
+    for (int i = 0; i < 40; ++i) { trigger->process(*triggerPlan, inputs); observed |= trigger->meter(3).detectorDb > -80; }
+    require(observed, "A Wet-to-Trigger cable detects delayed reverb even when Mix is zero and Audio has returned to silence");
+}
 void stateAndRealtime() {
     for(const char* kind:{"denoiser","deEsser","plosive","reverb","expander","gate"}) {
         auto graph=chain(kind); const auto plan=compileGraph(graph);
@@ -299,8 +416,8 @@ void dedicatedGate() {
     rejects([&] { compileGraph(invalid); }, "Gate rejects unknown processing modes");
     invalid = graph; invalid.nodes[1].expander.rangeDb = 81;
     rejects([&] { compileGraph(invalid); }, "Gate validates the existing attenuation range contract");
-    invalid = graph; invalid.edges.push_back({"invalid-detector", "in", "fx", "sidechain"});
-    rejects([&] { compileGraph(invalid); }, "Gate has no detector-only cable input");
+    auto triggered = graph; triggered.edges.push_back({"external-detector", "in", "fx", "sidechain"});
+    require(compileGraph(triggered).nodes[1].sidechainEdge >= 0, "Gate accepts its optional detector-only Trigger input");
 }
 void timing() {
     AudioGraph graph;graph.nodes.push_back(node("in","virtualInput"));std::string previous="in";
@@ -335,4 +452,4 @@ void maximumGraphTiming() {
     }
 }
 }
-int main(){try{validationAndPersistence();dedicatedGate();spectralReduction();splitBand();reverberation();stateAndRealtime();transientsAndParameterEdits();timing();maximumGraphTiming();std::cout<<"PASS: "<<checks<<" advanced-effect assertions; no audio devices, personal settings or live processes accessed.\n";return 0;}catch(const std::exception& e){trackAllocations=false;std::cerr<<"FAIL after "<<checks<<" checks: "<<e.what()<<'\n';return 1;}}
+int main(){try{validationAndPersistence();dedicatedGate();spectralReduction();splitBand();reverberation();reverbWetOutput();reverbWetTransitions();stateAndRealtime();transientsAndParameterEdits();timing();maximumGraphTiming();std::cout<<"PASS: "<<checks<<" advanced-effect assertions; no audio devices, personal settings or live processes accessed.\n";return 0;}catch(const std::exception& e){trackAllocations=false;std::cerr<<"FAIL after "<<checks<<" checks: "<<e.what()<<'\n';return 1;}}

@@ -63,8 +63,12 @@ Right-click an input and choose **Duplicate input** to add a named copy nearby,
 selected for placement. It retains the source and controls, starts without cables,
 and can be undone/redone as one edit. Each copy has its own level, mute, Mono,
 name, position and routing. Copy/paste retains input assignments too. Routing
-several copies to the same destination adds their signals together. Physical and
-virtual output assignments remain exclusive to one node per playback device.
+several copies to the same destination adds their signals together. Several
+output nodes can share a playback device with independent controls. **Duplicate
+output** retains the destination and Level, starts muted without cables, and
+supports Undo/Redo. Pasted outputs retain their bindings and start muted too.
+The engine combines all contributions into one render stream for that device;
+removing or muting one node leaves the other contributions intact.
 The mouse wheel zooms through fixed stops; middle-drag pans; Home frames the
 graph. Click the zoom percentage or press Ctrl+0 for 100%. **F** frames selected
 nodes while the canvas is focused; the same action
@@ -268,14 +272,17 @@ range, the existing connections stay intact.
 
 ## Node library
 
-The Add menu offers 24 types, using the same category mapping as node headers:
-Inputs (microphone, virtual input, running app), Outputs (physical and virtual),
-Effects (EQ, tone, Voice Color, high/low-pass, Compressor, Limiter, Ducking, Expander, Gate,
-Alignment Delay, denoiser, de-esser, plosive remover, reverb), Mixing (Mix, Balance,
-Mono), and Controls (linked control).
-Gain / Multiply and Reroute are hidden from creation because Mix covers their
-volume role with one incoming connection. Both remain supported for existing
-graphs and copied legacy nodes, making 26 compatible types. Category submenus
+The Add menu offers 32 types. Inputs contains microphone, virtual input and
+running app; Outputs contains physical and virtual outputs. Effects contains
+Low / Mid / High, Voice Color, high/low-pass, Limiter, Denoiser, Reverb,
+Echo, Distortion, Equalizer, Compressor, Ducking,
+Expander, Gate, Alignment Delay, Plosive and De-esser. Mixing contains Mix,
+Balance, Mono, Channel Swap, Stereo Width, Pan, Crossfade, Stereo Combine and
+Stereo Split. Controls contains Linked control. All effects share one category
+and retain the effect header colour.
+Gain / Multiply and Reroute remain hidden from creation because Mix covers their
+volume role. Both are supported in existing graphs and copied legacy nodes,
+making 34 compatible types. Category submenus
 keep the initial menu compact; typing searches
 both node names and category names. Down/Enter/Escape navigate, add and dismiss.
 
@@ -331,6 +338,8 @@ and screen-space snapping remain unchanged.
 | De-esser | Stereo-linked dynamic high-band reduction for loud sibilants; frequency, threshold and maximum reduction |
 | Plosive remover | Dynamic low-band reduction for bass bursts such as microphone pops; cutoff, threshold and maximum reduction |
 | Reverb | Stereo room tail; wet/dry mix, decay, damping and pre-delay |
+| Echo | Time, exact Repeats count and Mix; finite decaying copies, mixed Audio plus echo-only Echo output; timing/count edits fade and restart the tail |
+| Distortion | Soft saturation from warmth to strong distortion; Drive, Tone, Mix and Output; 32-frame processing/bypass latency |
 | Balance | Attenuate the opposite stereo channel; centre preserves the original stereo signal |
 | Mono | Average left/right and send the result equally to both channels |
 | Channel Swap | Exchange left and right; bypass restores the original order |
@@ -649,7 +658,13 @@ and recovery. Input nodes with identical capture bindings share one worker: each
 block is read once and supplied to every copy before its independent processing.
 Legacy microphone channel selections remain part of the capture binding, so
 different channel selections keep separate workers. App capture workers provide
-the same stereo input contract. Output workers remain exclusive per endpoint.
+the same stereo input contract. Logical output nodes resolving to one active
+endpoint share one render worker. Their post-Level/mute signals are summed
+before final device clipping, with one queue write and one device recovery path.
+Old/new graph fades blend the complete aggregates. Individual meters show each
+logical path; an endpoint overload also flags its contributing output nodes.
+Reconnection resolves saved exact/stable identities centrally so aliases do not
+open competing streams. Physical versus virtual device-role restrictions remain.
 
 Endpoint workers request shorter supported shared periods with bounded default
 and legacy fallbacks. Capture pre-roll, device-aware playback budgets and bounded

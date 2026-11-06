@@ -4,6 +4,7 @@
   <SolidColorBrush x:Key="BrandActionTextBrush" Color="#F5F8F6"/>
   <SolidColorBrush x:Key="BrandHoverBrush" Color="#347B5B"/>
   <SolidColorBrush x:Key="NodeSidechainBrush" Color="#B8A0D8"/>
+  <SolidColorBrush x:Key="NodeEffectReturnBrush" Color="#8EC8E8"/>
   <SolidColorBrush x:Key="ConsoleWindowBrush" Color="#0C0D0F"/>
   <SolidColorBrush x:Key="ConsolePanelBrush" Color="#15181E"/>
   <SolidColorBrush x:Key="ConsoleTextBrush" Color="#E8EBF2"/>

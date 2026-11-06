@@ -15,6 +15,8 @@ and telemetry capabilities remain here, with links to the separate refinements.
 
 Implemented items are removed from this active list and retained in the
 [implemented ideas archive](IDEAS_IMPLEMENTED.md). IDs are never reused.
+Entries still awaiting live/release qualification, or retaining unselected
+alternatives, can remain here with an explicit source-complete status until closeout.
 Cleanup on 20 October 2026 archived IDEA-007 through IDEA-010; their remaining
 manual qualification notes are preserved there.
 
@@ -31,6 +33,359 @@ authorized; the implementation direction remains to be selected.
 The maintainer selected the quiet-frame header, now implemented locally with
 visual review pending. A later correction replaces the two hero actions with
 one Download link and gives header Docs a more prominent pill; pause remains removed.
+
+<a id="release-0-5-0-plan"></a>
+## Current 0.5.0 scope and implementation status
+
+**Audited: 2026-11-04.** This section is the authority for 0.5.0 scope and
+recommended delivery order. Stable idea, issue and tweak entries remain the
+owners of detailed requirements, research and dated evidence. The older backlog
+priority table below does not override this release order.
+
+**Release intent:** Make existing graphs easier to navigate and edit, preserve
+reliable editing across the interface/engine boundary, and add focused audio
+routing and creative effects. Keep this a bounded improvement to the current mixer.
+
+**Authorized first-run refinement — 2026-11-06, verified and locally integrated:**
+Use the seven-node voice starter recorded under [IDEA-031](#voice-focused-starting-graph-proposal--2026-11-06),
+with evenly spaced processing nodes and stacked outputs. This replaces the
+three-node default for new/explicitly reset workspaces only; existing saved
+graphs and device/output policies remain intact.
+
+**Current presentation selection — 2026-11-05, implemented, offline verified
+and locally integrated:** The maintainer selected **Quiet Blocks** (concept 1)
+under [TWEAK-025](TWEAKS.md#tweak-025). At the existing low-detail transition near
+30%, retain plain solid charcoal node bodies and category-coloured header strips,
+with no decorative type symbols, name/control text, miniature controls or meters.
+Keep selection/device-warning indicators, node bounds, ports, cables and edit
+guards; zooming in restores full controls. This supersedes
+all symbol and control-silhouette directions below. No additional hover or
+selection behavior is part of the selection. Earlier verification and local
+integration evidence remain historical. Quiet Blocks passed 195 focused detached
+checks covering all 34 real kinds and existing zoom/draft/reveal guards, plus
+normal/high-contrast screenshot review and a production build with unchanged
+engine. Guarded interface-only activation through the actual shortcut passed
+eight seconds of observation, preserving the same engine, physical settings,
+preferences, configuration, advancing frames and running paths without rollback
+or restart. Maintainer visual follow-up and final release qualification remain.
+
+**Earlier symbol refinement — 2026-11-05, now superseded:** The maintainer requested slightly larger,
+thicker and more refined symbols. The 128-DIP/2.6-stroke update and simplified
+internal details are offline verified and locally integrated under
+[TWEAK-025](TWEAKS.md#tweak-025). Targeted symbol/zoom checks and all 34 real-node
+probes pass; UI-only integration preserved the same engine and settings.
+Maintainer visual follow-up remains. The initial symbol verification and local
+build below remain historical evidence.
+
+**Earlier symbol-colour correction — 2026-11-05, now superseded:** Replace bright white with
+the earlier control-silhouette shade `#0B0D11`, retaining the refined shapes,
+size/stroke and system foreground in high contrast. Offline verified and locally
+integrated under [TWEAK-025](TWEAKS.md#tweak-025), preserving the same engine and
+settings. Earlier white-colour requirements are superseded; follow-up review remains.
+
+**Authorized scope extension — 2026-11-05, implemented, offline verified and locally integrated:** Before
+the final release audit, checks and documentation pass, add Simple Effects and
+Advanced Effects categories ([TWEAK-024](TWEAKS.md#tweak-024)), Echo
+([IDEA-055](#idea-055)) and Distortion ([IDEA-002](#idea-002)). The maintainer
+selected a continuous subtle-to-strong range for Distortion. The original extension
+also replaced zoomed-out control silhouettes with a centred soft-white type
+symbol ([TWEAK-025](TWEAKS.md#tweak-025)), later darkened and now superseded by
+Quiet Blocks above. Coloured headers, hidden meters, fixed node/socket geometry
+and existing detail/edit guards remain part of the current contract.
+The prior recommendation to freeze features is superseded by this explicit
+extension. Earlier qualification counts describe the earlier candidate, not
+these additions. The new candidate passed 19 native suites (359 focused creative
+checks), 15,164 detached UI checks/317 renders/zero binding errors, 732 native/
+desktop boundary checks and 111 activation fixtures. All 34 node types passed
+the separate symbol geometry/theme probe. Guarded paired activation through the
+trusted shell and actual shortcut passed, preserving settings, preferences and
+configuration and restoring the previously running paths. See the
+[execution report](IMPLEMENTATION_0.5.0.md) for quality/timing limits. Maintainer
+visual/listening follow-up and final release qualification remain; nothing was published.
+
+**Current checkpoint — maintainer feedback, 2026-11-04:** The previously
+integrated baseline remains unreleased. The maintainer reports successful manual
+checks of minimap navigation and visibility persistence; Tab/Shift+Tab control
+navigation; Ctrl+Tab pipeline navigation; arrow nudging with undo and arrow
+panning; F2 rename and Find by custom name/node type; direct dial entry and Page
+Up/Down; decimal-edit undo; both Trigger cases; and Reverb Wet independence from
+Mix, its other controls and Bypass. These are maintainer-reported results, not
+independently observed tests or comprehensive accessibility/listening qualification.
+The checklist's Reverb Mute instruction was incorrect: Reverb has Bypass, not a
+Mute control. No new Mute button is requested.
+
+**Simplified meters and centring — 2026-11-04, implemented, offline verified and
+locally integrated:** Hide meters in
+both Compact and Overview at the existing low-detail transition below 30%,
+respecting hysteresis and active-edit guards. Centre passive controls with
+symmetric 16-world-DIP horizontal padding, without reserving a meter column.
+Keep the global 72-DIP dial diameter, dark shade, coloured headers, full-detail
+meters and stable node/socket geometry. The earlier policy retained Compact
+meters and reserved their column; that policy is now superseded. The suite passed
+14,752 checks / 314 renders / zero binding errors. The updated mixed-node fixture
+checks meter visibility at both simplified levels and full detail, horizontal
+centring, shared dial size and unchanged geometry/history. Reviewed 25%, 10%,
+named-frame and 100% screenshots confirm hidden simplified meters and their
+full-detail restoration. Guarded activation preserved the same engine process/
+start time/path/hash and settings through eight seconds without rollback.
+This remains unreleased; maintainer follow-up is pending.
+
+**Corrected node-detail sizing — 2026-11-04, implemented, offline verified and
+locally integrated:** Use one fixed,
+modestly larger 72-world-DIP dial diameter across all simplified nodes, with
+regular spacing. Circle size must not grow with node area. The maintainer
+clarified that filling the entire box was not the intended request; the
+oversized layout below is superseded. Keep the minimal shape types, dark shade,
+full-detail geometry and existing navigation behavior. The suite passed 14,752
+checks / 314 renders / zero binding errors. Its updated mixed 32-node fixture
+checks every simplified circle against the common 72-DIP diameter across node
+types. Reviewed 25%/10% and named-frame screenshots confirm matching single- and
+multi-dial sizes with compact spacing. Guarded activation preserved the same
+engine process/start time/path/hash and settings/preferences through eight seconds
+without rollback. This remains unreleased; maintainer follow-up is pending.
+
+**Earlier interior-filling layout — 2026-11-04, locally integrated, now
+superseded:** Simplified controls filled the padded node interior, with
+every dial circle within a node the same size, independently of full-detail
+sizes. The minimal shape types, darker shade and full-detail geometry remain
+unchanged. The existing suite passed 14,752 checks / 314 renders / zero binding
+errors. Reviewed 25%/10% and varied-control screenshots show the dynamics node's
+five equal circles in a 2/2/1 layout; this is visual evidence, not new automated
+multi-dial coverage. Guarded activation preserved the same engine identity/hash
+and settings/preferences through eight seconds without rollback. Maintainer
+follow-up remains pending under ISSUE-005; the change is unreleased.
+
+**Minimal dark silhouettes — 2026-11-04, implemented and locally integrated:** Simplify silhouettes
+to dial circles and main selector/plot blocks only; remove numeric-entry bars and
+all button/Bypass blocks. Shapes use a dedicated `NodeSimplifiedBrush`, normally
+`#0B0D11` against the `#15181E` node background, with `WindowTextBrush` in high
+contrast. The minimap remains `#4A5058`. Preserve coloured headers, geometry,
+connections, hover/Find names and full controls on zoom-in. The previous matching
+brighter shade and extra blocks below are superseded. The existing detached suite
+passed 14,752 checks / 314 renders / zero binding errors, with screenshots and
+exact darker-than-background pixels reviewed. Guarded interface-only activation
+preserved the same engine identity/hash and settings/preferences through eight
+seconds without rollback; all 36 inventory entries passed. This remains unreleased.
+
+**Earlier node-detail direction — 2026-11-04, locally integrated:** Replace zoomed-out
+centred names with low-detail silhouettes of the actual controls, such as dial
+circles and field/button rectangles, following the supplied ComfyUI reference.
+Keep header colours, geometry and connections; names remain available through
+tooltips/Find and full controls return when zooming in. This supersedes the
+fitted-name direction below, not the minimap shade or group-header behavior.
+The detached suite passed 14,752 checks / 314 renders / zero binding errors;
+25%/10% and varied-control screenshots were reviewed. Shapes are passive and port
+text hides too. Guarded interface-only activation preserved the same engine
+identity/hash and unchanged settings/preferences through eight seconds without
+rollback. Mode-handling review remains source evidence, not additional live
+interaction proof. Maintainer follow-up remains pending under ISSUE-005;
+the change is unreleased.
+
+**Earlier node-header correction — 2026-11-04:** Keep the coloured header bar
+on simplified nodes; hide only its small title text. The centred actual/custom
+name remains unchanged. Group-header behavior is unchanged. This narrow
+ISSUE-005 correction is implemented, offline verified and locally integrated.
+
+**Subsequent meter correction — 2026-11-04:** Restore the full meter border and
+original peak indicator, including its idle cap. Only the tiny red sliver was
+unwanted. The gradient is inset 1 DIP inside the restored border, preserving
+actual clipping and peak hold/history. This TWEAK-021 correction is implemented,
+offline verified and locally integrated. The earlier removals below are superseded.
+
+**Latest correction qualification — 2026-11-04:** Both corrections passed
+**14,748 detached checks, 314 renders and zero binding errors**, including
+525 focused checks. Guarded interface-only activation through the
+trusted shell and actual shortcut passed, preserving the same engine process,
+start time, path and hash and unchanged settings/preferences through eight seconds
+without rollback. Maintainer follow-up remains pending; this is unreleased
+0.5.0 work. The 14,726-check evidence below belongs to the preceding candidate.
+
+The preceding feedback candidate implemented these changes:
+remove Escape cancellation of arrow nudges while retaining ordinary draft
+cancellation; add Ctrl+plus/minus canvas zoom; simplify node/group headings;
+darken the minimap and remove its header/title; remove the idle clipping strip
+and unintended red top seam while preserving actual clipping indication; and
+correct [ISSUE-025](KNOWN_ISSUES.md#issue-025) so Settings uses available height
+while retaining scrolling for genuinely small work areas. All feedback
+refinements passed source review and the final offline suite:
+**14,726 detached checks, 314 renders, zero binding errors**.
+
+Final guarded interface-only activation passed through the trusted shell and
+actual shortcut. It preserved the same engine process/start time/path/hash,
+current configuration, saved settings/preferences, advancing frames and running
+paths through eight seconds of observation, with no rollback. Final independent
+audit verified all 36 installed payload hashes and matching source/build receipt/
+inventory identity; the final workspace screenshot was reviewed. Maintainer follow-up review
+of the integrated refinements remains pending. Release identity and published
+downloads stay **0.4.0 Beta**; this is unreleased 0.5.0 development.
+
+**Earlier feedback checkpoint — 2026-11-04:** The 14,665-check / 309-render
+pass preceded the Settings and final red-seam corrections. It is historical;
+the final qualification above supersedes it.
+
+**Earlier source and local integration checkpoint — 2026-11-04:** All items
+accepted at that checkpoint were implemented,
+verified offline and locally integrated for **unreleased 0.5.0**. The release
+identity and published downloads remain **0.4.0 Beta**. The combined run passed 18 native
+suites, 14,583 detached UI checks with 305 previews and zero binding errors,
+712 production serialization/history boundary checks, 51 controller-identity
+checks and 97 UI-activation fixtures. These isolated checks do not establish
+native keyboard/Narrator interaction or listening results. The
+[execution report](IMPLEMENTATION_0.5.0.md) owns commands and detailed evidence.
+
+The maintainer separately authorized source implementation/testing after the
+planning audit, then engine restarts and invasive testing. Guarded paired
+activation through the trusted Windows shell and actual shortcut passed: the
+engine became ready in 0.247 seconds, all 10 previously running paths returned,
+and frames advanced. The final keyboard correction used an interface-only
+update that preserved the same engine process and hash. Each update preserved
+its then-current saved settings/preferences and verified the physical settings
+file; newer workspace edits between updates were retained. Both settings
+views and recovery backups remain outside the checkout. Final installed payload
+hashes match 36/36 entries, with source receipt and inventory aligned. This
+local integration does not publish a release or establish listening results
+for the new Trigger/Wet routes. Actual keyboard/IME, Narrator and pointer/DPI usability
+remain separate qualification. Computer-use tools remain excluded.
+
+### Accepted scope and completion evidence
+
+#### Reliable editing and maintainable implementation
+
+| Work | Tracking | Completion evidence required |
+| --- | --- | --- |
+| Preserve gain precision through saved settings and undo history | [ISSUE-024](KNOWN_ISSUES.md#issue-024) | Decimal node/cable edits survive real serialization, acknowledgement, save/reload and undo/redo; genuine conflicting changes are still detected |
+| Add production desktop/native boundary tests in CI | [IDEA-054](#idea-054) | A regression fails before the precision fix and passes after it, using the actual serializers and acknowledgement/history path; retain fast tests and separate full-engine qualification |
+| Harden local UI activation identification | [ISSUE-011](KNOWN_ISSUES.md#issue-011) | Startup/exit cases are handled without accepting an unidentified process or weakening identity, settings, backup and rollback safeguards |
+| Replace behavioural status-message matching with stable reason codes | [IDEA-054](#idea-054) | Reasons survive native/desktop serialization; wording changes do not change behaviour; unknown reasons and recovery transitions remain usable |
+| Refactor workspace/node views incrementally | [IDEA-054](#idea-054) | Small, separately reviewable extractions preserve layout, focus, gestures, history and subscriptions; no framework rewrite or unrelated cleanup |
+
+#### Canvas navigation and readable presentation
+
+| Work | Tracking | Completion evidence required |
+| --- | --- | --- |
+| Smooth green/yellow/red meter gradients | [TWEAK-021](TWEAKS.md#tweak-021) | Fixed-scale colours remain meaningful at low/high levels; restore the full border and original peak/idle indicator, removing only the tiny red seam with an inset gradient; preserve actual clipping, readings, timing and high contrast |
+| Settings menu uses available height | [ISSUE-025](KNOWN_ISSUES.md#issue-025) | Fixed-cap defect resolved locally and integrated; full menu fits available space while constrained work areas retain scrolling and keyboard access; follow-up review pending |
+| One flat Effects menu | [TWEAK-024](TWEAKS.md#tweak-024) | Reunite the earlier Simple/Advanced split; creation/search/help share one catalog and existing kinds, saved graphs and header colours remain compatible |
+| Secondary-output colours, cable gradients and midpoint markers | [TWEAK-026](TWEAKS.md#tweak-026) | Light-blue effect-return audio sockets retain their shape; cables blend between actual socket colours; markers follow full-detail visibility and stay under nodes; preserve selection/mute/high contrast and interactions |
+| Quiet Blocks at low zoom | [TWEAK-025](TWEAKS.md#tweak-025) | Plain charcoal bodies and category-coloured headers across all kinds, without decorative symbols/name/control text/mini-controls/meters; retain selection/device warnings, geometry/ports and full-detail restoration; offline verified and locally integrated, maintainer follow-up pending |
+| Zoom out further and progressively simplify nodes/groups | [ISSUE-005](KNOWN_ISSUES.md#issue-005) | Keep verified 10–200% range, guarded detail transitions, hidden simplified meters and fixed node/socket geometry; Quiet Blocks supersedes symbols under TWEAK-025 |
+| Ctrl+plus / Ctrl+minus canvas zoom | [ISSUE-005](KNOWN_ISSUES.md#issue-005) | Reuse guarded canvas zoom and preserve focused editors' native shortcuts; verify alongside existing reset, wheel and Fit controls |
+| Bottom-right minimap showing the visible canvas region | [IDEA-053](#idea-053) | Accurate viewport rectangle through pan/zoom/resize and a saved **Show minimap** setting; manual navigation/persistence reported successful; darker title-free refinement offline verified and integrated, follow-up review pending |
+
+#### Keyboard editing and accessibility
+
+| Work | Tracking | Completion evidence required |
+| --- | --- | --- |
+| Ctrl+Tab / Ctrl+Shift+Tab follow the pipeline; Tab / Shift+Tab traverse controls | [ISSUE-003](KNOWN_ISSUES.md#issue-003) | Predictable branches/endpoints, off-screen reveal and focus return; no trapped focus or accidental numeric commits |
+| Arrow keys nudge selected nodes, otherwise pan | [ISSUE-003](KNOWN_ISSUES.md#issue-003) | Canvas-focus-only behaviour, coherent group/multi-selection moves, layout-lock protection and one undo step per held-key gesture; focused controls retain their arrows |
+| F2 renames exactly one selected node or group | [TWEAK-022](TWEAKS.md#tweak-022) | Multiple/empty/non-renamable selections do nothing; one selected group is one logical target |
+| Typing on a focused dial starts manual value entry | [TWEAK-023](TWEAKS.md#tweak-023) | First character retained, signed/decimal entry supported, validation and cancellation preserved; no audio change from an incomplete draft |
+| Refresh the screen-reader name after rename | [ISSUE-003](KNOWN_ISSUES.md#issue-003) | Rename/undo/redo metadata verified in detached checks; actual screen-reader announcements still require qualification |
+
+#### Focused audio additions
+
+| Work | Tracking | Completion evidence required |
+| --- | --- | --- |
+| Gate and Expander Trigger inputs | [IDEA-052](#idea-052) | Unconnected nodes retain self-detection; connected trigger affects the main signal without being mixed into it; silent/missing/muted trigger cases, timing and stereo behaviour specified and tested |
+| Separate Reverb Wet output | [IDEA-052](#idea-052) | Wet signal is independent of Mix, shaped by Decay/Damping/Pre-delay, and correctly routed/metered as stereo where appropriate; existing Audio output and saved routes retain their behaviour |
+| Echo | [IDEA-055](#idea-055), [ISSUE-026](KNOWN_ISSUES.md#issue-026) | Exact Time/Repeats/Mix controls, finite decaying copies, fresh timing/count edits, separate echo-only output, bounded real-time processing and legacy-feedback migration; offline verified and locally integrated |
+| Distortion | [IDEA-002](#idea-002) | Drive/Tone/Mix/Output from warmth to strong saturation, measured alias/DC/headroom behavior, aligned dry/wet/bypass, stereo and persistence/reset/history |
+| Several output nodes for one device | [IDEA-056](#idea-056) | Independent controls; canonical endpoint ownership; one summed stream and final clip boundary; reconnect/alias/fade handling; duplicate/paste/undo/persistence coverage |
+
+Page Up/Down larger-step dial adjustment and search by custom name plus node type
+already exist. Preserve and verify them; do not count them as new features.
+The activation-helper correction is development tooling, not a new in-app updater
+feature. Refactoring and reason-code work address source maintenance risks, not
+additional reproduced user defects.
+
+### Settled implementation contracts — 2026-11-04
+
+These contracts include the maintainer's later manual-feedback decisions.
+The feedback refinements, including the Settings-menu correction, passed offline
+verification and guarded local integration; maintainer follow-up review remains.
+The later Quiet Blocks selection under TWEAK-025 supersedes control silhouettes,
+dial sizing and type symbols; it is offline verified and locally integrated. Earlier silhouette,
+symbol and meter-visibility implementation evidence remains in dated entries.
+Offline verification and maintainer-reported results are distinct evidence.
+
+| Decision | Accepted behavior and remaining qualification |
+| --- | --- |
+| Lower zoom and compatibility | Desktop uses 10–200%; native accepts 10–400%, retaining its historical upper bound. Older builds may reject new low zoom or ports; transparent downgrade is not promised |
+| Low-detail thresholds and editing | Progressive detail with hysteresis preserves node bounds/socket anchors. Quiet Blocks retains solid charcoal bodies and coloured header strips, with no decorative type symbols, name/control text, miniature controls or meters. Existing selection/device-warning indicators remain. Zooming in restores full detail. Existing interactions and high contrast remain; no new hover/selection presentation is added. Group headers keep fixed geometry and their existing simplification. Active edits defer hiding; navigation reveals controls before focus. Overview sockets cannot be snapped to. Quiet Blocks is offline verified and locally integrated; maintainer follow-up remains |
+| Canvas zoom shortcuts | Add Ctrl+plus and Ctrl+minus through the existing guarded zoom path; keep Ctrl+0 reset and native focused-control behavior |
+| Minimap visibility and bounds | Default-on saved Show minimap toggle, bottom-right overview, click-to-centre and drag-to-pan. Mapping stays stable during dragging and includes the visible region outside node bounds. Darker presentation with no header/title is accepted; optional wheel zoom remains deferred |
+| Pipeline branches and endpoints | Follow main audio edges, including muted routes, so silent paths can still be inspected. At splits/merges show a small named branch chooser; retain the last traversed edge for a predictable reverse step. At endpoints stay put with brief feedback. Disconnected nodes remain reachable through Find/ordinary focus; no automatic wrapping into unrelated pipelines |
+| Focus, selection and drafts | Navigate from the focused node, or a single selected node when canvas-focused; multiple selections need an explicit starting-node choice. Ordinary Tab can leave the node/canvas. Menus, dialogs and controls keep their native keys. Before pipeline navigation, commit only a valid pending numeric draft; invalid/incomplete drafts retain focus with feedback and Escape cancellation |
+| Nudge/pan distances | 10 world DIPs per nudge, Shift for 1-DIP fine nudging, and 40 screen DIPs per pan step. One held key is one guarded undo step. Remove Escape-to-cancel nudging at the maintainer's request; ordinary Escape cancellation of text/value drafts remains. Locked selected nodes do not switch to pan |
+| Trigger disconnect versus silence | No cable means self-detection. A connected silent, muted or unavailable source means a silent detector, not automatic fallback to the main input. Deleting/disconnecting the cable restores self-detection. Preserve attack/hold/release and identify unavailable sources clearly |
+| Reverb Wet bypass/mute/tails | Wet is independent of Mix and stereo where appropriate. The UI's Bypass passes dry Audio and fades Wet to silence without dry leakage. The model's retained muted state silences both outputs, but Reverb has no Mute control and this was not a reported manual test. The network advances its tail during bypass/mute; resuming fades in the current result. Explicit reset clears the tail |
+| Stable reasons and bounded refactoring | Separate stream/device status reasons from configure-command error codes. Start with already identified behavioural text matches. Keep structural extraction separate from feature/fix commits and scoped to touched components; stop once the agreed seams and regression checks are delivered |
+
+**Superseded contract, earlier 2026-11-04:** Arrow nudges previously supported
+Escape cancellation and passed the corresponding held-key regression. The later
+maintainer decision removes that feature; ordinary text/value draft cancellation
+is retained. Earlier test counts describe the earlier implementation.
+
+### Recommended delivery order
+
+1. **Establish correctness:** Add the failing production-serialization/history
+   regression, then correct gain precision and qualify genuine conflicts. Harden
+   activation identity before relying on it for later live interface work.
+2. **Prepare only necessary boundaries:** Define reason-code/schema compatibility
+   and perform bounded workspace/node-view extractions, in separate changes.
+   Do not make every later feature wait for a broad cleanup project.
+3. **Deliver the canvas/keyboard work together:** Resolve focus and selection
+   contracts first, then extend shared zoom bounds, simplified rendering,
+   minimap/settings and pipeline navigation. Add F2/direct entry and qualify
+   their interactions. Meter gradients can be a small independent change.
+4. **Add the audio ports:** Agree detector and Wet-output contracts, implement
+   desktop/native ports together, and verify old/new graphs, channel semantics,
+   bypass, mute, missing sources and undo/copy/paste. Keep Gate/Expander and Reverb
+   separately reviewable even if they share port infrastructure.
+5. **Qualify the combined candidate:** Run the acceptance checks above and relevant
+   existing suites; inspect real keyboard/pointer/Narrator behaviour, low-zoom
+   rendering and audio continuity. Compare against the same baseline and example
+   graphs before claiming a performance improvement. Preserve installed settings
+   and qualify matching source/binaries separately from publication.
+
+### Scope limits and release readiness
+
+- Keep the existing 32-node/96-connection limits. More zoom is not authorization
+  for larger graphs, new frameworks, a general modulation system or a full
+  screen-reader graph inspector.
+- Audio File input, Recording output, Desktop Audio, Compressor Trigger, Mix
+  pre-Level, network/plugin integration and a Reverb Mix-label change remain
+  outside confirmed 0.5.0 scope. Optional minimap extras are also deferred unless
+  separately selected. All accepted work above remains in scope.
+- Full accessibility compliance is not established by a renamed label and a few
+  shortcuts. Complete focused workflow checks and report remaining limitations
+  accurately; unresolved ISSUE-003 cable-inspection work is not silently added.
+- Compatible existing workspaces must load with unchanged audio and preserve
+  settings/history where applicable. Explicitly define what older builds do
+  with new ports and zoom values; do not promise transparent downgrade support.
+- The final package must have matching source/build identity, regression and
+  integration evidence, release notes, checksums and signed update metadata.
+  No version bump or publication is authorized by this work. Authorized guarded
+  local activation passed, and the maintainer later reported the focused manual
+  successes above; comprehensive listening/native accessibility qualification
+  and maintainer follow-up review of the integrated refinements remain incomplete;
+  repository visibility remains a separate maintainer decision.
+
+### Audit conclusions — 2026-11-04
+
+The plan is coherent as a graph editing and routing release. Its largest risks
+are interaction between zoom/focus/selection, new audio-port semantics and an
+open-ended refactor. Preserve the accepted features, bound the refactor and
+qualify those behaviours before adding optional extras. Tests and reason codes
+support the release rather than competing as separate user features.
+
+This audit reorganized the previously flat 15-item list without dropping accepted
+work, removed obsolete "awaiting agreement" language from current scope, separated
+source-only completion from release qualification, exposed the native 15% zoom
+limit and distinguished stream status reasons from command errors. Detailed
+historical proposals and dated evidence remain in their stable entries. Source
+was reviewed for these findings; no external research was refreshed and no app
+code, tests, live process, settings or release identity changed during the audit.
 
 ## How this log works
 
@@ -67,6 +422,11 @@ preferences. Completed work stays in [the archive](IDEAS_IMPLEMENTED.md).
 
 | Priority | ID | Idea | Status |
 | --- | --- | --- | --- |
+| P3 | [IDEA-052](#idea-052) | 0.5.0 node inputs and outputs exploration | Accepted ports integrated; focused manual passes reported; unreleased; other ports exploratory |
+| P2 | [IDEA-053](#idea-053) | Bottom-right canvas minimap | Baseline manual passes reported; darker, title-free refinement offline verified and integrated; follow-up review pending; unreleased |
+| P2 | [IDEA-054](#idea-054) | Integration coverage, incremental refactoring and stable status reasons | Offline verified and locally integrated; unreleased |
+| P3 | [IDEA-055](#idea-055) | Echo effect and echo-only output | Researched refinement offline verified and locally integrated for unreleased 0.5.0 |
+| P2 | [IDEA-056](#idea-056) | Multiple output nodes for the same device | Offline verified and locally integrated; unreleased 0.5.0 |
 | P2 | [IDEA-022](#idea-022) | Save selected node sections as User Presets | Captured |
 | P2 | [IDEA-024](#idea-024) | Guided introduction to nodes, noodles and navigation | Captured |
 | P2 | [IDEA-025](#idea-025) | Why no sound? with a highlighted blocking node | Needs decision |
@@ -75,7 +435,7 @@ preferences. Completed work stays in [the archive](IDEAS_IMPLEMENTED.md).
 | P2 | [IDEA-030](#idea-030) | Selected-node inspector at a readable size | Captured |
 | P2 | [IDEA-051](#idea-051) | Website quick-access header and matching actions | Implemented locally; visual review pending |
 | P3 | [IDEA-029](#idea-029) | Route inspection, diagnostics and useful activity history | Captured |
-| P3 | [IDEA-031](#idea-031) | Task templates and favorite or recent node types | Captured |
+| P3 | [IDEA-031](#idea-031) | Task templates and favorite or recent node types | Voice starter verified and locally integrated for unreleased 0.5.0; other template/favorite work captured |
 | P3 | [IDEA-032](#idea-032) | More informative overload readings | Captured |
 | P3 | [IDEA-016](#idea-016) | Guided node calibration and Learn settings | Researched |
 | P3 | [IDEA-033](#idea-033) | New voice cleanup and leveling nodes | Captured |
@@ -84,7 +444,7 @@ preferences. Completed work stays in [the archive](IDEAS_IMPLEMENTED.md).
 | P3 | [IDEA-004](#idea-004) | User-created tasks for multiple changes | Researched |
 | P3 | [IDEA-048](#idea-048) | Developer API for third-party apps and automation | Captured |
 | P3 | [IDEA-013](#idea-013) | Audio-file inputs and soundboard playback | Researched |
-| P3 | [IDEA-002](#idea-002) | Distortion and related creative effects | Researched |
+| P3 | [IDEA-002](#idea-002) | Distortion and related creative effects | Distortion offline verified and locally integrated; unreleased 0.5.0 |
 | P3 | [IDEA-015](#idea-015) | Support additional virtual audio drivers | Captured |
 | P3 | [IDEA-043](IDEAS_LATER.md#idea-043) | Sound recall across processing updates | Captured |
 | P3 | [IDEA-006](#idea-006) | External parameters and conditional task triggers | Researched |
@@ -184,7 +544,28 @@ the candidates reviewed with the maintainer, not every historical planning note.
 <a id="idea-002"></a>
 ## IDEA-002: Distortion and related creative effects
 
-- **Captured:** 2026-10-19. **Status:** Researched.
+- **Refinement authorized 2026-11-06 — offline verified and locally integrated:** Audit control transitions,
+  bypass/mute, state continuity, alias/headroom behavior and full routing-fade
+  performance after the Echo refinement. Preserve the selected sound and controls
+  unless a demonstrated defect justifies a change. The effects-menu correction
+  moves this node into the single Effects category under TWEAK-024.
+- **Refinement result:** FIR work scheduling was optimized while preserving
+  one million stereo frames bit-for-bit against the previous processor. Complete
+  control/publication tests and maximum routing fades now run; all 19 native
+  suites and 461 creative checks pass. Performance margin remains host-dependent;
+  see [ISSUE-027](KNOWN_ISSUES.md#issue-027) and the execution report. No independent
+  live listening claim is made.
+- **Captured:** 2026-10-19. **Updated:** 2026-11-05. **Status:** Implemented, offline verified and locally integrated for unreleased 0.5.0.
+- **Selected scope:** The maintainer authorized Distortion before final release
+  qualification and chose a broad subtle-to-strong range. One soft-saturation
+  algorithm, Drive 0–36 dB (default 6), Tone 500–18000 Hz (6000), Mix 0–100% (50),
+  Output −24–0 dB (−6), and existing Bypass. Effects category. No mode
+  dropdown, bitcrusher, new routing ports or dependency is requested.
+- **Implementation contract:** Preserve stereo; smooth parameter changes; qualify
+  harmonic character, alias suppression, DC, headroom and worst-case CPU using
+  synthetic buffers. Match dry/wet/bypass timing and disclose any processing
+  latency. Existing workspace loading, copy/paste, reset and undo/redo must work.
+  This records authorization and a plan, not a completed listening or release check.
 - **Original intent:** A distortion node and other effects in that general family.
 - **Proposal:** Start with a dedicated Distortion node with Drive, Tone, Mix,
   Output level, and bypass. Soft saturation, hard clipping, and overdrive are
@@ -203,10 +584,14 @@ the candidates reviewed with the maintainer, not every historical planning note.
   additional effect families expand scope. Address output headroom, DC offset,
   smooth controls, and dry/wet timing if oversampling is used. The mixer currently
   has no automatic compensation between parallel paths.
-- **Open question:** Is the initial target subtle voice coloration, aggressive
-  distortion, or an adjustable range covering both?
-- **Next step:** Define representative sounds and quality/latency expectations
-  before choosing an algorithm or dependency.
+- **Earlier question, settled 2026-11-05:** The initial range covers both subtle
+  voice coloration and strong distortion; modes listed above remain exploratory.
+- **Verification:** Shared creative suite passes 359 synthetic checks, combined
+  native/UI/boundary checks and guarded paired integration pass. Fixed 8×
+  oversampling retains 32-frame dry/wet/bypass alignment; measured quality and
+  timing limits are in the [execution report](IMPLEMENTATION_0.5.0.md).
+- **Next step:** Maintainer listening follow-up and final combined release
+  qualification/documentation; synthetic tests do not establish listening quality.
 
 <a id="idea-003"></a>
 ## IDEA-003: Inline switch and toggle nodes
@@ -466,6 +851,10 @@ for existing references and must not be reused.
 
 <a id="idea-013"></a>
 ## IDEA-013: Audio-file inputs and soundboard playback
+
+- **0.5.0 review, 2026-11-04:** Shortlisted for discussion in
+  [IDEA-052](#idea-052); no implementation commitment. Source Reader feasibility
+  was rechecked, while format coverage and playback/storage decisions remain open.
 
 - **Captured:** 2026-10-20 (UTC+10). **Status:** Researched.
 - **User's requested direction:** Drag MP3 and other supported audio files
@@ -913,7 +1302,9 @@ for existing references and must not be reused.
 <a id="idea-031"></a>
 ## IDEA-031: Task templates and favorite or recent node types
 
-- **Captured:** 2026-10-23. **Status:** Captured. **Priority:** P3.
+- **Captured:** 2026-10-23. **Status:** Voice starter verified and locally
+  integrated for unreleased 0.5.0 on 2026-11-06; other proposals captured.
+  **Priority:** P3.
 - **Origin and need:** Prior UI-review suggestion. Reduce repeated setup after
   users understand the graph, without limiting exploration.
 - **Proposal:** Optional examples for hearing a microphone, sending voice/music
@@ -928,6 +1319,67 @@ for existing references and must not be reused.
   activation; they must not replace an existing workspace by surprise.
 - **Next step:** Identify two frequently repeated setups and decide whether a
   curated preset is sufficient before building a separate template system.
+
+### Voice-focused starting graph proposal — 2026-11-06
+
+- **Status:** Authorized, implemented, verified and locally integrated for
+  unreleased 0.5.0 on 2026-11-06.
+  The maintainer accepted the revised order and requested a default with clean,
+  generous spacing so cables remain visible. Other IDEA-031 template/favorite
+  proposals remain unselected.
+- **Need/proposed behavior:** Give new users a useful voice-processing route
+  they can understand immediately: Microphone → High-pass → Expander →
+  Compressor → Denoiser, with the final output connected to both Listening
+  output and Virtual output. This develops the earlier optional-template idea
+  into a potential first-run default. No additional splitter node is needed.
+- **Selected order, 2026-11-06:** Microphone → High-pass →
+  Denoiser → Expander → Compressor → both outputs. Putting denoising before
+  dynamics lets them respond to the cleaned signal and gives RNNoise speech
+  before expansion/compression alters its level envelope. This is engineering
+  judgment, not a proven universal order or an independently listened-to result.
+  Use gentle starter settings; do not assume the screenshot's exact thresholds
+  or gains suit every microphone, room or speaking level. Use the existing
+  new-node effect defaults shown in the accepted reference, neutral node names,
+  and no copied device assignments.
+- **Evidence/research, 2026-11-06:** The desktop `GraphDefaults.Fresh` and native
+  `defaultConfiguration` at proposal time created only an input and two directly
+  connected outputs. [OBS noise-suppression guidance](https://obsproject.com/kb/noise-suppression-filter)
+  supports the noise-cleanup role. [OBS expander guidance](https://obsproject.com/kb/expander-filter)
+  emphasizes threshold adjustment to avoid cutting speech and suggests an
+  alternative placement after compression; order therefore remains a listening
+  decision. The local RNNoise implementation reports 1,440 frames / 30 ms of
+  delay, retained in bypass and at zero Mix; endpoint buffering adds further
+  monitoring delay. No listening or performance test was run for this proposal.
+- **Scope/dependencies:** Small fixed starter-graph change using existing nodes;
+  coordinate desktop/native factories, first-run verification, layout/Fit and
+  documentation. A preset framework is not required. If later exposed as a
+  reusable optional example, coordinate with IDEA-022 and IDEA-024.
+- **Assumptions/tradeoffs:** Voice/call/streaming is the intended first-use case;
+  this is not a general music-processing default. Preserve both outputs muted,
+  the existing conservative Listening level, explicit physical-device selection
+  and recognized virtual-device binding policy. Do not store the screenshot's
+  device assignments or personal graph, and never replace a saved workspace.
+  More processing adds control complexity and monitoring latency; quiet speech
+  may need a lower expander threshold. Review readability at normal and minimum
+  window sizes rather than forcing the whole chain below full-detail zoom.
+- **Selected layout:** Five processing/source nodes share the same top edge,
+  with 95 canvas DIPs between each node body. Listening output sits above
+  Virtual output at the right, also separated by 95 DIPs. Existing first-run
+  Fit adapts the view to the available window; the saved fallback view is 40%.
+  The preliminary 100-DIP spacing was narrowed slightly so minimum-width Fit
+  reaches the full-detail threshold even after zooming out.
+- **Verification/integration:** 225 detached checks / 22 renders / zero binding
+  errors, 38 preparation/recovery checks, 802 real native/desktop boundary
+  checks, 289,921 graph assertions and the full synthetic engine lifecycle
+  passed. Normal/minimum-size screenshots were reviewed; minimum-width Fit
+  restores full controls from Quiet Blocks at 30.05%. Packaged smoke and guarded
+  paired integration passed, preserving the personal graph/settings/preferences
+  and restoring all previously running paths. All installed/candidate payloads
+  and source provenance were verified. See the
+  [execution record](IMPLEMENTATION_0.5.0.md#voice-starter-workspace--6-november-2026).
+- **Next step:** Maintainer visual follow-up and final release qualification.
+  Listening remains separate; the layout change does not establish ideal
+  processing values for every voice. Reusable templates/favorites remain proposals.
 
 <a id="idea-032"></a>
 ## IDEA-032: More informative overload readings
@@ -1182,15 +1634,533 @@ for existing references and must not be reused.
   [the visual review](../website-redesign/design-qa.md). Capture desktop and phone
   implementations for comparison, then complete maintainer review.
 
+<a id="idea-052"></a>
+## IDEA-052: 0.5.0 node inputs and outputs exploration
+
+- **Current status, 2026-11-04:** Accepted Gate/Expander Trigger and Reverb Wet
+  ports are implemented, offline verified and locally integrated for unreleased 0.5.0.
+  Other candidate ports and source/destination types remain exploratory.
+- **Implemented behavior:** No Trigger cable preserves Gate/Expander self-detection;
+  a connected silent, muted or unavailable source remains silent detection.
+  Trigger never joins the programme. Reverb Wet is independent of Mix, retains
+  stereo reflections and the existing decay/damping/pre-delay treatment.
+  Bypass fades Wet to silence without dry leakage; mute silences both outputs.
+  The network continues processing incoming audio and advancing tails during
+  bypass/mute, then resumes the current result through the existing ramps.
+- **Offline evidence:** Synthetic DSP checks cover detector isolation/timing,
+  stereo, absent/silent sources, Wet independence, tail transitions and realtime
+  allocation limits. Detached port checks cover sockets, snap, validation,
+  JSON, clipboard serialization, undo and preserved Audio-route insertion/detach.
+  Detach with a Wet branch is rejected rather than substituting dry audio.
+  See the [combined execution report](IMPLEMENTATION_0.5.0.md).
+- **Local integration and next step:** Matching binaries passed guarded live
+  activation and preserved each update's then-current workspace/settings. At
+  that earlier checkpoint, new-route listening had not been performed.
+- **Maintainer-reported manual results, 2026-11-04:** The maintainer subsequently
+  reports both Trigger cases passing, and successful Reverb Wet independence
+  from Mix, other Reverb controls and Bypass. These results were not independently
+  observed and do not extend to every silent/missing-source or tail-transition
+  case. The manual checklist incorrectly referred to muting Reverb: the UI has
+  Bypass and no Mute affordance. Retained model/DSP muted-state tests remain valid,
+  but are not a manual UI result. No new Mute control is requested.
+- **Next step:** Retain automated port regressions and these reported results;
+  keep broader listening qualification separate. No release has been published.
+  Unselected source/destination ideas need a separate decision.
+
+### Planning and research history — 2026-11-04
+
+- **Requested and updated:** 2026-11-04. **Status at planning:** Gate/Expander Trigger and
+  Reverb Wet planned; other ports exploratory. The separately selected meter
+  gradient belongs to TWEAK-021. **Target:** 0.5.0. **Priority:** P3, provisional.
+- **Audit clarification, 2026-11-04:** The
+  [current release plan](#release-0-5-0-plan) distinguishes accepted scope from
+  recommended detector/bypass/mute/tail defaults. Those behaviour contracts must
+  be settled before implementation. Extra ports require actual engine buffers
+  and port-aware channel/telemetry handling, not just new sockets. In particular,
+  `graphSignalChannels` currently treats every non-`audio` source port as mono
+  because existing alternate outputs are Left/Right. A future Reverb Wet port
+  must not inherit that assumption. Include stereo routing, fan-out, sidechain
+  use, copy/paste/history and old workspace loading in qualification.
+- **Maintainer direction:** Explore both additional connection sockets on existing
+  nodes and new audio source/destination types. This clarifies the original broad
+  request. The subsequent selection below supersedes the initial shortlist;
+  remaining suggestions are not selected for implementation.
+- **Confirmed first three changes, 2026-11-04:**
+  1. Smooth green/yellow/red meter gradients, tracked in
+     [TWEAK-021](TWEAKS.md#tweak-021).
+  2. Gate/Expander Trigger inputs. Without a Trigger cable, use the node's own
+     incoming audio as its detector, preserving current behaviour. With a cable,
+     use that separate signal to control attenuation of the main audio; never
+     mix the trigger into the output. A clean microphone branch controlling a
+     processed voice branch is the agreed explanatory example. Connected-but-
+     silent, muted and missing-source behaviour still needs specification.
+  3. A separate Reverb Wet output, described by the maintainer as a "wetness
+     output". Supply reverberation alone, independently of the Mix dial, while
+     retaining the existing combined Audio output. Decay, Damping and Pre-delay
+     still shape the wet signal. Mix remains the dry/wet balance for the normal
+     Audio output. Final socket wording and bypass/mute/tail behaviour remain
+     to be specified. The assistant's suggestion to rename Mix to Dry/Wet was
+     not separately approved and is not a fourth confirmed change.
+  These are confirmed feature-planning decisions, not completed implementation
+  or authorization to install or publish a build.
+- **Later scope addition, 2026-11-04:** The maintainer requested investigation
+  of ISSUE-024 and ISSUE-011 and selected more zoom-out, progressive node detail
+  reduction and a minimap for ISSUE-005. See the
+  [current 0.5.0 plan](#release-0-5-0-plan); the first three remain unchanged.
+- **Need:** Make useful routing, processing and playback/recording workflows
+  possible without making ordinary nodes harder to understand.
+- **Current source evidence (2026-11-04):** Reviewed `NodeCatalog.cs`,
+  `GraphModels.cs`, `GraphNodeView.cs`, `native/include/am/graph.hpp`,
+  `native/src/graph.cpp` and the existing backlog. Sources are Physical input,
+  Virtual input and Running app; destinations are Listening output and Virtual
+  output. Audio can already branch to multiple destinations and multiple cables
+  can feed an input. Crossfade has A/B inputs, Stereo Combine has Left/Right
+  inputs, and Stereo Split has Left/Right outputs. Only Ducking accepts a
+  detector/Trigger cable. Linked control is deliberately limited to Level-knob
+  nodes for new connections; retain [TWEAK-018](TWEAKS.md#tweak-018).
+  Dynamic Ducking already follows an external signal with a compressor curve.
+  The graph has typed connections, bounded processing and feedback prevention;
+  arbitrary new sockets are not just a layout change.
+
+### Additional sockets — proposed options
+
+| Candidate | Useful behaviour | Fit, alternatives and likely scope |
+| --- | --- | --- |
+| Gate / Expander Trigger input | A clean voice branch opens a gate on a separately processed voice branch, without mixing the trigger into the sound. | Strong first investigation; medium scope. Reuse the detector-cable concept, but add detector-aware processing, validation, persistence and UI. No connection should preserve existing self-detection. Decide connected-but-silent, muted and missing-source behaviour explicitly. |
+| Compressor Trigger input | Compress one signal according to another signal or a filtered detector branch. | Medium scope, but lower priority: Dynamic Ducking already overlaps substantially. Require an example that needs Compressor's own controls before adding another way to do the same job. Preserve Limiter's own-signal ceiling protection. |
+| Reverb Wet output | Send only the reverb tail to a separate Mix for level/EQ, while keeping the existing mixed Audio output. | Medium scope. First compare the existing recipe: branch the original signal and set a separate Reverb to 100% wet. An extra socket is convenience unless simultaneous wet and mixed outputs are needed. Define bypass, mute and tail behaviour; do not expose an internal bypass-blend buffer as a new output without checking its meaning. |
+| Mix pre-Level output | Feed a recording or auxiliary mix whose level is independent of that Mix's Level knob. | Medium scope. Branching upstream into another Mix already covers many cases. Specify whether mute and Linked control affect the tap; avoid silently bypassing mute. Add only if it materially simplifies real graphs. |
+| Parameter-control inputs / detector-value outputs | A macro or envelope controls crossfade position, effect amount or another parameter. | Large scope; retain under [IDEA-038](IDEAS_LATER.md#idea-038). Needs typed/ranged control values, smoothing, ownership and transient updates. Existing Linked control is not a general modulation signal. |
+
+Initial recommendation was to investigate Gate/Expander Trigger first and compare
+existing recipes before selecting Reverb Wet or Mix pre-Level sockets. The
+maintainer has now selected Gate/Expander Trigger and Reverb Wet above; Mix
+pre-Level remains exploratory. Keep optional
+sockets unobtrusive, but connected sockets always visible. This is a proposed UI
+principle, not an approved interaction design.
+
+### New sources and destinations — proposed options
+
+| Candidate | User benefit | Assessment and existing owner |
+| --- | --- | --- |
+| Audio File input | Play clips, loops and soundboard audio directly into effects or a mix. | Strongest new-source candidate; medium-to-large scope. Continue [IDEA-013](#idea-013), including drag/drop, Play/Stop, Loop, missing-file handling and a bounded decoding pipeline. Global shortcuts remain a later phase. |
+| Recording output | Connect any chosen graph point to an explicit recorder for a voice take or finished mix. | Strongest new-destination candidate; medium-to-large scope. Continue [IDEA-036](IDEAS_LATER.md#idea-036). Suggest one stereo WAV recording first, with explicit start/stop, path, elapsed time and failure feedback; multitrack/replay remain later. |
+| Desktop Audio input | Capture the combined playback on a selected Windows output device. | Medium-to-large scope, useful when users want the whole device mix instead of selecting apps. Endpoint loopback is supported by Windows, but routing VineMix back to that device can recapture its output. Needs a concrete feedback-prevention policy, device-switch handling and duplicate-playback guidance before selection. |
+| More virtual endpoints | Choose additional compatible virtual cables for existing input/output nodes. | Continue [IDEA-015](#idea-015); principally endpoint selection and compatibility work, rather than another socket family. Ordinary Windows and streamed devices already have coverage; do not present them as wholly missing. |
+| Test Signal input | Supply a tone/noise source for checking routing and effects. | Smaller than file playback, but narrower everyday value. Continue [IDEA-042](IDEAS_LATER.md#idea-042), with explicit enable and conservative initial level. |
+| Network send/receive, plugin audio ports, hardware insert | Connect other computers, plugins or an external processor. | Large separate investigations under [IDEA-037](IDEAS_LATER.md#idea-037). No protocol, SDK or dependency selected; defer from the initial 0.5.0 shortlist. |
+
+### Research, boundaries and next decision
+
+- **Primary sources checked 2026-11-04:**
+  [Cockos ReaPlugs](https://www.cockos.com/reaper/reaplugs/index.php) documents
+  compressor and gate sidechain capabilities, establishing a useful precedent,
+  not VineMix compatibility or permission to reuse implementation code.
+  [Microsoft WASAPI loopback](https://learn.microsoft.com/en-us/windows/win32/coreaudio/loopback-recording)
+  documents capture of a playback endpoint's mix in shared mode. The recapture
+  concern above is an inference from feeding that same endpoint.
+  [Media Foundation Source Reader](https://learn.microsoft.com/en-us/windows/win32/medfound/source-reader)
+  supports decoding samples but leaves presentation timing to the application;
+  it is an option for IDEA-013, not a selected decoder. Recording format/library
+  choices and network/plugin feasibility have not been researched in this pass.
+- **Scope and dependencies:** Effort labels are comparative source-review
+  estimates, not schedules. New sockets need matching desktop/engine validation,
+  saved port identities, undo/copy compatibility, labels, metering semantics and
+  routing checks. New audio sources/sinks also need lifecycle, buffering and
+  unavailable-device/file handling. Keep file I/O and decoding off the audio
+  callback. Preserve existing workspace sound and prevent feedback cycles.
+- **Earlier assistant shortlist (superseded by the maintainer's selection):**
+  Meter gradient (TWEAK-021), Gate/Expander Trigger,
+  Audio File input and basic Recording output. Investigate these together, then
+  size the work before committing all of them to 0.5.0. Desktop Audio is a
+  secondary option pending its feedback design. Other rows remain alternatives.
+- **Next step:** Specify remaining socket behaviours and meter transition widths
+  for the selected changes, using the release plan's decision table. Further
+  candidate exploration does not expand accepted 0.5.0 scope automatically.
+  Audio File input and Recording output remain unconfirmed proposals, with file
+  lifecycle decisions pending if selected. No app code, dependencies, live settings or release
+  identity changed; no runtime prototype or performance verification is claimed.
+
+<a id="idea-053"></a>
+## IDEA-053: Bottom-right canvas minimap
+
+- **Current node-detail selection, 2026-11-05:** Quiet Blocks under
+  [TWEAK-025](TWEAKS.md#tweak-025) replaces all low-detail interior shapes and
+  decorative symbols; it is implemented, offline verified and locally integrated. The minimap's
+  own presentation and saved visibility setting are unchanged.
+- **Earlier related node-detail correction, 2026-11-04, now superseded:** [ISSUE-005](KNOWN_ISSUES.md#issue-005)
+  used fewer control silhouettes and a dedicated darker node-content shade,
+  verified offline and locally integrated. The oversized interior-filling
+  interpretation is superseded; one fixed 72-world-DIP dial diameter across
+  simplified nodes with regular compact spacing is verified and locally integrated. The
+  minimap stays `#4A5058`.
+  Earlier matching-name-text and matching-silhouette-shade requirements
+  below are retained as history, not the current node-detail direction.
+- **Earlier matching-shade refinement, 2026-11-04 — implemented, offline verified and
+  locally integrated:** Darker minimap node silhouettes and centred simplified-node
+  names ([ISSUE-005](KNOWN_ISSUES.md#issue-005)) share the solid
+  `CanvasOverviewBrush`, normally `#4A5058`, preserving selection highlighting
+  and system high contrast. The maintainer found the previous `#626974` still too
+  light. The suite passed 14,748 checks / 314 renders / zero
+  binding errors, and screenshots were reviewed. Guarded interface-only activation
+  preserved the same engine process/hash and unchanged settings/preferences
+  through eight seconds of observation. This remains an unreleased 0.5.0
+  refinement under the installed `0.4.0-beta` identity; earlier evidence below
+  describes the preceding presentation.
+- **Current status, 2026-11-04:** Implemented, offline verified and locally
+  integrated for unreleased 0.5.0, including the subsequent visual refinement;
+  maintainer follow-up review remains pending.
+  The minimap is default-on at the bottom right and shows the
+  visible canvas rectangle. Click centres the view; dragging pans with stable
+  mapping. Bounds include the viewport when it is outside the graph.
+- **Visibility and verification:** **Settings → Show minimap** persists separately
+  from audio configuration, hides/restores the overview and leaves graph/audio
+  state unchanged. Detached geometry, keyboard/capture, preference, high-contrast,
+  viewport and maximum-size graph cases pass in the
+  [combined execution report](IMPLEMENTATION_0.5.0.md). No live usability or
+  performance claim follows from synthetic rendering alone.
+- **Maintainer-reported manual results, 2026-11-04:** Minimap navigation and the
+  Show minimap visibility preference's persistence passed the maintainer's checks.
+  These were not independently observed and do not establish all pointer/DPI cases.
+- **Accepted presentation refinement, 2026-11-04:** Darken the minimap and remove
+  its header/title, keeping the useful canvas/viewport overview and existing saved
+  visibility setting. This reduces visual clutter; no navigation or audio behavior
+  change is requested. Source review and the combined offline run passed
+  (14,726 detached checks, 314 renders, zero binding errors). Guarded local
+  interface-only integration passed while preserving the engine and current
+  workspace/settings. Maintainer follow-up review remains pending.
+- **Next step:** Retain the darker, title-free presentation and
+  geometry/navigation/persistence regressions, then review the integrated result. Computer-use
+  automation is excluded and release remains separate. Optional wheel zoom and
+  collapse controls stay deferred.
+
+### Planning and research history — 2026-11-04
+
+- **Requested:** 2026-11-04. **Status at planning:** Planned for 0.5.0; researched.
+  **Priority:** P2. Research/planning only at this stage.
+- **Confirmed understanding:** A small overview of the whole node canvas in the
+  bottom-right corner, with a rectangle indicating the portion currently visible
+  in the main workspace. The rectangle moves when panning and changes size when
+  zooming. This is an overview navigator, not a magnified node preview or another
+  set of zoom buttons. It accompanies the increased zoom-out and reduced-detail
+  rendering selected under [ISSUE-005](KNOWN_ISSUES.md#issue-005).
+- **Need:** Maintain orientation in a large graph and locate off-screen nodes
+  without repeatedly zooming all the way out and back in.
+- **Primary-source research, 2026-11-04:** Official ComfyUI frontend inspected at
+  commit `59bde61e054ce44873e7b6267726ca27f5476482`:
+  [MiniMap.vue](https://github.com/Comfy-Org/ComfyUI_frontend/blob/59bde61e054ce44873e7b6267726ca27f5476482/src/renderer/extensions/minimap/MiniMap.vue)
+  anchors the map bottom-right;
+  [viewport calculations](https://github.com/Comfy-Org/ComfyUI_frontend/blob/59bde61e054ce44873e7b6267726ca27f5476482/src/renderer/extensions/minimap/composables/useMinimapViewport.ts)
+  map graph bounds and the visible world rectangle into the overview;
+  [interaction handling](https://github.com/Comfy-Org/ComfyUI_frontend/blob/59bde61e054ce44873e7b6267726ca27f5476482/src/renderer/extensions/minimap/composables/useMinimapInteraction.ts)
+  supports pointer capture, click/drag navigation and wheel zoom. Its wheel path
+  uses 0.1–10 scale bounds; this is not a requirement to adopt ComfyUI's zoom range
+  or wheel behaviour throughout VineMix. Source inspection only; no ComfyUI
+  interaction session was run. No third-party source or assets were imported.
+- **Proposed first design:** A compact approximately 220 x 140 DIP overlay inside
+  the viewport, above footer messages, fixed in screen space. Show simplified
+  category-coloured node rectangles, subdued group outlines and a contrasting
+  visible-area rectangle. Selection can be highlighted; omit fine controls,
+  live meters and tiny labels. Optional faint connections should be evaluated
+  for clutter. Exact dimensions and a quick collapse/reopen control remain
+  proposals; the Settings toggle is now a confirmed requirement below.
+- **Confirmed visibility setting, 2026-11-04:** Add **Show minimap** in the
+  workspace section of Settings. Off hides the overview completely; On restores
+  it. Persist the preference across restarts, and keep the Settings action
+  available while the minimap is hidden. Proposed default: on. Hiding must not
+  change canvas position, zoom, selection or audio; stop hidden overview rendering
+  work and handle focus safely if the map was focused. A temporary collapse
+  button alone does not satisfy the requested setting. Verify immediate toggling,
+  persistence and re-enabling, including keyboard and high-contrast use.
+- **Proposed interaction:** Click the map to centre the main view there; drag
+  the visible-area rectangle to pan while preserving the grab offset. Keep the
+  zoom unchanged during these actions. Main-canvas wheel behaviour stays familiar;
+  minimap wheel zoom is optional and deferred unless useful in review. Navigation
+  works with layout locked. Capture/cancel must not leak clicks into covered nodes
+  or change audio controls. Provide keyboard focus/arrow panning and an accessible
+  name; retain existing Find/Frame shortcuts for precise navigation.
+- **Local feasibility:** `GraphWorkspace` already owns node geometry, viewport
+  size, pan/zoom and `ToWorld`. With its transform, visible world bounds are
+  `(-panX / zoom, -panY / zoom, viewportWidth / zoom, viewportHeight / zoom)`.
+  Reuse that authoritative transform and existing `SetCanvasView` behaviour:
+  navigation changes the session view without engine configuration or an undo
+  entry; the next substantive edit includes the view in its save. Only the new
+  Show minimap preference must persist immediately through UI preferences.
+  Do not silently introduce always-saved pan/zoom as part of this feature. Keep
+  minimap geometry separate from full WPF node controls and from audio telemetry.
+  Draw on graph/layout/view changes; stop unnecessary work while hidden.
+- **Bounds policy proposal:** Fit node/group bounds with padding, incorporating
+  the visible region when panning outside the graph so the indicator cannot
+  disappear. Avoid continuously rescaling the map under an active drag; freeze
+  its mapping for the gesture, then reconcile. Handle empty graphs, coincident
+  nodes, negative coordinates, extreme spread, resized windows and DPI changes.
+- **Scope/tradeoffs:** Medium UI work, shared with ISSUE-005's transform and
+  zoom changes. The overlay uses canvas space; collapsing and size adaptation
+  should keep it usable in smaller windows. It does not increase graph limits,
+  move nodes, modify routes, add undo steps or change processing.
+- **Next step:** Review normal and simplified canvas states plus minimap placement;
+  settle interaction/bounds policy, then qualify viewport accuracy, round-trip
+  pan/zoom, lock mode, input capture, high contrast and keyboard operation. Check
+  32-node/96-connection examples for rendering cost before claiming performance.
+  Implementation, live integration and publication are separate later work.
+
+<a id="idea-054"></a>
+## IDEA-054: Integration coverage, incremental refactoring and stable status reasons
+
+- **Current status, 2026-11-04:** Implemented, offline verified and locally integrated for
+  unreleased 0.5.0. CI now runs the production native/C# serialization and
+  acknowledgement/history regression. It demonstrated the precision defect
+  before the correction; expanded coverage passes 712 checks afterward.
+- **Implemented boundaries:** Shared camera, detail, minimap and pipeline policies
+  and focused workspace/node-view components support the new behavior without
+  a framework rewrite. `path.reason` separates stable stream reasons from human
+  diagnostics; typed configure conflicts use existing `errorCode` with
+  `revision_conflict`. Unknown reasons retain general handling, exact legacy
+  adapters are bounded, and recovery clears stale reasons. Stored graph gains
+  remain double until explicit DSP conversion; [ISSUE-024](KNOWN_ISSUES.md#issue-024)
+  owns that defect and its evidence.
+- **Evidence and next step:** The combined offline run passed 18 native suites
+  and 14,583 detached UI checks with zero binding errors; guarded paired and
+  interface-only activation also passed. See the
+  [execution report](IMPLEMENTATION_0.5.0.md). Preserve these regressions for
+  future changes. Native interaction, new-route listening and release
+  qualification remain separate; no broader refactor is implied.
+
+### Planning and source-investigation history — 2026-11-04
+
+- **Requested/date:** 2026-11-04. **Status at planning:** Planned for 0.5.0; documentation
+  only. The maintainer selected the investigated engineering improvements for
+  the release plan. No implementation, new dependencies or live changes are
+  authorized by recording them.
+- **Need/rationale:** Preserve reliable editing across the desktop/native
+  boundary, reduce the chance of unrelated interface regressions and allow
+  diagnostic wording to change without changing error classification.
+- **Evidence:** Source review on 2026-11-04 found that
+  `WorkspaceHistoryVerification.Snapshot` copies C# configuration rather than
+  passing through native serialization. `GraphWorkspace` combines navigation,
+  selection, connections, clipboard, feedback and rendering; `GraphNodeView`
+  combines device selection, meters, availability and effect construction.
+  `InputAvailability`, `OutputAvailability` and a microphone-privacy branch in
+  `GraphNodeView` classify some statuses by exact English messages. These are
+  verified source observations. The precision defect is tracked separately in
+  [ISSUE-024](KNOWN_ISSUES.md#issue-024); no live failure from status wording or
+  class size was reproduced. External technical research is not required for
+  these repository-specific proposals; feasibility is based on source review,
+  not a completed implementation or performance measurement.
+
+### Real serialization and history integration tests
+
+- Keep fast detached tests. Add an inert native test executable using production
+  C++ deserialization/serialization, fed by the production C# model serializer.
+  Deserialize its output in C# and pass the returned configuration through the
+  real acknowledgement/history path. Do not reimplement native conversion in
+  the test or substitute copied C# objects for the returned values.
+- Cover node and cable gains, non-binary-exact decimals, limits, old settings,
+  repeated save/reload, an edit arriving before an earlier acknowledgement,
+  undo while saving, lost acknowledgements and reconnects. Audit other numeric
+  model fields and add cases where their contracts differ. Genuine independent
+  name/device/gain changes must still trigger the appropriate conflict handling.
+- Require the regression to fail on the current precision defect and pass on
+  its correction. Add the new checks to CI alongside existing checks. An inert
+  serializer test does not qualify actual engine IPC, audio or live pointer use;
+  retain separate isolated engine integration and release qualification.
+- **Dependency/safety:** The existing engine probe uses a per-user connection
+  and refuses to run alongside the personal engine. Preserve that refusal and
+  app/engine identity checks; use a separate test environment for full engine
+  communication. No personal engine restart is implied by this plan.
+
+### Incremental workspace and node-view refactoring
+
+- **Audit boundary, 2026-11-04:** Use the
+  [release delivery order](#release-0-5-0-plan). Inventory responsibilities and
+  pick a short list of extractions needed for this release before starting.
+  Deliver them with characterization/regression evidence and stop; file size
+  alone is not an acceptance metric. Unrelated rewrites and exhaustive cleanup
+  remain outside scope. Feature work need not wait for every possible extraction.
+
+- Fix and qualify ISSUE-024 first. Keep defect corrections and structural
+  extractions in separate reviewable changes, preserving behaviour and public
+  contracts. Start with connection descriptions/geometry and individual effect
+  control builders; then separate selection/gesture handling with explicit
+  state ownership. Splitting more methods into partial files alone does not
+  satisfy the aim of reducing coupling.
+- Check drag/cancel, layout lock, selection, undo grouping and pending edits
+  around gesture extractions. Verify event unsubscription and disposal so view
+  rebuilds do not duplicate handlers. Run relevant existing tests and compare
+  rendered layouts where affected; qualify real pointer/keyboard flows before
+  claiming interaction equivalence. Preserve concurrent branding and interface
+  work, saved settings and normal WPF behaviour.
+- **Scope/tradeoff:** Bounded extractions, not a wholesale architecture rewrite
+  or new UI framework. Small steps increase review work but make regressions
+  easier to identify and revert. Exact component boundaries remain an
+  implementation design task, coordinated with the planned canvas features.
+
+### Stable engine status reason codes
+
+- **Audit clarification, 2026-11-04:** Separate path/status reasons from command
+  failure codes. `ProtocolResponse.ErrorCode` already exists and distinguishes
+  `settings_write_failed`, while `MixerViewModel` still uses message text for
+  revision/stale responses. Reuse and extend that command field where supported;
+  do not add a competing code field. Stream reasons belong with path status and
+  its state/message. Inventory the affected comparisons and define both contracts
+  before changing producers and consumers, preserving matching-release checks.
+
+- Extend status with a stable machine-readable reason alongside overall state
+  and human-readable message. Proposed example: state `Error`, reason
+  `accessDenied`, message explaining the denial. Assign reasons at the native
+  failure source and map interface warnings from the reason rather than text.
+- Cover access denial, audio-service unavailability, disabled devices, ambiguous
+  app instances and microphone-privacy presentation. Audit all behavioural
+  message comparisons; do not mechanically replace harmless display comparisons.
+  Each status transition replaces or clears stale reasons. Messages remain
+  available for diagnostics and can be reworded independently.
+- Missing/unknown reasons must produce a useful generic warning. Specify schema
+  and supported-version behaviour before implementation. Any legacy text fallback
+  must be narrowly scoped to an actually supported case; do not weaken matching
+  app/engine release checks to allow mixed versions.
+- Test native-to-desktop serialization, each reason mapping, recovery transitions,
+  absent/unknown reasons and changed messages with unchanged reasons. Changing
+  wording alone must leave classification unchanged; changing the reason must
+  select the appropriate warning. Keep recovery/retry ownership in the engine.
+- **Scope/tradeoff:** Coordinated native status, serialization, C# models and
+  presentation change; adds protocol maintenance but removes wording coupling.
+  Exact reason names and compatibility policy remain to be specified.
+
+- **Practical next step:** Create the failing production-serialization/history
+  regression for ISSUE-024, then implement and qualify the precision correction.
+  Follow with separately reviewed extractions and the reason-code contract.
+  Record actual local and release verification separately from this plan.
+
 ## Dependencies within the priority order
 
-The priority index above supersedes the former unranked investigation order.
+For the wider backlog, the priority index above supersedes the former unranked
+investigation order. For accepted 0.5.0 work, the
+[release plan](#release-0-5-0-plan) controls sequence and scope.
 Lock and quit affordances are implemented in the local candidate. Presets and organizational
 groups should agree on selection/identity handling; neither requires scenes or
 A/B. Review the tutorial and silence-diagnostic flows with the maintainer before
 large implementation work. Pinning may start with existing controls; task pins
 depend on IDEA-004. Manual tasks and timed actions should precede external triggers.
 Later DSP and integration entries require their own research and qualification.
+
+<a id="idea-055"></a>
+## IDEA-055: Echo effect
+
+- **Current refinement, 2026-11-05 — implemented, offline verified and locally integrated:** The maintainer
+  reports confusing Time-change replay and asks for a researched refinement,
+  an actual repeat counter instead of Feedback percent, clearer Mix behavior,
+  and an echo-only output for effects such as Reverb. The defect is tracked
+  separately as [ISSUE-026](KNOWN_ISSUES.md#issue-026).
+- **Selected refinement contract:** Time 20–2000 ms (default 300); integer
+  Repeats 1–8 (default 3), counting copies after the original; Mix 0–100%
+  (default 25). Original-fed repeats decay by half each time, with total wet
+  weights normalized to avoid coherent level buildup. Time/Repeats changes
+  briefly fade the previous effect before starting fresh; Mix does not reset it.
+  Audio remains the chosen original/echo blend. A second **Echo** output carries
+  only repeats, independently of Mix, and can feed Reverb or another effect.
+- **Rationale/tradeoffs:** Finite copies make the displayed count truthful and
+  prevent repeats becoming another generation of input. Eight repeats cap the
+  tail at 16 seconds with the current maximum Time. Fresh timing changes trade
+  uninterrupted old tails for avoiding replay/pitch artifacts. Very short Time
+  remains available for thickening; long settings create distinguishable echoes.
+  The three-control design uses fixed decay rather than adding another dial.
+- **Compatibility:** Read legacy `feedback` 0–0.9 as an approximate count of
+  repeats at or above −40 dB relative to the first, clamped to 1–8. Legacy 0 maps to 1,
+  0.35 to 5, and 0.9 to 8. Explicit valid `repeats` takes priority, but malformed
+  legacy values still fail validation. Time and Mix stay unchanged; new/absent
+  settings default to 3 repeats. This deliberately changes the old infinite
+  decay model, and is not exact preservation of its sound.
+- **Research:** Primary delay manuals and DSP documentation reviewed
+  2026-11-05; [evidence and original design choices](EFFECTS_RESEARCH.md#echo-refinement-2026-11-05).
+- **Verification:** All 19 native suites pass, including 436 creative checks
+  and actual synthetic-engine lifecycle/budget coverage; 15,175 detached UI
+  checks/317 renders/zero binding errors, 198 focused UI/port checks, 781 native/
+  desktop boundary checks and 229 isolated activation comparisons pass.
+  [Evidence and timing limits](IMPLEMENTATION_0.5.0.md#echo-refinement-after-listening-feedback--2026-11-05).
+- **Local integration:** Guarded paired replacement through the trusted shell
+  and actual shortcut passed its eight-second observation. Settings/preferences,
+  physical settings identity and running paths were preserved; only the
+  documented in-memory Echo conversion was accepted. No rollback occurred.
+- **Next step:** Maintainer listening follow-up and final release qualification.
+  No independent live sound-quality pass is implied.
+
+### Initial implementation history — superseded by the refinement above
+
+- **Captured/authorized:** 2026-11-05. **Earlier status:** Implemented, offline verified and locally integrated for unreleased 0.5.0.
+- **Need:** A dedicated repeating Echo effect, distinct from precise Alignment
+  Delay and the diffuse Reverb tail. Promoted from the Echo candidate in
+  [IDEA-035](IDEAS_LATER.md#idea-035); other creative effects remain deferred.
+- **Selected behavior:** Simple Effects category; Time 20–2000 ms (default 300),
+  Feedback 0–90% (35), Mix 0–100% (25), and normal Bypass. Standard stereo Audio
+  input/output. No tempo sync, ping-pong mode or extra output is assumed.
+- **Implementation choice:** Independent stereo feedback buffers, preallocated
+  outside the audio callback, with smooth changes and crossfaded time edits.
+  Feedback also reduces each fresh repeat's feed so accumulated echoes remain
+  bounded; higher Feedback produces more, quieter repeats. Continue tails during
+  bypass/mute, preserve history across ordinary edits and clear on explicit reset.
+- **Scope/tradeoffs/dependencies:** Existing native effect lifecycle, graph
+  validation/serialization and desktop controls. No new dependency. Synthetic
+  impulse/stereo/feedback/headroom/state/continuity tests and persistence/UI checks
+  precede live review. This is an original implementation contract, not an
+  externally researched sound-quality or listening claim.
+- **Verification:** Shared creative suite passes 359 synthetic checks; combined
+  native/UI/boundary checks and guarded paired integration pass. Detailed scope
+  and limits are in the [execution report](IMPLEMENTATION_0.5.0.md).
+- **Next step:** Maintainer listening follow-up and final combined release
+  audit/documentation. No independent hardware/listening qualification is claimed.
+
+<a id="idea-056"></a>
+## IDEA-056: Multiple output nodes for the same device
+
+- **Captured/authorized:** 2026-11-06. **Status:** Implemented, offline verified
+  and locally integrated for unreleased 0.5.0. The maintainer explicitly authorized all
+  discussed features after the initial proposal, including shared outputs.
+- **Need:** End independent pipelines near their own controls while sending
+  them to the same physical or virtual destination, reducing long converging
+  cables and matching the flexibility of repeated input nodes.
+- **Implemented behavior:** Allow several output nodes to select
+  the same destination. Each retains its own name, position, Level, mute and
+  incoming connections. Sum their contributions once into one shared device
+  render stream. Muting or removing one node affects only that contribution;
+  do not automatically scale the mix according to how many output nodes exist.
+- **Example:** A voice branch and a music branch each end in their own output
+  node targeting the same example headphones. Both are heard together, with
+  independent branch controls.
+- **Local evidence, 2026-11-06:** `VirtualDeviceBindings.IsUsed` and the device
+  selector intentionally block repeated output assignment. Native configuration
+  validation also rejects repeated output bindings. `Engine::prepare` shares
+  newly prepared source workers; sink dispatch currently takes the first node
+  for a shared Port. Removing the restrictions alone would not correctly mix
+  repeated sinks. `windows_audio.cpp` uses shared mode for ordinary listening
+  outputs and exclusive mode for virtual outputs, making single-worker ownership
+  especially important for the latter. Existing multiple cables into one output
+  remain an alternative.
+- **Research:** Microsoft's [WASAPI overview](https://learn.microsoft.com/windows/win32/coreaudio/wasapi)
+  (reviewed 2026-11-06) documents shared access to an endpoint through the Windows
+  audio engine. One VineMix render stream with internal summing is our proposed
+  architecture, not a Windows requirement. No runtime prototype or live test
+  had been performed when the proposal was first captured; current verification
+  is recorded below.
+- **Scope/dependencies/tradeoffs:** Coordinate desktop choices, virtual-device
+  auto-assignment, native validation, physical endpoint resolution, shared worker
+  lifetime, final summing/metering, reconnect and old/new graph crossfades.
+  Repeated routing of identical audio adds level; delayed copies can alter the
+  sound. Current sink processing clamps each output before dispatch; review that
+  boundary when defining combined-output headroom and overload indication.
+  Preserve independent node meters and existing muted defaults for new outputs.
+  Distinct saved bindings that resolve to one physical endpoint need consistent
+  ownership; preserve current exact-ID/stable-ID resolution without introducing
+  automatic fallback to another device.
+- **Verification:** Shared listening/exclusive virtual streams, aliases,
+  reconnect/ambiguity, independent mute/gain, deletion/recreation, aggregate
+  clipping/cancellation, one queue write, exact 480-sample fade and saved reopen
+  pass in synthetic engine tests. The maximum 32-node/31-output run showed no
+  mixer-thread C++ allocations/frees. Desktop duplicate/paste/history and 799
+  real native/desktop boundary checks pass. Guarded local integration passed;
+  [full evidence](IMPLEMENTATION_0.5.0.md#effects-cable-clarity-and-repeated-outputs--6-november-2026).
+- **Next step:** Maintainer listening/workflow follow-up and final release
+  qualification. Earlier rejection/implementation observations above describe
+  the pre-refinement source; the current engine implements the shared behavior.
 
 <!-- Entry guide: use only the detail warranted by the idea.
 ## IDEA-001: Short title

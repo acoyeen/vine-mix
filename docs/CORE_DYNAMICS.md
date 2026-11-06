@@ -1,11 +1,15 @@
 # Dynamics and alignment
 
+This document describes the current source, including **unreleased 0.5.0**
+Trigger additions. The published version and release identity remain
+**0.4.0 Beta**. Offline source checks do not imply a live installation or release.
+
 The Effects library offers separate **Compressor**, **Limiter**, **Ducking**,
 **Expander**, **Gate** and **Alignment Delay** nodes. The Add/search library has
-24 creatable types and supports 26 types including legacy Gain and Reroute.
+30 creatable types and supports 32 types including legacy Gain and Reroute.
 Compressor always measures its own audio, with no detector selector or sidechain
-input. Ducking owns the external trigger workflow through its **Static ducking**
-and **Dynamic ducking** modes. Existing compressor records may retain their
+input. Ducking offers **Static ducking** and **Dynamic ducking** for external
+triggers; Gate and Expander have optional Trigger inputs. Existing compressor records may retain their
 Compress/Limit selector; the saved detector field remains serialized but no
 longer changes processing.
 
@@ -28,6 +32,9 @@ and entry. Frequency and broad positive time ranges use logarithmic travel.
 Attack times and ratios retain decimals, Q retains hundredths and delay shows
 milliseconds to three places. Entering an unchanged exact value preserves the
 stored precision. The wheel zooms the canvas; it does not edit parameters.
+Typing a number from a keyboard-focused dial opens its exact-value field and
+retains the first character as a draft. Enter, Tab/Shift+Tab or focus loss applies
+a valid draft; incomplete or invalid text stays unapplied, and Escape cancels.
 
 ## Expander and Gate
 
@@ -36,6 +43,15 @@ phrases. **Expander** progressively turns down audio below Threshold. **Gate**
 switches between an open target and the chosen attenuation floor, with
 attack/release smoothing. Both link the two stereo channels, preserving their
 relative balance. Neither node has a mode dropdown.
+
+With no **Trigger** cable, each node detects its own Audio input as before.
+An external Trigger replaces that detector without adding any trigger samples
+to the main output. The larger absolute trigger channel drives one shared gain,
+so stereo programme balance and programme channel metadata stay unchanged.
+A connected silent, muted or unavailable source supplies silent detection,
+subject to the existing detector, gain and cable ramps. It never falls back to
+the main signal. Removing the cable restores self-detection. This also applies
+to older `expander` records using gate mode.
 
 | Control | Applies to | Default | Range | Purpose |
 |---|---|---:|---:|---|
@@ -153,7 +169,8 @@ The node shows **Connect a trigger**, **Below threshold** or **Ducking**, with
 trigger level and current reduction. These are passive readouts. The bottom
 Bypass button remains distinct from parameters.
 
-Ducking accepts one trigger connection. Compressor accepts none. Combine
+Ducking, Gate and Expander each accept one trigger connection. Compressor and
+Limiter accept none. Combine
 multiple trigger sources in a Mix first. The diamond socket and lavender cable
 identify audio used only for detection; square Linked control sockets carry parameter
 control. Audio outputs may fan out to both audible and detector destinations.
@@ -257,8 +274,11 @@ when absent from older node records:
   Both amount and ratio remain saved regardless of the selected mode.
 - `dynamicsUiVersion`: `0` for legacy compressor presentation (also the missing
   default), `1` for newly created compressors.
-- A trigger connection uses edge `kind: "sidechain"` and targets only a Ducking
-  node. It remains separate from both audible and linked-control edges.
+- A trigger connection uses edge `kind: "sidechain"` and targets `ducking`,
+  `gate` or `expander`. It remains separate from audible and linked-control edges.
+  Gate/Expander use self-detection only when the cable is absent; Ducking never
+  substitutes its main input for a missing trigger. Reverb's `wet` output is a
+  valid detector source, carrying only its reverb independently of Mix.
 
 Native validation rejects malformed modes, non-finite values, out-of-range
 settings, fractional sample counts, incompatible endpoints and cycles. Delay
@@ -273,6 +293,10 @@ absent/disconnected/silent triggers, threshold/depth/ratio/timing, stereo linkin
 zero amount, unity ratio, bypass and live edits; separate Expander/Gate controls;
 standalone and legacy limiter ceilings with inherited/linked gain; main-signal
 compression; exact delay; persistence and validation.
+The 0.5.0 source adds synthetic cases for external Gate/Expander detection,
+connected silence/mute/unavailable sources, cable removal, stereo isolation,
+and exact agreement with self-detection when both detectors receive the same
+samples. Trigger processing remains allocation-free in those checks.
 Detached preview graphs cover dial precision/bounds/defaults, routed keyboard
 events, focus, wheel behavior, copy/reset, insertion, rewiring, cycle rejection,
 and stable layouts at supported zoom, DPI and minimum window size.

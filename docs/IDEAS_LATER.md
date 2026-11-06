@@ -62,6 +62,9 @@ The presentation and branding follow-ups formerly in IDEA-046 moved to
 
 ## IDEA-035: Creative effect extensions
 
+- **Selected subset, 2026-11-05:** Repeating Echo is authorized for 0.5.0 and
+  tracked separately as [IDEA-055](IDEAS.md#idea-055). The other candidates below
+  remain later proposals; this does not authorize a full creative-effects suite.
 - **Captured:** 2026-10-23. **Status:** Captured. **Priority:** P4 — Later.
 - **Need and proposal:** Explore repeating echo, a voice doubler, chorus, flanger,
   phaser, pitch and formant shifting, convolution/impulse responses, binaural
@@ -82,6 +85,11 @@ The presentation and branding follow-ups formerly in IDEA-046 moved to
 <a id="idea-036"></a>
 
 ## IDEA-036: Recording and replay
+
+- **0.5.0 review, 2026-11-04:** A basic stereo WAV Recording output is proposed
+  for discussion in [IDEA-052](IDEAS.md#idea-052). This narrows the first candidate
+  to explicit single-route capture; replay and multitrack remain later options.
+  Implementation is not authorized and the recording backend remains undecided.
 
 - **Captured:** 2026-10-23. **Status:** Captured. **Priority:** P4 — Later.
 - **Need and proposal:** Record from a chosen graph point, compare a recorded

@@ -150,6 +150,16 @@ public sealed partial class GraphWorkspace
     private void BeginFrameRename(string id)
     {
         if (!RequireLayoutEdit() || !_frames.TryGetValue(id, out var view)) return;
+        if (!view.HeaderVisible)
+        {
+            if (!CanFrameSelection || _viewport.ActualWidth <= 0 || _viewport.ActualHeight <= 0) return;
+            _world.UpdateLayout();
+            Rect bounds = FrameBounds(id);
+            _zoom = Math.Max(.6, _zoom);
+            _panX = (_viewport.ActualWidth - bounds.Width * _zoom) / 2 - bounds.Left * _zoom;
+            _panY = 24 - bounds.Top * _zoom;
+            ApplyTransform(); PersistView();
+        }
         view.BeginRename(name => RenameFrame(id, name));
     }
 

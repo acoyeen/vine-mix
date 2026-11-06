@@ -90,8 +90,8 @@ internal sealed class OffscreenDesignRenderer
             foreach (bool configured in new[] { false, true })
             {
                 var fixture = UiPreview.CreateBetaSnapshot(configured);
-                Require(fixture.Configuration.Graph.Nodes.Count == 3 && fixture.Configuration.Graph.Edges.Count == 2,
-                    "The beta screenshot has exactly physical input, virtual output, listening output and two routes.");
+                Require(fixture.Configuration.Graph.Nodes.Count == 7 && fixture.Configuration.Graph.Edges.Count == 6,
+                    "The current-source starter has seven voice-chain nodes and six audio routes.");
                 Require(fixture.Configuration.Graph.Nodes.Where(node => node.Kind is "output" or "virtualOutput").All(node => node.Muted),
                     "Both starter outputs remain muted in fresh and configured examples.");
                 Require(configured || fixture.Configuration.Graph.Nodes.All(node => string.IsNullOrEmpty(node.Device.Id)),
@@ -99,20 +99,47 @@ internal sealed class OffscreenDesignRenderer
                 Require(fixture.Endpoints.All(endpoint => endpoint.Id.StartsWith("preview-example-", StringComparison.Ordinal)),
                     "Every configured documentation endpoint is explicitly synthetic.");
                 mixer.ApplyPreviewSnapshot(fixture);
-                await Layout(root); workspace.FitAll(); await Layout(root); workspace.UpdateWires(); await Layout(root);
-                Require(Descendants<GraphNodeView>(root).Count() == 3, "The real workspace renders exactly three starter node controls.");
-                var outputViews = Descendants<GraphNodeView>(root).ToDictionary(node => node.Id);
-                Rect virtualBounds = outputViews["starter-virtual-output"].TransformToAncestor(root)
-                    .TransformBounds(new Rect(new Point(), outputViews["starter-virtual-output"].RenderSize));
-                Rect listeningBounds = outputViews["starter-listening-output"].TransformToAncestor(root)
-                    .TransformBounds(new Rect(new Point(), outputViews["starter-listening-output"].RenderSize));
-                Require(virtualBounds.Bottom < listeningBounds.Top,
-                    "Both output node bodies are fully visible with a positive gap at the required starter positions.");
-                Require(window.BetaVersionLabel.Text == ReleaseInfo.DisplayVersion && window.BetaVersionLabel.ActualWidth > 0,
-                    "The caption displays the packaged beta version beside the engine indicator.");
-                Render(root, configured ? "workspace.png" : "first-run.png");
-                Render(root, configured ? "workspace-192dpi.png" : "first-run-192dpi.png", 192);
+                foreach (var size in new[] { new Size(Width, Height), new Size(window.MinWidth, window.MinHeight) })
+                {
+                    root.Width = size.Width; root.Height = size.Height;
+                    if (size.Width == window.MinWidth)
+                    {
+                        mixer.SetCanvasView(20, 20, .1); mixer.RefreshPreviewTelemetry(); await Layout(root);
+                        Require(Descendants<GraphNodeView>(root).All(view => view.DetailLevel != NodeDetailLevel.Full),
+                            "The minimum-window starter begins its Fit regression in Quiet Blocks, without retained full-detail hysteresis.");
+                    }
+                    await Layout(root); workspace.FitAll(); await Layout(root); workspace.UpdateWires(); await Layout(root);
+                    var starterViews = Descendants<GraphNodeView>(root).ToDictionary(node => node.Id);
+                    Require(starterViews.Count == 7 && starterViews.Values.All(view => view.DetailLevel == NodeDetailLevel.Full),
+                        $"At {size.Width:0} x {size.Height:0}, the whole seven-node starter retains its full controls.");
+                    Rect Bounds(string id) => starterViews[id].TransformToAncestor(root)
+                        .TransformBounds(new Rect(new Point(), starterViews[id].RenderSize));
+                    var screenBounds = new Rect(0, 0, size.Width, size.Height);
+                    Require(starterViews.Keys.All(id => screenBounds.Contains(Bounds(id))),
+                        $"At {size.Width:0} x {size.Height:0}, every starter node fits inside the initial view.");
+                    Rect minimapBounds = workspace.Minimap.TransformToAncestor(root)
+                        .TransformBounds(new Rect(new Point(), workspace.Minimap.RenderSize));
+                    Rect Interior(GraphNodeView view) => view.TransformToAncestor(root).TransformBounds(new Rect(
+                        view.BorderThickness.Left, view.BorderThickness.Top,
+                        view.ActualWidth - view.BorderThickness.Left - view.BorderThickness.Right,
+                        view.ActualHeight - view.BorderThickness.Top - view.BorderThickness.Bottom));
+                    Require(starterViews.Values.All(view => !minimapBounds.IntersectsWith(Interior(view))),
+                        $"At {size.Width:0} x {size.Height:0}, the minimap leaves every starter node interior and its controls unobscured.");
+                    _windowLayouts.Add(new { width = size.Width, height = size.Height, configured,
+                        zoom = mixer.GraphConfig.Zoom, minimapBounds,
+                        outputOuterBorderOverlap = Math.Max(0, Bounds("starter-virtual-output").Bottom - minimapBounds.Top) });
+                    Require(Bounds("starter-listening-output").Bottom < Bounds("starter-virtual-output").Top,
+                        "Listening output is above Virtual output, with a positive gap between their bodies.");
+                    var columns = new[] { "starter-input", "starter-high-pass", "starter-denoiser", "starter-expander", "starter-compressor", "starter-listening-output" };
+                    Require(columns.Zip(columns.Skip(1)).All(pair => Math.Abs((Bounds(pair.Second).Left - Bounds(pair.First).Right) / mixer.GraphConfig.Zoom - 95) < 1),
+                        "Every adjacent starter column has the same visible 95-DIP cable gap.");
+                    Require(window.BetaVersionLabel.Text == ReleaseInfo.DisplayVersion && window.BetaVersionLabel.ActualWidth > 0,
+                        "The caption displays the packaged beta version beside the engine indicator.");
+                    string name = (configured ? "workspace" : "first-run") + (size.Width == Width ? "" : "-minimum");
+                    Render(root, name + ".png"); Render(root, name + "-192dpi.png", 192);
+                }
             }
+            root.Width = Width; root.Height = Height; await Layout(root);
             RenderMenu(MainWindow.CreateSettingsMenu(mixer), "settings-menu.png");
             string? copiedVersion = null;
             bool aboutClosed = false, creditsOpened = false;
@@ -191,6 +218,7 @@ internal sealed class OffscreenDesignRenderer
             LinkedControlVerification.Run(Require);
             WorkspaceHistoryVerification.Run(Require);
             AutosaveVerification.Run(Require);
+            StatusReasonVerification.Run(Require);
             GestureHistoryVerification.Run(Require);
             mixer.ApplyPreviewSnapshot(UiPreview.CreateSnapshot(["--signal"]));
 
@@ -201,6 +229,7 @@ internal sealed class OffscreenDesignRenderer
             var openedWebsites = new List<string>();
             var window = new MainWindow(mixer, openedWebsites.Add);
             Render(RotaryControlVerification.Run(Require), "rotary-controls.png");
+            Render(ControlRefinementVerification.Run(Require), "meter-gradient-and-entry.png");
             Render(PointerEntryVerification.Run(Require), "numeric-entry-retained-draft.png");
             Render(ToolTipVerification.Run(Require), "tooltips.png");
             CheckNumericResetAndEntryTemplates();
@@ -270,8 +299,10 @@ internal sealed class OffscreenDesignRenderer
             Require(new[] { "ConsoleWindowBrush", "ConsolePanelBrush", "NodeCanvasBrush" }.All(key => ConsoleTheme.Get(key) is SolidColorBrush brush
                 && brush.Color.R <= 32 && brush.Color.G <= 32 && brush.Color.B <= 32),
                 "Window, canvas and node body backgrounds use near-black values while controls and text remain independently contrasted.");
+            await KeyboardNavigationVerification.RunAsync(workspace, mixer, () => Layout(root), Require);
             await CheckFractionalZoomAndWindowLayouts(root, workspace, mixer);
             await CheckCanvasRetention(root, workspace, mixer);
+            await ZoomDetailVerification.RunAsync(workspace, mixer, () => Layout(root), Require, name => Render(root, name));
             await CheckDropdownWheelRouting(root, workspace, mixer);
             Render(EqEditorVerification.Run(Require), "eq-editor-spectrum.png");
             EqTextLayoutVerification.Run(Require, (element, name, dpi) => Render(element, name, dpi));
@@ -280,6 +311,11 @@ internal sealed class OffscreenDesignRenderer
             await EqDefaultsVerification.RunAsync(workspace, mixer, () => Layout(root), Require,
                 (view, name) => RenderNode(view, workspace, name));
             await NodeDefaultsVerification.RunAsync(workspace, mixer, () => Layout(root), Require);
+            await CreativeEffectsVerification.RunAsync(workspace, mixer, () => Layout(root), Require,
+                (view, name) => RenderNode(view, workspace, name));
+            await EffectPortsVerification.RunAsync(workspace, mixer, () => Layout(root), Require,
+                (view, name) => RenderNode(view, workspace, name));
+            await CablePresentationVerification.RunAsync(workspace, mixer, () => Layout(root), Require, name => Render(root, name));
             await NumericTabCommitVerification.RunAsync(workspace, mixer, () => Layout(root), Require);
             await DenoiserSelectionVerification.RunAsync(workspace, mixer, () => Layout(root), Require,
                 (view, name) => RenderNode(view, workspace, name));
@@ -294,6 +330,7 @@ internal sealed class OffscreenDesignRenderer
             await GraphGroupVerification.RunAsync(workspace, mixer, () => Layout(root), Require, name => Render(root, name));
             await NamedFrameVerification.RunAsync(workspace, mixer, () => Layout(root), Require, name => Render(root, name));
             NodeStackingVerification.Run(Require, (element, name) => Render(element, name));
+            MinimapVerification.Run(Require, (element, name) => Render(element, name));
             workspace.SetMessage("");
             await CheckMicrophoneControls(root, workspace, mixer);
             await NodePresentationVerification.RunAsync(workspace, mixer, () => Layout(root), Require);
@@ -1080,11 +1117,12 @@ internal sealed class OffscreenDesignRenderer
         // filtered tree shrink before fixing its detached bitmap dimensions.
         menu.Height = double.NaN;
         menu.InvalidateMeasure();
-        menu.Measure(new Size(440, 520));
+        double availableHeight = Math.Min(900, menu.MaxHeight);
+        menu.Measure(new Size(440, availableHeight));
         menu.Width = Math.Max(280, menu.DesiredSize.Width);
         // Fix the width before measuring wrapped item headers and feedback.
-        menu.Measure(new Size(menu.Width, 520));
-        menu.Height = Math.Min(menu.MaxHeight, Math.Max(80, menu.DesiredSize.Height + 4));
+        menu.Measure(new Size(menu.Width, availableHeight));
+        menu.Height = Math.Min(availableHeight, Math.Max(80, menu.DesiredSize.Height + 4));
         Render(menu, filename, dpi);
         Require(!menu.IsOpen && PresentationSource.FromVisual(menu) is null, "Menu preview remains detached from the desktop.");
     }

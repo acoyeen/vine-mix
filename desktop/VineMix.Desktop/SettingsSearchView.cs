@@ -260,6 +260,7 @@ internal sealed class SettingsSearchView : StackPanel
     private static string Aliases(string? header) => header switch
     {
         "Right-click drag to pan" => "canvas navigation mouse panning",
+        "Show minimap" => "canvas overview navigation zoom map panning",
         "Reduce meter animation" => "motion accessibility meters",
         "Audio device visibility" => "filters hidden inputs outputs",
         "Start VineMix when I sign in" => "startup windows login launch automatic",

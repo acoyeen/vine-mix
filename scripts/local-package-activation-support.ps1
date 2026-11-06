@@ -4,19 +4,51 @@
 . (Join-Path $PSScriptRoot 'local-ui-activation-support.ps1')
 
 function Get-PackageActivationComparableConfiguration($Configuration) {
-    # Compare old/new engine snapshots with exactly the documented missing-field
-    # defaults. This is an in-memory copy; never rewrite saved user settings.
+    # Compare old/new engine snapshots with the documented defaults and Echo
+    # migration. This is an in-memory copy; never rewrite saved user settings.
     $copy = $Configuration | ConvertTo-Json -Depth 80 | ConvertFrom-Json -Depth 80
+    $finiteNumber = {
+        param($Value, [double]$Minimum, [double]$Maximum)
+        # ConvertFrom-Json yields Int64 or Double for the supported ranges.
+        ($Value -is [long] -or $Value -is [double]) -and [double]::IsFinite([double]$Value) -and
+            $Value -ge $Minimum -and $Value -le $Maximum
+    }
     foreach ($node in @($copy.graph.nodes)) {
         foreach ($field in @(
             @{Name='stereoWidth';Value=1}, @{Name='panPosition';Value=0},
             @{Name='crossfadePosition';Value=0}, @{Name='crossfadeCurve';Value='equalPower'},
-            @{Name='controlMultiplier';Value=-1}
+            @{Name='controlMultiplier';Value=-1},
+            # Only wholly absent records receive defaults. Explicit null,
+            # partial/custom records and unknown fields remain detectable.
+            @{Name='echo';Value=[pscustomobject][ordered]@{timeMs=300;repeats=3;mix=.25}},
+            @{Name='distortion';Value=[pscustomobject][ordered]@{driveDb=6;toneHz=6000;mix=.5;outputDb=-6}}
         )) {
             if (-not $node.PSObject.Properties[$field.Name]) {
                 $node | Add-Member -NotePropertyName $field.Name -NotePropertyValue $field.Value
             }
         }
+        $echo = $node.echo
+        # Engine snapshots contain complete records. Do not repair partial or
+        # malformed saved data, discard unknown fields, or hide a Time/Mix edit.
+        if ($echo -isnot [pscustomobject] -or -not (& $finiteNumber $echo.timeMs 20 2000) -or
+            -not (& $finiteNumber $echo.mix 0 1)) { continue }
+        $feedback = $echo.PSObject.Properties['feedback']
+        $repeats = $echo.PSObject.Properties['repeats']
+        if ($feedback -and -not (& $finiteNumber $feedback.Value 0 .9)) { continue }
+        if ($repeats -and (-not (& $finiteNumber $repeats.Value 1 8) -or
+            [Math]::Truncate([double]$repeats.Value) -ne [double]$repeats.Value)) { continue }
+        if ($repeats) { $echo.repeats = [int]$repeats.Value }
+        if (-not $repeats) {
+            $count = 3
+            if ($feedback) {
+                $count = 1; $level = [double]$feedback.Value
+                while ($count -lt 8 -and $level -ge .01) { ++$count; $level *= [double]$feedback.Value }
+            }
+            $echo | Add-Member -NotePropertyName repeats -NotePropertyValue $count
+        }
+        # Explicit valid repeats win, but a present feedback value was still
+        # validated above. Removing it makes the migration idempotent.
+        if ($feedback) { $echo.PSObject.Properties.Remove('feedback') }
     }
     foreach ($edge in @($copy.graph.edges)) {
         foreach ($name in @('fromPort','toPort')) {

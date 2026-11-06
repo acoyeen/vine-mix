@@ -139,11 +139,14 @@ internal static class WorkspaceHistoryVerification
             var outputBefore = before.Copy(); outputBefore.Nodes[2].Kind = kind; outputBefore.Nodes[2].Device.Id = "original-output";
             var outputAfter = outputBefore.Copy(); outputAfter.Nodes[2].Device.Id = "replacement-output";
             var outputRestore = new WorkspaceGraphRestore(outputAfter, outputBefore);
-            var otherOutput = GraphDefaults.NewNode(kind == "output" ? "virtualOutput" : "output", 1200, 30);
+            var otherOutput = GraphDefaults.NewNode(kind, 1200, 30);
             otherOutput.Device.Id = "original-output"; outputAfter.Nodes.Add(otherOutput);
             string unchangedOutputs = Json(outputAfter);
-            require(!outputRestore.TryApply(outputAfter, out _, out _) && Json(outputAfter) == unchangedOutputs,
-                "Undo keeps " + kind + " assignments exclusive when another playback node claimed the former device.");
+            require(outputRestore.TryApply(outputAfter, out var restoredOutputs, out _)
+                && restoredOutputs.Nodes.Count(n => n.Device.Id == "original-output") == 2
+                && restoredOutputs.Nodes.Single(n => n.Id == otherOutput.Id).Muted == otherOutput.Muted
+                && Json(outputAfter) == unchangedOutputs,
+                "Undo restores a shared " + kind + " assignment while preserving the other output and its controls.");
         }
     }
 

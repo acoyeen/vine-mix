@@ -10,11 +10,18 @@
 #include <fstream>
 #include <iomanip>
 #include <limits>
+#include <optional>
 #include <stdexcept>
 #include <unordered_map>
 #include <unordered_set>
 
 namespace am {
+#ifdef VINEMIX_ENGINE_LIFECYCLE_TESTS
+void engineLifecycleBoundary();
+void engineLifecycleQuantumBegin();
+void engineLifecycleQuantumEnd();
+void engineLifecycleOutput(std::string_view endpoint, std::span<const Frame> frames);
+#endif
 namespace {
 void raisePeak(std::atomic<float>& target, float value) noexcept {
     float previous = target.load(std::memory_order_relaxed);
@@ -27,6 +34,57 @@ bool sameDevice(const DeviceBinding& a, const DeviceBinding& b) noexcept {
 bool sameProcess(const ProcessBinding& a, const ProcessBinding& b) noexcept {
     return a.processId == b.processId && a.executablePath == b.executablePath;
 }
+struct OutputTarget {
+    std::string endpointId, transport;
+    PathState unavailable;
+};
+OutputTarget resolveOutput(const GraphNode& node, std::span<const Endpoint> devices) {
+    OutputTarget result;
+    result.transport = node.kind == "virtualOutput" ? "vacLite" : "listening";
+    result.unavailable.state = assigned(node.device) ? "Waiting" : "Unassigned";
+    result.unavailable.reason = assigned(node.device) ? "device_unavailable" : "";
+    result.unavailable.message = assigned(node.device) ? "Waiting for device" : "";
+    const Endpoint* match{};
+    const Endpoint* exact{};
+    for (const auto& endpoint : devices)
+        if (!node.device.id.empty() && endpoint.id == node.device.id && endpoint.direction == "render") {
+            exact = &endpoint;
+            if (endpoint.state == "Active") match = &endpoint;
+            break;
+        }
+    if (!match && !node.device.stableId.empty()) {
+        for (const auto& endpoint : devices) {
+            if (endpoint.direction != "render" || endpoint.state != "Active" || endpoint.stableId != node.device.stableId) continue;
+            if (match) {
+                result.unavailable.message = "Several devices match the saved output; select the device again";
+                return result; // Ambiguous fallback stays unresolved.
+            }
+            match = &endpoint;
+        }
+    }
+    if (!match) {
+        if (exact) {
+            result.unavailable.endpointId = exact->id;
+            result.unavailable.rate = exact->rate; result.unavailable.channels = exact->channels;
+            if (exact->state == "Disabled") {
+                result.unavailable.reason = "device_disabled";
+                result.unavailable.message = "Device disabled in Windows Sound settings";
+            }
+        }
+        return result;
+    }
+    if ((node.kind == "output" && !listeningEndpoint(*match))
+        || (node.kind == "virtualOutput" && match->transport != "vacLite")) {
+        result.unavailable.message = node.kind == "output"
+            ? "Choose a listening device here; use Virtual output for VAC"
+            : "Choose the VAC Lite send endpoint for a virtual microphone output";
+        result.unavailable.state = "Error";
+        result.unavailable.reason.clear();
+        return result;
+    }
+    result.endpointId = match->id;
+    return result;
+}
 }
 struct Engine::Port {
     GraphNode identity;
@@ -34,25 +92,49 @@ struct Engine::Port {
     CaptureBufferReader reader; // Mixer-thread consumer state, retained with the shared source.
     std::unique_ptr<AudioWorker> device;
     std::unique_ptr<ProcessCaptureWorker> app;
+    std::optional<OutputTarget> output;
     bool activated{};
-    Port(const GraphNode& node, GraphKind kind, DeviceCatalog& catalog) : identity(node) {
+    Port(const GraphNode& node, GraphKind kind, DeviceCatalog& catalog, std::optional<OutputTarget> target = {})
+        : identity(node), output(std::move(target)) {
         if (kind == GraphKind::appInput) app = std::make_unique<ProcessCaptureWorker>(queue);
         else device = std::make_unique<AudioWorker>(isSource(kind), kind == GraphKind::microphone, queue, catalog,
             kind == GraphKind::virtualInput ? "vbCable" : kind == GraphKind::virtualOutput ? "vacLite"
                 : kind == GraphKind::microphone ? "" : "listening");
     }
-    bool matches(const GraphNode& node) const noexcept {
+    bool matches(const GraphNode& node, const OutputTarget* target = nullptr) const noexcept {
+        if (output || target) {
+            if (!output || !target || output->transport != target->transport) return false;
+            if (!output->endpointId.empty() || !target->endpointId.empty()) return output->endpointId == target->endpointId;
+            // Unresolved bindings cannot open a device until the engine has
+            // reconciled every logical destination against the same catalog.
+            return identity.kind == node.kind && identity.device.id == node.device.id
+                && identity.device.stableId == node.device.stableId
+                && output->unavailable.message == target->unavailable.message
+                && output->unavailable.endpointId == target->unavailable.endpointId
+                && output->unavailable.channels == target->unavailable.channels
+                && output->unavailable.rate == target->unavailable.rate;
+        }
         return identity.kind == node.kind
             && sameDevice(identity.device, node.device) && sameProcess(identity.app, node.app);
     }
     void activate() {
         if (activated) return;
-        if (device) device->configure(identity.device);
+        if (device) {
+            auto selection = identity.device;
+            // An output worker owns exactly one resolved endpoint. Stable-ID
+            // fallback is coordinated centrally, never raced by two workers
+            // whose saved aliases happen to converge after a reconnect.
+            if (output) selection = {output->endpointId, {}, identity.device.name, -1};
+            device->configure(std::move(selection));
+        }
         if (app) app->configure(identity.app);
         activated = true;
     }
     bool ready() const noexcept { return device ? device->ready() : app->ready(); }
-    PathState status() const { return device ? device->status() : app->status(); }
+    PathState status() const {
+        if (output && output->endpointId.empty()) return output->unavailable;
+        return device ? device->status() : app->status();
+    }
     void retry() noexcept { if (device) device->retry(); else app->retry(); }
     void stop() noexcept { if (device) device->stop(); else app->stop(); }
 };
@@ -156,11 +238,22 @@ void Engine::validateEndpoints(const Configuration& config) {
     }
 }
 std::unique_ptr<Engine::Runtime> Engine::prepare(const Configuration& config, GraphPlan plan) {
+    retire(); // Every caller holds configurationMutex_; destruction stays off audio.
+    // Bound pending long Echo buffers before allocation, opening workers or
+    // saving a new revision. The settled active runtime is not pending: a
+    // maximum graph must always be able to prepare one complete successor.
+    const auto active = activeGeneration_.load(std::memory_order_acquire);
+    std::size_t pendingEchoBytes = GraphProcessor::echoHistoryBytes(plan);
+    for (const auto& retained : runtimes_) if (retained->generation > active)
+        pendingEchoBytes += GraphProcessor::echoHistoryBytes(retained->plan);
+    if (pendingEchoBytes > maximumPendingEchoHistoryBytes)
+        throw std::runtime_error("The audio engine is still applying Echo changes. Wait briefly and try again.");
     auto runtime = std::make_unique<Runtime>();
     runtime->plan = std::move(plan);
     runtime->processor.prepare(runtime->plan);
     runtime->generation = ++nextGeneration_;
     auto* previous = published_.load(std::memory_order_acquire);
+    const auto devices = catalog_.enumerate();
     for (std::size_t i = 0; i < runtime->plan.nodeCount; ++i) {
         const auto& node = config.graph.nodes[i];
         if (previous) for (std::size_t j = 0; j < previous->plan.nodeCount; ++j) {
@@ -172,21 +265,22 @@ std::unique_ptr<Engine::Runtime> Engine::prepare(const Configuration& config, Gr
         }
         if (!runtime->meters[i]) runtime->meters[i] = std::make_shared<Meter>();
         const auto kind = runtime->plan.nodes[i].kind;
+        const auto target = isSink(kind) ? std::optional<OutputTarget>(resolveOutput(node, devices)) : std::nullopt;
         if (kind == GraphKind::eq && !runtime->spectra[i])
             runtime->spectra[i] = std::make_shared<LiveSpectrum>(spectrumRevision_.fetch_add(1, std::memory_order_relaxed) + 1);
-        // A fresh load (or one edit adding several inputs) has no retained port
-        // for the second copy yet. Share the capture already prepared in this
-        // runtime; the mixer reads each unique Port once and fans out its block.
-        // Per-node meters, gain, mute, Mono and downstream DSP stay independent.
-        // matches retains legacy capture-channel selection as part of identity.
-        if (isSource(kind)) for (std::size_t j = 0; j < i; ++j)
-            if (runtime->ports[j] && runtime->ports[j]->matches(node)) { runtime->ports[i] = runtime->ports[j]; break; }
+        // Share workers already prepared in this runtime as well as retained
+        // workers. Capture is read once and fanned out; all output contributions
+        // for a resolved endpoint are summed into one queue write. Per-node
+        // meters, gain, mute, Mono and downstream DSP remain independent.
+        // Capture matching retains legacy channel selection in its identity.
+        if (isSource(kind) || isSink(kind)) for (std::size_t j = 0; j < i; ++j)
+            if (runtime->ports[j] && runtime->ports[j]->matches(node, target ? &*target : nullptr)) { runtime->ports[i] = runtime->ports[j]; break; }
         // A rapid A -> B -> A assignment can revisit a still-live older plan.
         // Reuse its matching endpoint worker instead of opening the hardware
         // twice. The same rule safely handles deleting/recreating a node.
         if (isSource(kind) || isSink(kind)) for (auto retained = runtimes_.rbegin(); retained != runtimes_.rend() && !runtime->ports[i]; ++retained)
-            for (const auto& port : (*retained)->ports) if (port && port->matches(node)) { runtime->ports[i] = port; break; }
-        if ((isSource(kind) || isSink(kind)) && !runtime->ports[i]) runtime->ports[i] = std::make_shared<Port>(node, kind, catalog_);
+            for (const auto& port : (*retained)->ports) if (port && port->matches(node, target ? &*target : nullptr)) { runtime->ports[i] = port; break; }
+        if ((isSource(kind) || isSink(kind)) && !runtime->ports[i]) runtime->ports[i] = std::make_shared<Port>(node, kind, catalog_, target);
         if (runtime->ports[i]) runtime->ports[i]->activate();
     }
     return runtime;
@@ -200,10 +294,26 @@ void Engine::retire() {
     const auto active = activeGeneration_.load(std::memory_order_acquire);
     std::erase_if(runtimes_, [&](const auto& runtime) { return runtime->generation < active; });
 }
+void Engine::refreshOutputPorts() {
+    auto* current = published_.load(std::memory_order_acquire);
+    if (!current || !store_.writable() || runtimes_.size() >= 128) return;
+    const auto devices = catalog_.enumerate();
+    for (std::size_t i = 0; i < current->plan.nodeCount; ++i) {
+        if (!isSink(current->plan.nodes[i].kind)) continue;
+        const auto& node = configuration_.graph.nodes[i];
+        const auto target = resolveOutput(node, devices);
+        if (current->ports[i] && current->ports[i]->matches(node, &target)) continue;
+        // Device return/alias convergence is a runtime-only reconciliation.
+        // Keep saved explicit choices, revision, controls and history intact.
+        runtimes_.reserve(runtimes_.size() + 1);
+        publish(prepare(configuration_, compileGraph(configuration_.graph)));
+        break;
+    }
+}
 void Engine::configure(Configuration config, std::uint64_t expectedRevision) {
     std::lock_guard lock(configurationMutex_);
     if (!store_.writable()) throw std::runtime_error("Choose workspace recovery before changing the configuration.");
-    if (expectedRevision != configuration_.revision) throw std::runtime_error("Configuration revision conflict. Refresh and retry your change.");
+    if (expectedRevision != configuration_.revision) throw ConfigurationConflictError();
     if (configuration_.revision == std::numeric_limits<std::uint64_t>::max()) throw std::runtime_error("The configuration revision cannot be advanced.");
     retire();
     if (runtimes_.size() >= 128) throw std::runtime_error("The audio engine is not adopting changes. Wait briefly or restart the engine.");
@@ -212,8 +322,11 @@ void Engine::configure(Configuration config, std::uint64_t expectedRevision) {
     auto plan = compileGraph(config.graph);
     auto* current = published_.load(std::memory_order_acquire);
     bool audioUnchanged = current && current->plan == plan;
-    if (audioUnchanged) for (std::size_t i = 0; i < plan.nodeCount; ++i)
-        if (current->ports[i] && !current->ports[i]->matches(config.graph.nodes[i])) { audioUnchanged = false; break; }
+    const auto devices = catalog_.enumerate();
+    if (audioUnchanged) for (std::size_t i = 0; i < plan.nodeCount; ++i) {
+        const auto target = isSink(plan.nodes[i].kind) ? std::optional<OutputTarget>(resolveOutput(config.graph.nodes[i], devices)) : std::nullopt;
+        if (current->ports[i] && !current->ports[i]->matches(config.graph.nodes[i], target ? &*target : nullptr)) { audioUnchanged = false; break; }
+    }
     std::unique_ptr<Runtime> runtime;
     if (!audioUnchanged) {
         runtime = prepare(config, std::move(plan));
@@ -321,13 +434,16 @@ void Engine::mixLoop() {
     std::array<Port*, maximumGraphNodes * 2> inputPorts{}, outputPorts{};
     std::array<Frame, quantumFrames> mixedOutput{};
     while (!stopping()) {
+#ifdef VINEMIX_ENGINE_LIFECYCLE_TESTS
+        engineLifecycleBoundary();
+        engineLifecycleQuantumBegin();
+#endif
         QueryPerformanceCounter(&now);
         const bool resumed = now.QuadPart - previous > frequency.QuadPart / 4;
         previous = now.QuadPart;
         auto* desired = published_.load(std::memory_order_acquire);
         if (!fading && desired && desired != active) {
             if (active) {
-                desired->processor.inherit(active->processor, active->plan, desired->plan);
                 bool changed = !sameGraphTopology(active->plan, desired->plan);
                 // Device/channel/application changes keep the same graph IDs,
                 // but the previous source must still fade out locally.
@@ -335,6 +451,7 @@ void Engine::mixLoop() {
                     for (std::size_t j = 0; j < active->plan.nodeCount; ++j)
                         if (desired->plan.nodes[i].id == active->plan.nodes[j].id
                             && desired->ports[i].get() != active->ports[j].get()) changed = true;
+                desired->processor.adopt(active->processor, active->plan, desired->plan, changed);
                 if (changed) { fading = active; fadeRemaining = 480; }
             }
             active = desired;
@@ -383,7 +500,7 @@ void Engine::mixLoop() {
                 }
                 views[i] = input[slot];
             }
-            runtime->processor.process(runtime->plan, views);
+            runtime->processor.process(runtime->plan, views, true);
             if (runtime == active) for (std::size_t i = 0; i < runtime->plan.nodeCount; ++i) {
                 const auto& meter = runtime->processor.meter(i);
                 raisePeak(runtime->meters[i]->peakLeft, meter.peakLeft);
@@ -411,23 +528,40 @@ void Engine::mixLoop() {
             if (std::find(outputPorts.begin(), outputPorts.begin() + rendered, port) != outputPorts.begin() + rendered) continue;
             outputPorts[rendered++] = port;
             if (!port->ready()) { if (!port->queue->clearPending()) port->queue->requestClear(); continue; }
-            std::span<const Frame> current, old;
+            std::array<std::span<const Frame>, maximumGraphNodes> current{}, old{};
+            std::size_t currentCount{}, oldCount{};
             if (active) for (std::size_t n = 0; n < active->plan.nodeCount; ++n)
-                if (active->ports[n].get() == port) { current = active->processor.output(n); break; }
+                if (active->ports[n].get() == port) current[currentCount++] = active->processor.output(n);
             if (fading) for (std::size_t n = 0; n < fading->plan.nodeCount; ++n)
-                if (fading->ports[n].get() == port) { old = fading->processor.output(n); break; }
+                if (fading->ports[n].get() == port) old[oldCount++] = fading->processor.output(n);
+            bool clipped{};
             for (std::size_t frame = 0; frame < quantumFrames; ++frame) {
                 const float weight = fading ? 1.f - static_cast<float>(fadeRemaining - static_cast<std::uint32_t>(frame) - 1) / 480.f : 1.f;
-                const auto a = current.empty() ? Frame{} : current[frame];
-                const auto b = old.empty() ? Frame{} : old[frame];
-                mixedOutput[frame] = {a.left * weight + b.left * (1 - weight), a.right * weight + b.right * (1 - weight)};
+                double left{}, right{}, previousLeft{}, previousRight{};
+                for (std::size_t n = 0; n < currentCount; ++n) { left += current[n][frame].left; right += current[n][frame].right; }
+                for (std::size_t n = 0; n < oldCount; ++n) { previousLeft += old[n][frame].left; previousRight += old[n][frame].right; }
+                left = left * weight + previousLeft * (1 - weight);
+                right = right * weight + previousRight * (1 - weight);
+                clipped = clipped || std::abs(left) > 1. || std::abs(right) > 1.;
+                // Logical outputs contribute at their own levels. Clamp only
+                // this final endpoint sum; never normalize by node count or
+                // clip opposing contributions before they can cancel.
+                mixedOutput[frame] = {static_cast<float>(std::clamp(left, -1., 1.)), static_cast<float>(std::clamp(right, -1., 1.))};
             }
+            if (clipped && active) for (std::size_t n = 0; n < active->plan.nodeCount; ++n)
+                if (active->ports[n].get() == port) active->meters[n]->clipped.store(true, std::memory_order_relaxed);
             if (port->queue->size() > sampleRate / 10) port->queue->requestClear();
+#ifdef VINEMIX_ENGINE_LIFECYCLE_TESTS
+            engineLifecycleOutput(port->output ? port->output->endpointId : std::string_view{}, mixedOutput);
+#endif
             port->queue->push(mixedOutput);
         }
         if (fading) { fadeRemaining -= static_cast<std::uint32_t>(quantumFrames); if (fadeRemaining == 0) fading = nullptr; }
         if (active && !fading) activeGeneration_.store(active->generation, std::memory_order_release);
         audioFrames_.fetch_add(quantumFrames, std::memory_order_relaxed);
+#ifdef VINEMIX_ENGINE_LIFECYCLE_TESTS
+        engineLifecycleQuantumEnd();
+#endif
         QueryPerformanceCounter(&now);
         const auto next = clock.advance(now.QuadPart);
         if (next <= now.QuadPart) continue;
@@ -446,6 +580,7 @@ void Engine::maintenanceLoop() {
             { std::lock_guard lock(endpointsMutex_); endpoints_ = std::move(devices); applications_ = std::move(applications); }
             std::lock_guard lock(configurationMutex_);
             retire();
+            refreshOutputPorts();
             if (auto* runtime = published_.load(std::memory_order_acquire)) {
                 std::erase_if(lastStates, [&](const auto& entry) {
                     for (std::size_t i = 0; i < runtime->plan.nodeCount; ++i) if (runtime->plan.nodes[i].id == entry.first) return false;

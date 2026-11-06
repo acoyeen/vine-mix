@@ -64,9 +64,20 @@ function Test-ActivationShellParent {
     finally { $shell.Dispose() }
 }
 
+function Get-ActivationProcessIdentity([Diagnostics.Process]$Process) {
+    $observation = Read-DesktopProcessIdentity $Process
+    if ($observation.State -ne 'Identified') {
+        throw "A process identity could not be captured safely (state: $($observation.State); identity field: $($observation.Field); native error: $($observation.NativeError))."
+    }
+    $observation.Identity
+}
+
 function Test-ActivationProcessIdentity($Actual, $Captured) {
     if ($null -eq $Actual -or $null -eq $Captured) { return $false }
     try {
+        if ($Actual -is [Diagnostics.Process]) { $Actual = Get-ActivationProcessIdentity $Actual }
+        if ($Captured.Id -le 0 -or $null -eq $Captured.StartTime -or $null -eq $Captured.SessionId -or
+            [string]::IsNullOrWhiteSpace($Captured.Path) -or [string]::IsNullOrWhiteSpace($Actual.Path)) { return $false }
         $Actual.Id -eq $Captured.Id -and $Actual.StartTime.ToUniversalTime().Ticks -eq $Captured.StartTime.ToUniversalTime().Ticks -and
             $Actual.Path -ieq $Captured.Path -and $Actual.SessionId -eq $Captured.SessionId
     } catch { $false }

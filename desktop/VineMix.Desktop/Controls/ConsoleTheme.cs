@@ -48,7 +48,9 @@ public static class ConsoleTheme
             ["ConsoleMeterMidBrush"] = Color("#E6BB5A"), ["ConsoleMeterHighBrush"] = Color("#E56F70"),
             ["NodeCanvasBrush"] = Color("#000000"), ["NodeGridBrush"] = Color("#1B1F23"),
             ["NodeOutlineBrush"] = Color("#30363D"), ["NodeSelectedBrush"] = Color("#DCE5EF"),
+            ["CanvasOverviewBrush"] = Color("#4A5058"),
             ["NodeAudioBrush"] = Color("#78BE98"), ["NodeControlBrush"] = Color("#A0A8B3"), ["NodeSidechainBrush"] = Color("#B8A0D8"),
+            ["NodeEffectReturnBrush"] = Color("#8EC8E8"),
             ["NodeInputHeaderBrush"] = Color("#583747"), ["NodeOutputHeaderBrush"] = Color("#4A2D34"),
             ["NodeProcessorHeaderBrush"] = Color("#40365B"), ["NodeUtilityHeaderBrush"] = Color("#294650"),
             ["NodeControllerHeaderBrush"] = Color("#374D3C")
@@ -60,7 +62,7 @@ public static class ConsoleTheme
             foreach (string key in new[] { "ConsoleABrush", "ConsoleBBrush", "ConsoleMuteBrush", "ConsoleMeterLowBrush", "ConsoleMeterMidBrush", "ConsoleMeterHighBrush", "ConsoleFaderInactiveBrush" }) palette[key] = SystemColors.HighlightBrush;
             palette["ConsoleInkBrush"] = SystemColors.HighlightTextBrush;
             foreach (string key in new[] { "NodeCanvasBrush", "NodeInputHeaderBrush", "NodeOutputHeaderBrush", "NodeProcessorHeaderBrush", "NodeUtilityHeaderBrush", "NodeControllerHeaderBrush" }) palette[key] = SystemColors.WindowBrush;
-            foreach (string key in new[] { "NodeOutlineBrush", "NodeAudioBrush", "NodeControlBrush", "NodeSidechainBrush" }) palette[key] = SystemColors.WindowTextBrush;
+            foreach (string key in new[] { "NodeOutlineBrush", "NodeAudioBrush", "NodeControlBrush", "NodeSidechainBrush", "NodeEffectReturnBrush", "CanvasOverviewBrush" }) palette[key] = SystemColors.WindowTextBrush;
             palette["NodeSelectedBrush"] = SystemColors.HighlightBrush;
             palette["NodeGridBrush"] = SystemColors.GrayTextBrush;
             palette["BrandActionBrush"] = palette["BrandHoverBrush"] = SystemColors.HighlightBrush;

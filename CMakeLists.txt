@@ -140,6 +140,16 @@ if(DEFINED AUDIO_MIXER_OFFLINE_TESTS AND NOT DEFINED VINEMIX_OFFLINE_TESTS)
 endif()
 option(VINEMIX_OFFLINE_TESTS "Build silent graph, settings, lifecycle, drift and queue verification" OFF)
 if(VINEMIX_OFFLINE_TESTS)
+  # Production configuration serializer over stdin/stdout; never opens the
+  # control pipe, user settings, endpoint inventory or audio devices.
+  add_executable(VineMix.ConfigurationBoundaryProbe
+    native/tests/configuration_boundary_probe.cpp native/src/configuration.cpp native/src/graph.cpp)
+  vinemix_verification_target(VineMix.ConfigurationBoundaryProbe)
+  target_link_libraries(VineMix.ConfigurationBoundaryProbe PRIVATE nlohmann_json::nlohmann_json advapi32)
+  add_executable(VineMix.ConfigurationPrecisionTests
+    native/tests/configuration_precision_tests.cpp native/src/graph.cpp)
+  vinemix_verification_target(VineMix.ConfigurationPrecisionTests)
+  target_link_libraries(VineMix.ConfigurationPrecisionTests PRIVATE nlohmann_json::nlohmann_json)
   add_executable(VineMix.GraphTests
     native/tests/graph_tests.cpp native/src/graph.cpp native/src/configuration.cpp native/src/dsp.cpp)
   target_include_directories(VineMix.GraphTests PRIVATE native/include)
@@ -153,6 +163,7 @@ if(VINEMIX_OFFLINE_TESTS)
   endif()
   add_executable(VineMix.EngineLifecycleTests
     native/tests/engine_lifecycle_tests.cpp native/src/engine.cpp native/src/control_server.cpp native/src/graph.cpp native/src/configuration.cpp native/src/dsp.cpp)
+  target_compile_definitions(VineMix.EngineLifecycleTests PRIVATE VINEMIX_ENGINE_LIFECYCLE_TESTS)
   target_include_directories(VineMix.EngineLifecycleTests PRIVATE native/include ${CMAKE_CURRENT_BINARY_DIR}/generated)
   target_compile_definitions(VineMix.EngineLifecycleTests PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
   target_link_libraries(VineMix.EngineLifecycleTests PRIVATE samplerate nlohmann_json::nlohmann_json advapi32 avrt)
@@ -261,6 +272,9 @@ endif()
 # Every target using graph.cpp needs the same effect implementation; linking
 # the library never executes it or creates an audio endpoint.
 if(VINEMIX_OFFLINE_TESTS)
+  add_executable(VineMix.CreativeEffectsTests native/tests/creative_effects_tests.cpp native/src/graph.cpp native/src/configuration.cpp)
+  vinemix_verification_target(VineMix.CreativeEffectsTests)
+  target_link_libraries(VineMix.CreativeEffectsTests PRIVATE nlohmann_json::nlohmann_json advapi32 avrt)
   add_executable(VineMix.AdvancedEffectsTests native/tests/advanced_effects_tests.cpp native/src/graph.cpp native/src/configuration.cpp)
   vinemix_verification_target(VineMix.AdvancedEffectsTests)
   target_link_libraries(VineMix.AdvancedEffectsTests PRIVATE nlohmann_json::nlohmann_json advapi32)
@@ -282,8 +296,8 @@ if(VINEMIX_OFFLINE_TESTS)
   vinemix_verification_target(VineMix.CoreDynamicsTests)
   target_link_libraries(VineMix.CoreDynamicsTests PRIVATE nlohmann_json::nlohmann_json advapi32)
 endif()
-foreach(graph_target VineMix.Engine VineMix.GraphTests VineMix.EngineLifecycleTests
-    VineMix.QualificationTests VineMix.HardwareTests VineMix.AdvancedEffectsTests VineMix.SpectrumTests
+foreach(graph_target VineMix.Engine VineMix.GraphTests VineMix.EngineLifecycleTests VineMix.ConfigurationBoundaryProbe VineMix.ConfigurationPrecisionTests
+    VineMix.QualificationTests VineMix.HardwareTests VineMix.AdvancedEffectsTests VineMix.CreativeEffectsTests VineMix.SpectrumTests
     VineMix.DeEsserQualityTests VineMix.EffectsQualityTests VineMix.GraphPerformanceTests VineMix.VoiceColorTests VineMix.CoreDynamicsTests)
   if(TARGET ${graph_target})
     target_link_libraries(${graph_target} PRIVATE VineMix.Effects)

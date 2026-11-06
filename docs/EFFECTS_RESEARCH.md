@@ -1,5 +1,146 @@
 # Effects and node simplification
 
+**Source update, 2026-11-06:** Unreleased 0.5.0 adds Echo/Distortion and reunites
+the earlier Simple/Advanced split into one Effects menu. Current controls
+and timing are in the [user guide](USER_GUIDE.md) and
+[protocol](CONTROL_PROTOCOL.md); implementation/verification evidence is in
+[the 0.5.0 report](IMPLEMENTATION_0.5.0.md). The dated original implementation
+notes and counts below describe the earlier effect set.
+
+<a id="distortion-refinement-2026-11-06"></a>
+## Distortion review and refinement — 6 November 2026
+
+**Status:** implemented, offline verified and locally integrated after the
+maintainer requested a review for problems analogous to the earlier Echo report.
+
+Primary sources reviewed on **2026-11-06**:
+
+- [Ableton Saturator](https://www.ableton.com/en/manual/live-audio-effect-reference/#saturator)
+  separates input Drive, Output attenuation and Dry/Wet balance. Its quality
+  options also illustrate that reducing aliasing costs processing time.
+- [JUCE Oversampling](https://docs.juce.com/master/classjuce_1_1dsp_1_1Oversampling.html)
+  describes upsampling before a nonlinear effect and downsampling afterwards,
+  including FIR phase behavior and latency.
+- [JUCE SmoothedValue](https://docs.juce.com/master/classjuce_1_1SmoothedValue.html)
+  documents gradual parameter changes to avoid abrupt control discontinuities;
+  linear and multiplicative smoothing are alternatives.
+- [Bilbao and colleagues, Antiderivative Antialiasing for Memoryless Nonlinearities](https://www.research.ed.ac.uk/en/publications/antiderivative-antialiasing-for-memoryless-nonlinearities/)
+  discusses oversampling and a different antialiasing technique for nonlinear
+  processing. It does not imply VineMix must replace its selected processor.
+
+VineMix retains its selected `tanh` curve, 8-times oversampling, 257-tap FIR,
+32-frame matched dry/wet/bypass latency, 10-ms control smoothing and existing
+defaults. Unlike the earlier Echo, Distortion has no recirculating phrase buffer.
+Drive intentionally affects harmonics and can raise loudness. Output trims the
+whole blend, including zero Mix; Bypass restores untrimmed original sound, so
+switching to Bypass can intentionally raise the level. Filtering/DC removal can
+produce transient peaks above unity at extreme settings. Distortion is not a
+brickwall limiter; preserve output headroom. Oversampling reduces aliasing but
+does not eliminate it, and the graph does not compensate parallel-path delay.
+
+The review found a gap in earlier verification: abrupt-edit checks sampled only
+the first frame, and the maximum Distortion graph was not timed while old/new
+routing graphs both processed during a crossfade. Expanded tests cover complete
+control transitions, repeated graph publication, bypass/mute/reset, finite
+extremes, stereo, latency, headroom and measured whole-transition execution time.
+Filter scheduling optimizations must retain the selected filter and algorithm;
+before/after waveform comparisons and performance evidence are recorded in the
+[implementation report](IMPLEMENTATION_0.5.0.md). Automated evidence does not
+claim an independent listening-quality pass.
+
+<a id="echo-refinement-2026-11-05"></a>
+## Echo research and refinement — 5 November 2026
+
+**Status:** implemented, offline verified and locally integrated, following
+the maintainer's listening report in [ISSUE-026](KNOWN_ISSUES.md#issue-026).
+The initial synthetic checks were insufficient to establish good behavior while
+retiming a stored phrase. This refinement has an explicit audible-behavior
+contract in addition to numeric bounds and real-time checks.
+
+### Evidence from established processors
+
+Primary sources reviewed on **2026-11-05**:
+
+- Ableton documents three distinct Time-change behaviors: changing pitch,
+  crossfading old/new delay positions, and an immediate jump. Crossfading itself
+  can create granular-sounding transitions; it is not a guarantee of transparent
+  retiming. Its dry/wet balance and wet-only return routing also distinguish the
+  direct voice from the delayed effect. Short 12–30 ms examples are used for
+  chorus rather than clearly separated echoes.
+  [Ableton Live effect reference](https://www.ableton.com/en/manual/live-audio-effect-reference/).
+- Audacity's Delay exposes an actual number of echoes separately from timing and
+  per-echo level change. Its documentation also warns that adding echoes can
+  increase output peaks. A repeat counter is an established alternative to a
+  feedback-level control, but does not make every repeated word perceptually
+  separate during continuous speech.
+  [Audacity Delay](https://manual.audacityteam.org/man/delay.html).
+- Apple's Delay Designer distinguishes discrete delay taps from routing a tap's
+  output back to the input. Taps can supply finite repeats without recirculation.
+  [Logic Pro Delay Designer](https://support.apple.com/en-ae/guide/logicpro/lgcef18b98e9/mac).
+- FL Studio describes Feedback as the signal level returned to the delay and
+  provides explicit wet/dry output controls. Its Time modes show that pitch
+  preservation and smooth control changes are separate concerns.
+  [Fruity Delay 3 manual](https://www.image-line.com/fl-studio-learning/fl-studio-online-manual/html/plugins/Fruity%20Delay%203.htm).
+- JUCE documents fractional delay taps and cautions that changing maximum delay
+  storage may allocate, so it must not occur on the audio thread. This informs
+  storage preparation and handoff constraints, not an adoption of JUCE code or
+  a new dependency.
+  [JUCE DelayLine reference](https://docs.juce.com/master/classjuce_1_1dsp_1_1DelayLine.html).
+
+### VineMix decisions
+
+The following are original product choices inferred from those alternatives and
+the maintainer's request; they are not claimed industry standards:
+
+- Retain three controls: Time **20–2000 ms**, default **300**; integer Repeats
+  **1–8**, default **3**; Mix **0–100%**, default **25%**. Repeats counts copies
+  after the original. Twenty milliseconds remains useful for thickening; the
+  help must not promise distinct syllable-sized echoes there.
+- Feed each repeat from original audio, never from a mixture of previous
+  repeats. Each successive copy is half the preceding copy's amplitude
+  (approximately −6 dB). Normalize positive tap weights to sum to one so
+  coherent repeated input does not produce a gain buildup inside Echo.
+- Time/Repeats changes briefly fade the old wet tail and start fresh using the
+  latest requested setting. This intentionally stops the old tail rather than
+  replaying it, bending its pitch, or pretending an arbitrary tap crossfade is
+  transparent. The direct component stays immediate. Mix changes only blend
+  original audio with repeats and must not restart the tail.
+- Keep the main **Audio** output as the selected blend. Add **Echo**, an
+  echo-only output before Mix, for separate processing such as Reverb. The
+  internal port key is `wet`, consistent with the existing alternate-output
+  mechanism. Bypass fades Echo to silence and Audio to original sound; mute
+  silences both. Ordinary graph changes preserve the tail, except explicit
+  Time/Repeats edits or timeline reset.
+- Preserve stereo separation and mono channel metadata. Unlike Reverb, Echo
+  must not claim to turn a mono source into stereo merely because its separate
+  wet output is connected.
+- Migrate legacy Feedback deterministically to an approximate audible repeat
+  count, as specified under [IDEA-055](IDEAS.md#idea-055). Preserve Time/Mix,
+  validate both schemas strictly and keep canonical desktop/native/history
+  comparisons consistent. The old decay sound cannot be preserved exactly
+  while replacing it with a finite fixed-decay model.
+
+### Verification obligations and limits
+
+Reproduce the earlier replay, verify exact impulse count/timing/decay, silence
+after the last copy, fractional-time interpolation, no prior-tail resurrection
+after edits, Mix-independent Echo output, stereo/mono behavior, bypass/mute and
+Reverb routing. Test continuous rapid edits, bounded levels, finite extreme
+inputs, reset and state continuity. Measure allocation, processing and graph
+handoff, including the existing maximum graph. Finite eight-repeat history at
+the maximum Time lasts 16 seconds; storage and queued runtimes must be bounded,
+and copying that full history on the audio thread is not acceptable by default.
+
+Mix at 100% intentionally has no immediate original voice and therefore sounds
+delayed. Very short delays can sound coloured. Neither fact establishes a CPU
+stall or clipping defect. Conversely, numeric peak tests do not establish
+listening quality. No independent live listening result is claimed until it is
+actually performed and recorded. The new native, interface, cross-language and
+activation-comparison results are recorded in the
+[implementation report](IMPLEMENTATION_0.5.0.md#echo-refinement-after-listening-feedback--2026-11-05).
+
+## Earlier implementation research
+
 Implemented 18 October 2026. These are local, real-time audio processors; they do
 not upload or record audio. The new effects are available in **Add → Effects**.
 Installing this version does not insert them into an existing route.

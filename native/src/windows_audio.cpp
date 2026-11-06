@@ -773,7 +773,7 @@ struct AudioWorker::Impl {
         if (!stopped.exchange(true)) { SetEvent(stopEvent.get()); SetEvent(controlEvent.get()); }
         if (thread.joinable()) thread.join();
     }
-    void state(std::string value, std::string message = {}, const Endpoint* endpoint = nullptr) {
+    void state(std::string value, std::string message = {}, const Endpoint* endpoint = nullptr, std::string reason = {}) {
         ready.store(value == "Running", std::memory_order_release);
         if (value != "Running" && value != "Priming") {
             targetQueueFrames.store(0, std::memory_order_relaxed);
@@ -781,7 +781,7 @@ struct AudioWorker::Impl {
             enginePeriodFrames.store(0, std::memory_order_relaxed);
         }
         std::lock_guard lock(mutex);
-        path.state = std::move(value); path.message = std::move(message);
+        path.state = std::move(value); path.message = std::move(message); path.reason = std::move(reason);
         if (path.state != "Running" && path.state != "Priming") path.periodMs = path.bufferMs = 0;
         if (endpoint) { path.endpointId = endpoint->id; path.channels = endpoint->channels; path.rate = endpoint->rate; }
         else if (path.state == "Unassigned") { path.endpointId.clear(); path.rate = path.channels = 0; }
@@ -1084,7 +1084,8 @@ struct AudioWorker::Impl {
                 if (!endpoint || endpoint->state != "Active") {
                     std::string message = "Waiting for device";
                     if (endpoint && endpoint->state == "Disabled") message = "Device disabled in Windows Sound settings";
-                    state("Waiting", std::move(message), endpoint ? &*endpoint : nullptr);
+                    state("Waiting", std::move(message), endpoint ? &*endpoint : nullptr,
+                        endpoint && endpoint->state == "Disabled" ? "device_disabled" : "device_unavailable");
                 } else if (const auto rejection = detail::streamEndpointRejection(*endpoint, capture, microphone, requiredTransport); !rejection.empty()) {
                     state("Error", std::string(rejection), &*endpoint);
                 } else {
@@ -1097,7 +1098,12 @@ struct AudioWorker::Impl {
                     if (capture) queue->requestClear(); else queue->clear();
                     if (stopped.load(std::memory_order_relaxed)) break;
                     if (result == S_FALSE) { backoff = 0; continue; }
-                    state(failureState(result), failureMessage(result, exclusiveRender), &*endpoint);
+                    const auto reason = result == E_ACCESSDENIED ? "access_denied" :
+                        result == AUDCLNT_E_SERVICE_NOT_RUNNING ? "audio_service_unavailable" : "stream_failure";
+                    auto message = failureMessage(result, exclusiveRender);
+                    if (result == E_ACCESSDENIED && !capture && !exclusiveRender)
+                        message = "Output access blocked; check Windows sound device settings";
+                    state(failureState(result), std::move(message), &*endpoint, reason);
                 }
                 delay = delays[std::min(backoff, delays.size() - 1)];
                 if (backoff + 1 < delays.size()) ++backoff;

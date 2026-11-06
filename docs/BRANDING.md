@@ -84,6 +84,18 @@ OFL terms are in [font provenance](IBM_PLEX_FONTS.md).
 Menu checkmarks use drawn strokes in the shared menu template instead of a font
 character, keeping their shape consistent across Settings and other menus.
 
+The selected unreleased 0.5.0 low-detail direction is **Quiet Blocks**:
+plain solid charcoal bodies (`#15181E`) and the existing category-coloured header
+strips. Below the existing roughly 30% threshold, show no decorative type symbols,
+name/control text, miniature controls or audio meters. Retain selection and
+device-warning indicators. Preserve header height, node bounds, ports
+and connections; full controls reappear when zooming in. High contrast keeps
+the existing system-colour policy. Implementation is offline verified and locally
+integrated, with maintainer visual follow-up pending. The earlier soft-white and
+then dark (`#0B0D11`) vector symbols,
+including the 128-DIP/2.6-stroke refinement, are superseded; their dated evidence
+is retained under [TWEAK-025](TWEAKS.md#tweak-025).
+
 | Role | Normal palette | Meaning |
 | --- | --- | --- |
 | In-app logo | `ConsoleTextBrush` (`#E8EBF2`) | One foreground for the entire identity |
@@ -95,7 +107,7 @@ character, keeping their shape consistent across Settings and other menus.
 | Window / panels | `#0C0D0F` / `#15181E` | Quiet working surfaces |
 | Text / secondary text | `#E8EBF2` / `#A5ADBA` | Information hierarchy |
 | Audio cable / socket | `#78BE98` | Audible audio route |
-| Sidechain cable / diamond socket | `#B8A0D8` | Ducking detector only |
+| Sidechain cable / diamond socket | `#B8A0D8` | Detector-only Trigger route |
 | Control cable / square socket | `#A0A8B3` | Control connection |
 
 Retain distinct muted category headers, explicit Mute/Bypass labels and

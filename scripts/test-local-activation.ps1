@@ -53,7 +53,7 @@ try {
     $replacement = [pscustomobject]@{Id=123;StartTime=$captured.StartTime.AddSeconds(1);Path=$captured.Path;SessionId=2}
     Check (-not (Test-ActivationProcessIdentity $replacement $captured)) 'A reused PID with a different start time cannot be stopped by rollback.'
     function ControllerFixture([bool]$ExitDuringPathRead = $false) {
-        $fixture = [pscustomobject]@{HasExited=$false;SessionId=2;StartTime=$captured.StartTime.AddSeconds(1);
+        $fixture = [pscustomobject]@{Id=123;SafeHandle=1;HasExited=$false;SessionId=2;StartTime=$captured.StartTime.AddSeconds(1);
             ImagePath=$captured.Path;ExitDuringPathRead=$ExitDuringPathRead;RefreshCount=0}
         $fixture | Add-Member -MemberType ScriptMethod -Name Refresh -Value { $this.RefreshCount++ }
         $fixture | Add-Member -MemberType ScriptProperty -Name Path -Value {
@@ -62,6 +62,10 @@ try {
         }
         return $fixture
     }
+    # Synthetic candidates exercise the inspection state machine without native
+    # handles. The separate identity suite covers the real native image query.
+    $productionImageReader = ${function:Get-DesktopProcessImagePath}
+    function Get-DesktopProcessImagePath($Process) { $Process.Path }
     $normalizing = ControllerFixture -ExitDuringPathRead $true
     Check (-not (Test-DesktopControllerCandidate $normalizing $captured.Path 2 $captured.StartTime) -and
         $normalizing.RefreshCount -eq 2) 'A normalization launcher exiting during image-path inspection is rechecked and skipped before the final controller appears.'
@@ -77,6 +81,7 @@ try {
         }
         Reject { Test-DesktopControllerCandidate $unexpected $captured.Path 2 $captured.StartTime } ('A still-running controller with a mismatched ' + $mismatch + ' is never accepted or ignored.')
     }
+    Set-Item Function:Get-DesktopProcessImagePath $productionImageReader
     Reject { Assert-ActivationEvidenceLocation (Join-Path $project 'artifacts\private-backup') @($project) } 'Evidence cannot be saved inside the source checkout.'
     Reject { Assert-ActivationEvidenceLocation $root @($root) } 'Evidence cannot be the application package itself.'
     Assert-ActivationEvidenceLocation ($root + '-sibling') @($root)

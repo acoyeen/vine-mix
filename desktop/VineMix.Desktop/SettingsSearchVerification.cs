@@ -42,6 +42,7 @@ internal static class SettingsSearchVerification
             require(search.SearchBox.Text.Length == 0 && search.Matches.Count == 0
                 && originalRows.All(row => row.Visibility == Visibility.Visible),
                 "An empty Settings query leaves the normal menu available without an unrelated list of help results.");
+            await VerifyMenuHeightAsync(mixer, require, render);
             await VerifyFieldGeometryAsync(mixer, require, render);
 
             search.SearchBox.Text = "Zoom";
@@ -174,6 +175,55 @@ internal static class SettingsSearchVerification
         }
     }
 
+    private static async Task VerifyMenuHeightAsync(MixerViewModel mixer,
+        Action<bool, string> require, Action<ContextMenu, string, double>? render)
+    {
+        string before = MixerState(mixer);
+        foreach (var (availableHeight, dpi) in new[] { (720d, 96d), (360d, 96d), (360d, 192d) })
+        {
+            var menu = MainWindow.CreateSettingsMenu(mixer);
+            // A constrained detached fixture models the size the popup gets
+            // from a small work area or fewer available DIPs at high scaling.
+            if (availableHeight <= 360) menu.MaxHeight = availableHeight;
+            menu.Visibility = Visibility.Visible; menu.ApplyTemplate();
+            await LayoutMenuAsync(menu, availableHeight);
+            VisualTreeHelper.SetRootDpi(menu, new DpiScale(dpi / 96, dpi / 96));
+            await LayoutMenuAsync(menu, availableHeight);
+            var scroll = VisualChildren(menu).OfType<ScrollViewer>()
+                .Single(view => ReferenceEquals(view.TemplatedParent, menu));
+            var viewport = VisualChildren(scroll).OfType<ScrollContentPresenter>().First();
+            var rows = menu.Items.OfType<MenuItem>().Where(item => item.Header is string && item.Visibility == Visibility.Visible).ToArray();
+            var quit = rows.Single(row => Header(row) == "Quit VineMix");
+            bool FullyVisible(MenuItem row)
+            {
+                Rect bounds = row.TransformToAncestor(viewport).TransformBounds(new Rect(row.RenderSize));
+                return bounds.Top >= -.01 && bounds.Bottom <= viewport.ActualHeight + .01 && HasVisibleArea(row, menu);
+            }
+            if (availableHeight > 360)
+            {
+                require(menu.ActualHeight <= availableHeight && scroll.ScrollableHeight <= .01
+                    && scroll.ComputedVerticalScrollBarVisibility != Visibility.Visible && rows.All(FullyVisible),
+                    "At an ordinary 720-DIP work-area height, every normal Settings command is fully visible without a scrollbar.");
+                render?.Invoke(menu, "settings-menu-full-height.png", dpi);
+            }
+            else
+            {
+                require(menu.ActualHeight <= availableHeight && scroll.ScrollableHeight > 0
+                    && scroll.ComputedVerticalScrollBarVisibility == Visibility.Visible && !FullyVisible(quit),
+                    $"At a constrained 360-DIP height and {dpi:0} DPI, Settings keeps a usable scrollbar instead of clipping inaccessible commands.");
+                render?.Invoke(menu, $"settings-menu-constrained-{dpi:0}dpi.png", dpi);
+                scroll.ScrollToEnd();
+                await menu.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                menu.UpdateLayout();
+                require(FullyVisible(quit) && quit.IsEnabled && scroll.VerticalOffset > 0,
+                    $"At {dpi:0} DPI, scrolling the constrained Settings menu reaches the complete final command.");
+                render?.Invoke(menu, $"settings-menu-constrained-end-{dpi:0}dpi.png", dpi);
+            }
+            require(!menu.IsOpen && PresentationSource.FromVisual(menu) is null && MixerState(mixer) == before,
+                "Settings height qualification uses a detached menu and changes no setting or audio state.");
+        }
+    }
+
     private static async Task VerifyFieldGeometryAsync(MixerViewModel mixer,
         Action<bool, string> require, Action<ContextMenu, string, double>? render)
     {
@@ -298,12 +348,12 @@ internal static class SettingsSearchVerification
         => !first.IsEmpty && !second.IsEmpty && Math.Abs(first.Left - second.Left) * scale <= 1
             && Math.Abs(first.Top - second.Top) * scale <= 1;
 
-    private static async Task LayoutMenuAsync(ContextMenu menu)
+    private static async Task LayoutMenuAsync(ContextMenu menu, double availableHeight = 520)
     {
         menu.Height = double.NaN;
         menu.InvalidateMeasure(); menu.InvalidateArrange();
-        menu.Measure(new Size(menu.Width, 520));
-        menu.Height = Math.Max(80, Math.Min(menu.MaxHeight, menu.DesiredSize.Height + 4));
+        menu.Measure(new Size(menu.Width, availableHeight));
+        menu.Height = Math.Max(80, Math.Min(availableHeight, Math.Min(menu.MaxHeight, menu.DesiredSize.Height + 4)));
         menu.Arrange(new Rect(0, 0, menu.Width, menu.Height));
         menu.UpdateLayout();
         await menu.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);

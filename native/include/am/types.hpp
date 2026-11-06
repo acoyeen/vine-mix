@@ -61,13 +61,17 @@ struct DenoiserSettings {
 struct DeEsserSettings { double frequencyHz = 6000, thresholdDb = -24, reductionDb = 9; bool operator==(const DeEsserSettings&) const = default; };
 struct PlosiveSettings { double frequencyHz = 150, thresholdDb = -24, reductionDb = 12; bool operator==(const PlosiveSettings&) const = default; };
 struct ReverbSettings { double mix = .2, decaySeconds = 1.2, damping = .5, preDelayMs = 15; bool operator==(const ReverbSettings&) const = default; };
+struct EchoSettings { double timeMs = 300; int repeats = 3; double mix = .25; bool operator==(const EchoSettings&) const = default; };
+struct DistortionSettings { double driveDb = 6, toneHz = 6000, mix = .5, outputDb = -6; bool operator==(const DistortionSettings&) const = default; };
 struct VoiceColorSettings { double tone{}, ambience{}; bool operator==(const VoiceColorSettings&) const = default; };
 struct GraphNode {
     std::string id;
     std::string kind = "gain";
     std::string name;
     double x{}, y{};
-    float gainDb{};
+    // Keep saved/acknowledged values identical to the desktop's doubles. Only
+    // the compiled DSP plan narrows gains to float.
+    double gainDb{};
     bool muted{};
     bool mono{};
     // -1 preserves the saved decibel-based controller in older workspaces.
@@ -86,6 +90,8 @@ struct GraphNode {
     DeEsserSettings deEsser{};
     PlosiveSettings plosive{};
     ReverbSettings reverb{};
+    EchoSettings echo{};
+    DistortionSettings distortion{};
     VoiceColorSettings voiceColor{};
     double balance{};
     double stereoWidth = 1;
@@ -101,7 +107,7 @@ struct GraphEdge {
     std::string from;
     std::string to;
     std::string kind = "audio";
-    float gainDb{};
+    double gainDb{};
     bool muted{};
     std::string fromPort = "audio";
     std::string toPort = "audio";
@@ -154,6 +160,8 @@ inline bool listeningEndpoint(const Endpoint& endpoint) noexcept {
 struct PathState {
     std::string state = "Unassigned";
     std::string message;
+    // Stable behaviour contract; human-readable message is presentation only.
+    std::string reason;
     std::string endpointId;
     std::uint32_t rate{};
     std::uint32_t channels{};

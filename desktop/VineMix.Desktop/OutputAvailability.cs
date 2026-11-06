@@ -44,7 +44,7 @@ internal static class OutputAvailability
     private static AudioAvailability WaitingForDevice(GraphNode node, PathState? path, IReadOnlyList<Endpoint> endpoints)
     {
         // The worker can report disablement before the next chooser refresh.
-        if (path?.Message == "Device disabled in Windows Sound settings")
+        if (StatusReasons.For(path) == "device_disabled")
             return new(AvailabilityNoticeKind.Problem, "OUTPUT DISABLED", "Enable in Windows sound settings");
 
         // Mirror AudioWorker::resolve: exact active render ID, unique active

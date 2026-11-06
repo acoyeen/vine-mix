@@ -55,7 +55,7 @@ internal static class CableHoverBoundsVerification
 
             // Compare the actual cubic's defining points and affine mapping
             // independently of WPF's native flattening/arc-length approximation.
-            double reach = Math.Max(70, Math.Abs(targetAnchor.X - sourceAnchor.X) * .48);
+            double reach = (targetAnchor - sourceAnchor).Length * .25;
             Point[] expected = [sourceAnchor, new(sourceAnchor.X + reach, sourceAnchor.Y),
                 new(targetAnchor.X - reach, targetAnchor.Y), targetAnchor];
             var worldCubic = AnalyticCurve(paths.Visible.Data);
