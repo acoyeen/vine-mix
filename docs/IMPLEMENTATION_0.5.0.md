@@ -1,5 +1,11 @@
 # VineMix 0.5.0 implementation and verification
 
+**Published — 6 November 2026:** [0.5.0 Beta](releases/0.5.0-beta.md) is released
+from commit `57052a200b0ec73d0d816f9ed12d2d5a2e13013d`, with matching source,
+Setup, standalone, checksums and signed update metadata. Both exact-source and
+published-asset CI passed. The [final qualification record](RELEASE_0.5.0_QUALIFICATION.md)
+is the current outcome; earlier local-only checkpoints below remain historical.
+
 **Final release pass authorized — 6 November 2026:** The maintainer requested a
 complete audit, fixes, thorough checks, refreshed documentation and screenshots,
 then explicitly authorized publication. This supersedes the earlier boundaries

@@ -10,6 +10,13 @@ change, reason, status and next step. Use **Captured**, **Planned**, **In progre
 **Implemented locally**, or **Released**, with verification and the release when
 available. Recording a tweak alone does not authorize implementation.
 
+**Release update — 6 November 2026:** TWEAK-021–026 are **Released** in
+[0.5.0 Beta](releases/0.5.0-beta.md), using their final accepted direction:
+gradient meters with borders/peaks, single-selection F2, focused-dial typing,
+one Effects menu, Quiet Blocks and coloured cables with enabled-only midpoint
+markers. The earlier symbols, miniature controls and split Effects menu remain
+historical decisions, not the shipped design. See [final qualification](RELEASE_0.5.0_QUALIFICATION.md).
+
 **Release update — 28 October 2026:** TWEAK-001–004 and TWEAK-013–020 are included
 in published [0.4.0 Beta](releases/0.4.0-beta.md), using the latest corrections
 recorded in each entry. Earlier local evidence is retained below; the

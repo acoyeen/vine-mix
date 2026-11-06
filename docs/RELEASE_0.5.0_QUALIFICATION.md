@@ -1,6 +1,11 @@
 # VineMix 0.5.0 Beta qualification
 
-**6 November 2026 — final audit and release preparation in progress.**
+**6 November 2026 — published; source and delivered packages verified.**
+
+[Download 0.5.0 Beta](https://github.com/acoyeen/vine-mix/releases/tag/v0.5.0-beta).
+Both the [exact-source checks](https://github.com/acoyeen/vine-mix/actions/runs/42153394427)
+and [published-asset checks](https://github.com/acoyeen/vine-mix/actions/runs/42154607689)
+passed.
 
 The maintainer authorized the complete audit, fixes, documentation refresh and
 publication. Identity: `0.5.0-beta`, Windows `0.5.0.0`, display **0.5.0 · Beta**.
@@ -50,10 +55,53 @@ The audit corrected channel/process JSON narrowing before range checks
 0.5.0 highlights, and removed stale starter/routing claims from current guides.
 Earlier implementation counts are not reused as final qualification.
 
-Final native, package, source-archive and publication results are recorded as
-their corresponding checks complete. The source archive's `SOURCE-MANIFEST.json`
-records its committed inputs and delivered-package verification; release
-checksums and signed metadata identify the exact downloadable bytes.
+The actual delivered Setup passed **225 checks**, covering isolated installation,
+repair, downgrade protection, uninstall and inert production smoke. The
+standalone passed **21 extraction/integrity/version/notice checks** and its
+production smoke. An additional **76 payload checks** verified receipt bytes,
+notice equality, engine equality between formats and absence of targeted private
+paths in 93 distributed files. Personal processes, settings, startup and shortcuts
+were unchanged during isolated package qualification.
+
+The final signed standalone passed **327 worker checks**, including **three
+production-worker smoke runs**. The original corrected 0.4.0 UpdateCore and trust
+key anonymously discover 0.5.0 as Available and verify both signed package hashes;
+the same code reports the 0.5.0 identity UpToDate. These checks do not substitute
+for the separate-account transaction limits below.
+
+## Source and publication
+
+Frozen source: `57052a200b0ec73d0d816f9ed12d2d5a2e13013d`.
+Build-input SHA-256: `dcafff73acef21e1ebb8c0e5de28df483bae032ddc355488573e299a33ee7689`.
+Both formats were built from the same clean checkout. The audited source ZIP
+contains **632 entries**, including all **347 build inputs** and a sanitized
+`SOURCE-MANIFEST.json`. Every archived file was rehashed against committed bytes;
+archive names, privacy markers and metadata were checked.
+
+Published at **03:07:41 UTC on 6 November 2026** as a normal GitHub prerelease.
+All five uploaded assets were downloaded and rehashed before publication; the
+production-pinned RSA-PSS/SHA-256 update signature passed. All five anonymous
+download links return HTTP 200. Earlier releases and repository visibility were
+preserved. No signing keys, raw diagnostics or personal settings were published.
+
+| Asset | SHA-256 |
+| --- | --- |
+| Setup x64 | `b350784d48e0a499143ce126c269f2532e7203fa73185c219997d9a66a5d75ef` |
+| Standalone x64 | `d60cc7b9304207f2e3e996a0809e087d7885b69fdfe3f9b27ccaa3739d6fe25c` |
+| Source ZIP | `69824a77514b5e32f99a17cbcc16bf70764f572f8daaebf06e4a6b61bd73f1e9` |
+| Signed Updates JSON | `e54db792a0afee6239ef343f7055d2cabb0b1db5018795d306252256fe99d693` |
+| SHA256SUMS.txt | `e9ae570535ec96554d8bc90140ea2efa82d792d046c2ea2bf0df57c13f477214` |
+
+The front page and current guides use the new starter and qualified screenshots.
+The source tag retains the audit checkpoint at freeze; this current record adds
+the subsequent package and publication outcomes without moving that tag.
+
+The website was updated after release verification. All **85 public files**
+match the prepared bytes and retain the three configured security headers.
+Saved fallback links, anonymous release discovery and reconnection select 0.5.0;
+hosting settings and domain routing were preserved. The
+[website cutover record](../website-redesign/HOSTING.md#050-beta-release-cutover--6-november-2026)
+contains deployment identity and scope. No browser/computer-use automation was used.
 
 ## Reproduce the offline checks
 

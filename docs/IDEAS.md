@@ -37,6 +37,16 @@ one Download link and gives header Docs a more prominent pill; pause remains rem
 <a id="release-0-5-0-plan"></a>
 ## Current 0.5.0 scope and implementation status
 
+**Released — 6 November 2026:** The accepted 0.5.0 scope is published as
+[VineMix 0.5.0 Beta](releases/0.5.0-beta.md), including Distortion (IDEA-002),
+selected Trigger/Wet ports (IDEA-052), optional minimap (IDEA-053), integration
+and status work (IDEA-054), Echo (IDEA-055), shared output devices (IDEA-056),
+keyboard/navigation refinements and the seven-node voice starter. The final
+interface uses one Effects menu and Quiet Blocks. Unselected alternatives and
+broader future ideas remain proposals. [Final qualification](RELEASE_0.5.0_QUALIFICATION.md)
+records shipped source, package checks, publication and remaining beta limits.
+The dated planning and local-integration history below is retained for rationale.
+
 **Audited: 2026-11-04.** This section is the authority for 0.5.0 scope and
 recommended delivery order. Stable idea, issue and tweak entries remain the
 owners of detailed requirements, research and dated evidence. The older backlog

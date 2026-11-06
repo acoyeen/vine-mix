@@ -179,3 +179,44 @@ Platform references:
 [Static assets](https://developers.cloudflare.com/workers/static-assets/),
 [response headers](https://developers.cloudflare.com/workers/static-assets/headers/),
 [custom domains](https://developers.cloudflare.com/workers/configuration/routing/custom-domains/).
+
+## 0.5.0 Beta release cutover — 6 November 2026
+
+The website offers [VineMix 0.5.0 Beta](https://github.com/acoyeen/vine-mix/releases/tag/v0.5.0-beta).
+Deployment followed publication and verification of the five release assets.
+All five download links also returned HTTP 200 without authentication.
+
+- The release-only patch updates `release.json`, the starter FAQ in
+  `src/index.html`, and generated `dist/index.html` and `dist/credits.html`.
+  Saved download, release, checksum and documentation links use `v0.5.0-beta`.
+  The existing site design and node imagery are unchanged; new full-workspace
+  screenshots remain in the product README and documentation.
+- Worker version: `867439b6-26b3-4036-b8ca-e350285203bf`.
+- Deployment: `8abefec5-c12c-4d6b-9bfd-f54acf0fb3a9`, serving 100% of traffic.
+- Prior Worker version retained for rollback:
+  `89105feb-9f2a-4517-b780-a0c221881395`. The previous deployment settings,
+  domain mapping and all 85 public files were backed up before the cutover.
+- The build and all ten offline check suites passed. All **85 public files**
+  were retrieved after deployment and matched the prepared bytes. Content
+  changes affect `index.html` and `credits.html`; ten other previously served
+  text files were normalized from CRLF to committed LF line endings only.
+- Every public file retained `X-Content-Type-Options: nosniff`,
+  `Referrer-Policy: strict-origin-when-cross-origin` and `X-Frame-Options: DENY`.
+  `_headers` remains configuration and returns HTTP 404 as a public path.
+- The assets-only Worker, empty bindings, compatibility date `2026-10-27`,
+  usage model, placement, logging, HTML handling, not-found handling and
+  custom-domain mapping were verified unchanged. DNS, redirects and Git
+  auto-deployment were not changed.
+- CLI checks exercised the actual retrieved homepage and release scripts.
+  Anonymous online discovery selected `v0.5.0-beta`; an offline fixture
+  preserved all six saved links, and reconnect restored **Latest Release**
+  with the same version and links. No browser or computer-use checks were run;
+  these checks do not claim a new visual or device-layout review.
+- The unmodified updater core and pinned trust from the corrected
+  `v0.4.0-beta` tag passed **seven anonymous discovery checks**: 0.4.0 discovers
+  0.5.0 with a valid signature and package hashes matching the final downloads;
+  0.5.0 reports itself up to date. This verifies discovery compatibility, not
+  an end-to-end installed update transaction.
+- Public inventories, hashes, configuration snapshots and the final receipt
+  remain outside the checkout. Short-lived upload credentials were removed
+  after verification.

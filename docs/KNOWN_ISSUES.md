@@ -5,6 +5,16 @@ belong in [development ideas](IDEAS.md). Recording an issue does not authorize
 implementation or imply that it has been independently reproduced.
 Optional refinements to working controls and layout belong in [tweaks](TWEAKS.md).
 
+**Release update — 6 November 2026:** Published [0.5.0 Beta](releases/0.5.0-beta.md)
+includes the accepted keyboard/zoom improvements (ISSUE-003/005), restart
+hardening (ISSUE-011), decimal history correction (ISSUE-024), Settings sizing
+(ISSUE-025), Echo correction (ISSUE-026), Distortion optimization (ISSUE-027),
+short-cable correction (ISSUE-028) and malformed-identity validation (ISSUE-029).
+Broader accessibility, the original unreplayed incidents and CPU-capacity limits
+remain explicitly distinguished from resolved defects. ISSUE-030 records the
+extreme multi-RNNoise limit. [Final qualification](RELEASE_0.5.0_QUALIFICATION.md)
+supersedes the dated local-only checkpoints below for release status.
+
 **Release update — 28 October 2026:** ISSUE-001, ISSUE-004 and ISSUE-022 are
 included in published [0.4.0 Beta](releases/0.4.0-beta.md). Their dated local
 integration evidence below remains historical; final combined qualification is
@@ -64,13 +74,13 @@ See [the execution report](IMPLEMENTATION_0.5.0.md) for evidence and remaining w
 
 | ID | Issue | Status |
 | --- | --- | --- |
-| [ISSUE-029](#issue-029) | Malformed channel/process numbers silently narrow to other identities | Corrected during 0.5.0 audit; focused recovery regressions pass |
+| [ISSUE-029](#issue-029) | Malformed channel/process numbers silently narrow to other identities | Resolved in 0.5.0 Beta; recovery regressions pass |
 | [ISSUE-030](#issue-030) | Many RNNoise nodes exceed the real-time processing budget | Confirmed synthetic capacity limitation; documented for 0.5.0 |
 | [ISSUE-001](#issue-001) | Settings search caret overlaps placeholder | Resolved in 0.4.0 Beta |
 | [ISSUE-002](#issue-002) | Duplicate application monitoring | Reported limitation |
 | [ISSUE-003](#issue-003) | Graph keyboard/accessibility gaps | Feedback refinements offline verified and integrated; maintainer follow-up and broader accessibility open |
 | [ISSUE-004](#issue-004) | Precise edits discarded on focus loss | Resolved in 0.4.0 Beta |
-| [ISSUE-005](#issue-005) | Dense-graph navigation and Fit limits | Navigation/detail guards and Quiet Blocks verified and locally integrated; maintainer follow-up pending |
+| [ISSUE-005](#issue-005) | Dense-graph navigation and Fit limits | Navigation, detail guards and Quiet Blocks released in 0.5.0 Beta; broader pointer/DPI review remains |
 | [ISSUE-006](#issue-006) | Website node route is hard to follow | Moved to [TWEAK-009](TWEAKS.md#tweak-009) |
 | [ISSUE-007](#issue-007) | Automatic update checks can appear inactive and suppress failed retries | Resolved in Beta 5 |
 | [ISSUE-008](#issue-008) | Installed Beta 2 reopens after an attempted Beta 4 update | Metadata defect resolved in Beta 5; tester incident not independently confirmed |
@@ -90,16 +100,16 @@ See [the execution report](IMPLEMENTATION_0.5.0.md) for evidence and remaining w
 | [ISSUE-022](#issue-022) | Selected nodes fall behind overlapping nodes | Resolved in 0.4.0 Beta |
 | [ISSUE-023](#issue-023) | Update rolls back after a successful package check | Resolved in corrected 0.4.0 Beta; old workers need direct Setup |
 | [ISSUE-024](#issue-024) | Undo history resets after a virtual-input Level adjustment | Precision defect corrected, boundary verified and locally integrated; original live incident unreplayed |
-| [ISSUE-025](#issue-025) | Settings menu scrolls and cuts off lower options despite available space | Resolved locally, offline verified and integrated; maintainer follow-up pending |
-| [ISSUE-026](#issue-026) | Echo Time changes replay stored repeat mixtures | Resolved locally, offline verified and integrated; listening follow-up pending |
+| [ISSUE-025](#issue-025) | Settings menu scrolls and cuts off lower options despite available space | Resolved in 0.5.0 Beta |
+| [ISSUE-026](#issue-026) | Echo Time changes replay stored repeat mixtures | Resolved in 0.5.0 Beta; listening refinement confirmed by maintainer |
 | [ISSUE-027](#issue-027) | Maximum Distortion graph has insufficient routing-fade timing margin | Optimized, offline verified and integrated; maximum-graph margin remains limited |
-| [ISSUE-028](#issue-028) | Short cables fold back instead of flowing directly between sockets | Resolved locally, offline verified and integrated; maintainer visual follow-up pending |
+| [ISSUE-028](#issue-028) | Short cables fold back instead of flowing directly between sockets | Resolved in 0.5.0 Beta; detached geometry and rendering verified |
 
 <a id="issue-029"></a>
 ## ISSUE-029: Malformed channel/process numbers silently narrow to other identities
 
-- **Found:** 2026-11-06 final release audit. **Status:** Corrected in source;
-  focused validation and recovery regressions pass.
+- **Found:** 2026-11-06 final release audit. **Status:** Resolved in 0.5.0 Beta;
+  focused validation/recovery regressions and all 19 native suites pass.
 - **Verified:** Native JSON arithmetic conversion accepted a channel value of
   `4294967295` as `-1` (all channels), and `1.9` as `1`, before range validation.
   Process identifiers had the same narrowing risk. This was reproduced with
@@ -112,8 +122,8 @@ See [the execution report](IMPLEMENTATION_0.5.0.md) for evidence and remaining w
 - **Verification:** Regression fixtures cover channel/process boundaries,
   read-only recovery, exact preservation of malformed originals and backups,
   older settings without new effect fields, and unknown node/port rejection.
-- **Next step:** Retain regressions in the full release suite and record final
-  package qualification in [the release record](RELEASE_0.5.0_QUALIFICATION.md).
+- **Next step:** Retain the regressions. Final package qualification is recorded
+  in [the release record](RELEASE_0.5.0_QUALIFICATION.md).
 
 <a id="issue-030"></a>
 ## ISSUE-030: Many RNNoise nodes exceed the real-time processing budget
