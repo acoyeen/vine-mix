@@ -1,0 +1,21 @@
+[package]
+name = "vinemix-update"
+description = "Release discovery, RSA-PSS manifest trust, download and update transactions."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+# Ephemeral signing keys for update tests; never enabled in releases.
+testing = []
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows.workspace = true

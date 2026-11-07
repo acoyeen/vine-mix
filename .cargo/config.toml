@@ -1,0 +1,4 @@
+# Self-contained executables: link the unwinder statically so installed
+# binaries need only system DLLs (UCRT ships with Windows 10 and later).
+[target.x86_64-pc-windows-gnullvm]
+rustflags = ["-C", "target-feature=+crt-static"]

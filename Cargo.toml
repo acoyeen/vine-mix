@@ -1,0 +1,96 @@
+# VineMix Rust workspace. See docs/RUST_REWRITE_PLAN.md.
+# The legacy C++ (native/) and C# (desktop/) trees remain the behavioural
+# oracle until each Rust crate has proven parity.
+[workspace]
+resolver = "3"
+members = [
+    "crates/vinemix-model",
+    "crates/vinemix-rt",
+    "crates/vinemix-dsp",
+    "crates/vinemix-resample",
+    "crates/vinemix-denoise",
+    "crates/vinemix-wasapi",
+    "crates/vinemix-engine",
+    "crates/vinemix-ipc",
+    "crates/vinemix-platform",
+    "crates/vinemix-update",
+    "crates/vinemix-ui",
+    "crates/vinemix-setup-helper",
+    "crates/vinemix-oracle",
+]
+
+[workspace.package]
+version = "0.5.0-beta"
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/acoyeen/vine-mix"
+publish = false
+
+[workspace.dependencies]
+vinemix-model = { path = "crates/vinemix-model" }
+vinemix-rt = { path = "crates/vinemix-rt" }
+vinemix-dsp = { path = "crates/vinemix-dsp" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+windows-core = "0.62.2"
+windows = { version = "0.62.2", features = [
+    "Win32_Foundation",
+    "Win32_Globalization",
+    "Win32_Media_Audio",
+    "Win32_Media_KernelStreaming",
+    "Win32_Media_Multimedia",
+    "Win32_Security",
+    "Win32_Security_Authorization",
+    "Win32_Storage_FileSystem",
+    "Win32_System_Com",
+    "Win32_System_Com_StructuredStorage",
+    "Win32_System_Console",
+    "Win32_System_Diagnostics_Debug",
+    "Win32_System_Diagnostics_ToolHelp",
+    "Win32_System_IO",
+    "Win32_System_LibraryLoader",
+    "Win32_System_Performance",
+    "Win32_System_Pipes",
+    "Win32_System_ProcessStatus",
+    "Win32_System_RemoteDesktop",
+    "Win32_System_SystemInformation",
+    "Win32_System_Threading",
+    "Win32_System_Variant",
+    "Win32_System_WindowsProgramming",
+    "Win32_UI_Shell_PropertiesSystem",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_System_Registry",
+    "Win32_UI_Shell",
+    "Win32_Security_Cryptography",
+    "Win32_Graphics_Gdi",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_Graphics_Dwm",
+    "Win32_System_DataExchange",
+    "Win32_Networking_WinHttp",
+    "Win32_UI_Shell_Common",
+    "Win32_System_Memory",
+    "Win32_System_Ole",
+    "Win32_Devices_DeviceAndDriverInstallation",
+    "Win32_Devices_FunctionDiscovery",
+    "Win32_Devices_Properties",
+] }
+
+[workspace.lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+missing_debug_implementations = "warn"
+
+[workspace.lints.clippy]
+float_cmp = "allow"            # DSP parity code compares exact targets deliberately.
+undocumented_unsafe_blocks = "warn"
+
+[profile.release]
+lto = "fat"
+codegen-units = 1
+# Realtime threads must never unwind across the mixer. The engine's panic hook
+# logs to engine.log; the desktop supervisor restarts an exited engine.
+panic = "abort"
+# Panic reports carry their source location without debug information, so
+# shipped binaries leave it out (46.8 -> 11.7 MB for the desktop, 9.9 -> 5.7 MB
+# for the engine).
+debug = false
+strip = "debuginfo"

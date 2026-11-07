@@ -1,0 +1,20 @@
+[package]
+name = "vinemix-setup-helper"
+description = "Read-only setup detection for the installer: virtual audio drivers, running sessions and install path safety."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "vinemix-setup-helper"
+path = "src/main.rs"
+
+[dependencies]
+vinemix-platform = { path = "../vinemix-platform" }
+
+[target.'cfg(windows)'.dependencies]
+windows.workspace = true

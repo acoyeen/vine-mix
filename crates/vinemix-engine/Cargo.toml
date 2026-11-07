@@ -1,0 +1,25 @@
+[package]
+name = "vinemix-engine"
+description = "VineMix engine: configuration store, runtime publication, realtime mixer and the control pipe server."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "vinemix-engine"
+path = "src/main.rs"
+
+[dependencies]
+vinemix-model.workspace = true
+vinemix-rt.workspace = true
+vinemix-dsp.workspace = true
+vinemix-platform = { path = "../vinemix-platform" }
+serde_json.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+vinemix-wasapi = { path = "../vinemix-wasapi" }
+windows.workspace = true

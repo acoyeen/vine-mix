@@ -1,0 +1,14 @@
+[package]
+name = "vinemix-model"
+description = "Configuration v2 model: node kinds, limits, defaults, validation and graph compilation shared by engine and UI."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true

@@ -1,0 +1,16 @@
+[package]
+name = "vinemix-platform"
+description = "Windows shell integration: user SID, paths, single-instance locks, start at login, migration."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+
+
+[target.'cfg(windows)'.dependencies]
+windows.workspace = true

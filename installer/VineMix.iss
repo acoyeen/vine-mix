@@ -82,6 +82,19 @@ Filename: "{app}\installation.ini"; Section: "Installation"; Key: "ApplicationId
 ; Retire only binaries owned by the previous AppId after the process guard passed.
 Type: files; Name: "{app}\AudioMixer.exe"
 Type: files; Name: "{app}\AudioMixer.Engine.exe"
+; The Rust build links its runtime statically and has no .NET runtime or JSON
+; library; retire those payload files from a 0.5 C++/.NET installation.
+Type: files; Name: "{app}\libc++.dll"
+Type: files; Name: "{app}\libunwind.dll"
+Type: files; Name: "{app}\libwinpthread-1.dll"
+Type: files; Name: "{app}\licenses\dotnet-runtime-LICENSE.txt"
+Type: files; Name: "{app}\licenses\dotnet-runtime-ThirdPartyNotices.txt"
+Type: files; Name: "{app}\licenses\dotnet-windowsdesktop-LICENSE.txt"
+Type: files; Name: "{app}\licenses\dotnet-winforms-ThirdPartyNotices.txt"
+Type: files; Name: "{app}\licenses\dotnet-wpf-ThirdPartyNotices.txt"
+Type: files; Name: "{app}\licenses\nlohmann-json-LICENSE"
+Type: files; Name: "{app}\licenses\nlohmann-json-third-party-notices.txt"
+Type: files; Name: "{app}\licenses\winpthreads-COPYING.txt"
 
 [UninstallDelete]
 Type: files; Name: "{app}\installation.ini"

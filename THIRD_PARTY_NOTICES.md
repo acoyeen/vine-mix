@@ -11,21 +11,20 @@ packaging and update guidance is in [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md)
 
 | Component | Use | Licence and included notices |
 |---|---|---|
-| [libsamplerate 0.2.2](https://github.com/libsndfile/libsamplerate/tree/0.2.2) | Native streaming resampling | BSD-2-Clause; `licenses/libsamplerate-LICENSE` and `libsamplerate-source-notices.txt` |
-| [SpeexDSP 1.2.1](https://downloads.xiph.org/releases/speex/) | Spectral noise suppression | BSD-3-Clause and source-file BSD notices; `licenses/SpeexDSP-COPYING.txt` and `SpeexDSP-source-notices.txt` |
-| [RNNoise v0.2](https://github.com/xiph/rnnoise/tree/v0.2) and matching default model `0b50c45` | Neural noise suppression | BSD-3-Clause and source-file BSD notices; `licenses/RNNoise-COPYING.txt` and `RNNoise-source-notices.txt` |
-| [nlohmann/json 3.12.0](https://github.com/nlohmann/json/tree/v3.12.0) | Configuration and control messages | MIT; `licenses/nlohmann-json-LICENSE` and `nlohmann-json-third-party-notices.txt`, including Florian Loitsch's Grisu2 and Evan Nemerson's Hedley credits |
+| [libsamplerate 0.2.2](https://github.com/libsndfile/libsamplerate/tree/0.2.2) | Streaming resampling (a Rust translation of the pinned sources and coefficient tables) | BSD-2-Clause; `licenses/libsamplerate-LICENSE` and `libsamplerate-source-notices.txt` |
+| [SpeexDSP 1.2.1](https://downloads.xiph.org/releases/speex/) | Spectral noise suppression (a Rust translation of the pinned preprocessor and FFT sources) | BSD-3-Clause and source-file BSD notices; `licenses/SpeexDSP-COPYING.txt` and `SpeexDSP-source-notices.txt` |
+| [RNNoise v0.2](https://github.com/xiph/rnnoise/tree/v0.2) and matching default model `0b50c45` | Neural noise suppression (a Rust translation of the pinned sources with the model tables generated from them) | BSD-3-Clause and source-file BSD notices; `licenses/RNNoise-COPYING.txt` and `RNNoise-source-notices.txt` |
 | [IBM Plex](https://github.com/IBM/plex/tree/71f558992315a12ca1f06a2215d57962a1992162): Sans 3.005 Regular, Medium and SemiBold; Mono 2.005 Regular | Embedded interface typography and numeric readouts | SIL Open Font License 1.1; `licenses/IBM-Plex-OFL.txt` and `Assets/Fonts/IBM-Plex-LICENSE.txt`; [asset provenance](docs/IBM_PLEX_FONTS.md) |
-| .NET 10.0.13, WPF and Windows Forms | Self-contained desktop runtime | MIT and component terms; `licenses/dotnet-runtime-LICENSE.txt`, `dotnet-windowsdesktop-LICENSE.txt`, and the `dotnet-*-ThirdPartyNotices.txt` files |
-| [LLVM-MinGW 20261006 UCRT x86_64](https://github.com/mstorsjo/llvm-mingw/releases/tag/20261006) | Native C++/unwind runtime, compiler support and Windows runtime support | Apache-2.0 with LLVM exceptions, legacy LLVM terms, MinGW-w64 and component terms; `licenses/LLVM-runtime-LICENSE.txt`, `MinGW-w64-COPYING.txt`, `MinGW-runtime-COPYING.txt`, and `winpthreads-COPYING.txt` |
+| Rust standard library (Rust 1.99.1) and the crates listed in `licenses/Rust-crates.txt`, including egui/eframe, the `windows` bindings and serde | Application runtime, interface toolkit, Windows bindings and data formats | Each crate's own licence (mostly MIT or Apache-2.0); every licence text and copyright notice is in `licenses/Rust-crates.txt`, including the fonts egui embeds as glyph fallbacks (Hack, Ubuntu, Noto Emoji and emoji-icon-font terms) |
+| [LLVM-MinGW 20261006 UCRT x86_64](https://github.com/mstorsjo/llvm-mingw/releases/tag/20261006) | Statically linked unwind, compiler support and Windows startup runtime | Apache-2.0 with LLVM exceptions, legacy LLVM terms and MinGW-w64 terms; `licenses/LLVM-runtime-LICENSE.txt`, `MinGW-w64-COPYING.txt` and `MinGW-runtime-COPYING.txt` |
 
 The source-file notice collections preserve additional authors and licence
 variants from the actual compiled vendor sources and headers. In particular,
 upstream root `COPYING` files alone do not list every RNNoise or SpeexDSP author.
-The checked-in .NET notices come from the runtime packages and the matching WPF
-and Windows Forms releases, rather than the SDK licence. SDKs, compilers, CMake,
-training datasets, training checkpoints and virtual audio drivers are not
-included in the application package.
+The Rust translations of libsamplerate, SpeexDSP and RNNoise are verified
+bit-exact against the pinned upstream sources and keep their BSD notices.
+Compilers, the Rust toolchain, training datasets, training checkpoints and
+virtual audio drivers are not included in the application package.
 
 IBM Plex is unmodified; only the local filenames differ from upstream.
 Copyright © 2017 IBM Corp., with Reserved Font Name "Plex". Sans is used for
@@ -41,11 +40,11 @@ branding; the use of IBM Plex does not imply IBM's endorsement.
 SpeexDSP source:
 `https://downloads.xiph.org/releases/speex/speexdsp-1.2.1.tar.gz`.
 SHA-256: `8c777343e4a6399569c72abc38a95b24db56882c83dbdb6c6424a5f4aeb54d3d`.
-The build compiles upstream preprocessor, FFT, filter-bank and echo-support
-sources; echo cancellation is not enabled. The local
-`native/vendor/speex_preprocess_bridge.c` includes the unmodified preprocessor
-and adds bounded state copying. Local allocation hooks instrument heap operations
-for offline verification. These additions are separate from the upstream files.
+The application translates the upstream preprocessor, FFT and filter-bank
+sources to Rust (`crates/vinemix-denoise`); echo cancellation is not included.
+State copying is an ordinary Rust clone of that state. The pinned C sources are
+compiled only by the offline verification crate (`crates/vinemix-oracle`), which
+proves the translation bit-exact; they are not part of the application.
 
 RNNoise source: `https://codeload.github.com/xiph/rnnoise/tar.gz/refs/tags/v0.2`.
 SHA-256: `e4a17eb1493b7551f9f7781d2acc67b8847d6ed7c4b64db0fd62c017021ae1ec`.
@@ -53,7 +52,7 @@ The matching default model is the archive selected by upstream v0.2's
 `model_version` and `download_model.sh`:
 `https://media.xiph.org/rnnoise/models/rnnoise_data-0b50c45.tar.gz`.
 SHA-256: `4ac81c5c0884ec4bd5907026aaae16209b7b76cd9d7f71af582094a2f98f4b43`.
-Only the generated `rnnoise_data.c` and header are compiled into the application;
+Only the model tables generated from `rnnoise_data.c` are built into the application;
 the training checkpoint and datasets are not distributed. This is the upstream
 default model distributed for RNNoise, used with the project's BSD notices; no
 third-party replacement model is added. Model and code are fetched at build

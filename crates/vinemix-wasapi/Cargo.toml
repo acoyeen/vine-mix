@@ -1,0 +1,19 @@
+[package]
+name = "vinemix-wasapi"
+description = "Windows audio I/O: device catalog, capture/render workers, process loopback."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+vinemix-model.workspace = true
+vinemix-rt.workspace = true
+vinemix-resample = { path = "../vinemix-resample" }
+
+[target.'cfg(windows)'.dependencies]
+windows.workspace = true
+windows-core.workspace = true

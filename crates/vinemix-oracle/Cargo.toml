@@ -1,0 +1,24 @@
+[package]
+name = "vinemix-oracle"
+description = "Test-only: the unmodified 0.5 C/C++ DSP built as a parity oracle for the Rust port."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+build = "build.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+
+[dev-dependencies]
+vinemix-model.workspace = true
+vinemix-rt.workspace = true
+vinemix-dsp.workspace = true
+vinemix-denoise = { path = "../vinemix-denoise" }
+vinemix-resample = { path = "../vinemix-resample" }
+serde_json.workspace = true
+
+[build-dependencies]
+cc = "1"
