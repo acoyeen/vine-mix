@@ -13,6 +13,9 @@ workspace = true
 # The single-file distribution: VineMix.exe carries the engine runtime.
 # Build with VINEMIX_RUNTIME_ZIP and VINEMIX_RUNTIME_MANIFEST set.
 standalone = []
+# Orange-tile icon and "(Rust)" window title, to tell a Rust build apart
+# from an installed 0.5 on the same machine (scripts/generate-rust-edition-icons.ps1).
+rust-edition = []
 
 [[bin]]
 name = "vinemix"

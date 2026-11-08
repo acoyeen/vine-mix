@@ -3,7 +3,8 @@
 include!("../../tools/winres.rs");
 
 fn main() {
-    winres::embed("VineMix", "VineMix", "VineMix.exe", Some("assets/branding/app.ico"), true);
+    let icon = if std::env::var_os("CARGO_FEATURE_RUST_EDITION").is_some() { "assets/branding/app-rust.ico" } else { "assets/branding/app.ico" };
+    winres::embed("VineMix", "VineMix", "VineMix.exe", Some(icon), true);
     println!("cargo::rerun-if-env-changed=VINEMIX_RUNTIME_ZIP");
     println!("cargo::rerun-if-env-changed=VINEMIX_RUNTIME_MANIFEST");
     source_revision();

@@ -194,9 +194,13 @@ fn main() -> ExitCode {
             }
         });
     }
-    let icon = eframe::icon_data::from_png_bytes(include_bytes!("../assets/branding/app.png")).ok();
+    #[cfg(not(feature = "rust-edition"))]
+    let (icon, title) = (include_bytes!("../assets/branding/app.png").as_slice(), "VineMix · Patch workspace");
+    #[cfg(feature = "rust-edition")]
+    let (icon, title) = (include_bytes!("../assets/branding/app-rust.png").as_slice(), "VineMix (Rust) · Patch workspace");
+    let icon = eframe::icon_data::from_png_bytes(icon).ok();
     let mut viewport = egui::ViewportBuilder::default()
-        .with_title(if options.preview { "VineMix · UI Preview" } else { "VineMix · Patch workspace" })
+        .with_title(if options.preview { "VineMix · UI Preview" } else { title })
         .with_inner_size([1280.0, 800.0])
         .with_min_inner_size([900.0, 580.0])
         .with_decorations(false)

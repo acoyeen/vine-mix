@@ -20,7 +20,11 @@ use crate::platform::wide;
 use crate::ui::app::Command;
 
 const CALLBACK: u32 = WM_APP + 1;
+#[cfg(not(feature = "rust-edition"))]
 const ICON: &[u8] = include_bytes!("../assets/branding/tray.ico");
+#[cfg(feature = "rust-edition")]
+const ICON: &[u8] = include_bytes!("../assets/branding/tray-rust.ico");
+const TIP: &str = if cfg!(feature = "rust-edition") { "VineMix (Rust)" } else { "VineMix" };
 
 struct Shared {
     sender: Sender<Command>,
@@ -48,7 +52,7 @@ fn add_icon(window: HWND, icon: HICON) {
         hIcon: icon,
         ..Default::default()
     };
-    for (target, source) in data.szTip.iter_mut().zip("VineMix".encode_utf16()) {
+    for (target, source) in data.szTip.iter_mut().zip(TIP.encode_utf16()) {
         *target = source;
     }
     // SAFETY: valid structure and window.
