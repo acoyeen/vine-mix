@@ -15,7 +15,10 @@ param(
     [string]$OutputDirectory = '',
     [string]$InnoSetupDirectory = '',
     [string]$DriverCacheDirectory = '',
-    [switch]$SkipInstaller
+    [switch]$SkipInstaller,
+    # Builds the standalone with the orange "VineMix (Rust)" identity, to run
+    # beside an installed 0.5 without confusing the two.
+    [switch]$RustEdition
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -100,7 +103,8 @@ $env:VINEMIX_RUNTIME_ZIP = Join-Path $packed 'VineMix.Runtime.zip'
 $env:VINEMIX_RUNTIME_MANIFEST = Join-Path $packed 'VineMix.Runtime.manifest.json'
 Push-Location $project
 try {
-    & cargo build --release --locked -p vinemix-ui --features standalone --target-dir (Join-Path $project 'target\standalone')
+    $features = if ($RustEdition) { 'standalone,rust-edition' } else { 'standalone' }
+    & cargo build --release --locked -p vinemix-ui --features $features --target-dir (Join-Path $project 'target\standalone')
     if ($LASTEXITCODE -ne 0) { throw 'The standalone build failed.' }
 } finally {
     Pop-Location

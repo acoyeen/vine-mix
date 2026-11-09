@@ -396,8 +396,8 @@ impl App {
         // Centred wordmark (opens the website).
         let mark = Rect::from_center_size(rect.center(), Vec2::new(122.0, 20.0));
         let mark_response = ui.interact(mark, Id::unique("website"), Sense::click()).tip("Opens https://vinemix.app in your browser.");
+        // No hover highlight behind the wordmark; the cursor still marks the link.
         if mark_response.hovered() {
-            painter.rect_filled(mark, 3.0, theme::BUTTON_HOVER);
             ctx.set_cursor_icon(egui::CursorIcon::PointingHand);
         }
         self.wordmark.paint(ui, Rect::from_center_size(mark.center(), Vec2::new(106.0, 20.0)), theme::TEXT);

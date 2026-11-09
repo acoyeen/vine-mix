@@ -3,6 +3,7 @@
 //! Notifications only advance a generation; they never touch an audio
 //! client. A failed enumeration keeps the last complete inventory.
 
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread::JoinHandle;
@@ -17,7 +18,7 @@ use windows::Win32::Media::Audio::{
 };
 use windows::Win32::System::Com::StructuredStorage::PROPVARIANT;
 use windows::Win32::System::Com::{CoCreateInstance, CoTaskMemFree, CLSCTX_ALL, STGM_READ};
-use windows::Win32::System::Variant::{VT_LPWSTR, VT_UI4};
+use windows::Win32::System::Variant::{VT_BLOB, VT_LPWSTR, VT_UI4};
 use windows::Win32::UI::Shell::PropertiesSystem::{IPropertyStore, PSGetPropertyKeyFromName};
 
 use crate::policy::{endpoint_state, transport_family, virtual_name};
@@ -37,6 +38,12 @@ const INTERFACE_NAME: PROPERTYKEY = PROPERTYKEY {
 };
 const FORM_FACTOR: PROPERTYKEY = PROPERTYKEY {
     fmtid: GUID::from_values(0x1da5d803, 0xd492, 0x4edd, [0x8c, 0x23, 0xe0, 0xc0, 0xff, 0xee, 0x7f, 0x0e]),
+    pid: 0,
+};
+/// `PKEY_AudioEngine_DeviceFormat`: the shared-mode format chosen in Sound
+/// settings, readable without activating an audio client.
+const DEVICE_FORMAT: PROPERTYKEY = PROPERTYKEY {
+    fmtid: GUID::from_values(0xf19f064d, 0x082c, 0x4e27, [0xbc, 0x73, 0x68, 0x82, 0xa1, 0xbb, 0x8e, 0x4c]),
     pid: 0,
 };
 /// `EndpointFormFactor_enum_count`.
@@ -69,6 +76,35 @@ fn form_factor(store: &IPropertyStore) -> Option<i32> {
     }
 }
 
+/// `(nSamplesPerSec, nChannels)` from `PKEY_AudioEngine_DeviceFormat`.
+fn device_format(store: &IPropertyStore) -> Option<(u32, u16)> {
+    // SAFETY: as above; the blob is a WAVEFORMATEX of at least 16 bytes.
+    unsafe {
+        let value: PROPVARIANT = store.GetValue(&DEVICE_FORMAT).ok()?;
+        let inner = &value.Anonymous.Anonymous;
+        if inner.vt != VT_BLOB || inner.Anonymous.blob.pBlobData.is_null() || inner.Anonymous.blob.cbSize < 16 {
+            return None;
+        }
+        let bytes = std::slice::from_raw_parts(inner.Anonymous.blob.pBlobData, 16);
+        let channels = u16::from_le_bytes([bytes[2], bytes[3]]);
+        let rate = u32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]);
+        Some((rate, channels))
+    }
+}
+
+/// The mix format last read by activating an endpoint's audio client, keyed
+/// by endpoint id, with the device format seen at that time.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MixFormatProbe {
+    device_format: Option<(u32, u16)>,
+    active: bool,
+    channels: u32,
+    rate: u32,
+}
+
+/// Per-endpoint mix format cache shared across enumerations.
+pub type MixFormatCache = HashMap<String, MixFormatProbe>;
+
 fn device_id(device: &IMMDevice) -> Option<String> {
     // SAFETY: GetId returns a CoTaskMem string we free.
     unsafe {
@@ -85,7 +121,13 @@ fn device_id(device: &IMMDevice) -> Option<String> {
 /// One complete inventory, or `None` when Windows failed mid-way (the caller
 /// keeps its previous snapshot). Optional metadata failures keep the known
 /// values for that exact identity.
-pub fn collect_endpoints(enumerator: &IMMDeviceEnumerator, previous: &[Endpoint]) -> Option<Vec<Endpoint>> {
+///
+/// Activating an `IAudioClient` to read the mix format is a round trip into
+/// the Windows audio service for every endpoint, and device arrival raises a
+/// burst of notifications while that service is busiest. The client is only
+/// activated for an endpoint that is new to `formats`, has just become active
+/// or whose device format changed; otherwise the cached mix format is kept.
+pub fn collect_endpoints(enumerator: &IMMDeviceEnumerator, previous: &[Endpoint], formats: &mut MixFormatCache) -> Option<Vec<Endpoint>> {
     let mut stable_key = PROPERTYKEY::default();
     let name = crate::win::wide("System.AudioEndpoint.StableId");
     // SAFETY: valid NUL-terminated name and output pointer.
@@ -110,8 +152,10 @@ pub fn collect_endpoints(enumerator: &IMMDeviceEnumerator, previous: &[Endpoint]
             if endpoint.transport.is_empty() {
                 endpoint.transport = "physical".into();
             }
+            let mut current_device_format = None;
             // SAFETY: as above.
             if let Ok(store) = unsafe { device.OpenPropertyStore(STGM_READ) } {
+                current_device_format = device_format(&store);
                 if let Some(name) = string_property(&store, &FRIENDLY_NAME) {
                     endpoint.name = name;
                 }
@@ -145,24 +189,46 @@ pub fn collect_endpoints(enumerator: &IMMDeviceEnumerator, previous: &[Endpoint]
             if endpoint.name.is_empty() {
                 endpoint.name = endpoint.id.clone();
             }
-            if state.0 & DEVICE_STATE_ACTIVE.0 != 0 {
+            let active = state.0 & DEVICE_STATE_ACTIVE.0 != 0;
+            let cached = formats.get(&endpoint.id).copied();
+            let reusable = cached.filter(|probe| {
+                active && probe.active && current_device_format.is_some() && probe.device_format == current_device_format
+            });
+            if let Some(probe) = reusable {
+                endpoint.channels = probe.channels;
+                endpoint.rate = probe.rate;
+            } else if active {
                 // SAFETY: activation and format query on a live device.
-                unsafe {
-                    if let Ok(client) = device.Activate::<IAudioClient>(CLSCTX_ALL, None) {
-                        if let Ok(format) = client.GetMixFormat() {
-                            if !format.is_null() {
-                                endpoint.channels = u32::from((*format).nChannels);
-                                endpoint.rate = (*format).nSamplesPerSec;
-                                CoTaskMemFree(Some(format as *const _));
-                            }
+                let mix = unsafe {
+                    device.Activate::<IAudioClient>(CLSCTX_ALL, None).ok().and_then(|client| {
+                        let format = client.GetMixFormat().ok()?;
+                        if format.is_null() {
+                            return None;
                         }
-                    }
+                        let result = (u32::from((*format).nChannels), (*format).nSamplesPerSec);
+                        CoTaskMemFree(Some(format as *const _));
+                        Some(result)
+                    })
+                };
+                if let Some((channels, rate)) = mix {
+                    endpoint.channels = channels;
+                    endpoint.rate = rate;
+                    formats.insert(endpoint.id.clone(), MixFormatProbe { device_format: current_device_format, active, channels, rate });
+                } else {
+                    // Retry the activation on the next enumeration.
+                    formats.remove(&endpoint.id);
                 }
+            } else {
+                formats.insert(
+                    endpoint.id.clone(),
+                    MixFormatProbe { device_format: current_device_format, active, channels: endpoint.channels, rate: endpoint.rate },
+                );
             }
             result.push(endpoint);
         }
     }
     result.sort_by(|a, b| a.id.cmp(&b.id));
+    formats.retain(|id, _| result.iter().any(|e| &e.id == id));
     Some(result)
 }
 
@@ -209,6 +275,8 @@ struct Shared {
     stop: Event,
     wake: Arc<Event>,
     generation: Arc<AtomicU64>,
+    /// An explicit retry re-reads every mix format.
+    reprobe: std::sync::atomic::AtomicBool,
     inventory: Mutex<Inventory>,
     ready: Condvar,
 }
@@ -227,6 +295,7 @@ impl DeviceCatalog {
             stop: Event::new(true)?,
             wake: Arc::new(Event::new(false)?),
             generation: Arc::new(AtomicU64::new(1)),
+            reprobe: std::sync::atomic::AtomicBool::new(false),
             inventory: Mutex::new(Inventory::default()),
             ready: Condvar::new(),
         });
@@ -254,6 +323,7 @@ impl DeviceCatalog {
 
     /// Forces a re-enumeration (explicit retry).
     pub fn refresh(&self) {
+        self.shared.reprobe.store(true, Ordering::Release);
         self.shared.generation.fetch_add(1, Ordering::Relaxed);
         self.shared.wake.set();
     }
@@ -274,6 +344,7 @@ fn run(shared: &Shared) {
     let notifications: IMMNotificationClient =
         Notifications { generation: shared.generation.clone(), wake: shared.wake.clone() }.into();
     let mut registered = false;
+    let mut formats = MixFormatCache::new();
     loop {
         if shared.stop.wait(0) {
             break;
@@ -289,9 +360,12 @@ fn run(shared: &Shared) {
             }
         }
         let mut delay = 5000;
+        if shared.reprobe.swap(false, Ordering::AcqRel) {
+            formats.clear();
+        }
         if let Some(enumerator) = &enumerator {
             let previous = shared.inventory.lock().unwrap_or_else(|e| e.into_inner()).endpoints.clone();
-            match collect_endpoints(enumerator, &previous) {
+            match collect_endpoints(enumerator, &previous, &mut formats) {
                 Some(next) => {
                     let mut inventory = shared.inventory.lock().unwrap_or_else(|e| e.into_inner());
                     if inventory.endpoints != next {

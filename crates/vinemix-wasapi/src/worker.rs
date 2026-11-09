@@ -223,6 +223,12 @@ struct Runner {
     prefer_low_latency: bool,
 }
 
+/// After a device is added, removed or reconfigured, glitches are attributed
+/// to the Windows audio service rebuilding its graph, not to this stream.
+const TOPOLOGY_SETTLE: Duration = Duration::from_secs(5);
+/// Glitches just before the notification arrived are forgiven too.
+const TOPOLOGY_LEAD_SECONDS: f64 = 2.0;
+
 /// A stream ended: `Ok` means a deliberate reopen (S_FALSE in C++).
 type StreamResult = Result<(), HRESULT>;
 
@@ -413,6 +419,7 @@ impl Runner {
         let mut last_event = Instant::now();
         let stream_start = last_event;
         let mut stability = StreamStability::default();
+        let mut topology_changed: Option<Instant> = None;
         let mut capture_check = last_event + Duration::from_secs(1);
         let mut previous_capture_underruns = shared.monitor.stats().underrun_events;
         let mut capture_warmed = false;
@@ -429,10 +436,16 @@ impl Runner {
                 Wait::Failed => return Err(hresult_from_win32(std::io::Error::last_os_error().raw_os_error().unwrap_or(0) as u32)),
                 _ => {}
             }
+            let generation_before = self.observed_generation;
             if !self.still_selected(endpoint, serial) {
                 return Ok(());
             }
             let now = Instant::now();
+            if self.observed_generation != generation_before {
+                topology_changed = Some(now);
+                stability.forgive_since((now - stream_start).as_secs_f64() - TOPOLOGY_LEAD_SECONDS);
+            }
+            let settling = topology_changed.is_some_and(|t| now - t < TOPOLOGY_SETTLE);
             if wait != Wait::Signalled(2) {
                 // Silent buffers still signal; this catches a stopped stream.
                 if now - last_event > Duration::from_secs(2) {
@@ -446,7 +459,7 @@ impl Runner {
             }
             last_event = now;
             let mut needs_compatible_timing = |now: Instant, prefer: &mut bool| -> bool {
-                if exclusive || !*prefer {
+                if exclusive || !*prefer || settling {
                     return false;
                 }
                 if !stability.observe((now - stream_start).as_secs_f64()) {
@@ -474,10 +487,13 @@ impl Runner {
                             }
                             return Ok(());
                         }
-                        resampler.reset();
-                        drift.reset();
+                        // Some input was lost upstream. The queued audio and the
+                        // resampler history are still good: keep them, so a few
+                        // missing milliseconds stay a few milliseconds instead
+                        // of an emptied queue the mixer must re-prime. A short
+                        // fade-in softens the splice; drift control re-centres
+                        // the queue.
                         clock_estimate = ClockEstimate::default();
-                        producer.request_clear();
                         fade_frames = 0;
                         capture_warmed = false;
                         capture_check = now + Duration::from_secs(1);
@@ -547,7 +563,9 @@ impl Runner {
                 // delivery earns a bounded extra block of jitter protection.
                 if now >= capture_check {
                     let underruns = shared.monitor.stats().underrun_events;
-                    if capture_warmed && underruns - previous_capture_underruns > 2 {
+                    // A device change is a one-off stall, not a reason to keep
+                    // extra latency for the rest of this stream.
+                    if capture_warmed && !settling && underruns - previous_capture_underruns > 2 {
                         buffering.observe_underrun();
                     }
                     previous_capture_underruns = underruns;
@@ -612,7 +630,9 @@ impl Runner {
                     output[filled..available].fill(Frame::SILENT);
                     if !render_underrun && render_primed {
                         shared.stream_underruns.fetch_add(1, Ordering::Relaxed);
-                        buffering.observe_underrun();
+                        if !settling {
+                            buffering.observe_underrun();
+                        }
                         if needs_compatible_timing(now, &mut self.prefer_low_latency) {
                             return Ok(());
                         }

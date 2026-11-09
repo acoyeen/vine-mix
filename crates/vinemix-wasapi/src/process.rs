@@ -684,9 +684,8 @@ fn capture(shared: &Shared, producer: &mut Producer, pid: u32, selection: &Proce
             unsafe { capture_client.GetBuffer(&mut data, &mut count, &mut flags, None, None) }.map_err(|e| e.code())?;
             let elapsed = (now - last_packet).as_secs_f64().clamp(0.001, 0.25);
             if flags & AUDCLNT_BUFFERFLAGS_DATA_DISCONTINUITY.0 as u32 != 0 {
-                resampler.reset();
-                drift.reset();
-                producer.request_clear();
+                // Keep the queued audio and resampler history (see the device
+                // worker); only soften the splice.
                 fade = 0;
             }
             last_packet = now;

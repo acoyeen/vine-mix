@@ -136,6 +136,32 @@ VineMix is in the tray. Now:
   the details window and Add-menu advice. Matched against the local tree's
   `processing-load-*` renders.
 
+**Device changes no longer disturb running streams (deliberate change from
+0.5, 9 November 2026).** Adding or removing any audio device makes the
+Windows audio service stall every stream briefly while it rebuilds. 0.5
+turned that small glitch into audible stutter in three ways, and the Rust
+engine now avoids all three:
+
+- a capture discontinuity emptied the queue and reset the resampler, so the
+  mixer re-primed (tens of ms of silence); the queue and resampler history are
+  now kept, with only a 10 ms fade-in at the splice (device and app capture);
+- the third glitch within 10 s closed and reopened the stream with slower
+  "compatible" timing for the rest of its life (0.5's log shows three devices
+  doing this in the same second). Glitches within 5 s after a device
+  notification, or 2 s before it, are now forgiven, and glitches within 250 ms
+  of each other count as one incident (`StreamStability`);
+- each such underrun permanently added 5 ms of buffering; it no longer does
+  during that settling window.
+
+The device catalog also stopped activating an `IAudioClient` on every active
+endpoint for each notification: mix formats are cached per endpoint and
+re-read only for new endpoints, endpoints that just became active, a changed
+`PKEY_AudioEngine_DeviceFormat`, or an explicit retry
+(`cargo run --release -p vinemix-wasapi --example catalog_timing` confirms an
+identical inventory). `examples/device_change_probe.rs` measures reopens,
+underruns and capture gaps on the physical endpoints while a device is added
+or removed.
+
 ---
 
 ## 1. Recommendation in one page

@@ -15,6 +15,9 @@ pub struct StreamStability {
 impl StreamStability {
     const WARMUP_SECONDS: f64 = 1.0;
     const WINDOW_SECONDS: f64 = 10.0;
+    /// Glitches this close together are one incident (one hiccup can flag
+    /// several consecutive packets).
+    const BURST_SECONDS: f64 = 0.25;
 
     /// Records a glitch; returns `true` once compatible timing is required.
     #[must_use]
@@ -30,6 +33,9 @@ impl StreamStability {
         if self.count > 0 && seconds_since_start < self.glitches[self.count - 1] {
             self.count = 0;
         }
+        if self.count > 0 && seconds_since_start - self.glitches[self.count - 1] < Self::BURST_SECONDS {
+            return false;
+        }
         let mut retained = 0;
         for i in 0..self.count {
             if seconds_since_start - self.glitches[i] <= Self::WINDOW_SECONDS {
@@ -42,6 +48,24 @@ impl StreamStability {
         self.count += 1;
         self.latched = self.count == self.glitches.len();
         self.latched
+    }
+
+    /// Forgets incidents at or after `seconds_since_start`: a device was added,
+    /// removed or reconfigured, and the Windows audio service briefly stalls
+    /// every stream while it rebuilds. That is not evidence this stream needs
+    /// slower timing. A latched tracker stays latched.
+    pub fn forgive_since(&mut self, seconds_since_start: f64) {
+        if self.latched {
+            return;
+        }
+        let mut retained = 0;
+        for i in 0..self.count {
+            if self.glitches[i] < seconds_since_start {
+                self.glitches[retained] = self.glitches[i];
+                retained += 1;
+            }
+        }
+        self.count = retained;
     }
 }
 
@@ -56,6 +80,28 @@ mod tests {
             assert!(!s.observe(t));
         }
         assert!(!s.observe(f64::NAN));
+    }
+
+    #[test]
+    fn a_burst_is_one_incident() {
+        let mut s = StreamStability::default();
+        for t in [2.0, 2.01, 2.05, 2.2] {
+            assert!(!s.observe(t));
+        }
+        assert!(!s.observe(3.0));
+        assert!(s.observe(4.0), "three separate incidents still latch");
+    }
+
+    #[test]
+    fn device_changes_are_forgiven() {
+        let mut s = StreamStability::default();
+        assert!(!s.observe(2.0));
+        assert!(!s.observe(4.0));
+        s.forgive_since(3.0);
+        assert!(!s.observe(5.0), "the 4.0 incident was forgiven");
+        assert!(s.observe(6.0));
+        s.forgive_since(0.0);
+        assert!(s.observe(7.0), "latched trackers are not reset");
     }
 
     #[test]
