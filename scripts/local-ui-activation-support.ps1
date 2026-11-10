@@ -25,6 +25,32 @@ function Assert-UiActivationRelease([string]$CandidateVersion, [string]$CurrentV
     }
 }
 
+# The 0.5 package carries three LLVM runtime libraries beside its executables.
+# The Rust package links that runtime statically and carries none of them. A
+# UI-only activation never touches these files, so each one must be exactly
+# the same in the installed package and in the staged candidate: the same
+# bytes, or absent from both. A null hash records "absent".
+function Get-UiActivationRuntimeHashes([string]$Package) {
+    $hashes = [ordered]@{}
+    foreach ($name in @('libc++.dll', 'libunwind.dll', 'libwinpthread-1.dll')) {
+        $path = Join-Path $Package $name
+        $hashes[$name] = if (Test-Path -LiteralPath $path -PathType Leaf) { (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash } else { $null }
+    }
+    $hashes
+}
+
+function Assert-UiActivationRuntime([string]$Directory, $Hashes, [string]$Message) {
+    foreach ($entry in $Hashes.GetEnumerator()) {
+        $path = Join-Path $Directory $entry.Key
+        $present = Test-Path -LiteralPath $path -PathType Leaf
+        if ($null -eq $entry.Value) {
+            if ($present) { throw $Message }
+        } elseif (-not $present -or (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash -cne $entry.Value) {
+            throw $Message
+        }
+    }
+}
+
 function Assert-UiActivationSnapshotStable($Before, $After) {
     if ($null -eq $Before.configuration -or $null -eq $After.configuration -or
         (ConvertTo-UiActivationCanonical $Before.configuration) -cne (ConvertTo-UiActivationCanonical $After.configuration)) {

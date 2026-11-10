@@ -150,11 +150,9 @@ fn process_table() -> ProcessTable {
     }
     loop {
         let mut session = 0u32;
-        // SAFETY: valid output pointer.
-        if entry.th32ProcessID != 0
-            && unsafe { ProcessIdToSessionId(entry.th32ProcessID, &mut session) }.is_ok()
-            && session == this_session
-        {
+        // SAFETY: `session` is a valid output pointer for the whole call.
+        let in_session = entry.th32ProcessID != 0 && unsafe { ProcessIdToSessionId(entry.th32ProcessID, &mut session) }.is_ok() && session == this_session;
+        if in_session {
             result.insert(
                 entry.th32ProcessID,
                 ProcessEntry { parent: entry.th32ParentProcessID, filename: strip_nul(&entry.szExeFile).to_vec() },
@@ -357,7 +355,10 @@ unsafe impl Sync for ActivationState {}
 
 impl std::fmt::Debug for ActivationState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("ActivationState").field("target", &unsafe { self.params.Anonymous.ProcessLoopbackParams.TargetProcessId }).finish_non_exhaustive()
+        // SAFETY: `begin_activation` is the only constructor and always
+        // stores the process-loopback member of the union.
+        let target = unsafe { self.params.Anonymous.ProcessLoopbackParams.TargetProcessId };
+        f.debug_struct("ActivationState").field("target", &target).finish_non_exhaustive()
     }
 }
 
@@ -501,7 +502,15 @@ impl ProcessCaptureWorker {
             if old.process_id == binding.process_id && old.executable_path == binding.executable_path && old.name == binding.name {
                 return;
             }
+            let assigned = !binding.executable_path.is_empty();
             guarded.desired = binding;
+            // As for device workers: a chosen application that has not been
+            // looked up yet is pending, not "Unassigned".
+            if assigned && guarded.path.state == "Unassigned" {
+                guarded.path.state = "Resolving".into();
+                guarded.path.message = "Finding selected application".into();
+                guarded.path.reason.clear();
+            }
             self.shared.serial.fetch_add(1, Ordering::Release);
         }
         self.shared.control_event.set();
@@ -878,6 +887,30 @@ mod tests {
         // CoTaskMemFree and failed here or crashed with 0xC0000374).
         // SAFETY: validating the process heap.
         let heap = unsafe { windows::Win32::System::Memory::GetProcessHeap() }.unwrap();
-        assert!(unsafe { windows::Win32::System::Memory::HeapValidate(heap, windows::Win32::System::Memory::HEAP_FLAGS(0), None) }.as_bool());
+        // SAFETY: `heap` is this process's own heap handle; a null block
+        // pointer asks Windows to validate the whole heap.
+        let intact = unsafe { windows::Win32::System::Memory::HeapValidate(heap, windows::Win32::System::Memory::HEAP_FLAGS(0), None) };
+        assert!(intact.as_bool());
+    }
+
+    /// Cost of one application enumeration (RUST-REV-011): what maintenance
+    /// did every second regardless of need. Read-only; prints timings only.
+    /// `cargo test -p vinemix-wasapi --release --lib application_enumeration_cost -- --ignored --nocapture`
+    #[test]
+    #[ignore = "benchmark; prints timings"]
+    fn application_enumeration_cost() {
+        let mut samples = Vec::new();
+        for _ in 0..30 {
+            let started = std::time::Instant::now();
+            std::hint::black_box(enumerate_audio_applications().len());
+            samples.push(started.elapsed());
+        }
+        samples.sort();
+        println!(
+            "enumerate_audio_applications: median {:?}, p90 {:?}, max {:?} (per call; previously once per second, always)",
+            samples[samples.len() / 2],
+            samples[samples.len() * 9 / 10],
+            samples[samples.len() - 1]
+        );
     }
 }

@@ -11,26 +11,45 @@ mod winres {
 
     fn field(text: &str, key: &str) -> String {
         let pattern = format!("\"{key}\"");
-        let start = text.find(&pattern).unwrap_or_else(|| panic!("release.json lacks {key}"));
+        let start = text.find(&pattern).unwrap_or_else(|| panic!("the build metadata lacks {key}"));
         let rest = &text[start + pattern.len()..];
         let open = rest.find('"').expect("string value") + 1;
         let close = rest[open..].find('"').expect("closing quote") + open;
         rest[open..close].to_owned()
     }
 
+    /// The resource compiler: an explicit `VINEMIX_WINDRES` (the release and
+    /// verification scripts set it), else the exact LLVM-MinGW directory
+    /// pinned in `tools/rust-pins.json`. Another `llvm-mingw-*` directory
+    /// under `.tools` is never used in its place, whatever order the file
+    /// system lists them in. Without the pinned copy the build falls back to
+    /// `llvm-windres` on PATH and says so.
     fn windres(workspace: &Path) -> PathBuf {
+        println!("cargo::rerun-if-env-changed=VINEMIX_WINDRES");
         if let Some(explicit) = std::env::var_os("VINEMIX_WINDRES") {
             return PathBuf::from(explicit);
         }
-        if let Ok(entries) = std::fs::read_dir(workspace.join(".tools")) {
-            for entry in entries.flatten() {
-                let candidate = entry.path().join("bin").join("llvm-windres.exe");
-                if entry.file_name().to_string_lossy().starts_with("llvm-mingw") && candidate.is_file() {
-                    return candidate;
-                }
-            }
+        let pins = workspace.join("tools").join("rust-pins.json");
+        println!("cargo::rerun-if-changed={}", pins.display());
+        let text = std::fs::read_to_string(&pins).unwrap_or_else(|e| panic!("could not read {}: {e}", pins.display()));
+        if let Some(pinned) = pinned_windres(&workspace.join(".tools"), &text) {
+            return pinned;
         }
+        println!("cargo::warning=the pinned LLVM-MinGW is not in .tools; using llvm-windres from PATH (run scripts/bootstrap-tools.ps1 for the pinned copy)");
         PathBuf::from("llvm-windres")
+    }
+
+    /// The resource compiler of the LLVM-MinGW that `pins` (the text of
+    /// `tools/rust-pins.json`) names, if exactly that directory exists under
+    /// `tools`. No other directory is considered.
+    pub fn pinned_windres(tools: &Path, pins: &str) -> Option<PathBuf> {
+        let name = field(pins.trim_start_matches('\u{feff}'), "llvmMingw");
+        assert!(
+            name.starts_with("llvm-mingw-") && !name.contains(['/', '\\']) && !name.contains(".."),
+            "tools/rust-pins.json must name one llvm-mingw-* directory"
+        );
+        let pinned = tools.join(&name).join("bin").join("llvm-windres.exe");
+        pinned.is_file().then_some(pinned)
     }
 
     fn escape(text: &str) -> String {

@@ -127,11 +127,44 @@ fn compact_status(status: &str) -> &str {
 impl App {
     #[allow(clippy::too_many_arguments)]
     pub fn new(cc: &eframe::CreationContext<'_>, link: Arc<EngineLink>, commands: Receiver<Command>, sender: Sender<Command>, startup: Startup) -> Self {
-        theme::install(&cc.egui_ctx);
-        egui_extras::install_image_loaders(&cc.egui_ctx);
-        cc.egui_ctx.set_theme(egui::Theme::Dark);
-        let Startup { background, preview, settings_existed, exit_flag, exit_code, update_health, rollback_notice, repaint } = startup;
-        let whats_new = super::whats_new::WhatsNew::begin(settings_existed, preview);
+        let whats_new = super::whats_new::WhatsNew::begin(startup.settings_existed, startup.preview);
+        Self::build(&cc.egui_ctx, link, commands, sender, startup, whats_new)
+    }
+
+    /// A complete application over a preview workspace and node groups, for
+    /// headless interface tests: no engine, no settings or data files, no
+    /// network, no window.
+    #[cfg(test)]
+    pub(crate) fn headless_with(ctx: &egui::Context, snapshot: crate::protocol::Snapshot, groups: Vec<crate::frames::Frame>) -> Self {
+        let mut state = MixerState::new(true);
+        state.apply_preview_snapshot(snapshot, groups).expect("the preview snapshot applies");
+        let link = EngineLink::preview(state, Box::new(|| {}));
+        let (sender, commands) = std::sync::mpsc::channel();
+        let startup = Startup {
+            background: false,
+            preview: true,
+            settings_existed: false,
+            exit_flag: Arc::new(AtomicBool::new(false)),
+            exit_code: Arc::new(std::sync::atomic::AtomicI32::new(0)),
+            update_health: None,
+            rollback_notice: None,
+            repaint: Arc::new(|| {}),
+        };
+        Self::build(ctx, link, commands, sender, startup, super::whats_new::WhatsNew::inert())
+    }
+
+    fn build(
+        ctx: &egui::Context,
+        link: Arc<EngineLink>,
+        commands: Receiver<Command>,
+        sender: Sender<Command>,
+        startup: Startup,
+        whats_new: super::whats_new::WhatsNew,
+    ) -> Self {
+        theme::install(ctx);
+        egui_extras::install_image_loaders(ctx);
+        ctx.set_theme(egui::Theme::Dark);
+        let Startup { background, preview, settings_existed: _, exit_flag, exit_code, update_health, rollback_notice, repaint } = startup;
         let health = update_health.map(|transaction| crate::update::session::observe_candidate(Arc::clone(&link), transaction, repaint));
         let mut app = Self {
             link,
@@ -213,6 +246,8 @@ impl App {
         }
         self.hidden = false;
         self.link.state().visible = true;
+        // End the hidden one-second poll wait now: fresh telemetry at once.
+        self.link.wake();
         ctx.send_viewport_cmd(egui::ViewportCommand::Visible(true));
         ctx.send_viewport_cmd(egui::ViewportCommand::Minimized(false));
         ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
@@ -242,7 +277,11 @@ impl App {
         if self.quitting || !matches!(self.quit, QuitPhase::Idle) {
             return;
         }
-        if self.updates.is_busy() {
+        // A check or download is cancelled and quitting continues through
+        // the normal save flow; only the installation handoff has to finish.
+        if !self.updates.cancel_for_quit() {
+            self.message("VineMix is installing an update and will close by itself in a moment. Quit is not needed.", false);
+            self.show_window(ctx);
             return;
         }
         {
@@ -697,9 +736,9 @@ impl App {
         let load_rect = Rect::from_min_size(Pos2::new(rect.right() - 8.0 - 232.0, rect.center().y - 13.0), Vec2::new(232.0, 26.0));
         let style = ButtonStyle { text: if alert { theme::ALERT_TEXT } else { theme::MUTED }, ..ButtonStyle::toolbar(12.0) };
         let help = if available {
-            "Audio processing load across the whole canvas. Open for recent peaks, missed deadlines and details."
+            "Audio processing load\nOpens recent peaks and missed deadlines for the whole canvas."
         } else {
-            "Audio processing measurements are unavailable. Open for details."
+            "Audio processing load\nMeasurements are unavailable. Opens the details."
         };
         let load_button = widgets::button(ui, Id::unique("processing-load"), load_rect, &label, style, true, 1.0);
         load_button.widget_info(|| egui::WidgetInfo::labeled(egui::accesskit::Role::Button, true, format!("Audio processing load: {}", label.replace("Audio load ", ""))));
@@ -766,7 +805,7 @@ impl App {
         );
         let response = widgets::button(ui, Id::unique("processing-dismiss"), dismiss, "Dismiss", ButtonStyle::toolbar(13.0), true, 1.0);
         response.widget_info(|| egui::WidgetInfo::labeled(egui::accesskit::Role::Button, true, "Dismiss audio processing notice"));
-        if response.tip("Dismiss this processing notice. The load reading remains visible.").clicked() {
+        if response.tip("Dismiss this notice. The load reading stays visible.").clicked() {
             let sequence = self.mixer().processing_notice_sequence();
             self.dismissed_processing_notice = Some(sequence);
         }
@@ -1076,7 +1115,7 @@ impl App {
                             ("Retry saving", "Try saving the queued workspace changes again.", theme::TEXT),
                             (
                                 "Save recovery copy and quit…",
-                                "Choose a new JSON file containing the complete workspace and queued edits. Quit only after the copy is saved. Existing files are never replaced.",
+                                "Saves the complete workspace and queued edits to a new file, then quits. Existing files are never replaced.",
                                 theme::TEXT,
                             ),
                             ("Cancel · keep VineMix open", "Keep the current session open and retain your pending changes.", theme::TEXT),
@@ -1251,16 +1290,33 @@ impl eframe::App for App {
             self.hide_window(ctx);
         }
         let minimized = ctx.input(|i| i.viewport().minimized.unwrap_or(false));
-        self.link.state().visible = !self.hidden && !minimized;
-        // The engine link repaints on telemetry; while hidden only logic runs.
+        let became_visible = {
+            let mut state = self.link.state();
+            let visible = !self.hidden && !minimized;
+            let became_visible = visible && !state.visible;
+            state.visible = visible;
+            // Background preference saves report here even with no engine.
+            state.poll_ui_preferences();
+            became_visible
+        };
+        if became_visible {
+            self.link.wake();
+        }
+        // While hidden only logic runs, and everything that needs a frame
+        // asks for one: the engine link after each (one-second) poll, the
+        // tray, update and quit workers when they finish, and the update
+        // schedule for its next deadline. This is only a backstop at the
+        // hidden polling cadence, not a four-times-a-second tick.
         if self.hidden {
-            ctx.request_repaint_after(std::time::Duration::from_millis(250));
+            ctx.request_repaint_after(std::time::Duration::from_secs(1));
         }
     }
 
     #[allow(clippy::too_many_lines)]
     fn ui(&mut self, ui: &mut Ui, _frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
+        // Keyboard access to hover help, before any control is drawn.
+        widgets::help_frame(&ctx);
         if self.background_start {
             self.background_start = false;
             ctx.send_viewport_cmd(egui::ViewportCommand::Visible(false));
@@ -1319,6 +1375,7 @@ impl eframe::App for App {
                 canvas_ui.disable();
             }
             self.canvas.show(&mut canvas_ui, viewport, &mut mixer);
+            mixer.note_spectrum_viewers(super::eq::take_spectrum_viewers(canvas_ui.ctx()));
         }
         self.footer(ui, footer);
         if notice_height > 0.0 {
@@ -1356,3 +1413,7 @@ impl eframe::App for App {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "app_tests.rs"]
+pub(crate) mod tests;

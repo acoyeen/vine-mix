@@ -2,7 +2,7 @@
 //! a configuration is accepted, ending with full graph compilation.
 
 use crate::config::{Configuration, DeviceBinding};
-use crate::plan::compile_graph;
+use crate::plan::{compile_graph, GraphPlan};
 use crate::ModelError;
 
 fn check_bus_gain(value: f32) -> Result<(), ModelError> {
@@ -24,7 +24,26 @@ fn check_binding(device: &DeviceBinding) -> Result<(), ModelError> {
     Ok(())
 }
 
+/// Proof that a configuration passed [`validate_and_compile`]. It borrows the
+/// configuration, which therefore cannot change while the proof exists, so a
+/// later boundary (the settings store) can rely on the validation that
+/// already ran instead of compiling the graph again.
+#[derive(Clone, Copy, Debug)]
+pub struct Validated<'a>(&'a Configuration);
+
+impl<'a> Validated<'a> {
+    pub fn configuration(self) -> &'a Configuration {
+        self.0
+    }
+}
+
 pub fn validate_configuration(config: &Configuration) -> Result<(), ModelError> {
+    validate_and_compile(config).map(|_| ())
+}
+
+/// Full validation, returning the compiled plan and the proof of validation
+/// so that accepting an edit compiles its graph exactly once.
+pub fn validate_and_compile(config: &Configuration) -> Result<(Validated<'_>, GraphPlan), ModelError> {
     if config.version != 2 {
         return Err(ModelError::invalid("This configuration version is not supported."));
     }
@@ -56,7 +75,7 @@ pub fn validate_configuration(config: &Configuration) -> Result<(), ModelError> 
             ));
         }
     }
-    compile_graph(&config.graph).map(|_| ())
+    compile_graph(&config.graph).map(|plan| (Validated(config), plan))
 }
 
 #[cfg(test)]

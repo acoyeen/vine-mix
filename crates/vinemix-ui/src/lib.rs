@@ -18,6 +18,7 @@ pub mod migration;
 pub mod mixer;
 pub mod paths;
 pub mod platform;
+pub mod preferences;
 pub mod processing_load;
 pub mod preview;
 pub mod protocol;

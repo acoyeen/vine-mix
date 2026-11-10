@@ -69,12 +69,26 @@ pub fn pipe_name() -> Result<String, String> {
 /// `%LOCALAPPDATA%\VineMix` (`VineMix.dev-<instance>` for a development
 /// instance, so test runs never touch an installed copy's data).
 pub fn application_data_directory() -> Result<PathBuf, String> {
-    let folder = match development_instance() {
+    application_data_directory_from(std::env::var_os("LOCALAPPDATA"), development_instance().as_deref())
+}
+
+/// [`application_data_directory`] for an explicit `LOCALAPPDATA` value. The
+/// location must be an absolute path: an unset, empty or relative value is an
+/// error, never a folder relative to the working directory.
+pub fn application_data_directory_from(local_app_data: Option<OsString>, instance: Option<&str>) -> Result<PathBuf, String> {
+    let folder = match instance {
         Some(instance) => format!("VineMix.dev-{instance}"),
         None => "VineMix".to_owned(),
     };
-    match std::env::var_os("LOCALAPPDATA") {
-        Some(value) if !value.is_empty() => Ok(PathBuf::from(value).join(folder)),
+    match local_app_data {
+        Some(value) if !value.is_empty() => {
+            let root = PathBuf::from(value);
+            if root.is_absolute() {
+                Ok(root.join(folder))
+            } else {
+                Err("LOCALAPPDATA is not an absolute folder path.".into())
+            }
+        }
         _ => Err("LOCALAPPDATA is unavailable.".into()),
     }
 }
@@ -268,4 +282,21 @@ pub fn current_executable() -> String {
 /// Converts a wide buffer to a path.
 pub fn path_from_wide(buffer: &[u16]) -> PathBuf {
     PathBuf::from(OsString::from_wide(buffer))
+}
+
+#[cfg(test)]
+mod data_directory_tests {
+    use super::*;
+
+    #[test]
+    fn data_directory_is_absolute_or_an_error() {
+        let ok = application_data_directory_from(Some(r"C:\Users\Example\AppData\Local".into()), None).unwrap();
+        assert!(ok.is_absolute() && ok.ends_with("VineMix"), "{ok:?}");
+        let dev = application_data_directory_from(Some(r"C:\Users\Example\AppData\Local".into()), Some("probe")).unwrap();
+        assert!(dev.ends_with("VineMix.dev-probe"), "{dev:?}");
+        for unusable in [None, Some(OsString::new()), Some("AppData".into()), Some(r".\Local".into()), Some(r"C:Local".into())] {
+            let result = application_data_directory_from(unusable.clone(), None);
+            assert!(result.is_err(), "{unusable:?} must not resolve, got {result:?}");
+        }
+    }
 }

@@ -179,6 +179,42 @@ fn band_description(bands: &[EqBand], index: usize) -> String {
     )
 }
 
+/// Hover help for the EQ plot. With a band under the pointer (or selected):
+/// that band's settings, what it does and whether it is in effect. Otherwise
+/// what the plot shows — the measured spectrum only where there is one.
+pub fn plot_help(node: &vinemix_model::config::GraphNode, shown: &[EqBand], band: Option<usize>, selected: Option<usize>, full: bool, practice: bool) -> String {
+    if full {
+        return format!("All {MAXIMUM_BANDS} bands are in use\nRemove a band to add another.");
+    }
+    if let Some(index) = band.filter(|&i| i < shown.len()) {
+        let band = &shown[index];
+        return format!(
+            "{}\n{}\n{}",
+            if Some(index) == selected { format!("Selected · {}", band_description(shown, index)) } else { band_description(shown, index) },
+            band_effect(band),
+            if node.bypass {
+                "Bypassed · EQ changes are not applied"
+            } else if band.enabled {
+                "Enabled"
+            } else {
+                "Disabled · This band does not affect audio"
+            }
+        );
+    }
+    let state = if node.bypass {
+        "Bypassed · EQ settings retained".to_owned()
+    } else if shown.is_empty() {
+        "No bands · Audio passes without EQ changes".to_owned()
+    } else {
+        format!("{} / {MAXIMUM_BANDS} bands", shown.len())
+    };
+    if practice {
+        format!("Equalizer\nPractice only · Calculated response; no audio is measured or changed.\n{state}")
+    } else {
+        format!("Equalizer\nLine · EQ response. Shaded · Measured output.\n{state}")
+    }
+}
+
 /// Normalises bands the way `CopyBand` does before publishing.
 fn publish_copy(bands: &[EqBand]) -> Vec<EqBand> {
     bands
@@ -317,6 +353,16 @@ fn move_selection(bands: &[EqBand], selection: &BTreeSet<usize>, ratio: f64, del
 }
 
 #[allow(clippy::too_many_lines)]
+/// Where a frame's drawn spectrum plots are listed (node ids).
+pub fn spectrum_viewers_id() -> egui::Id {
+    egui::Id::unique("vinemix-spectrum-viewers")
+}
+
+/// Takes the EQ nodes whose spectrum plot was drawn since the last call.
+pub fn take_spectrum_viewers(ctx: &egui::Context) -> Vec<String> {
+    ctx.data_mut(|d| std::mem::take(d.get_temp_mut_or_default::<Vec<String>>(spectrum_viewers_id())))
+}
+
 pub fn show(ctx: &mut ItemCtx<'_, '_>, plot_world: Rect, details_world: Rect) {
     let s = ctx.s;
     let node = ctx.node;
@@ -332,6 +378,12 @@ pub fn show(ctx: &mut ItemCtx<'_, '_>, plot_world: Rect, details_world: Rect) {
     let now = ctx.env.now;
     let running = ctx.status.is_some_and(|st| st.path.state == "Running");
     let full = ctx.runtime.detail() == graph::canvas::DetailLevel::Full;
+    // Only a plot that is actually on screen asks the engine to analyse its
+    // spectrum (collected by the window after the frame).
+    if full && ctx.status.is_some() && ctx.ui.is_rect_visible(screen) {
+        let viewer = node.id.clone();
+        ctx.ui.ctx().data_mut(|d| d.get_temp_mut_or_default::<Vec<String>>(spectrum_viewers_id()).push(viewer));
+    }
     let state = &mut ctx.runtime.eq;
     state.reconcile(count);
     let status = ctx.status;
@@ -499,6 +551,11 @@ pub fn show(ctx: &mut ItemCtx<'_, '_>, plot_world: Rect, details_world: Rect) {
             }
         }
         if response.has_focus() {
+            // Arrows move the selected bands; without this they would also
+            // move focus to a neighbouring control after the first step.
+            ctx.ui.memory_mut(|m| {
+                m.set_focus_lock_filter(id, egui::EventFilter { tab: false, horizontal_arrows: true, vertical_arrows: true, escape: false });
+            });
             let keys = ctx.ui.input(|i| {
                 [Key::Escape, Key::A, Key::Delete, Key::Backspace, Key::Insert, Key::ArrowLeft, Key::ArrowRight, Key::ArrowUp, Key::ArrowDown, Key::Home, Key::PageUp, Key::PageDown]
                     .into_iter()
@@ -849,36 +906,24 @@ pub fn show(ctx: &mut ItemCtx<'_, '_>, plot_world: Rect, details_world: Rect) {
             theme::MUTED,
         );
     }
-    let tip = if state.feedback.is_some() {
-        "All 8 bands are in use\nMaximum EQ capacity · 8 bands".to_owned()
-    } else if let Some(index) = state.hovered.or(state.selected).filter(|&i| i < shown.len()) {
-        let band = &shown[index];
-        format!(
-            "{}\n{}\n{}\n{}",
-            if Some(index) == state.selected { format!("Selected band {}", index + 1) } else { format!("Band {}", index + 1) },
-            band_effect(band),
-            band_description(&shown, index),
-            if node.bypass {
-                "Bypassed · EQ changes are not applied"
-            } else if band.enabled {
-                "Enabled · Contributes to the EQ response"
-            } else {
-                "Disabled · This band does not affect audio"
-            }
-        )
-    } else {
-        format!(
-            "Equalizer\nShapes frequency balance with up to 8 bands\nLine · Calculated EQ response on the left dB scale\nShaded spectrum · Measured output on the right dBFS scale\n{}",
-            if node.bypass {
-                "Bypassed · EQ settings retained".to_owned()
-            } else if shown.is_empty() {
-                "No bands · Audio passes without EQ changes".to_owned()
-            } else {
-                format!("{} / {MAXIMUM_BANDS} bands", shown.len())
-            }
-        )
+    // A practice lesson edits sample values: nothing is measured or changed,
+    // so its help must not describe a measured spectrum.
+    let practice = ctx.env.preview && ctx.status.is_none();
+    let tip = plot_help(node, &shown, state.hovered.or(state.selected).filter(|&i| i < shown.len()), state.selected, state.feedback.is_some(), practice);
+    // The plot is painted: name it, report the band count and the selected
+    // band as its value, and describe its keyboard operation.
+    let value = match state.selected.filter(|&i| i < shown.len()) {
+        Some(index) => format!("{} of {MAXIMUM_BANDS} bands. Selected: {}", shown.len(), band_description(&shown, index)),
+        None => format!("{} of {MAXIMUM_BANDS} bands. No band selected", shown.len()),
     };
-    let response = response.tip(tip);
+    response.widget_info(|| egui::WidgetInfo {
+        current_text_value: Some(value.clone()),
+        ..egui::WidgetInfo::labeled(egui::accesskit::Role::Group, enabled, "Equalizer plot")
+    });
+    let response = response.tip_described(
+        tip,
+        "Ctrl+Left and Ctrl+Right choose a band. Arrow keys move the selected bands in frequency and gain; hold Shift for finer movement. Page Up and Page Down change width. Insert adds a band, Delete removes the selection and Home resets it. The Frequency, Band gain and Width dials below edit the active band exactly.",
+    );
     if response.hovered() && enabled {
         ctx.ui.ctx().set_cursor_icon(if state.dragged.is_some() {
             egui::CursorIcon::Move
@@ -998,7 +1043,7 @@ mod tests {
         off.enabled = false;
         assert_eq!(response_db(&off, 1000.0), 0.0);
         let selection: BTreeSet<usize> = [0].into();
-        let moved = move_selection(&[boost.clone()], &selection, 100.0, 30.0).unwrap();
+        let moved = move_selection(std::slice::from_ref(&boost), &selection, 100.0, 30.0).unwrap();
         assert_eq!(moved[0].frequency_hz, 20000.0);
         assert_eq!(moved[0].gain_db, 24.0);
     }

@@ -1,0 +1,6 @@
+Crate: accesskit_windows
+Manifest-License: MIT OR Apache-2.0
+Used-Under: Apache-2.0
+Text: Apache-2.0.txt
+Basis: The package published on crates.io contains no licence file. Apache-2.0 reads the same for every work, so its text is reproduced exactly; the MIT alternative would need the copyright line from the source repository, which has not been copied into this distribution.
+Review: Pending: confirm against https://github.com/AccessKit/accesskit that binaries need no further notice (a NOTICE file, or separate terms for code derived from another project).

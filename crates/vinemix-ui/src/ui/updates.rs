@@ -102,6 +102,28 @@ impl UpdatesUi {
         self.job.is_some()
     }
 
+    /// Quit was requested. A check or download is cancelled (its transport
+    /// is aborted, see `vinemix_update::http`) and no longer holds the
+    /// session open; returns false only while an installation handoff is in
+    /// progress, which must run to its own exit or failure.
+    pub fn cancel_for_quit(&mut self) -> bool {
+        match self.job {
+            Some(Job::Install(_)) => false,
+            Some(Job::Check(..) | Job::Download(_)) => {
+                self.cancel.store(true, Ordering::Release);
+                // The worker reports to a dropped receiver and ends.
+                self.job = None;
+                self.message = "Update check or download cancelled because VineMix is quitting.".into();
+                if self.automatic_enabled == Some(true) && self.next_automatic.is_none() {
+                    // A quit that is later cancelled keeps automatic checks alive.
+                    self.next_automatic = Some(Instant::now() + RETRY);
+                }
+                true
+            }
+            None => true,
+        }
+    }
+
     /// A verified newer release found by any check and not yet installed.
     pub fn available_version(&self) -> Option<String> {
         self.offer.as_ref().filter(|_| !self.installing()).map(|o| o.manifest.version.clone())
@@ -146,7 +168,9 @@ impl UpdatesUi {
             return;
         }
         self.message = "Checking GitHub for updates…".into();
-        self.cancel.store(false, Ordering::Release);
+        // One flag per job: starting a new job can never un-cancel a
+        // previous one that is still winding down.
+        self.cancel = Arc::new(AtomicBool::new(false));
         let (sender, receiver) = std::sync::mpsc::channel();
         let cancel = Arc::clone(&self.cancel);
         let repaint = ctx.clone();
@@ -168,7 +192,7 @@ impl UpdatesUi {
             return;
         }
         self.message = "Downloading and verifying the update… You can keep using your audio.".into();
-        self.cancel.store(false, Ordering::Release);
+        self.cancel = Arc::new(AtomicBool::new(false));
         self.progress.0.store(0, Ordering::Release);
         self.progress.1.store(offer.manifest.installer.size, Ordering::Release);
         let (sender, receiver) = std::sync::mpsc::channel();
@@ -388,7 +412,7 @@ impl UpdatesUi {
                 ui.add_space(1.0 + 16.0);
                 let automatic = link.state().automatically_check_for_updates();
                 if widgets::checkbox(ui, automatic, "Check automatically", !installing)
-                    .tip("Checks daily while VineMix is running. Failed checks retry automatically. You choose when to download and install.")
+                    .tip("Check automatically\nChecks daily. You choose when to download and install.")
                     .clicked()
                 {
                     toggled = Some(!automatic);
@@ -497,6 +521,45 @@ mod tests {
         let mut updates = UpdatesUi::default();
         assert!(!updates.finish_check(Ok(CheckResult::UpToDate("Up to date.".into())), false, true));
         assert!(updates.announcement.is_none());
+    }
+
+    /// RUST-REV-004: Quit cancels a check or download instead of silently
+    /// doing nothing; only the installation handoff makes it wait.
+    #[test]
+    fn quit_cancels_checks_and_downloads_but_not_an_install() {
+        let mut updates = UpdatesUi::default();
+        assert!(updates.cancel_for_quit(), "idle never blocks quit");
+
+        let (_check_sender, check) = std::sync::mpsc::channel();
+        updates.job = Some(Job::Check(check, true));
+        updates.automatic_enabled = Some(true);
+        let flag = Arc::clone(&updates.cancel);
+        assert!(updates.is_busy());
+        assert!(updates.cancel_for_quit());
+        assert!(!updates.is_busy(), "the check no longer holds the session");
+        assert!(flag.load(Ordering::Acquire), "the running check was told to stop");
+        assert!(updates.next_automatic.is_some(), "automatic checks resume if the quit is cancelled");
+
+        let (_download_sender, download) = std::sync::mpsc::channel();
+        updates.job = Some(Job::Download(download));
+        assert!(updates.cancel_for_quit());
+        assert!(!updates.is_busy());
+
+        let (_install_sender, install) = std::sync::mpsc::channel();
+        updates.job = Some(Job::Install(install));
+        assert!(!updates.cancel_for_quit(), "the installation handoff is not interrupted");
+        assert!(updates.is_busy());
+    }
+
+    #[test]
+    fn a_new_job_cannot_un_cancel_an_older_one() {
+        let mut updates = UpdatesUi::default();
+        let old = Arc::clone(&updates.cancel);
+        old.store(true, Ordering::Release);
+        // What `start_check` and `start_download` do before spawning.
+        updates.cancel = Arc::new(AtomicBool::new(false));
+        assert!(old.load(Ordering::Acquire));
+        assert!(!updates.cancel.load(Ordering::Acquire));
     }
 
     #[test]

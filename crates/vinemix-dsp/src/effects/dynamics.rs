@@ -54,6 +54,17 @@ impl Default for Expander {
     }
 }
 
+/// `base.powf(exponent)` for the expander's transfer curve, where `base` has
+/// already been limited to at most 1. At or above the threshold the base is
+/// exactly 1, and `1.0.powf(x)` is exactly 1 for every `x` (IEEE 754 `pow`),
+/// so the power is skipped there. The result is bit-identical to always
+/// calling `powf`; it only avoids the call for signal above the threshold,
+/// which is where an open gate or idle expander spends its time.
+#[inline]
+fn expansion(base: f64, exponent: f64) -> f64 {
+    if base == 1.0 { 1.0 } else { base.powf(exponent) }
+}
+
 impl Expander {
     pub fn configure(&mut self, s: &ExpanderSettings) {
         self.threshold.set(10f64.powf(s.threshold_db / 20.0));
@@ -67,6 +78,43 @@ impl Expander {
     }
 
     pub fn process(&mut self, input: Frame, detector: Frame) -> Frame {
+        let peak = f64::from(detector.left.abs().max(detector.right.abs()));
+        // Stereo-linked peak detector: fast enough to reopen on speech onset,
+        // with a 20 ms decay so zero crossings cannot chatter the gate.
+        let coefficient = if peak > self.envelope { DETECTOR_ATTACK } else { DETECTOR_RELEASE_20MS };
+        self.envelope = denormal(peak + coefficient * (self.envelope - peak));
+        let level = self.threshold.next();
+        let exponent = self.ratio.next() - 1.0;
+        let minimum = self.floor.next();
+        let close_level = level * self.hysteresis.next();
+        let amount = self.gate_mix.next();
+        let duration = self.hold_samples.next().round() as u32;
+        if self.envelope >= level {
+            self.open = true;
+            self.hold = duration;
+        } else if self.open && self.envelope >= close_level {
+            self.hold = duration;
+        } else if self.hold != 0 {
+            self.hold -= 1;
+        } else {
+            self.open = false;
+        }
+        let expanded = minimum.max(expansion((self.envelope / level).min(1.0), exponent));
+        let gated = if self.open { 1.0 } else { minimum };
+        let target = expanded + (gated - expanded) * amount;
+        let opening = self.attack.next();
+        let closing = self.release.next();
+        let coefficient = if target > self.attenuation { opening } else { closing };
+        self.attenuation = target + coefficient * (self.attenuation - target);
+        Frame::new(
+            (f64::from(input.left) * self.attenuation) as f32,
+            (f64::from(input.right) * self.attenuation) as f32,
+        )
+    }
+
+    /// The transfer curve as it was before the shortcut (benchmark baseline).
+    #[cfg(test)]
+    fn process_always_powf(&mut self, input: Frame, detector: Frame) -> Frame {
         let peak = f64::from(detector.left.abs().max(detector.right.abs()));
         // Stereo-linked peak detector: fast enough to reopen on speech onset,
         // with a 20 ms decay so zero crossings cannot chatter the gate.
@@ -197,6 +245,64 @@ impl BandReduction {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// RUST-REV-018: the skipped power is exact, including at the edges.
+    #[test]
+    fn expansion_shortcut_is_bit_identical_to_powf() {
+        let exponents = [0.0, 1.0, 0.25, 3.0, 19.0, -0.5, 1e-300, f64::MAX, f64::INFINITY, f64::NEG_INFINITY, f64::NAN];
+        for exponent in exponents {
+            assert_eq!(expansion(1.0, exponent).to_bits(), 1.0f64.powf(exponent).to_bits(), "exponent {exponent}");
+        }
+        let mut state = 0x9E37_79B9_7F4A_7C15u64;
+        let mut next = || {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            (state >> 11) as f64 / (1u64 << 53) as f64
+        };
+        for _ in 0..200_000 {
+            let base = if next() < 0.3 { 1.0 } else { next() };
+            let exponent = next() * 19.0;
+            assert_eq!(expansion(base, exponent).to_bits(), base.powf(exponent).to_bits(), "{base} ^ {exponent}");
+        }
+        for base in [0.0, f64::MIN_POSITIVE, 1.0 - f64::EPSILON, 0.999_999_999_999_999_9] {
+            assert_eq!(expansion(base, 3.0).to_bits(), base.powf(3.0).to_bits());
+        }
+    }
+
+    /// Cost of the expander with signal above its threshold, with and
+    /// without the shortcut. Run with
+    /// `cargo test -p vinemix-dsp --release --lib expander_cost -- --ignored --nocapture`.
+    #[test]
+    #[ignore = "benchmark; prints timings"]
+    fn expander_cost() {
+        const FRAMES: usize = 48_000 * 20;
+        let run = |shortcut: bool, amplitude: f32| {
+            let mut samples = Vec::new();
+            for _ in 0..5 {
+                let mut expander = Expander::default();
+                expander.configure(&ExpanderSettings::default());
+                let started = std::time::Instant::now();
+                let mut checksum = 0.0f64;
+                for n in 0..FRAMES {
+                    let x = (n as f32 * 0.02).sin() * amplitude;
+                    let frame = Frame::new(x, x);
+                    if shortcut {
+                        checksum += f64::from(expander.process(frame, frame).left);
+                    } else {
+                        checksum += f64::from(expander.process_always_powf(frame, frame).left);
+                    }
+                }
+                std::hint::black_box(checksum);
+                samples.push(started.elapsed().as_secs_f64());
+            }
+            samples.sort_by(f64::total_cmp);
+            samples[2] / 20.0 * 100.0
+        };
+        for (label, amplitude) in [("above the threshold (open)", 0.5f32), ("below the threshold (reducing)", 0.001)] {
+            println!("expander, signal {label}: always powf {:.4}% of a core, with the shortcut {:.4}%", run(false, amplitude), run(true, amplitude));
+        }
+    }
 
     #[test]
     fn constants_match_their_time_constants() {

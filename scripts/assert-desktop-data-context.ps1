@@ -35,15 +35,36 @@ namespace VineMix {
         private static extern int GetClassNameW(IntPtr window, StringBuilder text, int count);
         [DllImport("user32.dll")]
         private static extern uint GetWindowThreadProcessId(IntPtr window, out uint processId);
+        // Which desktop a window with this title and class belongs to, or null.
+        //
+        // Both desktops title their workspace window identically. The 0.5
+        // application is WPF, whose top-level windows have a class beginning
+        // "HwndWrapper[". The Rust application's window is created by winit
+        // (through eframe), which registers the fixed class "Window Class" and
+        // is given no other name. Nothing else is accepted: a startup error
+        // dialog (class "#32770"), a differently titled window, or an unknown
+        // class is not a ready workspace. If a later toolkit version changes
+        // the class, readiness fails closed until this list is updated.
+        public static string WorkspaceFramework(string title, string className) {
+            if (title != "VineMix · Patch workspace" || className == null) return null;
+            if (className.StartsWith("HwndWrapper[", StringComparison.Ordinal)) return "wpf";
+            if (className == "Window Class") return "rust";
+            return null;
+        }
         public static bool MatchesWorkspaceIdentity(string title, string className, bool visible, uint actualProcess, uint expectedProcess)
-            => visible && actualProcess == expectedProcess && title == "VineMix · Patch workspace"
-                && className.StartsWith("HwndWrapper[", StringComparison.Ordinal);
-        public static bool IsWorkspaceWindow(IntPtr window, uint expectedProcess) {
+            => visible && actualProcess == expectedProcess && WorkspaceFramework(title, className) != null;
+        // The framework of the visible workspace window this exact process
+        // owns, or null. Process identity (image path, session, start time) is
+        // established separately before this is consulted.
+        public static string DescribeWorkspaceWindow(IntPtr window, uint expectedProcess) {
             var title = new StringBuilder(1024); var className = new StringBuilder(256);
             GetWindowTextW(window, title, title.Capacity); GetClassNameW(window, className, className.Capacity);
             GetWindowThreadProcessId(window, out uint actualProcess);
-            return MatchesWorkspaceIdentity(title.ToString(), className.ToString(), IsWindowVisible(window), actualProcess, expectedProcess);
+            if (!IsWindowVisible(window) || actualProcess != expectedProcess) return null;
+            return WorkspaceFramework(title.ToString(), className.ToString());
         }
+        public static bool IsWorkspaceWindow(IntPtr window, uint expectedProcess)
+            => DescribeWorkspaceWindow(window, expectedProcess) != null;
     }
 }
 
@@ -122,6 +143,16 @@ function Test-DesktopWorkspaceReady($Process) {
         $Process.MainWindowHandle -ne 0 -and $Process.Responding -and $Process.WaitForInputIdle(0) -and
             [VineMix.DesktopDataContext]::IsWorkspaceWindow($Process.MainWindowHandle, $Process.Id)
     } catch [ComponentModel.Win32Exception], [InvalidOperationException] { $false }
+}
+
+# 'wpf' for the 0.5 desktop, 'rust' for the Rust desktop, or $null when the
+# process shows no workspace window. For activation evidence only: readiness
+# itself is Test-DesktopWorkspaceReady.
+function Get-DesktopWorkspaceFramework($Process) {
+    try {
+        if ($Process.MainWindowHandle -eq 0) { return $null }
+        [VineMix.DesktopDataContext]::DescribeWorkspaceWindow($Process.MainWindowHandle, $Process.Id)
+    } catch [ComponentModel.Win32Exception], [InvalidOperationException] { $null }
 }
 
 function Wait-DesktopController($Launcher, [string]$ExpectedPath, [int]$Session, [DateTime]$Started,

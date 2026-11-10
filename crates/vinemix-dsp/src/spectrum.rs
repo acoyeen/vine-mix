@@ -353,4 +353,105 @@ mod tests {
         assert_eq!(view.frame, 0);
         assert!(view.db.iter().all(|&db| db == FLOOR_DB));
     }
+
+    /// RUST-REV-022: the triple-buffer hand-over under real contention. The
+    /// producer publishes and resets as fast as it can while the consumer
+    /// takes windows; every window the consumer sees must be one complete
+    /// publication (a contiguous run of samples ending at its frame, under
+    /// one revision), never a mixture of two.
+    #[test]
+    fn windows_are_never_torn_under_concurrent_publication_and_reset() {
+        use std::sync::atomic::AtomicBool;
+        let (mut producer, mut consumer) = live_spectrum(1);
+        let stop = Arc::new(AtomicBool::new(false));
+        let writer = {
+            let stop = Arc::clone(&stop);
+            std::thread::spawn(move || {
+                let mut end = 0u64;
+                let mut revision = 1u64;
+                let mut quanta = 0u64;
+                let mut published = 0u64;
+                while !stop.load(Ordering::Acquire) {
+                    // Each sample carries its own absolute frame number.
+                    let block: Vec<Frame> = (end..end + 240).map(|n| Frame::new(n as f32, revision as f32)).collect();
+                    end += 240;
+                    producer.push(&block, end);
+                    quanta += 1;
+                    if quanta.is_multiple_of(10) {
+                        published += 1;
+                    }
+                    if quanta.is_multiple_of(257) {
+                        revision += 1;
+                        producer.reset(revision);
+                    }
+                    // Stay below 2^24 so every frame number is exact in f32.
+                    if end > 12_000_000 {
+                        break;
+                    }
+                }
+                published
+            })
+        };
+        let mut seen = 0u64;
+        let mut empties = 0u64;
+        let mut last_revision = 0u64;
+        let started = std::time::Instant::now();
+        while started.elapsed() < std::time::Duration::from_millis(1500) && !writer.is_finished() {
+            let Some(window) = consumer.consume() else {
+                std::hint::spin_loop();
+                continue;
+            };
+            assert!(window.revision >= last_revision, "revision went backwards: {} after {last_revision}", window.revision);
+            last_revision = window.revision;
+            if window.frame == 0 {
+                empties += 1;
+                continue;
+            }
+            let first = window.frame - FFT_FRAMES as u64;
+            for (k, sample) in window.samples.iter().enumerate() {
+                assert_eq!(sample.left as u64, first + k as u64, "window ending at {} is not one contiguous publication at sample {k}", window.frame);
+                assert_eq!(sample.right as u64, window.revision, "window mixes revisions at sample {k}");
+            }
+            seen += 1;
+        }
+        stop.store(true, Ordering::Release);
+        let published = writer.join().unwrap();
+        assert!(seen > 0, "the consumer never received a window ({published} hops, {empties} resets seen)");
+        assert!(empties > 0, "resets were exercised");
+    }
+
+    /// Cost of the on-demand part of a spectrum (RUST-REV-010): one
+    /// `read()` after a new window, which is what a snapshot does per EQ.
+    /// `cargo test -p vinemix-dsp --release --lib spectrum_read_cost -- --ignored --nocapture`
+    #[test]
+    #[ignore = "benchmark; prints timings"]
+    fn spectrum_read_cost() {
+        let (mut producer, mut consumer) = live_spectrum(1);
+        let mut frame = 0u64;
+        let mut reads = Vec::new();
+        let mut pushes = Vec::new();
+        let mut idle = Vec::new();
+        for _ in 0..400 {
+            for _ in 0..10 {
+                let block = tone(1000.0, 0.5, frame as usize, 240);
+                frame += 240;
+                let started = std::time::Instant::now();
+                producer.push(&block, frame);
+                pushes.push(started.elapsed());
+            }
+            let started = std::time::Instant::now();
+            std::hint::black_box(consumer.read().frame);
+            reads.push(started.elapsed());
+            let started = std::time::Instant::now();
+            std::hint::black_box(consumer.read().frame);
+            idle.push(started.elapsed());
+        }
+        let summary = |mut samples: Vec<std::time::Duration>| {
+            samples.sort();
+            (samples[samples.len() / 2], samples[samples.len() * 99 / 100])
+        };
+        println!("mixer-side push of one 5 ms quantum (median, p99): {:?}", summary(pushes));
+        println!("read with a new window: FFT + smoothing (median, p99): {:?}", summary(reads));
+        println!("read with no new window (median, p99): {:?}", summary(idle));
+    }
 }

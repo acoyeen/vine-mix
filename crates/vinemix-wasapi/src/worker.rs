@@ -25,10 +25,10 @@ use windows::Win32::System::Threading::{
     AvRevertMmThreadCharacteristics, AvSetMmThreadCharacteristicsW, AvSetMmThreadPriority, AVRT_PRIORITY_HIGH,
 };
 
-use crate::catalog::DeviceCatalog;
+use crate::catalog::{DeviceCatalog, StreamWatch};
 use crate::clock::{failure_message, failure_reason, failure_state, ClockEstimate, E_ACCESSDENIED};
 use crate::format::SampleFormat;
-use crate::policy::{resolve_endpoint, stream_endpoint_rejection};
+use crate::policy::{resolve_endpoint, stream_endpoint_rejection, TopologyGrace};
 use crate::stream::{initialize_exclusive_render, initialize_shared_stream, render_frames_available};
 use crate::win::{hresult_from_win32, wait_any, wide, Apartment, Event, Wait, ERROR_TIMEOUT, FOREVER};
 
@@ -118,7 +118,17 @@ impl AudioWorker {
             if old.id == binding.id && old.stable_id == binding.stable_id && old.name == binding.name && old.channel == binding.channel {
                 return;
             }
+            let assigned = binding.assigned();
             guarded.desired = binding;
+            // The worker thread reports its progress asynchronously. Until it
+            // has looked at this assignment, a status read must not still say
+            // "Unassigned" (a new worker's initial state): an assigned device
+            // that is being connected is pending, never unassigned.
+            if assigned && guarded.path.state == "Unassigned" {
+                guarded.path.state = "Resolving".into();
+                guarded.path.message = "Finding selected device".into();
+                guarded.path.reason.clear();
+            }
             self.shared.configuration_serial.fetch_add(1, Ordering::Release);
         }
         self.shared.control_event.set();
@@ -204,10 +214,6 @@ impl Shared {
         }
     }
 
-    fn binding(&self) -> DeviceBinding {
-        self.lock().desired.clone()
-    }
-
     fn resolve(&self, selection: &DeviceBinding) -> Option<Endpoint> {
         resolve_endpoint(&self.catalog.enumerate(), selection, self.capture)
     }
@@ -223,10 +229,10 @@ struct Runner {
     prefer_low_latency: bool,
 }
 
-/// After a device is added, removed or reconfigured, glitches are attributed
-/// to the Windows audio service rebuilding its graph, not to this stream.
-const TOPOLOGY_SETTLE: Duration = Duration::from_secs(5);
-/// Glitches just before the notification arrived are forgiven too.
+/// After the device inventory changes, glitches are attributed to the Windows
+/// audio service rebuilding its graph, not to this stream — within the bounds
+/// of [`TopologyGrace`]. Glitches just before the change was observed are
+/// forgiven too.
 const TOPOLOGY_LEAD_SECONDS: f64 = 2.0;
 
 /// A stream ended: `Ok` means a deliberate reopen (S_FALSE in C++).
@@ -292,27 +298,13 @@ impl Runner {
         }
     }
 
-    /// The catalog changed: keep a healthy stream unless this endpoint changed.
-    fn still_selected(&mut self, endpoint: &Endpoint, serial: u64) -> bool {
-        if self.shared.configuration_serial.load(Ordering::Acquire) != serial {
-            return false;
-        }
-        let generation = self.shared.catalog.generation();
-        if generation == self.observed_generation {
-            return true;
-        }
-        self.observed_generation = generation;
-        let shared = &self.shared;
-        match shared.resolve(&shared.binding()) {
-            Some(selected) => {
-                selected.state == "Active"
-                    && selected.id == endpoint.id
-                    && selected.channels == endpoint.channels
-                    && selected.rate == endpoint.rate
-                    && stream_endpoint_rejection(&selected, shared.capture, shared.microphone, &shared.required_transport).is_none()
-            }
-            None => false,
-        }
+    /// Whether the running stream should continue: the configuration is the
+    /// one it opened for and the catalog has not found its endpoint changed.
+    /// Runs every wake-up of the stream loop and only loads atomics — the
+    /// catalog thread resolves bindings and compares inventories
+    /// ([`StreamWatch`]); nothing here locks, allocates or copies.
+    fn still_selected(&self, watch: &StreamWatch, serial: u64) -> bool {
+        self.shared.configuration_serial.load(Ordering::Acquire) == serial && !watch.is_stale()
     }
 
     fn open_and_run(&mut self, endpoint: &Endpoint, selection: &DeviceBinding, serial: u64) -> StreamResult {
@@ -419,7 +411,10 @@ impl Runner {
         let mut last_event = Instant::now();
         let stream_start = last_event;
         let mut stability = StreamStability::default();
-        let mut topology_changed: Option<Instant> = None;
+        let mut grace = TopologyGrace::default();
+        // Registered before the stream starts; judged against the inventory
+        // as it is now, in case it changed since `endpoint` was resolved.
+        let watch = shared.catalog.watch(selection.clone(), endpoint, shared.capture, shared.microphone, &shared.required_transport);
         let mut capture_check = last_event + Duration::from_secs(1);
         let mut previous_capture_underruns = shared.monitor.stats().underrun_events;
         let mut capture_warmed = false;
@@ -436,16 +431,20 @@ impl Runner {
                 Wait::Failed => return Err(hresult_from_win32(std::io::Error::last_os_error().raw_os_error().unwrap_or(0) as u32)),
                 _ => {}
             }
-            let generation_before = self.observed_generation;
-            if !self.still_selected(endpoint, serial) {
+            if !self.still_selected(&watch, serial) {
                 return Ok(());
             }
             let now = Instant::now();
-            if self.observed_generation != generation_before {
-                topology_changed = Some(now);
-                stability.forgive_since((now - stream_start).as_secs_f64() - TOPOLOGY_LEAD_SECONDS);
+            let stream_seconds = (now - stream_start).as_secs_f64();
+            let generation = shared.catalog.generation();
+            if generation != self.observed_generation {
+                self.observed_generation = generation;
+                // Bounded: a run of inventory changes shares one allowance.
+                if grace.changed(stream_seconds) {
+                    stability.forgive_since(stream_seconds - TOPOLOGY_LEAD_SECONDS);
+                }
             }
-            let settling = topology_changed.is_some_and(|t| now - t < TOPOLOGY_SETTLE);
+            let settling = grace.settling(stream_seconds);
             if wait != Wait::Signalled(2) {
                 // Silent buffers still signal; this catches a stopped stream.
                 if now - last_event > Duration::from_secs(2) {
@@ -778,6 +777,55 @@ impl Runner {
                 }
                 waited += step;
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use vinemix_rt::frame_queue;
+
+    /// RUST-REV-032: the status sequence of a newly created worker that is
+    /// given an assigned device. The endpoint ID is synthetic and matches no
+    /// device, so nothing is opened: the worker settles on "Waiting".
+    #[test]
+    fn assigned_worker_is_pending_never_unassigned() {
+        for capture in [false, true] {
+            let catalog = Arc::new(DeviceCatalog::new().expect("device catalog"));
+            let (producer, consumer, monitor) = frame_queue(9600);
+            let (queue, _other_end): (QueueEnd, Box<dyn std::any::Any>) =
+                if capture { (QueueEnd::Capture(producer), Box::new(consumer)) } else { (QueueEnd::Render(consumer), Box::new(producer)) };
+            let worker = AudioWorker::new(capture, queue, monitor, catalog, if capture { "" } else { "listening" }).expect("worker");
+            assert_eq!(worker.status().state, "Unassigned", "nothing is assigned yet");
+            worker.configure(DeviceBinding {
+                id: "vinemix-test-endpoint-that-does-not-exist".into(),
+                stable_id: String::new(),
+                name: "Example returning device".into(),
+                channel: -1,
+            });
+            // Sample from the very first read after assignment onwards.
+            let mut seen: Vec<String> = Vec::new();
+            let until = Instant::now() + Duration::from_millis(600);
+            while Instant::now() < until {
+                let state = worker.status().state;
+                if seen.last() != Some(&state) {
+                    seen.push(state);
+                }
+                std::thread::yield_now();
+            }
+            assert!(!seen.iter().any(|s| s == "Unassigned"), "an assigned device was reported as unassigned: {seen:?}");
+            assert_eq!(seen.first().map(String::as_str), Some("Resolving"), "{seen:?}");
+            // It then alternates between looking and waiting with backoff.
+            assert!(seen.iter().any(|s| s == "Waiting"), "{seen:?}");
+            assert!(seen.iter().all(|s| s == "Resolving" || s == "Waiting"), "{seen:?}");
+            // Clearing the assignment is the only way back to "Unassigned".
+            worker.configure(DeviceBinding::default());
+            let until = Instant::now() + Duration::from_secs(2);
+            while worker.status().state != "Unassigned" && Instant::now() < until {
+                std::thread::sleep(Duration::from_millis(5));
+            }
+            assert_eq!(worker.status().state, "Unassigned");
         }
     }
 }

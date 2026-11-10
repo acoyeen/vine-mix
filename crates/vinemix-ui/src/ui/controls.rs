@@ -90,11 +90,9 @@ impl ChoiceKey {
 
     pub fn help(self, node: &GraphNode) -> String {
         match self {
-            Self::CrossfadeCurve => "Fade curve\nEqual power · Different sources\nLinear · Matching signals\nDelayed paths may need Alignment Delay".into(),
-            Self::DenoiserAlgorithm => {
-                "Algorithm\nSpeexDSP: faster, lighter cleanup.\nRNNoise: more delay, usually cleaner speech.\n20/30 ms is added node delay.".into()
-            }
-            Self::CompressorMode => "Compressor mode".into(),
+            Self::CrossfadeCurve => "Fade curve\nEqual power suits different sources; Linear suits matching signals.".into(),
+            Self::DenoiserAlgorithm => "Algorithm\nSpeexDSP is lighter (20 ms delay). RNNoise is usually cleaner (30 ms).".into(),
+            Self::CompressorMode => "Mode\nCompress reduces loud passages; Limit holds peaks under a ceiling.".into(),
             Self::DuckingMode => ducking_description(&node.ducking.mode),
         }
     }
@@ -102,9 +100,9 @@ impl ChoiceKey {
 
 pub fn ducking_description(mode: &str) -> String {
     if mode == "dynamic" {
-        "Dynamic ducking\nLowers the audio more as the trigger sound gets louder above the threshold.\nTrigger audio is detector only\nStereo linked".into()
+        "Dynamic ducking\nLowers the audio more as the trigger gets louder above the threshold.".into()
     } else {
-        "Static ducking\nLowers the audio by a set amount when the trigger sound crosses the threshold.\nTrigger audio is detector only\nStereo linked".into()
+        "Static ducking\nLowers the audio by a set amount while the trigger is above the threshold.".into()
     }
 }
 
@@ -187,9 +185,9 @@ fn effect_description(kind: &str, gate: bool, label: &str) -> String {
     let text = match (kind, label) {
         ("alignmentDelay", _) => "Delays this audio path to align it with another.",
         ("pan", _) => "Balances audio between the left and right channels.",
-        ("stereoWidth", _) => "Sets stereo width. 0% is mono; 100% is unchanged. Wider settings can raise peaks. Mono input remains mono.",
-        ("stereoPan", _) => "Moves a mono signal from left (-1) to centre (0) to right (1). Stereo input is combined to mono first; centre is -3 dB per side.",
-        ("crossfade", _) => "Blends stereo inputs A and B. 0% plays A only; 100% plays B only. Bypass plays A only.",
+        ("stereoWidth", _) => "Sets stereo width. 0% is mono; 100% is unchanged.",
+        ("stereoPan", _) => "Moves the signal from left (-1) through centre (0) to right (1).",
+        ("crossfade", _) => "Blends inputs A and B. 0% is A only; 100% is B only.",
         ("denoiser", "Reduction") => "Sets how strongly SpeexDSP reduces steady background noise.",
         ("denoiser", "Mix") => "Blends original and RNNoise audio. 0% is original; 100% is fully denoised.",
         ("deEsser", "Frequency") => "Sets the frequency of the harsh S and SH sounds to reduce.",
@@ -201,13 +199,13 @@ fn effect_description(kind: &str, gate: bool, label: &str) -> String {
         ("reverb", "Decay") => "Sets how long the reverberation lasts.",
         ("reverb", "Damping") => "Softens high frequencies in the reverb tail.",
         ("reverb", "Pre-delay") => "Sets the gap before reverberation begins.",
-        ("echo", "Time") => "Sets the gap before and between echoes. Very short times, such as 20 ms, thicken the sound; longer times separate the repeats. Changing Time smoothly restarts the echoes.",
-        ("echo", "Repeats") => "Sets how many echoes follow the original: 1 gives one echo, 3 gives three. Each repeat is half as strong as the previous one, with the total kept controlled. Changing Repeats smoothly restarts the echoes.",
-        ("echo", "Mix") => "Blends the Audio output: 0% is original sound only; 100% is echoes only. The separate Echo output is always echoes only and ignores Mix.",
-        ("distortion", "Drive") => "Pushes the signal into stronger distortion. Higher values add harmonics and can increase loudness; balance the result with Output.",
-        ("distortion", "Tone") => "Softens high frequencies in the distorted sound. Lower values sound darker.",
-        ("distortion", "Mix") => "Blends original audio with the distorted sound. 0% is original, 100% is distorted; Output applies to both.",
-        ("distortion", "Output") => "Trims the complete blend, including Mix at 0%. Bypass restores the original sound without this trim.",
+        ("echo", "Time") => "Sets the gap before and between echoes.",
+        ("echo", "Repeats") => "Sets how many echoes follow the original sound.",
+        ("echo", "Mix") => "Blends original sound and echoes on the Audio output.",
+        ("distortion", "Drive") => "Sets how strongly the signal is distorted.",
+        ("distortion", "Tone") => "Sets the brightness of the distorted sound.",
+        ("distortion", "Mix") => "Blends original and distorted sound.",
+        ("distortion", "Output") => "Trims the level after the blend.",
         ("compressor", "Threshold") => "Sets the level above which louder passages are reduced.",
         ("compressor", "Ratio") => "Sets how strongly audio above the threshold is reduced.",
         ("compressor", "Make-up") => "Adds level after compression to compensate for the reduction.",
@@ -634,36 +632,40 @@ fn limiter(kind: &str, gate: bool, b: &mut Builder<'_>) {
     b.item(Item::Note("Sample peaks · No lookahead\nBypass removes limiting.\nLater gain can exceed this ceiling."));
 }
 
-/// The header tooltip (`NodeDescription`).
+/// The header tooltip (`NodeDescription`): the node's kind and one line on
+/// what it is for. What each control does is on the controls themselves;
+/// how to use the node is in Help.
 pub fn node_description(node: &GraphNode) -> String {
     let kind = if is_gate(node) { "gate" } else { node.kind.as_str() };
-    match kind {
-        "mono" => "Mono\nCombines left and right equally".into(),
-        "channelSwap" => "Channel Swap\nExchanges left and right\nChannel levels stay unchanged".into(),
-        "stereoWidth" => "Stereo Width\n0% · Mono\n100% · Original stereo\nAbove 100% · Wider stereo\nMono input remains mono".into(),
-        "stereoPan" => "Pan\nPositions a mono signal left to right\nStereo input is combined to mono first\nEqual-power curve · Centre is −3 dB per side".into(),
-        "crossfade" => "Crossfade\nBlends stereo inputs A and B\n0% · A only\n100% · B only\nBypass · A only".into(),
-        "stereoCombine" => "Stereo Combine\nLeft input → Left channel\nRight input → Right channel\nEach input is combined to mono\nAn empty input leaves its side silent".into(),
-        "stereoSplit" => "Stereo Split\nExtracts left and right separately\nEach output is a centred mono signal\nUse Stereo Combine to rebuild stereo".into(),
-        "control" => "Linked control\nScales connected levels while keeping their individual settings.".into(),
-        "gain" => "Gain\nAdjusts the incoming level\n0 dB · Unchanged".into(),
-        "mix" => "Mix\nCombines incoming audio\nLevel · Adjusts the combined volume".into(),
-        "highPass" => "High-pass\nReduces sound below the cutoff".into(),
-        "lowPass" => "Low-pass\nReduces sound above the cutoff".into(),
-        "denoiser" => "Denoiser\nSpeexDSP: faster, lighter cleanup.\nRNNoise: more delay, usually cleaner speech.\n20/30 ms is added node delay.".into(),
-        "deEsser" => "De-esser\nTames harsh S and SH sounds\nActs above the threshold".into(),
-        "plosive" => "Plosive remover\nTames low P and B thumps\nActs above the threshold".into(),
-        "reverb" => "Reverb\nAdds room-like decay\nAudio · Mix blends dry sound and reverb\nWet · Reverb only, independent of Mix\nBypass · Audio passes dry sound; Wet fades to silence\nThe reverb tail keeps advancing while bypassed".into(),
-        "echo" => "Echo\nAdds a chosen number of fading echoes\nTime · Gap before and between echoes\nRepeats · Echoes after the original sound\nMix · 0% original only; 100% echoes only\nAudio · The Mix blend\nEcho output · Echoes only, independent of Mix\nChanging Time or Repeats smoothly restarts the echoes".into(),
-        "distortion" => "Distortion\nAdds warmth through to stronger distortion\nDrive · Strength of the distortion\nTone · Brightness of the distorted sound\nMix · Original and distorted sound\nOutput · Final level adjustment\nAdds 0.67 ms delay, including Mix 0% and bypass".into(),
-        "voiceColor" => "Voice Color\nWarm / Bright · Tone\nNatural / Broadcast · Character\nBody, clarity and controlled thickening\nBottom centre · Neutral".into(),
-        "compressor" => "Compressor\nReduces its own louder passages\nRatio controls reduction above threshold".into(),
-        "limiter" => "Limiter\nSample-peak ceiling · No lookahead\nBypass removes limiting\nLater gain can exceed this ceiling".into(),
-        "ducking" => ducking_description(&node.ducking.mode),
-        "expander" => "Expander\nReduces quieter passages below the threshold\nTrigger · Optional detector-only input; otherwise uses Audio\nRatio · Reduction below threshold\nRange · Maximum attenuation".into(),
-        "gate" => "Gate\nCloses below the threshold\nTrigger · Optional detector-only input; otherwise uses Audio\nHold · Keeps the gate open briefly\nHysteresis · Separate closing threshold\nRange · Maximum attenuation".into(),
-        "alignmentDelay" => "Alignment Delay\nDelay one path to align it with another\n48 samples = 1 ms · Up to 2 seconds\nBypass · Undelayed audio".into(),
-        "reroute" => "Reroute\nA junction for organizing cables".into(),
-        _ => graph::kind_label(kind).to_owned(),
+    if kind == "ducking" {
+        return ducking_description(&node.ducking.mode);
     }
+    let summary = graph::catalog::summary(kind);
+    if summary.is_empty() { graph::kind_label(kind).to_owned() } else { format!("{}\n{summary}", graph::kind_label(kind)) }
+}
+
+/// Every dial a node of this kind and state can show (interface tests).
+#[cfg(test)]
+pub fn dial_specs(node: &GraphNode) -> Vec<Spec> {
+    fn collect(items: &[Item], out: &mut Vec<Spec>) {
+        for item in items {
+            match item {
+                Item::Dial(dial, _) | Item::Multiplier(dial) => out.push(dial.spec.clone()),
+                Item::Tone(dials) => out.extend(dials.iter().map(|d| d.spec.clone())),
+                Item::Group { cells, .. } => {
+                    for cell in cells {
+                        match cell {
+                            Cell::Dial(dial) => out.push(dial.spec.clone()),
+                            Cell::Alternatives(dials, _) => out.extend(dials.iter().map(|d| d.spec.clone())),
+                        }
+                    }
+                }
+                Item::Alternatives(alternatives, _) => alternatives.iter().for_each(|items| collect(items, out)),
+                _ => {}
+            }
+        }
+    }
+    let mut specs = Vec::new();
+    collect(&items(node), &mut specs);
+    specs
 }

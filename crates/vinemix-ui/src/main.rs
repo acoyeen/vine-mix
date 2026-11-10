@@ -97,6 +97,18 @@ fn main() -> ExitCode {
         let platform = update::windows::WindowsPlatform;
         return code(update::worker::run(transaction, &platform, None, None));
     }
+    // Without a resolvable per-user data folder nothing is opened, created
+    // or saved: never fall back to the working directory.
+    if !options.preview
+        && let Err(error) = paths::try_data_directory()
+    {
+        return fail(
+            "VineMix \u{b7} Could not start",
+            &format!(
+                "VineMix could not locate its application data folder, so no saved workspace was opened or changed. Sign out and back in, then try again.\n\n{error}"
+            ),
+        );
+    }
     if let Some(transaction) = &options.update_health {
         if update::session::begin_health(transaction, options.settings.as_deref()).is_err() {
             return ExitCode::from(1);
@@ -194,6 +206,10 @@ fn main() -> ExitCode {
             }
         });
     }
+    // The local activation scripts recognise a ready workspace by this exact
+    // title together with the window class winit registers ("Window Class");
+    // see `WorkspaceFramework` in scripts/assert-desktop-data-context.ps1.
+    // Change either only together with that guard and its fixtures.
     #[cfg(not(feature = "rust-edition"))]
     let (icon, title) = (include_bytes!("../assets/branding/app.png").as_slice(), "VineMix · Patch workspace");
     #[cfg(feature = "rust-edition")]

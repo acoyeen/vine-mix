@@ -45,14 +45,62 @@ enum Engine {
     Band(BandReduction),
 }
 
-#[derive(Clone, Debug, Default, PartialEq)]
+/// Copyable image of [`DenoiserSettings`]: the validated algorithm name is
+/// reduced to a flag so storing a node's settings never touches the heap.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+struct DenoiserKey {
+    suppression_db: f64,
+    neural: bool,
+    rnnoise_mix: f64,
+}
+
+impl DenoiserKey {
+    fn of(s: &DenoiserSettings) -> Self {
+        Self { suppression_db: s.suppression_db, neural: s.algorithm == "rnnoise", rnnoise_mix: s.rnnoise_mix }
+    }
+}
+
+/// Copyable image of [`ExpanderSettings`] (mode name reduced to a flag).
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+struct ExpanderKey {
+    gate: bool,
+    threshold_db: f64,
+    ratio: f64,
+    attack_ms: f64,
+    hold_ms: f64,
+    release_ms: f64,
+    range_db: f64,
+    hysteresis_db: f64,
+}
+
+impl ExpanderKey {
+    fn of(s: &ExpanderSettings) -> Self {
+        Self {
+            gate: s.mode == "gate",
+            threshold_db: s.threshold_db,
+            ratio: s.ratio,
+            attack_ms: s.attack_ms,
+            hold_ms: s.hold_ms,
+            release_ms: s.release_ms,
+            range_db: s.range_db,
+            hysteresis_db: s.hysteresis_db,
+        }
+    }
+}
+
+/// The settings an effect was last configured with. Every field is `Copy`:
+/// `configure` runs inside `GraphProcessor::process` on the mixer thread, and
+/// `inherit`/`adopt` run there too, so recording or comparing settings must
+/// never allocate or free. Plan compilation has already validated the mode
+/// names, so the flags carry the same information as the strings.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 struct Settings {
-    denoiser: DenoiserSettings,
+    denoiser: DenoiserKey,
     de_esser: DeEsserSettings,
     plosive: PlosiveSettings,
     reverb: ReverbSettings,
     voice_color: VoiceColorSettings,
-    expander: ExpanderSettings,
+    expander: ExpanderKey,
     alignment_delay: AlignmentDelaySettings,
     echo: EchoSettings,
     distortion: DistortionSettings,
@@ -61,42 +109,16 @@ struct Settings {
 impl Settings {
     fn of(node: &PlanNode) -> Self {
         Self {
-            denoiser: node.denoiser.clone(),
+            denoiser: DenoiserKey::of(&node.denoiser),
             de_esser: node.de_esser,
             plosive: node.plosive,
             reverb: node.reverb,
             voice_color: node.voice_color,
-            expander: node.expander.clone(),
+            expander: ExpanderKey::of(&node.expander),
             alignment_delay: node.alignment_delay,
             echo: node.echo,
             distortion: node.distortion,
         }
-    }
-
-    fn matches(&self, node: &PlanNode) -> bool {
-        self.denoiser == node.denoiser
-            && self.de_esser == node.de_esser
-            && self.plosive == node.plosive
-            && self.reverb == node.reverb
-            && self.voice_color == node.voice_color
-            && self.expander == node.expander
-            && self.alignment_delay == node.alignment_delay
-            && self.echo == node.echo
-            && self.distortion == node.distortion
-    }
-
-    fn copy_from(&mut self, other: &Self) {
-        // `clone_from` reuses the existing string buffers when they fit, so
-        // the audio-thread copy never allocates for unchanged mode names.
-        self.denoiser.clone_from(&other.denoiser);
-        self.de_esser = other.de_esser;
-        self.plosive = other.plosive;
-        self.reverb = other.reverb;
-        self.voice_color = other.voice_color;
-        self.expander.clone_from(&other.expander);
-        self.alignment_delay = other.alignment_delay;
-        self.echo = other.echo;
-        self.distortion = other.distortion;
     }
 }
 
@@ -152,11 +174,12 @@ impl AdvancedEffect {
     /// Applies a node's settings. Unchanged settings are a no-op, so a plan
     /// re-published for an unrelated edit never restarts a ramp.
     pub fn configure(&mut self, node: &PlanNode) {
-        if self.configured && self.settings.matches(node) {
+        let settings = Settings::of(node);
+        if self.configured && self.settings == settings {
             return;
         }
         let first = !self.configured;
-        self.settings = Settings::of(node);
+        self.settings = settings;
         self.configured = true;
         match &mut self.engine {
             Engine::Expander(expander) => expander.configure(&node.expander),
@@ -230,7 +253,7 @@ impl AdvancedEffect {
             (Engine::Band(a), Engine::Band(b)) => *a = *b,
             _ => {}
         }
-        self.settings.copy_from(&previous.settings);
+        self.settings = previous.settings;
         self.configured = previous.configured;
     }
 

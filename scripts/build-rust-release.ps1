@@ -4,10 +4,19 @@ Builds the Rust VineMix release candidates: the installed payload and its
 Setup, and the standalone single-file executable.
 
 .DESCRIPTION
-Windows PowerShell 5.1 compatible. Uses the pinned toolchains under .tools
-(LLVM-MinGW, Inno Setup) and the verified driver archives listed in
-installer\drivers.json. Nothing is installed, launched against user data or
-published; every candidate stays in a new staging directory.
+Windows PowerShell 5.1 compatible. Uses the exact Rust release, build target
+and LLVM-MinGW named by rust-toolchain.toml and tools\rust-pins.json (see
+scripts\rust-env.ps1), Inno Setup under .tools, and the verified driver
+archives listed in installer\drivers.json. Nothing is installed, launched
+against user data or published; every candidate stays in a new staging
+directory.
+
+A release candidate is built from a source tree that matches its commit. The
+tree is checked before compiling and again afterwards, and the output
+directory receives a build receipt: the commit, a digest of every build
+input, the toolchain identities and the SHA-256 of every produced file. Each
+desktop executable reports the same commit and digest under About and in its
+inert smoke report, and the script checks that they agree.
 #>
 [CmdletBinding()]
 param(
@@ -18,7 +27,10 @@ param(
     [switch]$SkipInstaller,
     # Builds the standalone with the orange "VineMix (Rust)" identity, to run
     # beside an installed 0.5 without confusing the two.
-    [switch]$RustEdition
+    [switch]$RustEdition,
+    # Builds from a tree that differs from its commit. Every identity then says
+    # "dirty" and the receipt is not a release-candidate receipt.
+    [switch]$AllowDirty
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -49,20 +61,49 @@ $stage = [IO.Path]::GetFullPath($StageDirectory)
 if (Test-Path -LiteralPath $stage) { throw 'Choose a new StageDirectory; earlier candidates are retained.' }
 if (-not $OutputDirectory) { $OutputDirectory = Join-Path $stage 'output' }
 $output = [IO.Path]::GetFullPath($OutputDirectory)
+
+# The exact Rust release, target and LLVM-MinGW; never the first llvm-mingw-*
+# directory found, nor whatever target the installed Rust defaults to.
+. (Join-Path $PSScriptRoot 'rust-env.ps1')
+$toolchain = Initialize-RustEnvironment -Project $project
+$target = $toolchain.target
+
+# Source identity, before anything is compiled or created.
+$sourceScript = Join-Path $PSScriptRoot 'get-rust-source-identity.ps1'
+$source = & $sourceScript -Project $project
+if (-not $source.inputsMatchCommit -and -not $AllowDirty) {
+    if (-not $source.gitDirty) {
+        throw ('The build inputs are not byte for byte those of the commit: ' + @($source.lineEndingsConverted).Count + ' file(s) have converted line endings in this work tree (for example ' + @($source.lineEndingsConverted)[0] + '). Build from a checkout that follows .gitattributes, or pass -AllowDirty for a candidate that is labelled dirty.')
+    }
+    throw 'The source tree differs from its commit, so the result could not be tied to that commit. Commit or stash the changes, or pass -AllowDirty for a candidate that is labelled dirty.'
+}
+$revision = if ($source.inputsMatchCommit) { $source.gitHead } else { $source.gitHead + '-dirty' }
+$buildTime = [DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ssZ')
 $null = New-Item -ItemType Directory -Force -Path $stage, $output
 
-# Toolchain from the checkout.
-$mingw = Get-ChildItem -LiteralPath (Join-Path $project '.tools') -Directory | Where-Object Name -like 'llvm-mingw-*' | Select-Object -First 1
-if (-not $mingw) { throw 'The pinned LLVM-MinGW toolchain is missing from .tools.' }
-$env:PATH = (Join-Path $env:USERPROFILE '.cargo\bin') + ';' + (Join-Path $mingw.FullName 'bin') + ';' + $env:PATH
+function Assert-BuildIdentity([string]$SmokeDirectory, [string]$Name) {
+    # The executable that just ran reports what was compiled into it.
+    $report = Get-Content -LiteralPath (Join-Path $SmokeDirectory 'results.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+    $build = if ($report.PSObject.Properties['build']) { $report.build } else { $null }
+    if (-not $report.passed -or $report.version -cne $version -or $null -eq $build -or
+        [string]$build.sourceRevision -cne $revision -or [string]$build.sourceSnapshotSha256 -cne $source.sourceSnapshotSha256 -or
+        [string]$build.builtUtc -cne $buildTime) {
+        throw ($Name + ' does not report the source identity of this build; it may be a stale binary.')
+    }
+}
+
+$env:VINEMIX_SOURCE_REVISION = $revision
+$env:VINEMIX_SOURCE_SNAPSHOT_SHA256 = $source.sourceSnapshotSha256
+$env:VINEMIX_BUILD_TIMESTAMP = $buildTime
 Push-Location $project
 try {
-    & cargo build --release --locked -p vinemix-ui -p vinemix-engine -p vinemix-setup-helper
+    & cargo build --release --locked --target $target -p vinemix-ui -p vinemix-engine -p vinemix-setup-helper
     if ($LASTEXITCODE -ne 0) { throw 'cargo build failed.' }
-    & py -3 (Join-Path $project 'tools\rust-notices.py')
-    if ($LASTEXITCODE -ne 0) { throw 'Third-party notice generation failed.' }
+    # Checked, not rewritten: a release never modifies its own source tree.
+    & py -3 (Join-Path $project 'tools\rust-notices.py') --check
+    if ($LASTEXITCODE -ne 0) { throw 'licenses\Rust-crates.txt does not match the locked dependencies. Run "py -3 tools\rust-notices.py", review and commit the result.' }
 } finally { Pop-Location }
-$built = Join-Path $project 'target\release'
+$built = Join-Path $project ('target\' + $target + '\release')
 
 # Notices shipped with every distribution (Rust build allowlist).
 $licenseNames = @('IBM-Plex-OFL.txt', 'libsamplerate-LICENSE', 'libsamplerate-source-notices.txt', 'SpeexDSP-COPYING.txt',
@@ -91,6 +132,7 @@ if ($LASTEXITCODE -ne 0 -or -not $engineVersion.Contains($version)) { throw 'The
 $smoke = Join-Path $stage ('smoke-installed-' + [Guid]::NewGuid().ToString('N'))
 & (Join-Path $payload 'VineMix.exe') --release-smoke $smoke | Out-Null
 if ($LASTEXITCODE -ne 0) { throw 'The installed release smoke check failed. See ' + $smoke }
+Assert-BuildIdentity $smoke 'The installed desktop'
 
 # Standalone single-file executable.
 $runtime = Join-Path $stage 'runtime-source'
@@ -104,18 +146,19 @@ $env:VINEMIX_RUNTIME_MANIFEST = Join-Path $packed 'VineMix.Runtime.manifest.json
 Push-Location $project
 try {
     $features = if ($RustEdition) { 'standalone,rust-edition' } else { 'standalone' }
-    & cargo build --release --locked -p vinemix-ui --features $features --target-dir (Join-Path $project 'target\standalone')
+    & cargo build --release --locked --target $target -p vinemix-ui --features $features --target-dir (Join-Path $project 'target\standalone')
     if ($LASTEXITCODE -ne 0) { throw 'The standalone build failed.' }
 } finally {
     Pop-Location
     Remove-Item Env:VINEMIX_RUNTIME_ZIP, Env:VINEMIX_RUNTIME_MANIFEST -ErrorAction SilentlyContinue
 }
 $standalone = Join-Path $output ('VineMix-' + $version + '-Standalone-x64.exe')
-Copy-Checked (Join-Path $project 'target\standalone\release\vinemix.exe') $standalone
+Copy-Checked (Join-Path $project ('target\standalone\' + $target + '\release\vinemix.exe')) $standalone
 Assert-FileVersion $standalone $version $numeric
 $smoke = Join-Path $stage ('smoke-standalone-' + [Guid]::NewGuid().ToString('N'))
 & $standalone --release-smoke $smoke | Out-Null
 if ($LASTEXITCODE -ne 0) { throw 'The standalone release smoke check failed. See ' + $smoke }
+Assert-BuildIdentity $smoke 'The standalone desktop'
 
 if (-not $SkipInstaller) {
     $support = Join-Path $payload 'SetupSupport'
@@ -156,9 +199,84 @@ if (-not $SkipInstaller) {
     if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $installer)) { throw 'Installer compilation failed. See compiler.log in the stage directory.' }
 }
 
+Remove-Item Env:VINEMIX_SOURCE_REVISION, Env:VINEMIX_SOURCE_SNAPSHOT_SHA256, Env:VINEMIX_BUILD_TIMESTAMP -ErrorAction SilentlyContinue
+
+# The receipt describes one source state only if nothing changed meanwhile.
+$sourceAfter = & $sourceScript -Project $project
+if ($sourceAfter.gitHead -cne $source.gitHead -or $sourceAfter.gitDirty -ne $source.gitDirty -or $sourceAfter.inputsMatchCommit -ne $source.inputsMatchCommit -or
+    $sourceAfter.sourceSnapshotSha256 -cne $source.sourceSnapshotSha256) {
+    throw 'The source tree changed while building. These candidates do not correspond to one source state; build again.'
+}
+
+function Get-Sha256Lower([string]$Path) { (Hash $Path).ToLowerInvariant() }
+function Get-OutputRecord([string]$Root, [string]$Label, $File) {
+    [ordered]@{ path = ($Label + '/' + $File.FullName.Substring($Root.Length + 1).Replace('\', '/')); size = $File.Length; sha256 = (Get-Sha256Lower $File.FullName) }
+}
+$produced = New-Object Collections.Generic.List[object]
+foreach ($file in Get-ChildItem -LiteralPath $payload -File -Recurse | Sort-Object FullName) { $produced.Add((Get-OutputRecord $payload 'payload' $file)) }
+foreach ($file in Get-ChildItem -LiteralPath $packed -File -Recurse | Sort-Object FullName) { $produced.Add((Get-OutputRecord $packed 'runtime' $file)) }
+foreach ($file in Get-ChildItem -LiteralPath $output -File -Filter '*.exe' | Sort-Object FullName) { $produced.Add((Get-OutputRecord $output 'output' $file)) }
+$inputs = [ordered]@{}
+foreach ($name in @('Cargo.lock', 'Cargo.toml', 'rust-toolchain.toml', '.cargo\config.toml', 'tools\rust-pins.json', 'release.json', 'installer\drivers.json')) {
+    $inputs[$name.Replace('\', '/')] = Get-Sha256Lower (Join-Path $project $name)
+}
+$receipt = [ordered]@{
+    format = 1
+    product = 'VineMix'
+    version = $version
+    numericVersion = $numeric
+    builtUtc = $buildTime
+    # False for -AllowDirty builds: the commit alone does not describe them.
+    releaseCandidate = [bool]$source.inputsMatchCommit
+    embeddedSourceRevision = $revision
+    source = [ordered]@{
+        gitHead = $source.gitHead
+        gitDirty = $source.gitDirty
+        inputsDirty = $source.inputsDirty
+        changedInputs = @($source.changedInputs)
+        lineEndingsConverted = @($source.lineEndingsConverted)
+        inputsMatchCommit = $source.inputsMatchCommit
+        linkedWorktree = $source.linkedWorktree
+        sourceSnapshotSha256 = $source.sourceSnapshotSha256
+        snapshotFormat = $source.snapshotFormat
+        scope = $source.scope
+        fileCount = $source.fileCount
+        files = $source.files
+    }
+    toolchain = [ordered]@{
+        target = $toolchain.target
+        rustRelease = $toolchain.rustRelease
+        rustc = $toolchain.rustc
+        cargo = $toolchain.cargo
+        rustHost = $toolchain.rustHost
+        llvmMingw = $toolchain.llvmMingw
+        clang = $toolchain.clang
+    }
+    inputs = $inputs
+    build = [ordered]@{
+        profile = 'release'
+        cargoArguments = ('build --release --locked --target ' + $target)
+        packages = @('vinemix-ui', 'vinemix-engine', 'vinemix-setup-helper')
+        standaloneFeatures = $features
+        installerBuilt = (-not $SkipInstaller)
+    }
+    verified = @(
+        'Source tree identical before and after the build',
+        'Version resources of every executable match release.json',
+        'Installed and standalone desktop executables report this revision, snapshot digest and build time',
+        'Third-party notices match the locked dependencies'
+    )
+    outputs = $produced.ToArray()
+}
+$receiptPath = Join-Path $output ('VineMix-' + $version + '-build-receipt.json')
+Write-Utf8 $receiptPath (($receipt | ConvertTo-Json -Depth 8) + "`n")
+
 foreach ($file in Get-ChildItem -LiteralPath $output -File -Filter '*.exe') {
     Write-Utf8 ($file.FullName + '.sha256') ((Hash $file.FullName) + '  ' + $file.Name + "`n")
     Write-Host ($file.Name + '  ' + (Hash $file.FullName))
 }
+Write-Host ('Source: ' + $revision + '  snapshot ' + $source.sourceSnapshotSha256)
+Write-Host ('Receipt: ' + (Split-Path -Leaf $receiptPath) + '  ' + (Hash $receiptPath))
 Write-Host ('Stage: ' + $stage)
+if (-not $source.inputsMatchCommit) { Write-Host 'This build came from inputs that differ from its commit (-AllowDirty). It is not a release candidate.' }
 Write-Host 'Unpublished release candidates built. No application session or driver was installed or launched.'

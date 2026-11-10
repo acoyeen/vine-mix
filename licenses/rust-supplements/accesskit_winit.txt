@@ -1,0 +1,6 @@
+Crate: accesskit_winit
+Manifest-License: Apache-2.0
+Used-Under: Apache-2.0
+Text: Apache-2.0.txt
+Basis: The package published on crates.io contains no licence file. Its manifest names Apache-2.0 only.
+Review: Pending: confirm against https://github.com/AccessKit/accesskit that binaries need no further notice (a NOTICE file, or separate terms for code derived from another project).

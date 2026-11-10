@@ -262,7 +262,23 @@ impl ConfigurationStore {
         if !self.writable() {
             return Err(StoreError::permanent("Choose workspace recovery before saving any changes."));
         }
-        validate_configuration(configuration)?;
+        let (validated, _) = vinemix_model::validate::validate_and_compile(configuration)?;
+        self.save_validated(validated)
+    }
+
+    /// Serialises and durably commits a configuration whose validation the
+    /// caller already holds proof of. The store's boundary is unchanged:
+    /// nothing unvalidated can reach it, because a [`Validated`] exists only
+    /// for a configuration that passed full validation and cannot have been
+    /// modified since.
+    pub fn save_validated(&mut self, configuration: vinemix_model::validate::Validated<'_>) -> Result<(), StoreError> {
+        let configuration = configuration.configuration();
+        if !self.inspected {
+            let _ = self.load();
+        }
+        if !self.writable() {
+            return Err(StoreError::permanent("Choose workspace recovery before saving any changes."));
+        }
         // A commit must also be readable on the next launch.
         let text = settings_text(configuration);
         if text.len() > MAXIMUM_SETTINGS_BYTES {

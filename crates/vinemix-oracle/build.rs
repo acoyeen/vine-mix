@@ -1,5 +1,12 @@
 //! Builds the 0.5 C/C++ DSP with the 0.5 release flags (-O3 -DNDEBUG, the
 //! same defines and per-file ISA options as CMakeLists.txt).
+//!
+//! The reference sources are not in the repository; `scripts/fetch-reference-
+//! sources.ps1` provides them. Without them an ordinary build still succeeds
+//! and the comparisons report themselves as ignored (`tests/availability.rs`).
+//! A qualification run sets `VINEMIX_REQUIRE_ORACLE=1`, which turns missing
+//! sources into a build failure so the comparisons can never be skipped
+//! unnoticed.
 
 use std::path::{Path, PathBuf};
 
@@ -12,10 +19,14 @@ fn main() {
     let json = third.join("json-3.12.0/json");
     let samplerate = third.join("libsamplerate-0.2.2");
     let native = root.join("native");
+    println!("cargo::rerun-if-env-changed=VINEMIX_REQUIRE_ORACLE");
+    let required = std::env::var_os("VINEMIX_REQUIRE_ORACLE").is_some_and(|value| !value.is_empty() && value != "0");
     for path in [&speex, &rnnoise, &json, &samplerate, &third.join("src/rnnoise_data.c")] {
         println!("cargo::rerun-if-changed={}", path.display());
         if !path.exists() {
-            println!("cargo::warning=vinemix-oracle: reference sources missing; parity tests are skipped");
+            let missing = format!("vinemix-oracle: reference source {} is missing (run scripts/fetch-reference-sources.ps1)", path.display());
+            assert!(!required, "{missing}. VINEMIX_REQUIRE_ORACLE is set, so the parity comparisons must not be skipped.");
+            println!("cargo::warning={missing}; the parity comparisons are not built and report as ignored");
             return;
         }
     }

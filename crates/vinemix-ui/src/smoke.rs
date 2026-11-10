@@ -83,6 +83,7 @@ pub fn run(directory: &Path) -> i32 {
             "version": vinemix_platform::release::VERSION,
             "displayVersion": vinemix_platform::release::DISPLAY_VERSION,
             "mode": crate::runtime::build_mode(),
+            "build": crate::ui::about::build_identity(),
             "payload": payload,
             "extractedEngine": extracted,
             "notices": notices,

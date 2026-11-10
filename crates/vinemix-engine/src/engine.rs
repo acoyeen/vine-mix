@@ -24,11 +24,12 @@ use std::thread::JoinHandle;
 use serde_json::Value;
 use vinemix_dsp::{live_spectrum, GraphProcessor, SpectrumConsumer, SpectrumProducer};
 use vinemix_model::config::{Configuration, DeviceBinding, GraphNode};
+use vinemix_model::identity;
 use vinemix_model::json::ObjectBuilder;
 use vinemix_model::limits::MAXIMUM_GRAPH_NODES;
-use vinemix_model::plan::{compile_graph, graph_signal_channels, same_graph_topology, GraphPlan};
+use vinemix_model::plan::{compile_graph, graph_signal_channels, same_graph_topology, same_indexing, GraphPlan};
 use vinemix_model::status::{ApplicationInfo, Endpoint, EngineStatus, NodeStatus, PathState};
-use vinemix_model::validate::validate_configuration;
+use vinemix_model::validate::validate_and_compile;
 use vinemix_model::GraphKind;
 use vinemix_rt::{frame_queue, CaptureBufferReader, Consumer, Frame, MixClock, Producer, QUANTUM_FRAMES, SAMPLE_RATE};
 use vinemix_wasapi::{enumerate_audio_applications, process_capture_available, AudioWorker, DeviceCatalog, ProcessCaptureWorker, QueueEnd};
@@ -125,23 +126,17 @@ fn resolve_output(node: &GraphNode, devices: &[Endpoint]) -> OutputTarget {
             if assigned { "device_unavailable" } else { "" },
         ),
     };
-    let exact = devices
-        .iter()
-        .find(|e| !node.device.id.is_empty() && e.id == node.device.id && e.direction == "render");
-    let mut matched = exact.filter(|e| e.state == "Active");
-    if matched.is_none() && !node.device.stable_id.is_empty() {
-        for endpoint in devices {
-            if endpoint.direction != "render" || endpoint.state != "Active" || endpoint.stable_id != node.device.stable_id {
-                continue;
-            }
-            if matched.is_some() {
-                // An ambiguous fallback stays unresolved.
-                result.unavailable.message = "Several devices match the saved output; select the device again".into();
-                return result;
-            }
-            matched = Some(endpoint);
+    // The same identity rule as input workers, validation and the chooser.
+    let exact = identity::exact(devices, &node.device, "render");
+    let matched = match identity::resolve(devices, &node.device, "render") {
+        identity::Resolution::Active(endpoint, _) => Some(endpoint),
+        identity::Resolution::Ambiguous => {
+            // An ambiguous fallback stays unresolved.
+            result.unavailable.message = "Several devices match the saved output; select the device again".into();
+            return result;
         }
-    }
+        identity::Resolution::Unresolved => None,
+    };
     let Some(matched) = matched else {
         if let Some(exact) = exact {
             result.unavailable.endpoint_id.clone_from(&exact.id);
@@ -352,7 +347,9 @@ impl Spectrum {
 struct Runtime {
     generation: u64,
     plan: GraphPlan,
-    processor: AudioCell<GraphProcessor>,
+    /// Shared by consecutive runtimes that differ only in parameters: the
+    /// mixer then retargets it in place instead of adopting a new one.
+    processor: Arc<AudioCell<GraphProcessor>>,
     ports: Vec<Option<Arc<Port>>>,
     meters: Vec<Arc<Meter>>,
     spectra: Vec<Option<Arc<Spectrum>>>,
@@ -361,10 +358,51 @@ struct Runtime {
 struct ConfigState {
     store: ConfigurationStore,
     configuration: Configuration,
+    /// Advances whenever `configuration` is replaced (snapshot gating).
+    configuration_generation: u64,
+    // Boxed on purpose: the mixer holds raw pointers to published runtimes,
+    // so a runtime must keep its address when this list grows or shrinks.
+    #[allow(clippy::vec_box)]
     runtimes: Vec<Box<Runtime>>,
     next_generation: u64,
     warning: String,
 }
+
+/// The device and application lists carried by snapshots.
+#[derive(Debug, Default)]
+struct Inventory {
+    endpoints: Vec<Endpoint>,
+    applications: Vec<ApplicationInfo>,
+    /// Advances whenever either list changes (snapshot gating).
+    generation: u64,
+}
+
+/// What a control client says it already holds, as the opaque tokens of an
+/// earlier snapshot. A part whose token is still current is left out of the
+/// reply: polling at 30 Hz then carries telemetry, not an unchanged
+/// configuration and device list. Absent (older clients), everything is sent.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Known<'a> {
+    pub configuration: Option<&'a str>,
+    pub inventory: Option<&'a str>,
+}
+
+/// What a control client is currently showing. Work that only feeds a
+/// display is done on demand: an EQ's spectrum is analysed only while some
+/// client lists that node, and running applications are enumerated only
+/// while a client wants the list. A client that says nothing (older
+/// clients) is treated as wanting everything, as before.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Interest<'a> {
+    /// EQ node ids whose spectrum is on screen; `None` means all.
+    pub spectrum: Option<&'a [&'a str]>,
+    /// Whether the application list is wanted; `None` means yes.
+    pub applications: Option<bool>,
+}
+
+/// How long one request's interest in the application list lasts. The
+/// desktop polls at least once a second while it wants the list.
+const APPLICATION_INTEREST: std::time::Duration = std::time::Duration::from_secs(3);
 
 struct Inner {
     state: Mutex<ConfigState>,
@@ -377,7 +415,19 @@ struct Inner {
     spectrum_revision: AtomicU64,
     stop_event: vinemix_wasapi::win::Event,
     catalog: Arc<DeviceCatalog>,
-    inventory: Mutex<(Vec<Endpoint>, Vec<ApplicationInfo>)>,
+    inventory: Mutex<Inventory>,
+    /// Distinguishes this engine's snapshot tokens from any other engine's.
+    token_seed: u64,
+    /// When the engine was created; the clock for `applications_wanted_until`.
+    created: std::time::Instant,
+    /// Milliseconds after `created` until which a client wants the
+    /// application list (0: nobody has asked).
+    applications_wanted_until: AtomicU64,
+    /// Wakes maintenance when interest in the application list resumes.
+    maintenance_wake: vinemix_wasapi::win::Event,
+    /// The settings file's physical location, refreshed by maintenance so
+    /// that snapshots never open the file while holding the state lock.
+    physical_settings: Mutex<String>,
     log: crate::log::Log,
     started: AtomicBool,
 }
@@ -429,8 +479,9 @@ impl Engine {
         std::panic::set_hook(Box::new(move |info| panic_log.write(&format!("Fatal error: {info}"))));
         let catalog = Arc::new(DeviceCatalog::new().map_err(|_| message("Could not create device notification events"))?);
         let endpoints = catalog.enumerate();
+        let physical_settings = physical_settings_path(&store);
         let inner = Arc::new(Inner {
-            state: Mutex::new(ConfigState { store, configuration, runtimes: Vec::new(), next_generation: 0, warning }),
+            state: Mutex::new(ConfigState { store, configuration, configuration_generation: 1, runtimes: Vec::new(), next_generation: 0, warning }),
             published: AtomicPtr::new(std::ptr::null_mut()),
             active_generation: AtomicU64::new(0),
             stopping: AtomicBool::new(false),
@@ -442,7 +493,12 @@ impl Engine {
             spectrum_revision: AtomicU64::new(qpc() as u64),
             stop_event: vinemix_wasapi::win::Event::new(true).map_err(|_| message("Cannot create the audio engine stop event."))?,
             catalog,
-            inventory: Mutex::new((endpoints, Vec::new())),
+            inventory: Mutex::new(Inventory { endpoints, applications: Vec::new(), generation: 1 }),
+            token_seed: (qpc() as u64) ^ (u64::from(std::process::id()) << 32),
+            created: std::time::Instant::now(),
+            applications_wanted_until: AtomicU64::new(0),
+            maintenance_wake: vinemix_wasapi::win::Event::new(false).map_err(|_| message("Cannot create the maintenance event."))?,
+            physical_settings: Mutex::new(physical_settings),
             log: crate::log::Log::new(log_path),
             started: AtomicBool::new(false),
         });
@@ -464,7 +520,7 @@ impl Engine {
                 if state.store.writable() {
                     let plan = compile_graph(&state.configuration.graph)?;
                     let configuration = state.configuration.clone();
-                    let runtime = prepare(inner, &mut state, &configuration, plan)?;
+                    let runtime = prepare(inner, &mut state, &configuration, plan, None)?;
                     publish(inner, &mut state, runtime);
                 }
             }
@@ -516,7 +572,7 @@ impl Engine {
     }
 
     pub fn endpoints(&self) -> Vec<Endpoint> {
-        self.inner.inventory.lock().unwrap_or_else(|e| e.into_inner()).0.clone()
+        self.inner.inventory.lock().unwrap_or_else(|e| e.into_inner()).endpoints.clone()
     }
 
     /// Applies a full configuration if `expected_revision` is current.
@@ -537,29 +593,32 @@ impl Engine {
             return Err(message("The audio engine is not adopting changes. Wait briefly or restart the engine."));
         }
         config.revision = state.configuration.revision + 1;
-        validate_configuration(&config)?;
+        // One validation and one compilation per accepted edit: the plan
+        // built here is the one published, and the store accepts the proof.
+        let (validated, plan) = validate_and_compile(&config)?;
         validate_endpoints(&self.endpoints(), &config)?;
-        let plan = compile_graph(&config.graph)?;
         let current = inner.published.load(Ordering::Acquire);
         // SAFETY: published runtimes are owned by `state.runtimes`, which we hold.
         let current = unsafe { current.as_ref() };
-        let mut audio_unchanged = current.is_some_and(|c| c.plan == plan);
-        if audio_unchanged {
-            let devices = inner.catalog.enumerate();
-            let current = current.expect("checked above");
-            for (i, node) in plan.nodes.iter().enumerate() {
-                let target = node.kind.is_sink().then(|| resolve_output(&config.graph.nodes[i], &devices));
-                if let Some(port) = &current.ports[i] {
-                    if !port.matches(&config.graph.nodes[i], target.as_ref()) {
-                        audio_unchanged = false;
-                        break;
-                    }
-                }
+        let same_plan = current.is_some_and(|c| c.plan == plan);
+        // Every stream the published runtime uses is still the right one.
+        let ports_unchanged = current.is_some_and(|c| {
+            (same_plan || same_indexing(&c.plan, &plan)) && {
+                let devices = inner.catalog.enumerate();
+                plan.nodes.iter().enumerate().all(|(i, node)| {
+                    let target = node.kind.is_sink().then(|| resolve_output(&config.graph.nodes[i], &devices));
+                    c.ports[i].as_ref().is_none_or(|port| port.matches(&config.graph.nodes[i], target.as_ref()))
+                })
             }
-        }
-        let runtime = if audio_unchanged { None } else { Some(prepare(inner, &mut state, &config, plan)?) };
-        state.store.save(&config)?;
+        });
+        let audio_unchanged = same_plan && ports_unchanged;
+        // A parameter edit (same nodes, cables and streams) keeps the
+        // processor: no effect storage is allocated and no state is copied.
+        let share = if ports_unchanged { current.map(|c| c.processor.clone()) } else { None };
+        let runtime = if audio_unchanged { None } else { Some(prepare(inner, &mut state, &config, plan, share)?) };
+        state.store.save_validated(validated)?;
         state.configuration = config;
+        state.configuration_generation += 1;
         // Canvas positions, names and reset anchors persist, but they never
         // rebuild denoiser plans or reverb delays at the next audio boundary.
         if let Some(runtime) = runtime {
@@ -578,6 +637,8 @@ impl Engine {
         let mut state = lock(inner);
         let recovered = state.store.recover(action)?;
         state.configuration = recovered;
+        state.configuration_generation += 1;
+        *inner.physical_settings.lock().unwrap_or_else(|e| e.into_inner()) = physical_settings_path(&state.store);
         state.warning = state.store.warning().to_owned();
         if !state.store.writable() || !inner.started.load(Ordering::Acquire) {
             return Ok(());
@@ -585,7 +646,7 @@ impl Engine {
         let configuration = state.configuration.clone();
         let result = compile_graph(&configuration.graph)
             .map_err(EngineError::from)
-            .and_then(|plan| prepare(inner, &mut state, &configuration, plan));
+            .and_then(|plan| prepare(inner, &mut state, &configuration, plan, None));
         match result {
             Ok(runtime) => {
                 publish(inner, &mut state, runtime);
@@ -603,7 +664,19 @@ impl Engine {
 
     /// The full engine snapshot (protocol v1 `snapshot` object).
     pub fn snapshot(&self) -> Value {
-        snapshot(&self.inner)
+        snapshot(&self.inner, Known::default(), Interest::default())
+    }
+
+    /// The snapshot without the parts `known` shows the client already has,
+    /// doing display-only work for what `interest` says is being shown.
+    pub fn snapshot_for(&self, known: Known<'_>, interest: Interest<'_>) -> Value {
+        snapshot(&self.inner, known, interest)
+    }
+
+    /// Whether maintenance is currently enumerating applications (a client
+    /// asked for the list within the interest window).
+    pub fn applications_wanted(&self) -> bool {
+        applications_wanted(&self.inner)
     }
 
     /// The configuration revision and load state, cheaply.
@@ -648,27 +721,13 @@ pub fn validate_endpoints(devices: &[Endpoint], config: &Configuration) -> Resul
             continue;
         }
         let direction = if capture { "capture" } else { "render" };
-        let exact =
-            devices.iter().find(|e| !node.device.id.is_empty() && e.id == node.device.id && e.direction == direction);
-        let mut matched = exact.filter(|e| e.state == "Active");
-        // Match worker resolution: an exact active ID wins; otherwise one
-        // active stable match. Ambiguous identities stay saved, unresolved.
-        let mut ambiguous = false;
-        if matched.is_none() && !node.device.stable_id.is_empty() {
-            for candidate in devices {
-                if candidate.direction != direction || candidate.state != "Active" || candidate.stable_id != node.device.stable_id {
-                    continue;
-                }
-                if matched.is_some() {
-                    ambiguous = true;
-                    break;
-                }
-                matched = Some(candidate);
-            }
-        }
-        if ambiguous {
-            continue;
-        }
+        // Worker resolution: ambiguous identities stay saved, unresolved.
+        let exact = identity::exact(devices, &node.device, direction);
+        let matched = match identity::resolve(devices, &node.device, direction) {
+            identity::Resolution::Active(endpoint, _) => Some(endpoint),
+            identity::Resolution::Ambiguous => continue,
+            identity::Resolution::Unresolved => None,
+        };
         let matched = matched.or(exact);
         let Some(matched) = matched else {
             if !node.device.id.is_empty() && devices.iter().any(|e| e.id == node.device.id && e.direction != direction) {
@@ -704,14 +763,19 @@ fn publish(inner: &Inner, state: &mut ConfigState, mut runtime: Box<Runtime>) {
     inner.published.store(pointer, Ordering::Release);
 }
 
-fn prepare(inner: &Inner, state: &mut ConfigState, config: &Configuration, plan: GraphPlan) -> Result<Box<Runtime>, EngineError> {
-    retire(inner, state);
-    // Bound pending long Echo buffers before allocating, opening workers or
-    // saving: the settled active runtime is not pending.
+/// Builds a processor for `plan`, first bounding the long Echo buffers that
+/// are waiting for adoption (the settled active runtime's are not pending,
+/// and runtimes sharing one processor share one history).
+fn new_processor(inner: &Inner, state: &ConfigState, plan: &GraphPlan) -> Result<Arc<AudioCell<GraphProcessor>>, EngineError> {
     let active = inner.active_generation.load(Ordering::Acquire);
-    let mut pending = GraphProcessor::echo_history_bytes(&plan);
+    let settled: Vec<*const AudioCell<GraphProcessor>> =
+        state.runtimes.iter().filter(|r| r.generation <= active).map(|r| Arc::as_ptr(&r.processor)).collect();
+    let mut counted = settled.clone();
+    let mut pending = GraphProcessor::echo_history_bytes(plan);
     for retained in &state.runtimes {
-        if retained.generation > active {
+        let pointer = Arc::as_ptr(&retained.processor);
+        if retained.generation > active && !counted.contains(&pointer) {
+            counted.push(pointer);
             pending += GraphProcessor::echo_history_bytes(&retained.plan);
         }
     }
@@ -719,13 +783,34 @@ fn prepare(inner: &Inner, state: &mut ConfigState, config: &Configuration, plan:
         return Err(message("The audio engine is still applying Echo changes. Wait briefly and try again."));
     }
     let mut processor = GraphProcessor::new();
-    processor.prepare(&plan);
+    processor.prepare(plan);
+    Ok(Arc::new(AudioCell::new(processor)))
+}
+
+/// Prepares a runtime for `plan`. `share` is the published runtime's
+/// processor when the caller found the edit to be parameters-only; it is used
+/// only if every stream of the new runtime turns out to be the published
+/// runtime's own stream object.
+fn prepare(
+    inner: &Inner,
+    state: &mut ConfigState,
+    config: &Configuration,
+    plan: GraphPlan,
+    share: Option<Arc<AudioCell<GraphProcessor>>>,
+) -> Result<Box<Runtime>, EngineError> {
+    retire(inner, state);
+    // Bound pending long Echo buffers before allocating, opening workers or
+    // saving. A shared processor allocates nothing.
+    let processor = match share.clone() {
+        Some(processor) => processor,
+        None => new_processor(inner, state, &plan)?,
+    };
     state.next_generation += 1;
     let count = plan.nodes.len();
     let mut runtime = Box::new(Runtime {
         generation: state.next_generation,
         plan,
-        processor: AudioCell::new(processor),
+        processor,
         ports: (0..count).map(|_| None).collect(),
         meters: Vec::with_capacity(count),
         spectra: (0..count).map(|_| None).collect(),
@@ -773,6 +858,17 @@ fn prepare(inner: &Inner, state: &mut ConfigState, config: &Configuration, plan:
             runtime.ports[i] = Some(port);
         }
     }
+    if share.is_some() {
+        // The mixer retargets a shared processor without a crossfade, which
+        // is only right when no stream changed. Normally guaranteed by the
+        // caller's check; verified here against the actual stream objects.
+        let unchanged = previous.is_some_and(|previous| {
+            previous.ports.len() == runtime.ports.len() && runtime.ports.iter().zip(&previous.ports).all(|(a, b)| same_port(a, b))
+        });
+        if !unchanged {
+            runtime.processor = new_processor(inner, state, &runtime.plan)?;
+        }
+    }
     Ok(runtime)
 }
 
@@ -798,7 +894,7 @@ fn refresh_output_ports(inner: &Inner, state: &mut ConfigState) {
         let configuration = state.configuration.clone();
         let result = compile_graph(&configuration.graph)
             .map_err(EngineError::from)
-            .and_then(|plan| prepare(inner, state, &configuration, plan));
+            .and_then(|plan| prepare(inner, state, &configuration, plan, None));
         match result {
             Ok(runtime) => publish(inner, state, runtime),
             Err(error) => inner.log.write(&format!("Output refresh: {error}")),
@@ -806,7 +902,24 @@ fn refresh_output_ports(inner: &Inner, state: &mut ConfigState) {
     }
 }
 
-fn snapshot(inner: &Inner) -> Value {
+fn physical_settings_path(store: &ConfigurationStore) -> String {
+    store.physical_path().map_or_else(|_| store.path().to_string_lossy().into_owned(), |p| p.to_string_lossy().into_owned())
+}
+
+fn applications_wanted(inner: &Inner) -> bool {
+    (inner.created.elapsed().as_millis() as u64) < inner.applications_wanted_until.load(Ordering::Acquire)
+}
+
+fn snapshot(inner: &Inner, known: Known<'_>, interest: Interest<'_>) -> Value {
+    if interest.applications != Some(false) {
+        let resumed = !applications_wanted(inner);
+        let until = (inner.created.elapsed() + APPLICATION_INTEREST).as_millis() as u64;
+        inner.applications_wanted_until.fetch_max(until, Ordering::AcqRel);
+        if resumed {
+            // Refresh the list now rather than at the next maintenance tick.
+            inner.maintenance_wake.set();
+        }
+    }
     let state = lock(inner);
     let mut status = EngineStatus { audio_frames: inner.audio_frames.load(Ordering::Relaxed), ..EngineStatus::default() };
     let mut load = inner.processing_load.read();
@@ -814,6 +927,8 @@ fn snapshot(inner: &Inner) -> Value {
         load.available = false;
     }
     status.processing_load = Some(load);
+    // Analysers to read once the state lock is released (status index, analyser).
+    let mut analysers: Vec<(usize, Arc<Spectrum>)> = Vec::new();
     let published = inner.published.load(Ordering::Acquire);
     // SAFETY: owned by `state.runtimes`, held here.
     if let Some(runtime) = unsafe { published.as_ref() } {
@@ -839,14 +954,13 @@ fn snapshot(inner: &Inner) -> Value {
                 value.gain_reduction_db = 0.0;
                 value.detector_db = -96.0;
             }
-            if let Some(spectrum) = &runtime.spectra[i] {
-                let mut consumer = spectrum.consumer.lock().unwrap_or_else(|e| e.into_inner());
-                let view = consumer.read();
-                value.spectrum_frame = view.frame;
-                value.spectrum_revision = view.revision;
-                if view.frame != 0 {
-                    value.spectrum_db = view.db.to_vec();
-                }
+            // The FFT is on demand: skipped for an EQ whose spectrum no
+            // client is showing, and run after the state lock is released.
+            // The mixer keeps the analyser's input current, so a returning
+            // viewer gets live data at once.
+            let shown = interest.spectrum.is_none_or(|ids| ids.contains(&node.id.as_str()));
+            if let Some(spectrum) = runtime.spectra[i].as_ref().filter(|_| shown) {
+                analysers.push((status.nodes.len(), Arc::clone(spectrum)));
             }
             match &runtime.ports[i] {
                 Some(port) => value.path = port.status(),
@@ -890,13 +1004,45 @@ fn snapshot(inner: &Inner) -> Value {
             node.channels = channels;
         }
     }
-    let inventory = inner.inventory.lock().unwrap_or_else(|e| e.into_inner());
+    // Everything that needs the state lock is copied out here; the JSON is
+    // built after the lock is released, so configure and maintenance never
+    // wait on serialisation.
+    let configuration_token = format!("c{:x}-{:x}", inner.token_seed, state.configuration_generation);
+    let configuration = (known.configuration != Some(configuration_token.as_str())).then(|| state.configuration.clone());
     let settings_path = state.store.path().to_string_lossy().into_owned();
-    let physical = state.store.physical_path().map(|p| p.to_string_lossy().into_owned()).unwrap_or_else(|_| settings_path.clone());
-    ObjectBuilder::new()
-        .set("configuration", state.configuration.to_json())
-        .set("endpoints", serde_json::to_value(&inventory.0).unwrap_or(Value::Null))
-        .set("applications", serde_json::to_value(&inventory.1).unwrap_or(Value::Null))
+    let warning = state.warning.clone();
+    let settings_state = state.store.load_state().as_str();
+    drop(state);
+    // The analysers are shared with the runtime by reference count, so they
+    // stay valid here even if that runtime has since been retired.
+    for (index, spectrum) in analysers {
+        let mut consumer = spectrum.consumer.lock().unwrap_or_else(|e| e.into_inner());
+        let view = consumer.read();
+        let value = &mut status.nodes[index];
+        value.spectrum_frame = view.frame;
+        value.spectrum_revision = view.revision;
+        if view.frame != 0 {
+            value.spectrum_db = view.db.to_vec();
+        }
+    }
+    let (inventory_token, lists) = {
+        let inventory = inner.inventory.lock().unwrap_or_else(|e| e.into_inner());
+        let token = format!("i{:x}-{:x}", inner.token_seed, inventory.generation);
+        let lists = (known.inventory != Some(token.as_str())).then(|| (inventory.endpoints.clone(), inventory.applications.clone()));
+        (token, lists)
+    };
+    let physical = inner.physical_settings.lock().unwrap_or_else(|e| e.into_inner()).clone();
+    let mut builder = ObjectBuilder::new();
+    if let Some(configuration) = &configuration {
+        builder = builder.set("configuration", configuration.to_json());
+    }
+    if let Some((endpoints, applications)) = &lists {
+        builder = builder
+            .set("endpoints", serde_json::to_value(endpoints).unwrap_or(Value::Null))
+            .set("applications", serde_json::to_value(applications).unwrap_or(Value::Null));
+    }
+    builder
+        .set("tokens", serde_json::json!({"configuration": configuration_token, "inventory": inventory_token}))
         .set("enginePid", std::process::id())
         .set("executablePath", vinemix_platform::current_executable())
         .set("engineProtocolVersion", 1)
@@ -907,8 +1053,8 @@ fn snapshot(inner: &Inner) -> Value {
         .set("status", serde_json::to_value(&status).unwrap_or(Value::Null))
         .set("settingsPath", settings_path.clone())
         .set("logPath", inner.log.path().to_string_lossy().into_owned())
-        .set("warning", state.warning.clone())
-        .set("settingsState", state.store.load_state().as_str())
+        .set("warning", warning)
+        .set("settingsState", settings_state)
         .set("backupPath", format!("{settings_path}.bak"))
         .build()
 }
@@ -958,24 +1104,32 @@ fn mix_loop(inner: &Inner) {
                 // SAFETY: `active` and `desired` are distinct live runtimes:
                 // neither generation has been acknowledged as retired.
                 let (old, new) = unsafe { (&*active, &*desired) };
-                let mut changed = !same_graph_topology(&old.plan, &new.plan);
-                // Device/channel/app changes keep ids but the old stream must
-                // still fade out locally.
-                if !changed {
-                    'outer: for (i, node) in new.plan.nodes.iter().enumerate() {
-                        for (j, other) in old.plan.nodes.iter().enumerate() {
-                            if node.id == other.id && !same_port(&new.ports[i], &old.ports[j]) {
-                                changed = true;
-                                break 'outer;
+                if Arc::ptr_eq(&old.processor, &new.processor) {
+                    // A parameter edit: same nodes, cables and streams, and
+                    // the processor both runtimes share already holds all the
+                    // state. Nothing is adopted and nothing fades.
+                    // SAFETY: the mixer is the only user of the processor.
+                    unsafe { new.processor.get().retarget(&old.plan, &new.plan) };
+                } else {
+                    let mut changed = !same_graph_topology(&old.plan, &new.plan);
+                    // Device/channel/app changes keep ids but the old stream must
+                    // still fade out locally.
+                    if !changed {
+                        'outer: for (i, node) in new.plan.nodes.iter().enumerate() {
+                            for (j, other) in old.plan.nodes.iter().enumerate() {
+                                if node.id == other.id && !same_port(&new.ports[i], &old.ports[j]) {
+                                    changed = true;
+                                    break 'outer;
+                                }
                             }
                         }
                     }
-                }
-                // SAFETY: the mixer is the only user of both processors.
-                unsafe { new.processor.get().adopt(old.processor.get(), &old.plan, &new.plan, changed) };
-                if changed {
-                    fading = active;
-                    fade_remaining = 480;
+                    // SAFETY: the mixer is the only user of both processors.
+                    unsafe { new.processor.get().adopt(old.processor.get(), &old.plan, &new.plan, changed) };
+                    if changed {
+                        fading = active;
+                        fade_remaining = 480;
+                    }
                 }
             }
             active = desired;
@@ -990,7 +1144,7 @@ fn mix_loop(inner: &Inner) {
             for runtime in [active, fading] {
                 // SAFETY: live runtimes, see above.
                 let Some(runtime) = (unsafe { runtime.as_ref() }) else { continue };
-                if runtime as *const Runtime == active as *const Runtime {
+                if std::ptr::eq(runtime, active) {
                     // Only the active graph publishes spectra; shared
                     // analysers are cleared once, even during a crossfade.
                     for spectrum in runtime.spectra.iter().flatten() {
@@ -1125,6 +1279,9 @@ fn mix_loop(inner: &Inner) {
                 let (mut current_count, mut old_count) = (0usize, 0usize);
                 // SAFETY: live runtimes; outputs are read-only here.
                 if let Some(active) = unsafe { active.as_ref() } {
+                    // SAFETY: only this (mixer) thread touches a published
+                    // runtime's processor, and this quantum's processing has
+                    // finished: the outputs are only read from here on.
                     let processor = unsafe { &*active.processor.as_ptr() };
                     for (n, other) in active.ports.iter().enumerate() {
                         if other.as_ref().is_some_and(|o| Arc::as_ptr(o) == pointer) {
@@ -1135,6 +1292,7 @@ fn mix_loop(inner: &Inner) {
                 }
                 // SAFETY: as above.
                 if let Some(fading) = unsafe { fading.as_ref() } {
+                    // SAFETY: as for the active runtime's processor above.
                     let processor = unsafe { &*fading.processor.as_ptr() };
                     for (n, other) in fading.ports.iter().enumerate() {
                         if other.as_ref().is_some_and(|o| Arc::as_ptr(o) == pointer) {
@@ -1239,21 +1397,109 @@ fn same_port(a: &Option<Arc<Port>>, b: &Option<Arc<Port>>) -> bool {
     }
 }
 
+/// A short, non-reversible token for an opaque Windows identifier, so the
+/// log shows whether two identifiers are equal without recording them.
+fn identity_token(value: &str) -> String {
+    use std::hash::{Hash, Hasher};
+    if value.is_empty() {
+        return "none".into();
+    }
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    value.hash(&mut hasher);
+    format!("{:08x}", hasher.finish() as u32)
+}
+
+/// One line describing how a saved device binding resolves in `devices`:
+/// what was saved, what matched and how, and how many active endpoints merely
+/// share its name. Identifiers appear only as tokens and names not at all.
+/// Written when it changes, this is the before/during/after record of a
+/// device being switched off and on (RUST-REV-041).
+fn identity_summary(node: &GraphNode, devices: &[Endpoint]) -> Option<String> {
+    let direction = match node.kind.as_str() {
+        "microphone" | "virtualInput" => "capture",
+        "output" | "virtualOutput" => "render",
+        _ => return None,
+    };
+    if !node.device.assigned() {
+        return None;
+    }
+    let saved = format!("saved id#{} stable#{}", identity_token(&node.device.id), identity_token(&node.device.stable_id));
+    let record = match identity::exact(devices, &node.device, direction) {
+        Some(endpoint) => format!("saved-id record {} stable#{}", endpoint.state, identity_token(&endpoint.stable_id)),
+        None => "saved-id record absent".into(),
+    };
+    let outcome = match identity::resolve(devices, &node.device, direction) {
+        identity::Resolution::Active(endpoint, matched) => {
+            format!("resolved by {} to id#{} stable#{}", matched.as_str(), identity_token(&endpoint.id), identity_token(&endpoint.stable_id))
+        }
+        identity::Resolution::Ambiguous => "unresolved: several active endpoints share the stable ID".into(),
+        identity::Resolution::Unresolved => "unresolved: no active endpoint has the saved identity".into(),
+    };
+    let resolved_id = identity::resolve(devices, &node.device, direction).active().map(|e| e.id.as_str());
+    let same_name = devices
+        .iter()
+        .filter(|e| {
+            e.direction == direction
+                && e.state == "Active"
+                && Some(e.id.as_str()) != resolved_id
+                && !node.device.name.is_empty()
+                && e.name.eq_ignore_ascii_case(&node.device.name)
+        })
+        .count();
+    Some(format!("{direction} {saved}; {record}; {outcome}; other active endpoints with the saved name: {same_name}"))
+}
+
 fn maintenance_loop(inner: &Inner) {
     let mut last_states: HashMap<String, String> = HashMap::new();
+    let mut last_identities: HashMap<String, String> = HashMap::new();
     while !inner.stopping.load(Ordering::Acquire) {
         if inner.resume_requested.swap(false, Ordering::AcqRel) {
             retry(inner);
         }
         let devices = inner.catalog.enumerate();
-        let applications = enumerate_audio_applications();
+        // The application list only feeds the desktop's pickers and notices
+        // (capture workers find their own process): enumerate processes and
+        // audio sessions only while a client wants it.
+        let applications = applications_wanted(inner).then(enumerate_audio_applications);
         {
             let mut inventory = inner.inventory.lock().unwrap_or_else(|e| e.into_inner());
-            *inventory = (devices, applications);
+            let applications_changed = applications.as_ref().is_some_and(|list| *list != inventory.applications);
+            if inventory.endpoints != devices || applications_changed {
+                inventory.endpoints = devices;
+                if let Some(applications) = applications {
+                    inventory.applications = applications;
+                }
+                inventory.generation += 1;
+            }
+        }
+        {
+            // Outside the state lock's critical path: resolving the physical
+            // location opens the settings file.
+            let physical = {
+                let state = lock(inner);
+                state.store.path().to_path_buf()
+            };
+            let resolved = vinemix_platform::physical_path(&physical)
+                .map_or_else(|_| physical.to_string_lossy().into_owned(), |p| p.to_string_lossy().into_owned());
+            *inner.physical_settings.lock().unwrap_or_else(|e| e.into_inner()) = resolved;
         }
         {
             let mut state = lock(inner);
             retire(inner, &mut state);
+            {
+                let inventory = inner.inventory.lock().unwrap_or_else(|e| e.into_inner());
+                last_identities.retain(|id, _| state.configuration.graph.nodes.iter().any(|n| &n.id == id));
+                for node in &state.configuration.graph.nodes {
+                    let Some(summary) = identity_summary(node, &inventory.endpoints) else {
+                        last_identities.remove(&node.id);
+                        continue;
+                    };
+                    if last_identities.get(&node.id) != Some(&summary) {
+                        inner.log.write(&format!("Device identity {}: {summary}", node.id));
+                        last_identities.insert(node.id.clone(), summary);
+                    }
+                }
+            }
             refresh_output_ports(inner, &mut state);
             let published = inner.published.load(Ordering::Acquire);
             // SAFETY: owned by `state.runtimes`, held here.
@@ -1271,8 +1517,42 @@ fn maintenance_loop(inner: &Inner) {
                 }
             }
         }
-        if inner.stop_event.wait(1000) {
+        let waits = [inner.stop_event.handle(), inner.maintenance_wake.handle()];
+        if vinemix_wasapi::win::wait_any(&waits, 1000) == vinemix_wasapi::win::Wait::Signalled(0) {
             break;
         }
+    }
+}
+
+#[cfg(test)]
+mod identity_log_tests {
+    use super::*;
+
+    fn endpoint(id: &str, stable: &str, state: &str) -> Endpoint {
+        Endpoint { id: id.into(), stable_id: stable.into(), name: "Example Headset".into(), direction: "render".into(), state: state.into(), ..Endpoint::default() }
+    }
+
+    /// The identity record distinguishes the cases RUST-REV-041 needs told
+    /// apart, without containing any identifier or device name.
+    #[test]
+    fn identity_summary_is_anonymous_and_tells_the_cases_apart() {
+        let mut node = GraphNode::new("main-output-1", "output", "Speakers", 0.0, 0.0);
+        assert!(identity_summary(&node, &[]).is_none(), "unassigned nodes are not logged");
+        node.device = DeviceBinding { id: "{raw-endpoint-id-A}".into(), stable_id: "raw-stable-S".into(), name: "Example Headset".into(), channel: -1 };
+        let same = identity_summary(&node, &[endpoint("{raw-endpoint-id-A}", "raw-stable-S", "Active")]).unwrap();
+        let replaced = identity_summary(&node, &[endpoint("{raw-endpoint-id-A}", "raw-stable-S", "Missing"), endpoint("{raw-endpoint-id-B}", "raw-stable-S", "Active")]).unwrap();
+        let stranger = identity_summary(&node, &[endpoint("{raw-endpoint-id-B}", "raw-stable-T", "Active")]).unwrap();
+        let ambiguous = identity_summary(&node, &[endpoint("{raw-endpoint-id-B}", "raw-stable-S", "Active"), endpoint("{raw-endpoint-id-C}", "raw-stable-S", "Active")]).unwrap();
+        assert!(same.contains("resolved by endpoint ID"), "{same}");
+        assert!(replaced.contains("saved-id record Missing") && replaced.contains("resolved by stable ID"), "{replaced}");
+        assert!(stranger.contains("saved-id record absent") && stranger.contains("unresolved: no active endpoint") && stranger.ends_with("saved name: 1"), "{stranger}");
+        assert!(ambiguous.contains("several active endpoints share"), "{ambiguous}");
+        for line in [&same, &replaced, &stranger, &ambiguous] {
+            assert!(!line.contains("raw-") && !line.contains("Example"), "identifiers and names stay out of the log: {line}");
+        }
+        // Equal identifiers give equal tokens; different ones differ.
+        assert_eq!(identity_token("{raw-endpoint-id-A}"), identity_token("{raw-endpoint-id-A}"));
+        assert_ne!(identity_token("{raw-endpoint-id-A}"), identity_token("{raw-endpoint-id-B}"));
+        assert_eq!(identity_token(""), "none");
     }
 }

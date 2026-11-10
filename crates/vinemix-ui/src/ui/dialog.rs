@@ -119,7 +119,7 @@ fn close_button(ui: &mut Ui, id: Id, top_left: Pos2, enabled: bool) -> bool {
     let width = widgets::text_width(ui.ctx(), "Close", theme::font(13.0, Weight::Regular)).ceil() + 20.0;
     let rect = Rect::from_min_size(top_left, Vec2::new(width, FOOTER));
     let style = ButtonStyle { fill: Color32::TRANSPARENT, text: theme::MUTED, border: Color32::TRANSPARENT, border_width: 0.0, ..ButtonStyle::console(13.0) };
-    widgets::button(ui, id, rect, "Close", style, enabled, 1.0).tip("Close this window. You can also press Escape or click the workspace.").clicked()
+    widgets::button(ui, id, rect, "Close", style, enabled, 1.0).tip_described("Close this window.", "Close this window. You can also press Escape or click the workspace.").clicked()
 }
 
 /// A dialog button sized to its text plus `padding` per side, `height` high.

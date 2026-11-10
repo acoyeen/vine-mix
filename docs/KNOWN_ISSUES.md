@@ -72,8 +72,37 @@ keyboard/IME, Narrator, pointer/DPI usability and listening tests of new
 Trigger/Wet routes remain unperformed. The release identity remains 0.4.0 Beta.
 See [the execution report](IMPLEMENTATION_0.5.0.md) for evidence and remaining work.
 
+**Rust review corrections — 10 November 2026:** The findings of the
+[Rust review](RUST_REVIEW_2026-11-10.md) were worked through on the `rust-rewrite` branch.
+ISSUE-031 to ISSUE-044 below keep their original evidence and each gains a
+dated correction paragraph. ISSUE-045 to ISSUE-048 record further defects found
+while doing that work. All of it is uncommitted source on top of `55e77c7`,
+verified by `scripts/verify-rust.ps1` (290 tests in 28 suites, the 11 C/C++
+parity comparisons and the update-record cross-check with the 0.5 serializer),
+on synthetic data only. Nothing here was checked in the installed application,
+on physical devices, by listening or with a screen reader, and nothing is
+released. The review tracker records what remains open.
+
 | ID | Issue | Status |
 | --- | --- | --- |
+| [ISSUE-045](#issue-045) | Typing on a focused Rust dial doubles the first digit | Resolved in source; typing regression passes; unreleased |
+| [ISSUE-046](#issue-046) | Escape in Rust Settings search closes the menu instead of clearing the search | Resolved in source; search tests pass; unreleased |
+| [ISSUE-047](#issue-047) | Arrow keys leave the Rust Voice Color pad and EQ plot after one step | Resolved in source; keyboard regressions pass; unreleased |
+| [ISSUE-048](#issue-048) | Rust crate notices state MIT terms and an invented MIT text for crates that publish no licence file | Generator corrected in source; replacement supplements await confirmation |
+| [ISSUE-031](#issue-031) | Rust effect configuration/adoption allocates on the mixer path | Resolved in source; allocation guard and all 11 parity comparisons pass; unreleased |
+| [ISSUE-032](#issue-032) | Rust live app/device selector retains an invalid highlighted index | Resolved in source; changing-inventory regressions pass; unreleased |
+| [ISSUE-033](#issue-033) | Rust damaged interface preferences are overwritten without preservation | Resolved in source; damaged file preserved and groups recovered in tests; unreleased |
+| [ISSUE-034](#issue-034) | Rust update checks/downloads block Quit and cancel only between network operations | Resolved in source; stalled-server and quit tests pass; not exercised from the tray; unreleased |
+| [ISSUE-035](#issue-035) | Returning assigned Rust output reportedly flashes Unassigned | Reproduced with a controlled status sequence and resolved in source; physical return not exercised |
+| [ISSUE-036](#issue-036) | Open Rust node dropdown grows with zoom but does not shrink on zoom-out | Resolved in source; bidirectional zoom regressions pass; unreleased |
+| [ISSUE-037](#issue-037) | Rust advertises keyboard tooltip access without implementing it | Resolved in source; keyboard help tests pass; screen readers not run |
+| [ISSUE-038](#issue-038) | Rust practice EQ tooltip describes measured output audio | Resolved in source; practice wording test passes |
+| [ISSUE-039](#issue-039) | Rust hover copy reintroduces lengthy control instructions and cable explanations | Application-wide audit done in source: 689 texts, none outside the standard; visual review pending |
+| [ISSUE-040](#issue-040) | Backwards drag selection collapses in an initially unfocused Rust dial entry | Resolved in source; selection regressions pass in both directions |
+| [ISSUE-041](#issue-041) | Cable tooltip is positioned at the canvas edge instead of the hovered cable | Resolved in source; verified in the real canvas at four size, scale and zoom combinations |
+| [ISSUE-042](#issue-042) | Clearing Rust Settings search leaves a roughly two-row scrollable menu | Reproduced in the real application code and resolved in source; unreleased |
+| [ISSUE-043](#issue-043) | Rust Settings search insertion caret is misaligned | 2.5-point vertical offset confirmed in the real application code and resolved in source; native appearance not observed |
+| [ISSUE-044](#issue-044) | Reconnected input/output appears separately while saved device remains Missing | In progress: shared identity rules and stale-row handling in source; physical off/on trace still needed |
 | [ISSUE-029](#issue-029) | Malformed channel/process numbers silently narrow to other identities | Resolved in 0.5.0 Beta; recovery regressions pass |
 | [ISSUE-030](#issue-030) | Many RNNoise nodes exceed the real-time processing budget | Confirmed synthetic capacity limitation; documented for 0.5.0 |
 | [ISSUE-001](#issue-001) | Settings search caret overlaps placeholder | Resolved in 0.4.0 Beta |
@@ -104,6 +133,388 @@ See [the execution report](IMPLEMENTATION_0.5.0.md) for evidence and remaining w
 | [ISSUE-026](#issue-026) | Echo Time changes replay stored repeat mixtures | Resolved in 0.5.0 Beta; listening refinement confirmed by maintainer |
 | [ISSUE-027](#issue-027) | Maximum Distortion graph has insufficient routing-fade timing margin | Optimized, offline verified and integrated; maximum-graph margin remains limited |
 | [ISSUE-028](#issue-028) | Short cables fold back instead of flowing directly between sockets | Resolved in 0.5.0 Beta; detached geometry and rendering verified |
+
+<a id="issue-048"></a>
+## ISSUE-048: Rust crate notices state MIT terms for crates that publish no licence file
+
+- **Found:** 2026-11-10 while correcting the notice generator
+  ([RUST-REV-025](RUST_REVIEW_2026-11-10.md#rust-rev-025)). **Status:** Generator corrected in
+  source; the replacement supplements await confirmation. Unreleased.
+- **Evidence:** The committed `licenses/Rust-crates.txt` said of 16 crates that
+  the crate "is used under the MIT licence named in its manifest" and followed
+  that with a standard MIT text whose copyright line was built from the
+  manifest's author list. One of them, `accesskit_winit 0.34.2`, names only
+  Apache-2.0 in its manifest. Two others, `enum-map` and `enum-map-derive`,
+  do publish licence texts, in a `LICENSES` directory the generator did not read.
+  The review had reported the generator's behaviour as a risk; this is an
+  inaccuracy in the file it produced. It is a notice-accuracy defect, not a
+  legal assessment.
+- **Correction:** `tools/rust-notices.py` reads the manifest's licence file and
+  `LICENSES` directories, never writes a text of its own, and stops when a
+  crate has no licence text and no reviewed supplement. The 14 crates that
+  publish none (the egui and eframe family, AccessKit, `profiling`) now have
+  supplements in `licenses/rust-supplements/` that use them under Apache-2.0,
+  which every one of their manifests offers and whose text is the same for
+  every work. `licenses/Rust-crates.txt` was regenerated; exactly those 16
+  entries changed. Fixture tests: `py -3 tools/test_rust_notices.py` (21).
+- **Open:** Each supplement is marked `Review: Pending`. Nobody has compared
+  them with the upstream repositories, which could not be reached offline.
+  The maintainer should confirm that Apache-2.0 is the intended choice (the
+  earlier header promised MIT where offered), or replace a supplement with the
+  upstream MIT text, and check whether AccessKit's repository carries further
+  notices that binaries must reproduce. The generator lists pending supplements
+  on every run.
+
+<a id="issue-047"></a>
+## ISSUE-047: Arrow keys leave the Rust Voice Color pad and EQ plot after one step
+
+- **Found:** 2026-11-10 while adding accessibility semantics
+  ([RUST-REV-027](RUST_REVIEW_2026-11-10.md#rust-rev-027)). **Status:** Resolved in source;
+  unreleased.
+- **Evidence:** With the pad or the EQ plot focused, the first arrow key moved
+  the value and also moved keyboard focus to a neighbouring control, so the
+  second press went elsewhere. Reproduced through the real application code
+  running without a window.
+- **Correction:** Both controls keep focus while handling arrow keys. Tests
+  `voice_color_pad_is_keyboard_operable` and
+  `equalizer_bands_follow_repeated_arrow_keys`.
+
+<a id="issue-046"></a>
+## ISSUE-046: Escape in Rust Settings search closes the menu instead of clearing the search
+
+- **Found:** 2026-11-10 while reproducing ISSUE-042. **Status:** Resolved in
+  source; unreleased.
+- **Evidence:** The search field's help says Escape clears the search. With a
+  query present, Escape closed the whole Settings menu, because focus left the
+  field before the field saw the key.
+- **Correction:** Escape with a query clears it and keeps the menu open; Escape
+  with an empty field closes the menu as before. Exercised by the Settings
+  search tests in `crates/vinemix-ui/src/ui/app_tests.rs`.
+
+<a id="issue-045"></a>
+## ISSUE-045: Typing on a focused Rust dial doubles the first digit
+
+- **Found:** 2026-11-10 while fixing ISSUE-040. **Status:** Resolved in source;
+  unreleased.
+- **Evidence:** With a dial focused, typing a digit started exact entry with
+  that digit entered twice, and the next digit replaced the text instead of
+  following it. The dial face and the new entry field both consumed the same
+  key event.
+- **Correction:** The face consumes the text event that starts entry and the
+  entry continues from it. Test
+  `typing_on_the_dial_face_starts_exact_entry_and_continues_it`.
+
+<a id="issue-044"></a>
+## ISSUE-044: Reconnected input/output appears separately while the saved device remains Missing
+
+- **Reported and investigated:** 2026-11-10, Rust commit `55e77c7`.
+  **Status:** Source-inspected; synthetic chooser/worker-policy reproduction;
+  actual physical off/on identity transition unverified. No fix applied.
+- **Reported behavior:** After turning an assigned input/output device off and
+  back on, a second version sometimes appears in the dropdown while the original
+  remains Missing. The maintainer asks whether Windows priority is involved.
+- **Evidence:** With a changed endpoint ID and absent/nonmatching saved stable
+  ID, production chooser code lists the active endpoint beside a retained or
+  synthesized saved Missing entry. The worker policy has no active identity match.
+  Same-ID return and unique matching-stable-ID return recover in the probe.
+  Six scenarios for both capture/render, with reversed inventory ordering, were
+  checked. The separate output resolver was inspected but not exercised directly.
+- **Important distinction:** With disconnected devices visible, an old Missing
+  record can remain listed even when the new matching Active endpoint is correctly
+  selected and resolved. Record whether recovery actually fails or only the old
+  row remains; neither a second row nor a matching friendly name proves identity.
+- **Priority assessment:** Explicit assignments resolve by exact ID then unique
+  stable ID, not default-device priority. Default-role changes can refresh the
+  catalog but do not substitute a new default into this resolution path.
+- **Expected:** A proven same endpoint reconnects consistently across chooser and
+  engine. Ambiguous or unidentified replacements preserve the saved assignment
+  and offer clear recovery instead of silently choosing another same-name device.
+- **Next step:** Capture an anonymized identity/state timeline and property-read
+  availability around a controlled off/on; examine stable-ID acquisition and safe
+  enrichment of existing bindings. Test unchanged/changed/missing/delayed IDs,
+  visibility settings, identical names, ambiguity and default-role changes.
+  Keep raw device evidence outside the checkout. Do not delete devices, merge
+  names or change Windows priority speculatively.
+- **References:** [RUST-REV-041](RUST_REVIEW_2026-11-10.md#rust-rev-041) contains
+  the synthetic matrix, source references and Microsoft documentation researched
+  on 2026-11-10. Distinct from the selector-index crash (ISSUE-032) and returning
+  output's transient Unassigned status (ISSUE-035).
+- **Correction and verification — 2026-11-10:** Partly resolved. The chooser, the output resolver and the worker now share one rule set (`vinemix_model::identity`): exact active ID, then a unique active stable ID, then the stable ID of the saved ID's own record; never the name, never default-device priority. When identity proves the active endpoint is the saved device, the superseded Missing record is hidden, which removes the stale-row case. When it cannot be proven, the same-name device stays separate and the saved row says how to recover. The engine logs an anonymised identity summary when a binding's resolution changes, to capture the next incident. Not done: a physical off/on trace, which needs the maintainer's hardware; and automatic enrichment of a saved binding, which was deliberately left out because it would open a new stream and reset undo history without the user asking. Working tree on `rust-rewrite` above `55e77c7`; not committed, not released, not checked in the installed application.
+
+<a id="issue-042"></a>
+## ISSUE-042: Clearing Settings search leaves a roughly two-row scrollable menu
+
+- **Reported and investigated:** 2026-11-10, Rust commit `55e77c7`.
+  **Status:** Reproduced in an isolated layout reconstruction; no fix applied.
+- **Reported behavior:** After entering and then removing a Settings search,
+  the menu collapses to a scrollable list showing at most about two options.
+- **Evidence:** The Settings Area/Frame/TextEdit/ScrollArea layout was recreated
+  with production theme/menu helpers and synthetic rows. Clearing a no-results
+  query restored 504 points of row content but left a 64-point scroll viewport;
+  the menu was 122 points high instead of its initial 562. The full application
+  and its search dispatch were not run.
+- **Likely cause:** The menu's remembered smaller height constrains subsequent
+  layout. ScrollArea's maximum alone does not expand the available parent area.
+  See `ui/app/settings_menu.rs:308–387`.
+- **Expected:** Clearing the query restores the normal menu height within the
+  visible window, with all settings present and no unnecessary two-row limit.
+- **Proposed fix and next step:** Recompute the parent maximum layout height
+  from available window space before laying out the menu, retaining content-driven
+  shrinking. This restored expansion in the isolated comparison. Verify real
+  search/clear paths, repeated queries, scroll offsets, submenus and small/DPI-
+  scaled windows before integration. Related historical WPF issue: ISSUE-025;
+  its resolution remains historical, not a qualification of this Rust layout.
+  See [RUST-REV-039](RUST_REVIEW_2026-11-10.md#rust-rev-039).
+- **Correction and verification — 2026-11-10:** Reproduced in the real application code, not only the reconstruction: after a search the menu stayed 95 points high instead of 578. The menu now takes its maximum height from the available window each frame. Tests `clearing_the_settings_search_restores_the_menu_height`, `repeated_searches_keep_restoring_the_full_menu` and `small_windows_and_display_scales_restore_to_the_available_height`. Working tree on `rust-rewrite` above `55e77c7`; not committed, not released, not checked in the installed application.
+
+<a id="issue-043"></a>
+## ISSUE-043: Settings search insertion caret is misaligned in Rust
+
+- **Reported and investigated:** 2026-11-10, Rust commit `55e77c7`.
+  **Status:** Reported visual defect; isolated vertical offset measured;
+  exact installed appearance and complete cause unverified. No fix applied.
+- **Reported behavior:** The typing line inside the Settings search box is not
+  aligned properly. Recorded as the insertion caret; the report does not specify
+  horizontal versus vertical offset or empty versus populated state.
+- **Evidence:** `ui/app/settings_menu.rs:319–327` sets a 30-point field with
+  padding but no vertical centring. An isolated reconstruction placed the
+  17-point text/caret layout 2.5 points above the field centre. Explicit left/
+  centre alignment removed that measured offset. This is a candidate cause and
+  correction, not confirmation of the exact reported native visual defect.
+- **Expected:** Caret, placeholder and typed text share the intended insertion
+  origin and alignment in empty and populated states.
+- **Next step:** Inspect focused empty/typed states, selection, long-query
+  horizontal scrolling and clearing across DPI scales; correct shared alignment
+  and investigate any remaining horizontal mismatch. Related historical WPF
+  issue: ISSUE-001; do not assume its old placeholder-offset cause applies here.
+  See [RUST-REV-040](RUST_REVIEW_2026-11-10.md#rust-rev-040).
+- **Correction and verification — 2026-11-10:** The 2.5-point vertical offset was confirmed in the real application code and removed by centring the field content. `search_caret_placeholder_and_typed_text_share_one_line` checks the caret, placeholder and typed text at display scales 1.0, 1.25, 1.5 and 2.0, including after clearing a long query. The native blinking caret was not observed, so whether this was the whole of the reported defect is unconfirmed. Working tree on `rust-rewrite` above `55e77c7`; not committed, not released, not checked in the installed application.
+
+<a id="issue-040"></a>
+## ISSUE-040: Backwards text selection collapses on first focus in a Rust dial entry
+
+- **Reported and verified:** 2026-11-10, Rust commit `55e77c7`.
+  **Status:** Reproduced with the unchanged production component in isolation;
+  proposed fix logged, not implemented.
+- **Reported behavior:** Selecting a dial's value from back to front removes
+  the highlight, disrupting familiar drag-to-replace interaction.
+- **Evidence:** With a synthetic `-12.3 dB` entry, a first-focus right-to-left
+  drag ended with both selection endpoints at zero. A left-to-right drag
+  selected all eight characters; a backwards drag also worked once focused.
+  `ui/dial.rs:469–475` overrides the pointer selection on gained focus with
+  select-all anchored at the beginning. Subsequent backwards movement collapses
+  that selection. Focus and the draft remain present.
+- **Expected:** Full and partial text selection works naturally in either
+  direction, whether the entry already has focus or not, across shared dials.
+- **Proposed fix:** Preserve the pointer-down anchor during selection. Separate
+  keyboard focus from pointer gestures; if retaining single-click select-all,
+  apply it after a completed click without a drag. Simply swapping the forced
+  selection endpoints would only reverse the defective direction.
+- **Next step:** Implement the gesture-aware behavior when requested and verify
+  forward/backward selection, click and keyboard focus, replacement typing,
+  release outside the entry, double-click reset and validation at different zoom
+  levels. No installed app, settings or audio engine was changed.
+  See [RUST-REV-037](RUST_REVIEW_2026-11-10.md#rust-rev-037).
+- **Correction and verification — 2026-11-10:** The entry keeps the pointer-down anchor and selects everything only after a click without a drag. Eleven interaction tests cover forward and backward, full and partial selection, in unfocused and already focused entries, release outside the entry, keyboard focus, double-click reset and rejected values. Working tree on `rust-rewrite` above `55e77c7`; not committed, not released, not checked in the installed application.
+
+<a id="issue-041"></a>
+## ISSUE-041: Cable tooltip is anchored to the canvas rather than the hovered cable
+
+- **Reported and investigated:** 2026-11-10, Rust commit `55e77c7`.
+  **Status:** Wrong source anchor and distant placement confirmed in isolation;
+  exact reported bottom-right corner not reproduced in the installed app.
+- **Reported behavior:** Noodle/cable tooltip appears at the bottom right,
+  rather than at the noodle being inspected.
+- **Evidence:** Cable hit-testing uses the pointer, but `ui/canvas/frame.rs:159`
+  attaches help to the whole-canvas background response. The normal tooltip
+  helper positions relative to that rectangle. A synthetic pointer at `(320,250)`
+  produced a tooltip at the lower canvas/window edge, near `(20,624)`; using a
+  pointer anchor placed it next to the pointer, near `(320,254)`.
+- **Expected:** Cable help appears at the hovered cable with a small readable
+  offset and stays within the visible window.
+- **Proposed fix:** Use a pointer or small hit-point anchor and per-edge tooltip
+  identity. Preserve hit-testing, dragging, dismissal and noninteractive help;
+  keep ordinary control placement separate.
+- **Next step:** Integrate when requested and verify centre/edge positions,
+  zoom/pan, DPI, overlapping cables and hover transfer. The alternative anchor
+  was checked only in an isolated harness. This placement issue is separate from
+  the application-wide tooltip-copy audit in ISSUE-039.
+  See [RUST-REV-038](RUST_REVIEW_2026-11-10.md#rust-rev-038).
+- **Correction and verification — 2026-11-10:** Cable help is anchored at the hovered point on the cable and has an identity per cable. `cable_help_appears_at_the_hovered_cable` runs the real canvas at four window size, display scale and zoom combinations and checks that dragging dismisses it. The exact bottom-right placement originally reported was not reproduced in the installed application. Working tree on `rust-rewrite` above `55e77c7`; not committed, not released, not checked in the installed application.
+
+<a id="issue-039"></a>
+## ISSUE-039: Rust hover copy reintroduces previously separated instructions
+
+- **Reported and investigated:** 2026-11-10, Rust commit `55e77c7`.
+  **Status:** Confirmed by source comparison; implementation unchanged.
+- **Maintainer clarification:** The tooltip concern is excessive explanation in
+  the content, following earlier work to keep the original version concise.
+  The required follow-up is a full application-wide tooltip-content audit and
+  refactor; Level and the shared controls are examples, not the scope limit.
+- **Evidence:** Rust's shared dial and numeric-entry helpers append range and
+  interaction instructions to the short purpose text. Cable hover adds connection
+  type, state and purpose. The retained C# version keeps ordinary hover to the
+  control title/purpose or cable route, with detailed instructions separately
+  exposed through accessible help. This contradicts the established concise-copy
+  direction in [TWEAK-018](TWEAKS.md#tweak-018).
+- **Expected:** Short, scannable control names and purpose; longer interaction
+  guidance in Help and accessible descriptions. Invalid-value guidance remains
+  available when relevant.
+- **Limits:** Existing long Echo/Reverb/Distortion headings and the Trigger
+  silent-source explanation also occur in retained C# source; they are not
+  established as new Rust regressions. No installed-app visual comparison was
+  performed for this content follow-up.
+- **Required coverage:** Inventory every tooltip family, including nodes,
+  controls, sockets/cables, pickers, meters, canvas/groups, menus, settings,
+  dialogs, updates/status and Help/practice surfaces. Include dynamic, disabled,
+  unavailable and invalid states. Review inherited wording as well as Rust-added
+  text; retain already-concise, accurate content.
+- **Next step and completion:** Check and refactor shared helpers and individual
+  wording against the concise, neutral content standard. Keep a coverage checklist
+  recording reviewed/revised/retained families and exceptions, verify relevant UI
+  states, and preserve detailed Help/accessibility guidance and meaningful errors.
+  A single-node or shared-dial-only change is insufficient. The full audit and
+  refactor remain pending; the current investigation verified specific examples.
+  See [RUST-REV-036](RUST_REVIEW_2026-11-10.md#rust-rev-036).
+  Recording this defect does not authorize implementation.
+- **Correction and verification — 2026-11-10:** The application-wide audit and refactor is done in source. A sweep test renders every surface and state and records each hover text: 588 texts with 205 outside the standard before, 689 texts with none outside it now, with two justified exceptions. Removed instructions are in Help (about 22 new entries) and in accessible descriptions. The coverage checklist is [TOOLTIP_AUDIT_2026-11-10.md](TOOLTIP_AUDIT_2026-11-10.md). Still open: the maintainer has not reviewed the wording or its appearance in the installed application. Working tree on `rust-rewrite` above `55e77c7`; not committed, not released, not checked in the installed application.
+
+<a id="issue-037"></a>
+## ISSUE-037: Rust advertises keyboard tooltip access without implementing it
+
+- **Found:** 2026-11-10 tooltip comparison at Rust commit `55e77c7`.
+  **Status:** Confirmed in source and isolated helper test; unfixed.
+- **Evidence:** Help advertises Ctrl+Shift+F10 for focused-menu help, but no
+  corresponding Rust handler was found. The production tooltip helper uses
+  pointer-hover methods. In a headless probe, focus without a pointer and then
+  the modifier chord produced no tooltip. Native menu navigation was not run.
+- **Expected:** Focused control/menu explanations are available through the
+  documented keyboard action, with the original focus/lifecycle safeguards.
+- **Next step:** Implement keyboard-owned help, test toggle/dismissal/handoff,
+  and preserve accessible help independently of visible hover content.
+  See [RUST-REV-034](RUST_REVIEW_2026-11-10.md#rust-rev-034).
+- **Correction and verification — 2026-11-10:** Help for the focused control appears after a short delay and at once with Ctrl+Shift+F10, hands over with focus, works on menu rows and is dismissed by Escape or pointer input. Covered in `ui/widgets_tests.rs`. Narrator and NVDA were not run. Working tree on `rust-rewrite` above `55e77c7`; not committed, not released, not checked in the installed application.
+
+<a id="issue-038"></a>
+## ISSUE-038: Rust practice EQ tooltip describes measured output audio
+
+- **Found:** 2026-11-10 tooltip comparison at Rust commit `55e77c7`.
+  **Status:** Confirmed in source; live lesson interaction not replayed; unfixed.
+- **Evidence:** The practice lesson uses the normal EQ component with no audio
+  status/frames. Its general tooltip unconditionally describes a measured output
+  spectrum. The C# lesson supplies explicit practice-only wording instead.
+- **Expected:** General practice-EQ help says the response is calculated from
+  sample values and no audio is measured or changed.
+- **Next step:** Add an explicit practice/live tooltip presentation choice and
+  verify both general and selected-band help. This is misleading copy, not
+  evidence that the practice lesson changes the user's running audio.
+  See [RUST-REV-035](RUST_REVIEW_2026-11-10.md#rust-rev-035).
+- **Correction and verification — 2026-11-10:** `eq::plot_help` takes a practice flag; the practice plot says the response is calculated and no audio is measured or changed, and practice meters say `Sample peaks`. Test `practice_help_never_claims_to_measure_audio`. Working tree on `rust-rewrite` above `55e77c7`; not committed, not released, not checked in the installed application.
+
+<a id="issue-036"></a>
+## ISSUE-036: Open Rust node dropdown retains its larger width after zooming out
+
+- **Reported and verified:** 2026-11-10, Rust commit `55e77c7`. **Status:**
+  Confirmed in an isolated headless probe; no implementation change made.
+- **Maintainer report:** A dropdown opened on a node appears to scale correctly
+  when zooming in, but does not scale properly when zooming out.
+- **Independent evidence:** The unchanged production selector grew from 250 to
+  500 logical points across 100% → 200% zoom. Kept open, it remained 500 points
+  wide through zoom-out to 50%, where the selector face was only 125 points.
+  Closing/reopening at 50% restored 125 points for the short example labels.
+  Eight frames were allowed at each scale. No live app/audio interaction was used.
+- **Cause:** Popup width supplies an egui default, while the area retains its
+  previous width. The content applies only a minimum width and fills available
+  width, permitting growth without enforcing shrinkage.
+- **Related distinction:** Popup text/row height remain fixed in logical points,
+  unlike the scaled selector face. This is separate from the retained-width bug;
+  any readable minimum/proportional scaling policy should be explicit.
+- **Expected:** The open dropdown responds to zoom in both directions, subject
+  to deliberate label/viewport constraints, without requiring close/reopen.
+- **Next step:** Correct actual-width constraints or sizing invalidation while
+  preserving selection, focus and scroll; add bidirectional zoom regressions.
+  Full evidence: [RUST-REV-033](RUST_REVIEW_2026-11-10.md#rust-rev-033).
+- **Correction and verification — 2026-11-10:** An open list is laid out at an explicit width each frame, so it shrinks as well as grows. `open_list_shrinks_as_well_as_grows_with_zoom` reproduces the retained 500-point width against the reviewed code and passes now. Rows keep a fixed 13-point text size with a readable minimum width bounded by the window; that is a recorded decision, not a defect. Working tree on `rust-rewrite` above `55e77c7`; not committed, not released, not checked in the installed application.
+
+<a id="issue-035"></a>
+## ISSUE-035: Returning assigned Rust output reportedly flashes Unassigned
+
+- **Reported:** 2026-11-10 through supplied Claude Code review notes. **Status:**
+  Reported; not independently reproduced, and no correction implemented.
+- **Reported behavior:** A returning assigned output briefly follows
+  `Waiting → Unassigned → Running`, misleadingly suggesting loss of assignment.
+  Raw logs were not supplied to this review.
+- **Source evidence / suspected cause:** At Rust commit `55e77c7`, a fresh
+  worker defaults to Unassigned and updates its status asynchronously after
+  configuration. A resolved output exposes that worker status. This is a
+  plausible transition window, not proof of the reported incident's cause.
+- **Expected:** Preserve a truthful Waiting/Opening/Priming status for an
+  assigned output until it is Running.
+- **Next step:** Reproduce with a controlled endpoint-return/status sequence
+  and retain sanitized evidence. See
+  [RUST-REV-032](RUST_REVIEW_2026-11-10.md#rust-rev-032).
+- **Correction and verification — 2026-11-10:** A worker configured with an assignment now reports Resolving until its first real status, so an assigned path never shows Unassigned. `assigned_worker_is_pending_never_unassigned` reproduces the reported sequence against the unchanged code path and passes now. The physical device return that prompted the report was not reproduced. Working tree on `rust-rewrite` above `55e77c7`; not committed, not released, not checked in the installed application.
+
+<a id="issue-031"></a>
+## ISSUE-031: Rust effect configuration/adoption allocates on the mixer path
+
+- **Found:** 2026-11-10 Rust review at commit `55e77c7`. **Status:** Confirmed;
+  no implementation or release correction made.
+- **Verified:** A device-free microphone → reverb → output probe counted two
+  allocations and two frees on first processing, unchanged-effect adoption and
+  first processing after reset. Steady processing counted zero. String-bearing
+  effect settings are cloned on these paths; no audible dropout was reproduced.
+- **Expected:** Effect processing, adoption and reset boundaries honor the
+  documented allocation-free mixer contract.
+- **Next step:** Use compiled runtime settings and add boundary allocation guards.
+  See [RUST-REV-001](RUST_REVIEW_2026-11-10.md#rust-rev-001) for locations and evidence.
+- **Correction and verification — 2026-11-10:** Effect settings are now plain copyable values, so configuring, adopting and resetting an effect no longer clones strings. `crates/vinemix-dsp/tests/realtime_alloc.rs` counts allocations on the calling thread: against the reviewed code it fails with 2 allocations and 2 frees for the reverb fixture and 20 of each across every effect kind; it now counts none for first processing, steady processing, edited settings, adoption, in-place retargeting and reset. The 11 C/C++ parity comparisons still pass. Limits: device-free fixtures; the running engine's mixer loop is not itself instrumented, and no listening test was done. Working tree on `rust-rewrite` above `55e77c7`; not committed, not released, not checked in the installed application.
+
+<a id="issue-032"></a>
+## ISSUE-032: Rust live app/device selector retains an invalid highlighted index
+
+- **Found:** 2026-11-10 Rust review at commit `55e77c7`. **Status:** Confirmed;
+  unfixed in the reviewed Rust source.
+- **Verified:** An open selector with highlight 2, reduced from three choices to
+  one, panicked on Enter at `ui/widgets.rs:316` in an isolated headless test.
+  Release panic-abort behavior would terminate the interface. Inventory reorder
+  can also change the identity represented by a retained index; that consequence
+  is source-derived, not a physical-device reproduction.
+- **Expected:** Live inventory updates preserve or safely clear highlighted
+  identity and never cause out-of-bounds access.
+- **Next step:** Reconcile by stable identity, bound index use and test changing
+  inventories. See [RUST-REV-002](RUST_REVIEW_2026-11-10.md#rust-rev-002).
+- **Correction and verification — 2026-11-10:** The open list now tracks its highlight by identity, bounds every index and never selects a disabled row. Regressions in `crates/vinemix-ui/src/ui/widgets_tests.rs` cover shrinking then Enter (the reproduced panic), reordering, an emptied list, a highlighted row that becomes disabled and backwards navigation after a shrink. Working tree on `rust-rewrite` above `55e77c7`; not committed, not released, not checked in the installed application.
+
+<a id="issue-033"></a>
+## ISSUE-033: Rust damaged interface preferences are overwritten without preservation
+
+- **Found:** 2026-11-10 Rust review at commit `55e77c7`. **Status:** Confirmed;
+  unfixed. Personal preferences were not used or modified.
+- **Verified:** After a disposable malformed `ui.json` failed to load, a minimap
+  toggle replaced it with defaults/current preferences. The original example
+  group was lost and no preserved file was created.
+- **Expected:** Preserve unreadable preferences, including group data, before
+  permitting a recovery replacement.
+- **Next step:** Add explicit preference recovery and preservation regression
+  tests. See [RUST-REV-003](RUST_REVIEW_2026-11-10.md#rust-rev-003).
+- **Correction and verification — 2026-11-10:** Unreadable preferences are copied to `ui.json.damaged-<time>` before anything is written, the last good `ui.json.bak` is used to recover groups, and a notice stays until dismissed. Tests `damaged_preferences_are_preserved_before_any_replacement`, `damaged_preferences_recover_groups_from_the_last_good_backup` and `damaged_copies_never_overwrite_each_other` use disposable files only. The same change bounds the file size read and moves writes to a background writer ([RUST-REV-014](RUST_REVIEW_2026-11-10.md#rust-rev-014)). Working tree on `rust-rewrite` above `55e77c7`; not committed, not released, not checked in the installed application.
+
+<a id="issue-034"></a>
+## ISSUE-034: Rust update checks/downloads block Quit and cancel slowly
+
+- **Found:** 2026-11-10 Rust review at commit `55e77c7`. **Status:** Confirmed
+  in source; stalled-network and live tray interaction reproduction pending.
+- **Verified in source:** `begin_quit` silently returns for all busy update jobs,
+  including automatic checks and downloads. Cancel sets a flag that blocking
+  WinHTTP operations do not observe until control returns to cancellation checks.
+- **Expected:** Checking/downloading should cancel promptly and permit the normal
+  save-and-quit flow. Installation handoff may require a distinct guarded state.
+- **Next step:** Separate installation from background work, make transport
+  cancellation/deadlines effective, and test stalled responses plus Quit.
+  See [RUST-REV-004](RUST_REVIEW_2026-11-10.md#rust-rev-004) and
+  [RUST-REV-005](RUST_REVIEW_2026-11-10.md#rust-rev-005).
+- **Correction and verification — 2026-11-10:** Quit now cancels a check or download and proceeds; only the installation handoff still holds it, with a message. Network calls run on a worker and are aborted by closing the request handle, with a total deadline. Tests against a local stalled server confirm cancellation and the deadline before headers and during the body; `quit_cancels_checks_and_downloads_but_not_an_install` covers the quit path. Limits: not exercised from the tray of a running application or against the real update service; a stalled redirect was not tested separately. Working tree on `rust-rewrite` above `55e77c7`; not committed, not released, not checked in the installed application.
 
 <a id="issue-029"></a>
 ## ISSUE-029: Malformed channel/process numbers silently narrow to other identities
@@ -1213,6 +1624,16 @@ They do not establish a chosen fix or implementation approval.
 
 <a id="issue-003"></a>
 ## ISSUE-003: Incomplete graph keyboard and accessibility workflows
+
+### Rust review follow-up — 2026-11-10
+
+The Rust replacement at `55e77c7` has explicit accessibility metadata for several
+standard/custom widgets, but comparable semantics for the Voice Color pad and
+EQ interactions remain incomplete in source. Assistive-technology behavior was
+not exercised in this review. See
+[RUST-REV-027](RUST_REVIEW_2026-11-10.md#rust-rev-027). Next step: inspect and test
+the custom controls' accessible names, values, actions and focus behavior with
+Narrator/NVDA. This does not change the status of dated legacy UI verification.
 
 ### Current feedback and accepted refinement — 2026-11-04
 

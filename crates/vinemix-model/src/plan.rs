@@ -210,8 +210,17 @@ fn db_to_linear(db: f64) -> f64 {
     10f64.powf(db / 20.0)
 }
 
+static COMPILATIONS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// How many times this process has compiled a graph. Diagnostic only: tests
+/// use it to hold the engine to one compilation per accepted edit.
+pub fn compilation_count() -> u64 {
+    COMPILATIONS.load(std::sync::atomic::Ordering::Relaxed)
+}
+
 /// Validates and compiles a canvas. Error messages are shown to users.
 pub fn compile_graph(graph: &AudioGraph) -> Result<GraphPlan, ModelError> {
+    COMPILATIONS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     if graph.nodes.len() > MAXIMUM_GRAPH_NODES || graph.edges.len() > MAXIMUM_GRAPH_EDGES {
         return Err(ModelError::invalid("A canvas supports up to 32 nodes and 96 cables."));
     }
@@ -619,6 +628,18 @@ pub fn same_graph_topology(a: &GraphPlan, b: &GraphPlan) -> bool {
     }
     a.nodes.iter().all(|node| b.nodes.iter().any(|other| node.id == other.id && node.kind == other.kind))
         && a.edges.iter().all(|edge| b.edges.iter().any(|other| same_edge(a, edge, b, other)))
+}
+
+/// Same topology with the same node and cable positions: node `i` and cable
+/// `i` are the same node and cable in both plans. Plans that differ only in
+/// parameters satisfy this, so per-node and per-cable processor state can
+/// stay where it is instead of being carried over by identity.
+pub fn same_indexing(a: &GraphPlan, b: &GraphPlan) -> bool {
+    a.nodes.len() == b.nodes.len()
+        && a.edges.len() == b.edges.len()
+        && a.order == b.order
+        && a.nodes.iter().zip(&b.nodes).all(|(node, other)| node.id == other.id && node.kind == other.kind)
+        && a.edges.iter().zip(&b.edges).all(|(edge, other)| edge.from == other.from && edge.to == other.to && same_edge(a, edge, b, other))
 }
 
 /// Index in `before` of the edge that `after.edges[index]` continues.

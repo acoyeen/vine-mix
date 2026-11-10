@@ -235,6 +235,91 @@ pub struct Runtime {
     pub eq: super::eq::EqState,
     pub voice: super::voice::VoiceState,
     pub editing: bool,
+    /// This node's device or application picker contents.
+    pub picker: PickerCache,
+}
+
+/// A picker's choice list, kept until something it was built from changes.
+///
+/// Building a list filters, sorts and labels the whole inventory. A picker is
+/// drawn every frame, open or closed, so doing that per frame cost more than
+/// anything else in a node (RUST-REV-013). The list depends only on the
+/// inventory (identified by its generation, which advances whenever the
+/// device or application lists or the visibility settings change), the
+/// node's saved binding and the visibility settings — so it is rebuilt
+/// exactly when one of those differs.
+#[derive(Clone, Debug, Default)]
+pub struct PickerCache {
+    generation: u64,
+    device: Option<(vinemix_model::config::DeviceBinding, availability::Visibility)>,
+    app: Option<vinemix_model::config::ProcessBinding>,
+    devices: Vec<availability::EndpointChoice>,
+    applications: Vec<ApplicationInfo>,
+    entries: Vec<Choice>,
+    selected: Option<usize>,
+    /// How many times a list was built (tests).
+    pub builds: u32,
+}
+
+impl PickerCache {
+    fn devices(&mut self, env: &Env<'_>, direction: &str, binding: &vinemix_model::config::DeviceBinding) {
+        let current = self.generation == env.inventory_generation && self.device.as_ref().is_some_and(|(b, v)| b == binding && *v == env.visibility);
+        if current {
+            return;
+        }
+        self.devices = availability::build(env.endpoints, direction, binding, env.visibility);
+        self.selected = availability::selected(&self.devices, binding);
+        self.entries = self.devices.iter().map(|c| Choice { key: c.key(), label: c.label(), enabled: c.selectable, help: c.help.clone() }).collect();
+        self.generation = env.inventory_generation;
+        self.device = Some((binding.clone(), env.visibility));
+        self.app = None;
+        self.builds += 1;
+    }
+
+    fn applications(&mut self, env: &Env<'_>, binding: &vinemix_model::config::ProcessBinding) {
+        if self.generation == env.inventory_generation && self.app.as_ref() == Some(binding) {
+            return;
+        }
+        let mut applications: Vec<ApplicationInfo> = env.applications.to_vec();
+        applications.sort_by(|a, b| a.name.cmp(&b.name));
+        let same_path = |a: &ApplicationInfo| !binding.executable_path.is_empty() && crate::text::eq_ignore_case(&a.executable_path, &binding.executable_path);
+        let mut selected = applications.iter().position(|a| {
+            binding.process_id != 0
+                && a.process_id == binding.process_id
+                && (binding.executable_path.is_empty() || crate::text::eq_ignore_case(&a.executable_path, &binding.executable_path))
+        });
+        if selected.is_none() {
+            let same: Vec<usize> = applications.iter().enumerate().filter(|(_, a)| same_path(a)).map(|(i, _)| i).collect();
+            if same.len() == 1 {
+                selected = Some(same[0]);
+            }
+        }
+        if selected.is_none() && (binding.process_id != 0 || !binding.executable_path.is_empty()) {
+            applications.push(ApplicationInfo {
+                process_id: binding.process_id,
+                executable_path: binding.executable_path.clone(),
+                name: format!("{} · saved selection", binding.name),
+                has_audio_session: false,
+            });
+            selected = Some(applications.len() - 1);
+        }
+        applications.insert(0, ApplicationInfo { name: "Choose a running app".into(), ..Default::default() });
+        self.selected = Some(selected.map_or(0, |i| i + 1));
+        self.entries = applications
+            .iter()
+            .map(|a| Choice {
+                key: format!("{}\u{1f}{}", a.process_id, a.executable_path),
+                label: graph::application_label(a),
+                enabled: true,
+                help: a.executable_path.clone(),
+            })
+            .collect();
+        self.applications = applications;
+        self.generation = env.inventory_generation;
+        self.app = Some(binding.clone());
+        self.device = None;
+        self.builds += 1;
+    }
 }
 
 impl Runtime {
@@ -249,6 +334,9 @@ pub struct Env<'a> {
     pub graph: &'a AudioGraph,
     pub endpoints: &'a [Endpoint],
     pub applications: &'a [ApplicationInfo],
+    /// Advances whenever `endpoints`, `applications` or the visibility
+    /// settings change (`MixerState::inventory_generation`).
+    pub inventory_generation: u64,
     pub visibility: availability::Visibility,
     pub can_edit: bool,
     pub preview: bool,
@@ -372,7 +460,7 @@ pub fn status_view(node: &GraphNode, status: Option<&NodeStatus>, env: &Env<'_>,
     }
     view.help = status.map(|s| s.path.message.clone()).unwrap_or_default();
     if clipped && matches!(kind, "output" | "virtualOutput") {
-        view.help = "Output clipping\nThis path or the combined device output exceeded its available level\nOutputs sharing a device add together. Lower the contributing levels.".into();
+        view.help = "Output clipping\nOutputs sharing a device add together and exceeded its level.\nLower the contributing levels.".into();
     }
     let virtual_device = graph::bindings::is_virtual(kind);
     view.visible = virtual_device || !env.can_edit || legacy_muted || (device && !running) || (clipped && !node.muted);
@@ -495,13 +583,9 @@ fn dynamics_feedback(node: &GraphNode, status: Option<&NodeStatus>, env: &Env<'_
     let detector_line = format!("{} · {detector} dBFS", if kind == "ducking" { "Trigger" } else { "Detector" });
     view.detector = Some(format!("{detector} dBFS"));
     view.help = format!(
-        "{band} reduction\n{detector_line}\n{} · {threshold:.1} dBFS\n{}",
+        "{band} reduction\n{detector_line} · {} {threshold:.1} dBFS\nThe bar spans 0–24 dB of {}.",
         if limiting { "Ceiling" } else { "Threshold" },
-        if matches!(kind, "compressor" | "limiter" | "ducking" | "expander" | "gate") {
-            "Gain reduction · Bar 0–24 dB"
-        } else {
-            "Shelf amount · Bar 0–24 dB"
-        }
+        if matches!(kind, "compressor" | "limiter" | "ducking" | "expander" | "gate") { "gain reduction" } else { "shelf reduction" }
     );
     view.visible = true;
     view.color = theme::MUTED;
@@ -632,7 +716,7 @@ pub fn show(
         header_response.tip(controls::node_description(node))
     } else {
         header_response.tip(format!(
-            "{}\n{}\n{}\nZoom in to edit controls and connections",
+            "{}\n{} · {}\nZoom in to edit.",
             node.name,
             graph::kind_label(&node.kind),
             if node.muted {
@@ -729,9 +813,8 @@ pub fn show(
                 (lay.width - 26.0) * s,
             );
             if port.kind == "sidechain" && matches!(node.kind.as_str(), "gate" | "expander") {
-                ui.interact(label_rect, id.with(("port-help", port.port, port.kind)), Sense::hover()).tip(
-                    "Optional detector-only audio. No cable uses this node's Audio input; a connected silent or unavailable source stays silent.",
-                );
+                ui.interact(label_rect, id.with(("port-help", port.port, port.kind)), Sense::hover())
+                    .tip("Trigger\nOptional detector-only audio; never heard. Without a cable the node detects its own input.");
             } else if port.kind == "control" && graph::linked::has_legacy_connection(env.graph, node) {
                 ui.interact(label_rect, id.with(("port-help", port.port, port.kind)), Sense::hover())
                     .tip("Existing level link. Use a Mix node for new level control.");
@@ -749,10 +832,8 @@ pub fn show(
             runtime.meter.advance(env.now);
             meter::paint(&painter, meter_screen, &runtime.meter, s);
             let lines = runtime.meter.peak_lines();
-            ui.interact(meter_screen, id.with("meter"), Sense::hover()).tip(format!(
-                "Highest observed peak\n{}\nHighest sample level observed per channel",
-                lines.join("\n")
-            ));
+            // Title plus one line: "Left · … · Right · …" for stereo.
+            ui.interact(meter_screen, id.with("meter"), Sense::hover()).tip(format!("Highest observed peak\n{}", lines.join(" · ")));
             if let Some(next) = runtime.meter.next_frame() {
                 ui.ctx().request_repaint_after(std::time::Duration::from_secs_f64(next));
             }
@@ -945,9 +1026,9 @@ impl ItemCtx<'_, '_> {
                     r.width(),
                 );
                 let help = if node.kind == "virtualInput" {
-                    format!("{text}\nReceives audio sent to the matching CABLE Input playback device")
+                    format!("{text}\nReceives audio sent to the matching CABLE Input playback device.")
                 } else {
-                    format!("{text}\nSends audio to the matching Line 1 recording device for Discord or games")
+                    format!("{text}\nSends audio to the matching Line 1 recording device.")
                 };
                 let help = self.notice_help(&help);
                 self.ui.interact(shown.union(Rect::from_min_size(r.min, Vec2::new(r.width(), r.height()))), self.id.with("virtual"), Sense::hover()).tip(help);
@@ -987,6 +1068,7 @@ impl ItemCtx<'_, '_> {
                 let choices: Vec<Choice> = options
                     .iter()
                     .map(|(value, label)| Choice {
+                        key: (*value).to_owned(),
                         label: (*label).to_owned(),
                         enabled: true,
                         help: if *key == ChoiceKey::DuckingMode { controls::ducking_description(value) } else { String::new() },
@@ -1182,15 +1264,13 @@ impl ItemCtx<'_, '_> {
         let node = self.node;
         let r = self.screen(rect);
         let direction = if node.kind == "microphone" { "capture" } else { "render" };
-        let choices = availability::build(self.env.endpoints, direction, &node.device, self.env.visibility);
-        let selected = availability::selected(&choices, &node.device);
-        let text = selected.map(|i| choices[i].label()).unwrap_or_default();
-        let entries: Vec<Choice> = choices.iter().map(|c| Choice { label: c.label(), enabled: c.selectable, help: c.help.clone() }).collect();
+        self.runtime.picker.devices(self.env, direction, &node.device);
         let color = self.device_text_color();
-        let help = self.notice_help("Choose an available audio device. Additional devices: Settings → Audio device visibility.");
-        let (_, picked) = widgets::selector(self.ui, self.id.with("device"), r, selected, &text, &entries, self.env.can_edit, self.s, color, &help);
-        if let Some(index) = picked {
-            let choice = &choices[index];
+        let help = self.notice_help("Audio device\nMore devices: Settings → Audio device visibility.");
+        let picker = &self.runtime.picker;
+        let text = picker.selected.and_then(|i| picker.entries.get(i)).map(|entry| entry.label.as_str()).unwrap_or_default();
+        let (_, picked) = widgets::selector(self.ui, self.id.with("device"), r, picker.selected, text, &picker.entries, self.env.can_edit, self.s, color, &help);
+        if let Some(choice) = picked.and_then(|index| picker.devices.get(index)) {
             if !availability::can_assign(choice, self.env.endpoints, direction) {
                 self.actions.push(Action::Message(format!("This device is unavailable. Reopen the list to see current devices. {}", choice.help), true));
                 return;
@@ -1206,39 +1286,13 @@ impl ItemCtx<'_, '_> {
     fn app_choice(&mut self, rect: Rect) {
         let node = self.node;
         let r = self.screen(rect);
-        let mut applications: Vec<ApplicationInfo> = self.env.applications.to_vec();
-        applications.sort_by(|a, b| a.name.cmp(&b.name));
-        let same_path = |a: &ApplicationInfo| !node.app.executable_path.is_empty() && crate::text::eq_ignore_case(&a.executable_path, &node.app.executable_path);
-        let mut selected = applications.iter().position(|a| {
-            node.app.process_id != 0
-                && a.process_id == node.app.process_id
-                && (node.app.executable_path.is_empty() || crate::text::eq_ignore_case(&a.executable_path, &node.app.executable_path))
-        });
-        if selected.is_none() {
-            let same: Vec<usize> = applications.iter().enumerate().filter(|(_, a)| same_path(a)).map(|(i, _)| i).collect();
-            if same.len() == 1 {
-                selected = Some(same[0]);
-            }
-        }
-        if selected.is_none() && (node.app.process_id != 0 || !node.app.executable_path.is_empty()) {
-            applications.push(ApplicationInfo {
-                process_id: node.app.process_id,
-                executable_path: node.app.executable_path.clone(),
-                name: format!("{} · saved selection", node.app.name),
-                has_audio_session: false,
-            });
-            selected = Some(applications.len() - 1);
-        }
-        applications.insert(0, ApplicationInfo { name: "Choose a running app".into(), ..Default::default() });
-        let selected = Some(selected.map_or(0, |i| i + 1));
-        let entries: Vec<Choice> =
-            applications.iter().map(|a| Choice { label: graph::application_label(a), enabled: true, help: a.executable_path.clone() }).collect();
-        let text = selected.map(|i| entries[i].label.clone()).unwrap_or_default();
+        self.runtime.picker.applications(self.env, &node.app);
         let color = self.device_text_color();
-        let help = self.notice_help("App capture\nCaptures a copy of the app's audio\nOriginal playback continues\nSame speakers on both paths = doubled audio");
-        let (_, picked) = widgets::selector(self.ui, self.id.with("app"), r, selected, &text, &entries, self.env.can_edit, self.s, color, &help);
-        if let Some(index) = picked {
-            let app = &applications[index];
+        let help = self.notice_help("App capture\nCaptures a copy of the app's audio; its own playback continues.\nThe same speakers on both paths double the audio.");
+        let picker = &self.runtime.picker;
+        let text = picker.selected.and_then(|i| picker.entries.get(i)).map(|entry| entry.label.as_str()).unwrap_or_default();
+        let (_, picked) = widgets::selector(self.ui, self.id.with("app"), r, picker.selected, text, &picker.entries, self.env.can_edit, self.s, color, &help);
+        if let Some(app) = picked.and_then(|index| picker.applications.get(index)) {
             if app.process_id != 0 && app.executable_path.is_empty() {
                 self.actions.push(Action::Message(
                     "Windows did not provide this app's identity. Choose another app or use the virtual input.".into(),
@@ -1302,5 +1356,106 @@ pub fn paint_socket(painter: &egui::Painter, center: Pos2, kind: &str, color: Co
         _ => {
             super::widgets::circle(painter, center, 6.0 * s - inset, fill, stroke);
         }
+    }
+}
+
+#[cfg(test)]
+mod picker_cache_tests {
+    use super::*;
+    use vinemix_model::config::{DeviceBinding, ProcessBinding};
+
+    fn endpoint(id: &str, state: &str) -> Endpoint {
+        Endpoint { id: id.into(), name: format!("Example {id}"), direction: "capture".into(), state: state.into(), transport: "physical".into(), channels: 2, ..Default::default() }
+    }
+
+    fn env<'a>(graph: &'a AudioGraph, endpoints: &'a [Endpoint], applications: &'a [ApplicationInfo], generation: u64, visibility: availability::Visibility) -> Env<'a> {
+        Env {
+            graph,
+            endpoints,
+            applications,
+            inventory_generation: generation,
+            visibility,
+            can_edit: true,
+            preview: true,
+            layout_locked: false,
+            reduced_animation: false,
+            now: 0.0,
+            meter_sequence: 0,
+            audio_frames: 0,
+            acknowledged: None,
+        }
+    }
+
+    /// RUST-REV-013: a picker's list is built once and again only when the
+    /// inventory, the saved binding or the visibility settings change.
+    #[test]
+    fn device_choices_are_rebuilt_exactly_when_their_inputs_change() {
+        let graph = AudioGraph::default();
+        let before = vec![endpoint("a", "Active"), endpoint("b", "Active"), endpoint("c", "Unplugged")];
+        let binding = DeviceBinding { id: "a".into(), name: "Example a".into(), ..DeviceBinding::default() };
+        let hidden = availability::Visibility::default();
+        let mut cache = PickerCache::default();
+        for _ in 0..50 {
+            cache.devices(&env(&graph, &before, &[], 7, hidden), "capture", &binding);
+        }
+        assert_eq!(cache.builds, 1, "fifty frames, one build");
+        let labels = |cache: &PickerCache| cache.entries.iter().map(|e| e.label.clone()).collect::<Vec<_>>();
+        assert_eq!(labels(&cache), ["Not assigned", "Example a", "Example b"]);
+        assert_eq!(cache.selected, Some(1));
+        // A device disappears: the generation advances and the list follows.
+        let after = vec![endpoint("a", "Active"), endpoint("c", "Unplugged")];
+        cache.devices(&env(&graph, &after, &[], 8, hidden), "capture", &binding);
+        assert_eq!(cache.builds, 2);
+        assert_eq!(labels(&cache), ["Not assigned", "Example a"]);
+        // The node is reassigned: same inventory, new current row.
+        let other = DeviceBinding { id: "c".into(), name: "Example c".into(), ..DeviceBinding::default() };
+        cache.devices(&env(&graph, &after, &[], 8, hidden), "capture", &other);
+        assert_eq!(cache.builds, 3);
+        assert_eq!(cache.selected.map(|i| cache.entries[i].label.clone()).as_deref(), Some("Example c · Unplugged"));
+        // Disconnected devices are made visible (the mixer also advances the
+        // generation for this; the settings alone are enough here).
+        let shown = availability::Visibility { disconnected: true, ..hidden };
+        cache.devices(&env(&graph, &after, &[], 8, shown), "capture", &binding);
+        assert_eq!(cache.builds, 4);
+        assert_eq!(labels(&cache), ["Not assigned", "Example a", "Example c · Unplugged"]);
+        // Unchanged again: no further builds.
+        for _ in 0..10 {
+            cache.devices(&env(&graph, &after, &[], 8, shown), "capture", &binding);
+        }
+        assert_eq!(cache.builds, 4);
+        // Entry keys are the stable identities the open list highlights by.
+        assert!(cache.entries.iter().zip(&cache.devices).all(|(entry, device)| entry.key == device.key()));
+    }
+
+    #[test]
+    fn application_choices_follow_the_inventory_and_the_saved_app() {
+        let graph = AudioGraph::default();
+        let app = |pid: u32, name: &str| ApplicationInfo { process_id: pid, executable_path: format!("C:/Example/{name}.exe"), name: name.into(), has_audio_session: true };
+        let running = vec![app(20, "Zeta"), app(10, "Alpha")];
+        let unset = ProcessBinding::default();
+        let hidden = availability::Visibility::default();
+        let mut cache = PickerCache::default();
+        for _ in 0..20 {
+            cache.applications(&env(&graph, &[], &running, 3, hidden), &unset);
+        }
+        assert_eq!(cache.builds, 1);
+        assert_eq!(cache.applications.iter().map(|a| a.name.as_str()).collect::<Vec<_>>(), ["Choose a running app", "Alpha", "Zeta"], "sorted, with the prompt first");
+        assert_eq!(cache.selected, Some(0));
+        // A saved app that is not running stays listed as the selection.
+        let saved = ProcessBinding { process_id: 99, executable_path: "C:/Example/Gone.exe".into(), name: "Gone".into() };
+        cache.applications(&env(&graph, &[], &running, 3, hidden), &saved);
+        assert_eq!(cache.builds, 2);
+        assert_eq!(cache.selected.map(|i| cache.applications[i].name.clone()).as_deref(), Some("Gone · saved selection"));
+        // It starts: the generation advances and it is matched by path.
+        let mut later = running.clone();
+        later.push(ApplicationInfo { process_id: 123, executable_path: "C:/Example/Gone.exe".into(), name: "Gone".into(), has_audio_session: true });
+        cache.applications(&env(&graph, &[], &later, 4, hidden), &saved);
+        assert_eq!(cache.builds, 3);
+        assert_eq!(cache.selected.map(|i| cache.applications[i].process_id), Some(123));
+        // Switching the same node's cache between kinds cannot reuse a list.
+        cache.devices(&env(&graph, &[], &later, 4, hidden), "capture", &DeviceBinding::default());
+        assert_eq!(cache.builds, 4);
+        cache.applications(&env(&graph, &[], &later, 4, hidden), &saved);
+        assert_eq!(cache.builds, 5);
     }
 }

@@ -48,6 +48,11 @@ try {
     Check (-not [VineMix.DesktopDataContext]::MatchesWorkspaceIdentity('VineMix · Could not start','#32770',$true,123,123)) 'A responsive startup error dialog is not a ready workspace.'
     Check (-not [VineMix.DesktopDataContext]::MatchesWorkspaceIdentity('VineMix · Patch workspace','HwndWrapper[VineMix;;example]',$false,123,123) -and
         -not [VineMix.DesktopDataContext]::MatchesWorkspaceIdentity('VineMix · Patch workspace','HwndWrapper[VineMix;;example]',$true,124,123)) 'Hidden windows and another process cannot satisfy workspace readiness.'
+    Check ([VineMix.DesktopDataContext]::MatchesWorkspaceIdentity('VineMix · Patch workspace','Window Class',$true,123,123)) 'Readiness recognizes a visible Rust workspace owned by the selected process.'
+    Check (-not [VineMix.DesktopDataContext]::MatchesWorkspaceIdentity('VineMix · Patch workspace','Window Class',$false,123,123) -and
+        -not [VineMix.DesktopDataContext]::MatchesWorkspaceIdentity('VineMix · Patch workspace','Window Class',$true,124,123)) 'A hidden Rust window or another process cannot satisfy workspace readiness.'
+    Check (-not [VineMix.DesktopDataContext]::MatchesWorkspaceIdentity('VineMix · Patch workspace','#32770',$true,123,123) -and
+        -not [VineMix.DesktopDataContext]::MatchesWorkspaceIdentity('VineMix · UI Preview','Window Class',$true,123,123)) 'A dialog borrowing the workspace title and a Rust preview window are not a ready workspace.'
     $captured = [pscustomobject]@{Id=123;StartTime=[DateTime]::UtcNow;Path=(Join-Path $root 'Example.exe');SessionId=2}
     Check (Test-ActivationProcessIdentity $captured $captured) 'Rollback identity accepts the captured exact process token.'
     $replacement = [pscustomobject]@{Id=123;StartTime=$captured.StartTime.AddSeconds(1);Path=$captured.Path;SessionId=2}

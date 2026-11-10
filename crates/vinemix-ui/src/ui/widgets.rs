@@ -183,9 +183,61 @@ pub fn field_ui(ui: &mut Ui, rect: Rect) -> Ui {
 /// One dropdown entry.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Choice {
+    /// Stable identity of the entry (endpoint ID, process identity, fixed
+    /// option name). An open list tracks its highlight by this key, never by
+    /// position: live inventories shrink and reorder between frames.
+    pub key: String,
     pub label: String,
     pub enabled: bool,
     pub help: String,
+}
+
+impl Choice {
+    /// An always-enabled entry of a fixed list, identified by its label.
+    pub fn fixed(label: &str) -> Self {
+        Self { key: label.to_owned(), label: label.to_owned(), enabled: true, help: String::new() }
+    }
+}
+
+/// The entry an open list highlights: the remembered key if that entry still
+/// exists, otherwise the current selection (if it is in range).
+fn resolve_highlight(choices: &[Choice], key: Option<&str>, selected: Option<usize>) -> Option<usize> {
+    key.and_then(|key| choices.iter().position(|c| c.key == key)).or(selected.filter(|&i| i < choices.len()))
+}
+
+/// The next enabled entry from `from` (or from the matching end), skipping
+/// disabled entries; `None` when there is none in that direction.
+fn next_enabled(choices: &[Choice], from: Option<usize>, forward: bool) -> Option<usize> {
+    let count = choices.len();
+    let mut index = from.filter(|&i| i < count);
+    for _ in 0..count {
+        let candidate = match (index, forward) {
+            (None, true) => 0,
+            (None, false) => count - 1,
+            (Some(i), true) => (i + 1).min(count - 1),
+            (Some(i), false) => i.saturating_sub(1),
+        };
+        if Some(candidate) == index {
+            return None;
+        }
+        if choices[candidate].enabled {
+            return Some(candidate);
+        }
+        index = Some(candidate);
+    }
+    None
+}
+
+/// Width of an open list: at least the selector face at the current zoom,
+/// widened to the longest label at the fixed 13 pt list size so entries stay
+/// readable when the canvas is zoomed out, and never wider than the window.
+fn popup_width(ui: &Ui, face_width: f32, choices: &[Choice]) -> f32 {
+    let widest = choices
+        .iter()
+        .map(|c| ui.fonts_mut(|f| f.layout_no_wrap(c.label.clone(), theme::font(13.0, Weight::Regular), theme::TEXT).size().x))
+        .fold(0.0f32, f32::max);
+    let limit = (ui.ctx().content_rect().width() - 8.0).max(64.0);
+    face_width.max(widest + 16.0 + 4.0 + 2.0).min(limit)
 }
 
 /// A selector face with a dropdown (`ComboBox` template). Returns the index
@@ -263,27 +315,14 @@ pub fn selector(
     // Keyboard (`ComboBox`): closed, Up/Down change the selection and
     // Alt+Down / Alt+Up / F4 open; open, arrows move the highlight, Enter
     // chooses and Escape closes. Disabled entries are skipped.
+    //
+    // The highlight is remembered by entry key and resolved against this
+    // frame's list, so an inventory that shrank or reordered while the list
+    // was open can neither index out of range nor point at a different entry.
     let highlight_id = id.with("highlight");
-    let next_enabled = |from: Option<usize>, forward: bool| -> Option<usize> {
-        let count = choices.len();
-        let mut index = from;
-        for _ in 0..count {
-            let candidate = match (index, forward) {
-                (None, true) => 0,
-                (None, false) => count - 1,
-                (Some(i), true) => (i + 1).min(count - 1),
-                (Some(i), false) => i.saturating_sub(1),
-            };
-            if Some(candidate) == index {
-                return None;
-            }
-            if choices[candidate].enabled {
-                return Some(candidate);
-            }
-            index = Some(candidate);
-        }
-        None
-    };
+    let selected = selected.filter(|&i| i < choices.len());
+    let key_of = |index: Option<usize>| index.and_then(|i| choices.get(i)).map(|c| c.key.clone());
+    let remembered = |ui: &Ui| ui.data(|d| d.get_temp::<Option<String>>(highlight_id)).flatten();
     let open_now = egui::Popup::is_id_open(ui.ctx(), popup_id);
     if enabled && response.has_focus() && !choices.is_empty() {
         let (up, down, enter, escape, alt, f4, home, end) = ui.input(|i| {
@@ -299,21 +338,21 @@ pub fn selector(
             )
         });
         if open_now {
-            let current = ui.data(|d| d.get_temp::<Option<usize>>(highlight_id)).flatten().or(selected);
+            let current = resolve_highlight(choices, remembered(ui).as_deref(), selected);
             let mut highlight = current;
             if alt && (up || down) || f4 {
                 egui::Popup::close_id(ui.ctx(), popup_id);
             } else if down {
-                highlight = next_enabled(current, true).or(current);
+                highlight = next_enabled(choices, current, true).or(current);
             } else if up {
-                highlight = next_enabled(current, false).or(current);
+                highlight = next_enabled(choices, current, false).or(current);
             } else if home {
-                highlight = next_enabled(None, true);
+                highlight = next_enabled(choices, None, true);
             } else if end {
-                highlight = next_enabled(None, false);
+                highlight = next_enabled(choices, None, false);
             }
             if enter {
-                if let Some(index) = highlight.filter(|&i| choices[i].enabled) {
+                if let Some(index) = highlight.filter(|&i| choices.get(i).is_some_and(|c| c.enabled)) {
                     if Some(index) != selected {
                         picked = Some(index);
                     }
@@ -328,17 +367,17 @@ pub fn selector(
             if enter {
                 ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, Key::Enter));
             }
-            ui.data_mut(|d| d.insert_temp(highlight_id, highlight));
+            ui.data_mut(|d| d.insert_temp(highlight_id, key_of(highlight)));
         } else if alt && (up || down) || f4 {
-            ui.data_mut(|d| d.insert_temp(highlight_id, selected));
+            ui.data_mut(|d| d.insert_temp(highlight_id, key_of(selected)));
             egui::Popup::open_id(ui.ctx(), popup_id);
         } else if up || down || home || end {
             let target = if home {
-                next_enabled(None, true)
+                next_enabled(choices, None, true)
             } else if end {
-                next_enabled(None, false)
+                next_enabled(choices, None, false)
             } else {
-                next_enabled(selected, down)
+                next_enabled(choices, selected, down)
             };
             if let Some(index) = target.filter(|&i| Some(i) != selected) {
                 picked = Some(index);
@@ -346,63 +385,67 @@ pub fn selector(
         }
     }
     if !open_now && response.clicked_by(egui::PointerButton::Primary) {
-        ui.data_mut(|d| d.insert_temp(highlight_id, selected));
+        ui.data_mut(|d| d.insert_temp(highlight_id, key_of(selected)));
     }
-    let highlight = ui.data(|d| d.get_temp::<Option<usize>>(highlight_id)).flatten();
-    // MinWidth is the selector's width; wider labels widen the list.
-    let widest = choices
-        .iter()
-        .map(|c| ui.fonts_mut(|f| f.layout_no_wrap(c.label.clone(), theme::font(13.0, Weight::Regular), theme::TEXT).size().x))
-        .fold(0.0f32, f32::max);
-    let width = rect.width().max(widest + 16.0 + 4.0 + 2.0);
-    egui::Popup::from_response(&response)
-        .id(popup_id)
-        .open_memory(None)
-        .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
-        .gap(0.0)
-        .width(width)
-        .frame(egui::Frame::new().fill(theme::WELL).stroke(Stroke::new(1.0, theme::BORDER)).corner_radius(3).inner_margin(2))
-        .show(|ui| {
-            ui.set_min_width(width - 6.0);
-            ui.spacing_mut().item_spacing = Vec2::ZERO;
-            egui::ScrollArea::vertical().max_height(280.0).show(ui, |ui| {
+    // List geometry is only needed while the list is open: a closed selector
+    // measures nothing (there can be one per node, every frame).
+    if egui::Popup::is_id_open(ui.ctx(), popup_id) {
+        let highlight = remembered(ui).and_then(|key| choices.iter().position(|c| c.key == key));
+        let width = popup_width(ui, rect.width(), choices);
+        egui::Popup::from_response(&response)
+            .id(popup_id)
+            .open_memory(None)
+            .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
+            .gap(0.0)
+            .width(width)
+            .frame(egui::Frame::new().fill(theme::WELL).stroke(Stroke::new(1.0, theme::BORDER)).corner_radius(3).inner_margin(2))
+            .show(|ui| {
+                // `Popup::width` is only the area's default: an open area
+                // keeps its remembered size. Pin both bounds every frame so
+                // the list follows its selector when the canvas zooms out as
+                // well as in (frame: 2 px margin + 1 px border per side).
+                ui.set_width((width - 6.0).max(1.0));
                 ui.spacing_mut().item_spacing = Vec2::ZERO;
-                for (index, choice) in choices.iter().enumerate() {
-                    let is_selected = selected == Some(index);
-                    let (row, row_response) = ui.allocate_exact_size(egui::vec2(ui.available_width(), 28.0), Sense::click());
-                    let row_response = if choice.enabled { row_response } else { ui.interact(row, row_response.id, Sense::hover()) };
-                    let pointer_moved = ui.input(|i| i.pointer.delta() != Vec2::ZERO);
-                    if choice.enabled && row_response.hovered() && pointer_moved {
-                        ui.data_mut(|d| d.insert_temp(highlight_id, Some(index)));
-                    }
-                    let highlighted = choice.enabled && (highlight == Some(index) || (highlight.is_none() && is_selected));
-                    if highlighted {
-                        ui.painter().rect_filled(row, 2.0, theme::A);
-                        if !ui.is_rect_visible(row.shrink(4.0)) {
-                            ui.scroll_to_rect(row, None);
+                egui::ScrollArea::vertical().max_height(280.0).show(ui, |ui| {
+                    ui.spacing_mut().item_spacing = Vec2::ZERO;
+                    for (index, choice) in choices.iter().enumerate() {
+                        let is_selected = selected == Some(index);
+                        let (row, row_response) = ui.allocate_exact_size(egui::vec2(ui.available_width(), 28.0), Sense::click());
+                        let row_response = if choice.enabled { row_response } else { ui.interact(row, row_response.id, Sense::hover()) };
+                        let pointer_moved = ui.input(|i| i.pointer.delta() != Vec2::ZERO);
+                        if choice.enabled && row_response.hovered() && pointer_moved {
+                            ui.data_mut(|d| d.insert_temp(highlight_id, Some(choice.key.clone())));
+                        }
+                        let highlighted = choice.enabled && (highlight == Some(index) || (highlight.is_none() && is_selected));
+                        if highlighted {
+                            ui.painter().rect_filled(row, 2.0, theme::A);
+                            if !ui.is_rect_visible(row.shrink(4.0)) {
+                                ui.scroll_to_rect(row, None);
+                            }
+                        }
+                        let color = if highlighted { theme::INK } else { theme::TEXT };
+                        text_elided(
+                            ui.painter(),
+                            Pos2::new(row.left() + 8.0, row.center().y),
+                            Align2::LEFT_CENTER,
+                            &choice.label,
+                            theme::font(13.0, Weight::Regular),
+                            if choice.enabled { color } else { theme::with_opacity(color, 0.5) },
+                            row.width() - 16.0,
+                        );
+                        let row_response = if choice.help.is_empty() { row_response } else { row_response.tip(&choice.help).disabled_tip(&choice.help) };
+                        if choice.enabled && row_response.clicked() {
+                            if !is_selected {
+                                picked = Some(index);
+                            }
+                            egui::Popup::close_id(ui.ctx(), popup_id);
                         }
                     }
-                    let color = if highlighted { theme::INK } else { theme::TEXT };
-                    text_elided(
-                        ui.painter(),
-                        Pos2::new(row.left() + 8.0, row.center().y),
-                        Align2::LEFT_CENTER,
-                        &choice.label,
-                        theme::font(13.0, Weight::Regular),
-                        if choice.enabled { color } else { theme::with_opacity(color, 0.5) },
-                        row.width() - 16.0,
-                    );
-                    let row_response = if choice.help.is_empty() { row_response } else { row_response.tip(&choice.help).disabled_tip(&choice.help) };
-                    if choice.enabled && row_response.clicked() {
-                        if !is_selected {
-                            picked = Some(index);
-                        }
-                        egui::Popup::close_id(ui.ctx(), popup_id);
-                    }
-                }
+                });
             });
-        });
-    let response = if help.is_empty() { response } else { response.tip(help) };
+    }
+    // The selector's help yields to its open list (`SubmenuOpened`).
+    let response = if help.is_empty() || egui::Popup::is_id_open(ui.ctx(), popup_id) { response } else { response.tip(help) };
     (response, picked)
 }
 
@@ -682,6 +725,12 @@ pub fn submenu_styled<R>(ui: &mut Ui, label: &str, enabled: bool, help: &str, sw
 }
 
 // ── Hover help (`ToolTip` style and `NodeToolTip.Create`) ──────────────────
+//
+// Content standard (TWEAK-018): hover help is a short control name and a
+// brief purpose or relevant state. How to operate a control (drag, keys,
+// ranges, reset) belongs in Help and in the control's accessible
+// description, not in the popup. Actionable errors, disabled explanations
+// and essential limitations stay.
 
 /// Lays out hover help: a multi-line text is a `NodeToolTip` (SemiBold title,
 /// then lines 5 px apart); a single line is a plain tooltip.
@@ -700,19 +749,179 @@ pub fn tip_ui(ui: &mut Ui, text: &str) {
     }
 }
 
+/// Keyboard access to hover help (`HoverHelp` / `MenuHoverHelp`): a control
+/// reached with the keyboard shows its help after the usual delay, and
+/// Ctrl+Shift+F10 shows or hides the focused control's help at once. Any
+/// other key, a pointer press or a focus change dismisses it. Showing help
+/// never moves focus.
+#[derive(Clone, Copy, Debug, Default)]
+struct KeyboardHelp {
+    focused: Option<Id>,
+    /// When the focused control received its focus.
+    since: f64,
+    /// Focus arrived by keyboard navigation and has not been dismissed.
+    by_keyboard: bool,
+    /// Explicitly shown with the shortcut.
+    forced: bool,
+    last_navigation: f64,
+    last_pointer: f64,
+}
+
+fn keyboard_help_id() -> Id {
+    Id::unique("vinemix-keyboard-help")
+}
+
+/// Keyboard navigation counts for this long when focus then moves.
+const NAVIGATION_WINDOW: f64 = 0.25;
+
+/// Updates keyboard help once per frame, before any control is drawn.
+pub fn help_frame(ctx: &egui::Context) {
+    let focused = ctx.memory(|m| m.focused());
+    let delay = f64::from(ctx.global_style().interaction.tooltip_delay);
+    let (now, chord, navigation, other_key, pointer) = ctx.input_mut(|i| {
+        let chord = i.consume_key(egui::Modifiers::CTRL | egui::Modifiers::SHIFT, Key::F10);
+        let is_navigation = |key: &Key| matches!(key, Key::Tab | Key::ArrowUp | Key::ArrowDown | Key::ArrowLeft | Key::ArrowRight);
+        let mut navigation = false;
+        let mut other_key = false;
+        for event in &i.events {
+            match event {
+                egui::Event::Key { key, pressed: true, .. } if is_navigation(key) => navigation = true,
+                egui::Event::Key { pressed: true, .. } | egui::Event::Text(_) => other_key = true,
+                _ => {}
+            }
+        }
+        (i.time, chord, navigation, other_key, i.pointer.any_pressed())
+    });
+    let mut state = ctx.data(|d| d.get_temp::<KeyboardHelp>(keyboard_help_id())).unwrap_or(KeyboardHelp {
+        last_navigation: f64::NEG_INFINITY,
+        last_pointer: f64::NEG_INFINITY,
+        ..KeyboardHelp::default()
+    });
+    if navigation {
+        state.last_navigation = now;
+    }
+    if pointer {
+        state.last_pointer = now;
+    }
+    if focused != state.focused {
+        state.focused = focused;
+        state.since = now;
+        state.forced = false;
+        state.by_keyboard = focused.is_some() && now - state.last_navigation <= NAVIGATION_WINDOW && state.last_navigation > state.last_pointer;
+    } else if pointer || other_key || navigation {
+        // Typing, adjusting or clicking: get out of the way.
+        state.by_keyboard = false;
+        state.forced = false;
+    }
+    if chord && state.focused.is_some() {
+        let showing = state.forced || (state.by_keyboard && now - state.since >= delay);
+        state.forced = !showing;
+        state.by_keyboard = false;
+    }
+    if state.by_keyboard && !state.forced {
+        let remaining = delay - (now - state.since);
+        if remaining > 0.0 {
+            ctx.request_repaint_after_secs(remaining as f32);
+        }
+    }
+    ctx.data_mut(|d| d.insert_temp(keyboard_help_id(), state));
+}
+
+/// Whether keyboard help is currently showing for the control `id`.
+pub fn keyboard_help_shown(ctx: &egui::Context, id: Id) -> bool {
+    let Some(state) = ctx.data(|d| d.get_temp::<KeyboardHelp>(keyboard_help_id())) else { return false };
+    if state.focused != Some(id) {
+        return false;
+    }
+    let delay = f64::from(ctx.global_style().interaction.tooltip_delay);
+    state.forced || (state.by_keyboard && ctx.input(|i| i.time) - state.since >= delay)
+}
+
+/// The accessible description for hover help: everything after a title line
+/// (the title repeats the control's accessible name), or the whole line.
+fn description_of(text: &str) -> String {
+    let mut lines = text.split('\n').map(str::trim).filter(|l| !l.is_empty());
+    let first = lines.next().unwrap_or_default();
+    let rest: Vec<&str> = lines.collect();
+    if rest.is_empty() { first.to_owned() } else { rest.join(" ") }
+}
+
+#[cfg(test)]
+thread_local! {
+    /// Every hover-help text requested on this thread (see `recorded_tips`).
+    static RECORDED_TIPS: std::cell::RefCell<Vec<String>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// Hover help is attached to every drawn control whether or not it is
+/// hovered, so recording what is attached while the interface is driven
+/// through its states yields the application's complete tooltip content.
+#[cfg(test)]
+fn record_tip(text: &str) {
+    RECORDED_TIPS.with(|tips| tips.borrow_mut().push(text.to_owned()));
+}
+
+/// Takes the hover-help texts recorded on this thread since the last call.
+#[cfg(test)]
+pub fn recorded_tips() -> Vec<String> {
+    RECORDED_TIPS.with(|tips| std::mem::take(&mut *tips.borrow_mut()))
+}
+
+/// Sets a control's accessible description without any hover popup, for
+/// content that is already on screen or one activation away.
+pub fn describe(response: &Response, description: &str) {
+    if !description.is_empty() {
+        response.ctx.accesskit_node_builder(response.id, |node| node.set_description(description.to_owned()));
+    }
+}
+
 /// Hover help on any response.
 pub trait Tip: Sized {
+    /// Concise hover help, also shown for keyboard focus (see
+    /// [`help_frame`]) and exposed as the control's accessible description.
     fn tip(self, text: impl Into<String>) -> Self;
+    /// As [`tip`](Tip::tip), with a separate, fuller accessible description
+    /// (how to operate the control) that is not shown in the popup.
+    fn tip_described(self, text: impl Into<String>, description: impl Into<String>) -> Self;
+    /// Hover help placed at `anchor` (a screen rectangle inside a large
+    /// owner, such as the hovered point of a cable on the canvas) instead of
+    /// at the edge of the owner's whole rectangle.
+    fn tip_at(self, anchor: Rect, text: impl Into<String>) -> Self;
     fn disabled_tip(self, text: impl Into<String>) -> Self;
 }
 
 impl Tip for Response {
     fn tip(self, text: impl Into<String>) -> Self {
         let text: String = text.into();
+        let description = description_of(&text);
+        self.tip_described(text, description)
+    }
+
+    fn tip_described(self, text: impl Into<String>, description: impl Into<String>) -> Self {
+        let text: String = text.into();
         if text.is_empty() {
             return self;
         }
+        #[cfg(test)]
+        record_tip(&text);
+        describe(&self, &description.into());
+        if keyboard_help_shown(&self.ctx, self.id) {
+            egui::Tooltip::for_widget(&self).show(|ui| tip_ui(ui, &text));
+            return self;
+        }
         self.on_hover_ui(move |ui| tip_ui(ui, &text))
+    }
+
+    fn tip_at(self, anchor: Rect, text: impl Into<String>) -> Self {
+        let text: String = text.into();
+        if text.is_empty() {
+            return self;
+        }
+        #[cfg(test)]
+        record_tip(&text);
+        let mut tooltip = egui::Tooltip::for_enabled(&self);
+        tooltip.popup = tooltip.popup.anchor(anchor);
+        tooltip.show(|ui| tip_ui(ui, &text));
+        self
     }
 
     fn disabled_tip(self, text: impl Into<String>) -> Self {
@@ -720,6 +929,13 @@ impl Tip for Response {
         if text.is_empty() {
             return self;
         }
+        #[cfg(test)]
+        record_tip(&text);
+        describe(&self, &description_of(&text));
         self.on_disabled_hover_ui(move |ui| tip_ui(ui, &text))
     }
 }
+
+#[cfg(test)]
+#[path = "widgets_tests.rs"]
+mod tests;

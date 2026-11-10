@@ -1408,6 +1408,22 @@ pub fn port_static(port: &str) -> &'static str {
     }
 }
 
+/// Hover help for a cable: its route, and a second line only when the cable
+/// is something other than an ordinary, enabled audio connection. (Saved
+/// level, detector state and the explanation of each connection type are in
+/// [`describe_connection`], Help and the cable's menu.)
+pub fn connection_help(graph: &AudioGraph, edge: &GraphEdge) -> String {
+    let (_, route, _, _) = describe_connection(graph, edge);
+    let kind = match edge.kind.as_str() {
+        "control" => "Linked control",
+        "sidechain" => "Trigger",
+        _ => "",
+    };
+    let state = if edge.muted { "Off" } else { "" };
+    let detail = [kind, state].into_iter().filter(|part| !part.is_empty()).collect::<Vec<_>>().join(" · ");
+    if detail.is_empty() { route } else { format!("{route}\n{detail}") }
+}
+
 /// Title, route, state and purpose of a cable (`DescribeConnection`).
 pub fn describe_connection(graph: &AudioGraph, edge: &GraphEdge) -> (String, String, String, String) {
     let source = graph.nodes.iter().find(|n| n.id == edge.from);

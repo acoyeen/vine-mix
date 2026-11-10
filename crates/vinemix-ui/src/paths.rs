@@ -14,9 +14,25 @@ pub fn custom_settings() -> Option<PathBuf> {
     CUSTOM_SETTINGS.read().unwrap_or_else(std::sync::PoisonError::into_inner).clone()
 }
 
-/// `%LOCALAPPDATA%\VineMix`.
+/// `%LOCALAPPDATA%\VineMix`, or why it cannot be located.
+pub fn try_data_directory() -> Result<PathBuf, String> {
+    vinemix_platform::application_data_directory()
+}
+
+/// Stands in for the data directory when it cannot be located: an absolute
+/// path whose name Windows rejects (`<` and `>` are never valid in a file
+/// name), so nothing exists there and nothing can be created. Reads find no
+/// file and writes fail visibly; nothing is ever read from or written to a
+/// folder relative to the working directory.
+pub fn unavailable_data_directory() -> PathBuf {
+    PathBuf::from(r"C:\<VineMix data location unavailable>")
+}
+
+/// `%LOCALAPPDATA%\VineMix`. `main` refuses to start a normal session when
+/// [`try_data_directory`] fails, so the inert stand-in is only ever seen by
+/// code paths that then report their own read or write failure.
 pub fn data_directory() -> PathBuf {
-    vinemix_platform::application_data_directory().unwrap_or_else(|_| PathBuf::from("VineMix"))
+    try_data_directory().unwrap_or_else(|_| unavailable_data_directory())
 }
 
 pub fn settings() -> PathBuf {
@@ -25,7 +41,7 @@ pub fn settings() -> PathBuf {
 
 /// `ui.json` beside the settings file.
 pub fn preferences() -> PathBuf {
-    settings().parent().map_or_else(|| PathBuf::from("ui.json"), |p| p.join("ui.json"))
+    settings().parent().map_or_else(|| data_directory().join("ui.json"), |p| p.join("ui.json"))
 }
 
 pub fn absolute(path: &Path) -> PathBuf {
@@ -60,5 +76,23 @@ pub mod lifetime_log {
         if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
             let _ = writeln!(file, "{now} pid={} {message}", std::process::id());
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// RUST-REV-029: the stand-in used when the data location cannot be
+    /// resolved is absolute and inert from any working directory.
+    #[test]
+    fn unavailable_data_directory_is_absolute_and_inert() {
+        let directory = unavailable_data_directory();
+        assert!(directory.is_absolute(), "{directory:?}");
+        assert!(!directory.join("ui.json").is_file());
+        assert!(std::fs::create_dir_all(directory.join("updates")).is_err(), "nothing can be created there");
+        assert!(std::fs::write(directory.join("ui.json"), b"{}").is_err());
+        // Joining never yields a working-directory-relative path.
+        assert_eq!(absolute(&directory.join("settings.json")), directory.join("settings.json"));
     }
 }

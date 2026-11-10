@@ -1,6 +1,8 @@
-//! Embeds the Windows version resource, manifest and application icon.
+//! Embeds the Windows version resource, manifest and application icon, and
+//! the build's source identity shown under About.
 
 include!("../../tools/winres.rs");
+include!("../../tools/source_identity.rs");
 
 fn main() {
     let icon = if std::env::var_os("CARGO_FEATURE_RUST_EDITION").is_some() { "assets/branding/app-rust.ico" } else { "assets/branding/app.ico" };
@@ -8,28 +10,45 @@ fn main() {
     println!("cargo::rerun-if-env-changed=VINEMIX_RUNTIME_ZIP");
     println!("cargo::rerun-if-env-changed=VINEMIX_RUNTIME_MANIFEST");
     source_revision();
+    compiler_version();
 }
 
 /// The checkout's commit, as the .NET SDK appends `+<revision>` to the
-/// informational version. An explicit `VINEMIX_SOURCE_REVISION` wins.
+/// informational version.
+///
+/// `scripts/build-rust-release.ps1` verifies the source tree and passes
+/// `VINEMIX_SOURCE_REVISION` (with the snapshot digest and build time); those
+/// values win and are used unchanged. Any other build reports what Git said
+/// when this script last ran and labels itself `local`, because nothing
+/// checked the tree against the compiled inputs afterwards.
 fn source_revision() {
-    println!("cargo::rerun-if-env-changed=VINEMIX_SOURCE_REVISION");
+    // Rebuild when the release script supplies or changes any of these.
+    for name in ["VINEMIX_SOURCE_REVISION", "VINEMIX_SOURCE_SNAPSHOT_SHA256", "VINEMIX_BUILD_TIMESTAMP"] {
+        println!("cargo::rerun-if-env-changed={name}");
+    }
     if std::env::var_os("VINEMIX_SOURCE_REVISION").is_some() {
         return;
     }
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let git = root.join(".git");
-    println!("cargo::rerun-if-changed={}", git.join("HEAD").display());
-    if let Ok(head) = std::fs::read_to_string(git.join("HEAD"))
-        && let Some(reference) = head.trim().strip_prefix("ref: ")
-    {
-        println!("cargo::rerun-if-changed={}", git.join(reference).display());
+    let Some(identity) = source_identity::read(&root) else {
+        return; // Not a Git checkout: About says "unavailable".
+    };
+    for path in &identity.watch {
+        println!("cargo::rerun-if-changed={}", path.display());
     }
-    let output = std::process::Command::new("git").arg("-C").arg(&root).args(["rev-parse", "HEAD"]).output();
-    if let Ok(output) = output {
-        let revision = String::from_utf8_lossy(&output.stdout).trim().to_owned();
-        if output.status.success() && revision.len() == 40 && revision.bytes().all(|b| b.is_ascii_hexdigit()) {
-            println!("cargo::rustc-env=VINEMIX_SOURCE_REVISION={revision}");
+    println!("cargo::rustc-env=VINEMIX_SOURCE_REVISION={}", source_identity::local_label(&identity));
+}
+
+/// The compiler that built this binary, for the About details.
+fn compiler_version() {
+    let rustc = std::env::var_os("RUSTC").unwrap_or_else(|| "rustc".into());
+    if let Ok(output) = std::process::Command::new(rustc).arg("--version").output()
+        && output.status.success()
+    {
+        let version = String::from_utf8_lossy(&output.stdout);
+        let version = version.trim().strip_prefix("rustc ").unwrap_or(version.trim());
+        if !version.is_empty() && !version.contains('\n') {
+            println!("cargo::rustc-env=VINEMIX_RUSTC_VERSION={version}");
         }
     }
 }

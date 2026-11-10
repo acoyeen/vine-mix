@@ -36,6 +36,54 @@ try {
     Reject { Assert-UiActivationRelease '0.3.0-beta.3.1-local' '0.3.0-beta.3' '0.3.0-beta.3.1-local' } 'An inconsistent original desktop and engine is rejected.'
     Reject { Assert-UiActivationRelease '' '' '' } 'Missing release identity is rejected.'
 
+    # Readiness recognizes both desktops and nothing else (RUST-REV-031). These
+    # are pure predicate checks; no window is created or inspected.
+    $title = 'VineMix · Patch workspace'
+    Check ([VineMix.DesktopDataContext]::WorkspaceFramework($title, 'HwndWrapper[VineMix;;example]') -ceq 'wpf' -and
+        [VineMix.DesktopDataContext]::WorkspaceFramework($title, 'Window Class') -ceq 'rust') 'The 0.5 (WPF) and Rust workspace windows are each identified by title and window class.'
+    Check ([VineMix.DesktopDataContext]::MatchesWorkspaceIdentity($title, 'Window Class', $true, 123, 123) -and
+        [VineMix.DesktopDataContext]::MatchesWorkspaceIdentity($title, 'HwndWrapper[VineMix;;example]', $true, 123, 123)) 'A visible workspace window of the verified process is ready, whichever desktop owns it.'
+    Check (-not [VineMix.DesktopDataContext]::MatchesWorkspaceIdentity($title, 'Window Class', $false, 123, 123) -and
+        -not [VineMix.DesktopDataContext]::MatchesWorkspaceIdentity($title, 'Window Class', $true, 124, 123)) 'A hidden Rust window, or one owned by another process, is not ready.'
+    foreach ($case in @(
+            @('VineMix · Could not start', '#32770', 'a startup error dialog'),
+            @($title, '#32770', 'a dialog that borrows the workspace title'),
+            @('VineMix · Could not start', 'Window Class', 'a Rust window with another title'),
+            @('VineMix · UI Preview', 'Window Class', 'the Rust preview window'),
+            @('VineMix (Rust) · Patch workspace', 'Window Class', 'the side-by-side Rust edition'),
+            @($title, 'Window Class 2', 'an unknown window class'),
+            @($title, 'window class', 'a class differing only in case'),
+            @($title, '', 'an empty window class'))) {
+        Check ($null -eq [VineMix.DesktopDataContext]::WorkspaceFramework($case[0], $case[1]) -and
+            -not [VineMix.DesktopDataContext]::MatchesWorkspaceIdentity($case[0], $case[1], $true, 123, 123)) ('Readiness rejects ' + $case[2] + '.')
+    }
+
+    # Runtime libraries: all present in a 0.5 package, none in a Rust package.
+    $legacyPackage = Join-Path $root 'runtime-legacy'
+    $rustPackage = Join-Path $root 'runtime-rust'
+    $staged = Join-Path $root 'runtime-staged'
+    foreach ($directory in @($legacyPackage, $rustPackage, $staged)) { $null = New-Item -ItemType Directory -Path $directory }
+    $runtimeNames = @('libc++.dll', 'libunwind.dll', 'libwinpthread-1.dll')
+    foreach ($name in $runtimeNames) { ('fixture ' + $name) | Set-Content -LiteralPath (Join-Path $legacyPackage $name) -Encoding utf8 }
+    $legacyRuntime = Get-UiActivationRuntimeHashes $legacyPackage
+    $rustRuntime = Get-UiActivationRuntimeHashes $rustPackage
+    Check (@($legacyRuntime.Values | Where-Object { $null -ne $_ }).Count -eq 3 -and @($rustRuntime.Values | Where-Object { $null -ne $_ }).Count -eq 0 -and $rustRuntime.Count -eq 3) 'A 0.5 package records three runtime libraries; a Rust package records that it has none.'
+    Assert-UiActivationRuntime $legacyPackage $legacyRuntime 'unexpected'
+    Assert-UiActivationRuntime $rustPackage $rustRuntime 'unexpected'
+    Assert-UiActivationRuntime $staged $rustRuntime 'unexpected'
+    Check $true 'A Rust package and a staged Rust candidate without runtime libraries agree, so activation is not blocked by files they never had.'
+    Reject { Assert-UiActivationRuntime $staged $legacyRuntime 'differs' } 'A staged candidate lacking the installed 0.5 runtime libraries is rejected.'
+    foreach ($name in $runtimeNames) { Copy-Item -LiteralPath (Join-Path $legacyPackage $name) -Destination (Join-Path $staged $name) }
+    Assert-UiActivationRuntime $staged $legacyRuntime 'unexpected'
+    Check $true 'A staged candidate with byte-identical runtime libraries matches the 0.5 package.'
+    Reject { Assert-UiActivationRuntime $staged $rustRuntime 'differs' } 'A staged candidate that adds runtime libraries to a Rust package is rejected.'
+    'changed' | Set-Content -LiteralPath (Join-Path $staged 'libunwind.dll') -Encoding utf8
+    Reject { Assert-UiActivationRuntime $staged $legacyRuntime 'differs' } 'A changed runtime library is rejected.'
+    Remove-Item -LiteralPath (Join-Path $legacyPackage 'libc++.dll')
+    Reject { Assert-UiActivationRuntime $legacyPackage $legacyRuntime 'differs' } 'A runtime library that disappears from the installed package during activation is detected.'
+    'appeared' | Set-Content -LiteralPath (Join-Path $rustPackage 'libunwind.dll') -Encoding utf8
+    Reject { Assert-UiActivationRuntime $rustPackage $rustRuntime 'differs' } 'A runtime library that appears in a Rust package during activation is detected.'
+
     $before = [pscustomobject]@{configuration=[pscustomobject]@{revision=71;graph=[pscustomobject]@{nodes=@('example-input','example-output');gain=0.5}};status=[pscustomobject]@{audioFrames=100000;nodes=@([pscustomobject]@{id='example-output';path=[pscustomobject]@{state='Running'}},[pscustomobject]@{id='example-unavailable';path=[pscustomobject]@{state='Unavailable'}})}}
     $after = Clone $before
     $after.status.audioFrames = 105000

@@ -673,6 +673,49 @@ pub mod catalog {
         }
     }
 
+    /// One short line saying what a node is for: the hover help of its
+    /// heading and of its entry in the node library. The fuller
+    /// [`description`] is what the library search matches against.
+    pub fn summary(kind: &str) -> &'static str {
+        match kind {
+            "microphone" => "Brings in audio from a Windows recording device.",
+            "virtualInput" => "Receives audio that other apps send to VB-CABLE.",
+            "appInput" => "Captures a copy of one running app's audio.",
+            "output" => "Sends audio to headphones or speakers.",
+            "virtualOutput" => "Sends your mix to VAC Lite for another app to use as its microphone.",
+            "eq" => "Shapes frequency balance with up to 8 bands.",
+            "tone" => "Adjusts bass, midrange and treble.",
+            "voiceColor" => "Shapes a voice from warm to bright and from natural to broadcast.",
+            "highPass" => "Reduces sound below the cutoff.",
+            "lowPass" => "Reduces sound above the cutoff.",
+            "compressor" => "Reduces louder passages above the threshold.",
+            "limiter" => "Holds sample peaks under a ceiling, with no lookahead. Later gain can exceed it.",
+            "ducking" => "Lowers this audio while a trigger sound is present.",
+            "expander" => "Reduces quieter passages below the threshold.",
+            "gate" => "Closes below the threshold to cut quiet sound.",
+            "alignmentDelay" => "Delays one path to align it with another.",
+            "denoiser" => "Reduces background noise in speech. Adds 20 or 30 ms of delay.",
+            "plosive" => "Tames low P and B thumps.",
+            "deEsser" => "Tames harsh S and SH sounds.",
+            "reverb" => "Adds room-like decay. Wet carries the reverb alone.",
+            "echo" => "Adds fading echoes. The Echo output carries the echoes alone.",
+            "distortion" => "Adds warmth through to strong distortion. Adds 0.67 ms of delay.",
+            "mix" => "Combines incoming audio at one level.",
+            "pan" => "Balances audio between left and right.",
+            "mono" => "Combines left and right equally.",
+            "channelSwap" => "Exchanges left and right.",
+            "stereoWidth" => "Narrows or widens stereo. Mono input stays mono.",
+            "stereoPan" => "Positions a mono signal from left to right.",
+            "crossfade" => "Blends stereo inputs A and B.",
+            "stereoCombine" => "Builds stereo from separate left and right inputs.",
+            "stereoSplit" => "Splits stereo into separate left and right outputs.",
+            "control" => "Scales connected node levels together.",
+            "gain" => "Adjusts the level of one audio path.",
+            "reroute" => "A junction for organizing cables.",
+            _ => "",
+        }
+    }
+
     /// Case-insensitive substring search over title, kind, category and description.
     pub fn matches_search(kind: &str, query: &str) -> bool {
         let extra = match kind {

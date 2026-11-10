@@ -83,7 +83,7 @@ fn rows(can_edit: bool, can_restart: bool) -> Vec<Row> {
         },
         Check {
             label: "Show minimap",
-            tip: "Show minimap\nShow the canvas overview in the bottom-right corner. Click it to centre the view or drag to pan.",
+            tip: "Show minimap\nShows the canvas overview in the bottom-right corner.",
             help: "Show the canvas overview in the bottom-right corner. Click it to centre the view or drag to pan.",
             enabled: true,
             pref: Pref::Minimap,
@@ -105,26 +105,26 @@ fn rows(can_edit: bool, can_restart: bool) -> Vec<Row> {
         Separator,
         Sub {
             label: "Audio device visibility",
-            tip: "Audio device visibility\nChoose which extra audio devices appear in the input and output lists. Your assigned device always remains visible. These preferences do not change Windows devices or audio routing.",
+            tip: "Audio device visibility\nChooses which extra devices appear in device lists. Routing is not changed.",
             help: VISIBILITY_HELP,
             children: vec![
                 Check {
                     label: "Show disabled devices",
-                    tip: "Show disabled devices\nShow disabled Windows devices. Enable them in Windows sound settings before using them. This only changes list visibility.",
+                    tip: "Show disabled devices\nLists devices disabled in Windows. They must be enabled there before use.",
                     help: "Show disabled Windows devices. Enable them in Windows sound settings before using them. This only changes list visibility.",
                     enabled: true,
                     pref: Pref::Disabled,
                 },
                 Check {
                     label: "Show disconnected or missing devices",
-                    tip: "Show disconnected or missing devices\nShow unplugged or missing devices. This does not reconnect devices or change audio routing.",
+                    tip: "Show disconnected or missing devices\nLists unplugged or missing devices. Nothing is reconnected or rerouted.",
                     help: "Show unplugged or missing devices. This does not reconnect devices or change audio routing.",
                     enabled: true,
                     pref: Pref::Disconnected,
                 },
                 Check {
                     label: "Show advanced inputs and outputs",
-                    tip: "Show advanced inputs and outputs\nShow line-level inputs, telephone endpoints, and S/PDIF or digital passthrough devices. Ordinary and streamed microphones, speakers, headphones and HDMI outputs remain visible; unclassified active devices also remain visible. Availability controls still apply.",
+                    tip: "Show advanced inputs and outputs\nLists line-level, telephone and S/PDIF or digital passthrough devices.",
                     help: "Show line-level inputs, telephone endpoints, and S/PDIF or digital passthrough devices. Ordinary and streamed microphones, speakers, headphones and HDMI outputs remain visible; unclassified active devices also remain visible. Availability controls still apply.",
                     enabled: true,
                     pref: Pref::Advanced,
@@ -140,7 +140,7 @@ fn rows(can_edit: bool, can_restart: bool) -> Vec<Row> {
             enabled: can_edit,
             act: Act::Retry,
         },
-        Command { label: "Restart audio engine", gesture: "", tip: "Restart audio engine\nBriefly interrupts audio, then reconnects your existing routes. Your workspace stays open.", help: RESTART_HELP, enabled: can_restart, act: Act::Restart },
+        Command { label: "Restart audio engine", gesture: "", tip: "Restart audio engine\nBriefly interrupts audio, then reconnects your routes.", help: RESTART_HELP, enabled: can_restart, act: Act::Restart },
         Separator,
         Check {
             label: "Start VineMix when I sign in",
@@ -159,7 +159,7 @@ fn rows(can_edit: bool, can_restart: bool) -> Vec<Row> {
         },
         Check {
             label: "Automatically check for updates",
-            tip: "Automatically check for updates\nCheck daily while VineMix is running, with automatic retries after failed checks. Turning this on checks shortly. Downloads and installation require your choice.",
+            tip: "Automatically check for updates\nChecks daily. You choose when to download and install.",
             help: "Check daily while VineMix is running, with automatic retries after failed checks. Turning this on checks shortly. Downloads and installation require your choice.",
             enabled: true,
             pref: Pref::AutoUpdates,
@@ -311,9 +311,18 @@ impl App {
             .fixed_pos(Pos2::new(anchor.right() - 380.0, anchor.bottom()))
             .constrain(true)
             .show(&ctx, |ui| {
+                // The area remembers the size of its last contents. After a
+                // search with few results that is a short menu, and a scroll
+                // area can only use the room its parent offers: without this
+                // the full list came back inside a two-row viewport. Offer
+                // the whole space below the title bar on every frame; the
+                // menu still sizes itself to its contents.
+                let room = (ctx.content_rect().bottom() - anchor.bottom() - 8.0).max(120.0);
+                ui.set_max_height(room);
                 widgets::menu_frame().show(ui, |ui| {
                     widgets::menu_body(ui, 376.0);
                     ui.set_max_width(376.0);
+                    ui.set_max_height(room - 6.0);
                     // Search field (6,6,6,5 margin; 30 px; 8,4 padding).
                     let query_before = self.settings_search.query.clone();
                     let field = egui::Frame::new().inner_margin(egui::Margin { left: 6, right: 6, top: 6, bottom: 5 }).show(ui, |ui| {
@@ -324,13 +333,30 @@ impl App {
                                 .desired_width(f32::INFINITY)
                                 .min_size(Vec2::new(0.0, 30.0))
                                 .margin(egui::Margin::symmetric(8, 4))
+                                // The text line is shorter than the 30-point
+                                // field: centre it, so the caret, the
+                                // placeholder and typed text sit mid-field
+                                // instead of 2.5 points high.
+                                .align(egui::Align2::LEFT_CENTER)
                                 .font(theme::font(13.0, Weight::Regular)),
                         )
-                        .tip("Find a setting or instructions for a control. Try zoom, devices or dials. Up and Down choose a help result; Enter opens its full instructions. Escape clears your search.")
+                        .tip_described(
+                            "Search settings and help\nFinds a setting or the instructions for a control.",
+                            "Finds a setting or the instructions for a control. Try zoom, devices or dials. Up and Down choose a help result; Enter opens its full instructions. Escape clears your search.",
+                        )
                     });
                     let search = field.inner;
                     if std::mem::take(&mut self.settings_search.focus) {
                         search.request_focus();
+                    }
+                    if search.has_focus() {
+                        // Escape with a query clears the query (below). egui
+                        // otherwise takes focus away on Escape before this
+                        // code runs, and the menu closed instead.
+                        let escape = !self.settings_search.query.is_empty();
+                        ui.memory_mut(|m| {
+                            m.set_focus_lock_filter(search.id, egui::EventFilter { tab: false, horizontal_arrows: true, vertical_arrows: true, escape });
+                        });
                     }
                     if self.settings_search.query != query_before {
                         self.settings_search.selected = 0;
@@ -362,7 +388,11 @@ impl App {
                         }
                     }
                     let any_setting = all.iter().any(|r| !matches!(r, Row::Separator) && visible(r, &terms, false));
-                    egui::ScrollArea::vertical().max_height((ctx.content_rect().height() - anchor.bottom() - 60.0).max(200.0)).show(ui, |ui| {
+                    // What is left of the offered room after the search
+                    // field and separator; the list scrolls only when the
+                    // window is too small to show it all.
+                    let list_room = (ctx.content_rect().bottom() - ui.cursor().top() - 14.0).max(84.0);
+                    egui::ScrollArea::vertical().max_height(list_room).show(ui, |ui| {
                         chosen = self.draw_rows(ui, &all, &terms, false);
                         if searching && any_setting && !matches.is_empty() {
                             widgets::menu_separator(ui);

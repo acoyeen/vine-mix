@@ -304,3 +304,59 @@ impl std::fmt::Debug for Denoise {
         f.debug_struct("Denoise").field("target_neural", &self.target_neural).finish_non_exhaustive()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn signal(n: usize) -> Frame {
+        let t = n as f32;
+        let voice = (t * 0.021).sin() * 0.3 * ((t * 0.0004).sin() * 0.5 + 0.5);
+        let noise = ((n as u32).wrapping_mul(2_654_435_761) >> 16) as f32 / 65_536.0 - 0.5;
+        Frame::new(voice + noise * 0.02, voice * 0.9 + noise * 0.02)
+    }
+
+    /// What settled RNNoise mode pays for keeping SpeexDSP warm
+    /// (RUST-REV-017). Run with
+    /// `cargo test -p vinemix-dsp --release --lib denoise_engine_cost -- --ignored --nocapture`.
+    #[test]
+    #[ignore = "benchmark; prints timings"]
+    fn denoise_engine_cost() {
+        const FRAMES: usize = 48_000 * 10;
+        let time = |mut work: Box<dyn FnMut(Frame)>| {
+            let mut samples = Vec::new();
+            for _ in 0..5 {
+                let started = std::time::Instant::now();
+                for n in 0..FRAMES {
+                    work(signal(n));
+                }
+                samples.push(started.elapsed().as_secs_f64());
+            }
+            samples.sort_by(f64::total_cmp);
+            samples[2]
+        };
+        let mut speex = SpeexDenoise::new();
+        let speex_only = time(Box::new(move |frame| {
+            std::hint::black_box(speex.process(frame));
+        }));
+        let mut neural = NeuralDenoise::new();
+        let neural_only = time(Box::new(move |frame| {
+            std::hint::black_box(neural.process(frame));
+        }));
+        let both = |algorithm: &str| {
+            let mut denoise = Denoise::new();
+            denoise.configure(&DenoiserSettings { algorithm: algorithm.into(), ..DenoiserSettings::default() }, true);
+            time(Box::new(move |frame| {
+                std::hint::black_box(denoise.process(frame));
+            }))
+        };
+        let (spectral_mode, neural_mode) = (both("speex"), both("rnnoise"));
+        let percent = |seconds: f64| seconds / 10.0 * 100.0;
+        println!("10 s of stereo audio, median of 5 (share of real time on one core):");
+        println!("  SpeexDSP engine alone      {:.3}%", percent(speex_only));
+        println!("  RNNoise engine alone       {:.3}%", percent(neural_only));
+        println!("  Denoiser node, SpeexDSP    {:.3}%", percent(spectral_mode));
+        println!("  Denoiser node, RNNoise     {:.3}%  (runs both engines)", percent(neural_mode));
+        println!("  SpeexDSP share of settled RNNoise mode: {:.1}%", speex_only / neural_mode * 100.0);
+    }
+}

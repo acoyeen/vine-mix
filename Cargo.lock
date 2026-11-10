@@ -2841,6 +2841,7 @@ dependencies = [
  "egui_extras",
  "serde",
  "serde_json",
+ "vinemix-engine",
  "vinemix-model",
  "vinemix-platform",
  "vinemix-update",

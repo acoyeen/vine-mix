@@ -7,6 +7,7 @@
 
 pub mod config;
 pub mod defaults;
+pub mod identity;
 pub mod json;
 pub mod kind;
 pub mod limits;
@@ -18,9 +19,9 @@ pub use config::{AudioGraph, Configuration, DeviceBinding, EqBand, GraphEdge, Gr
 pub use defaults::{default_configuration, migrate_legacy_graph};
 pub use kind::{GraphKind, GraphPort, UnknownKind};
 pub use limits::{check_gain_db, check_id};
-pub use plan::{compile_graph, graph_signal_channels, same_graph_topology, Biquad, GraphPlan, PlanEdge, PlanNode};
+pub use plan::{compile_graph, graph_signal_channels, same_graph_topology, same_indexing, Biquad, GraphPlan, PlanEdge, PlanNode};
 pub use status::{ApplicationInfo, EngineStatus, Endpoint, NodeStatus, PathState, ProcessingLoadState, ProcessingLoadStatus};
-pub use validate::validate_configuration;
+pub use validate::{validate_and_compile, validate_configuration, Validated};
 
 /// The engine's fixed processing rate.
 pub const SAMPLE_RATE: u32 = 48_000;

@@ -29,6 +29,7 @@ internal static class Program
     }
     private static int Main(string[] args)
     {
+        if (SerializerInterop.TryRun(args, out int interopResult)) return interopResult;
         if (LaunchedProcessVerification.TryRunChild(args, out int childResult)) return childResult;
         try
         {

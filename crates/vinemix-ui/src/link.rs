@@ -6,7 +6,7 @@
 //! never waits on the pipe. Lock order is always `io`, then `state`.
 
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, Condvar, Mutex, MutexGuard};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
@@ -46,6 +46,9 @@ pub struct EngineLink {
     repaint: Box<dyn Fn() + Send + Sync>,
     events: Mutex<Vec<LinkEvent>>,
     poller: Mutex<Option<JoinHandle<()>>>,
+    /// Counts wake-ups; waiting threads sleep on the condition variable
+    /// instead of polling the stop flag.
+    wake: (Mutex<u64>, Condvar),
 }
 
 impl std::fmt::Debug for EngineLink {
@@ -76,6 +79,7 @@ impl EngineLink {
             repaint,
             events: Mutex::new(Vec::new()),
             poller: Mutex::new(None),
+            wake: (Mutex::new(0), Condvar::new()),
         });
         {
             let mut io = lock(&link.io);
@@ -93,6 +97,7 @@ impl EngineLink {
             repaint,
             events: Mutex::new(Vec::new()),
             poller: Mutex::new(None),
+            wake: (Mutex::new(0), Condvar::new()),
         })
     }
 
@@ -122,7 +127,9 @@ impl EngineLink {
         deadline: Option<Instant>,
     ) -> Result<Response, ConnectionError> {
         let stop = Arc::clone(&self.stop);
+        let interest = self.state().interest();
         let connection = io.connection.as_mut().ok_or_else(|| ConnectionError::Io("The audio engine is not available.".into()))?;
+        connection.set_interest(Some(interest));
         let mut timeout = Duration::from_secs(3);
         if let Some(deadline) = deadline {
             let remaining = deadline.saturating_duration_since(Instant::now());
@@ -135,15 +142,47 @@ impl EngineLink {
         connection.request(command, configuration, revision, &stop)
     }
 
+    /// Ends every wait early: something changed that the polling thread
+    /// should react to now (the window was shown, an edit was queued, or the
+    /// link is stopping).
+    pub fn wake(&self) {
+        *lock(&self.wake.0) += 1;
+        self.wake.1.notify_all();
+    }
+
+    fn set_stopping(&self) {
+        self.stop.store(true, Ordering::Release);
+        self.wake();
+    }
+
+    /// Waits `duration`, returning false as soon as the link is stopping. One
+    /// timer wake-up per wait instead of one every 10 ms.
     fn sleep(&self, duration: Duration) -> bool {
-        let until = Instant::now() + duration;
-        while Instant::now() < until {
+        self.wait(duration, false)
+    }
+
+    /// Like [`sleep`](Self::sleep), but also ends early on [`wake`](Self::wake).
+    fn idle(&self, duration: Duration) -> bool {
+        self.wait(duration, true)
+    }
+
+    fn wait(&self, duration: Duration, until_woken: bool) -> bool {
+        let deadline = Instant::now() + duration;
+        let mut wakes = lock(&self.wake.0);
+        let seen = *wakes;
+        loop {
             if self.is_stopping() {
                 return false;
             }
-            std::thread::sleep((until - Instant::now()).min(Duration::from_millis(10)));
+            if until_woken && *wakes != seen {
+                return true;
+            }
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            if remaining.is_zero() {
+                return true;
+            }
+            wakes = self.wake.1.wait_timeout(wakes, remaining).unwrap_or_else(std::sync::PoisonError::into_inner).0;
         }
-        !self.is_stopping()
     }
 
     /// Starts the polling loop (`PollAsync`).
@@ -202,7 +241,9 @@ impl EngineLink {
             };
             let elapsed = began.elapsed();
             let remaining = Duration::from_millis(interval).saturating_sub(elapsed).max(Duration::from_millis(1));
-            if !self.sleep(remaining) {
+            // Hidden, this is a one-second wait that the window can end at
+            // once by showing itself or queueing an edit.
+            if !self.idle(remaining) {
                 break;
             }
         }
@@ -666,7 +707,7 @@ impl EngineLink {
     /// The irreversible phase (`StopAsync`): stop polling, ask the engine to
     /// shut down and wait for it.
     pub fn stop(self: &Arc<Self>) {
-        self.stop.store(true, Ordering::Release);
+        self.set_stopping();
         self.state().stopping = true;
         if let Some(poller) = lock(&self.poller).take() {
             let _ = poller.join();
@@ -689,7 +730,7 @@ impl EngineLink {
     /// Releases the window's hold without stopping the engine (the engine
     /// outlives the window when the process exits without Quit).
     pub fn detach(&self) {
-        self.stop.store(true, Ordering::Release);
+        self.set_stopping();
         if let Some(poller) = lock(&self.poller).take() {
             let _ = poller.join();
         }
@@ -856,7 +897,68 @@ impl EngineLink {
         if io.supervisor.as_ref().is_none_or(|s| s.wait_for_update_exit(pid, remaining).is_err()) {
             return false;
         }
-        self.stop.store(true, Ordering::Release);
+        self.set_stopping();
         true
+    }
+}
+
+#[cfg(test)]
+mod wait_tests {
+    use super::*;
+
+    fn link() -> Arc<EngineLink> {
+        EngineLink::preview(MixerState::new(true), Box::new(|| {}))
+    }
+
+    /// RUST-REV-012: waits are interruptible instead of polled.
+    #[test]
+    fn idle_ends_at_once_when_woken_and_sleep_does_not() {
+        let link = link();
+        let waker = Arc::clone(&link);
+        let started = Instant::now();
+        let thread = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(100));
+            waker.wake();
+        });
+        assert!(link.idle(Duration::from_secs(30)), "woken, not stopping");
+        let woke_after = started.elapsed();
+        assert!(woke_after >= Duration::from_millis(100) && woke_after < Duration::from_secs(5), "{woke_after:?}");
+        thread.join().unwrap();
+        // A fixed-length sleep is not shortened by an ordinary wake.
+        let waker = Arc::clone(&link);
+        let started = Instant::now();
+        let thread = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(50));
+            waker.wake();
+        });
+        assert!(link.sleep(Duration::from_millis(400)));
+        assert!(started.elapsed() >= Duration::from_millis(400), "{:?}", started.elapsed());
+        thread.join().unwrap();
+    }
+
+    #[test]
+    fn stopping_ends_every_wait_promptly() {
+        for until_woken in [false, true] {
+            let link = link();
+            let stopper = Arc::clone(&link);
+            let started = Instant::now();
+            let thread = std::thread::spawn(move || {
+                std::thread::sleep(Duration::from_millis(100));
+                stopper.set_stopping();
+            });
+            assert!(!link.wait(Duration::from_secs(30), until_woken), "a stopping link reports it");
+            assert!(started.elapsed() < Duration::from_secs(5), "{:?}", started.elapsed());
+            thread.join().unwrap();
+            assert!(!link.sleep(Duration::from_secs(30)), "later waits return immediately");
+        }
+    }
+
+    #[test]
+    fn an_undisturbed_wait_lasts_its_duration() {
+        let link = link();
+        let started = Instant::now();
+        assert!(link.idle(Duration::from_millis(250)));
+        let elapsed = started.elapsed();
+        assert!(elapsed >= Duration::from_millis(250) && elapsed < Duration::from_secs(3), "{elapsed:?}");
     }
 }

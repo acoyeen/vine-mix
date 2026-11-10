@@ -56,6 +56,13 @@ change the user's machine or public release state, so they need the
 maintainer's go-ahead. Remaining documentation work: `docs/DISTRIBUTION.md`
 and the user guides still describe the .NET/C++ packages.
 
+Reviewed on 10 November 2026: [RUST_REVIEW_2026-11-10.md](RUST_REVIEW_2026-11-10.md)
+records 41 findings against the 7 November state and what was done about
+each. "Done and verified" above means what it meant on 7 November: parity and
+the listed scenarios. It does not mean release-qualified. Section 0.3 lists
+where the code differs from the plan below, and [RUST_BUILD.md](RUST_BUILD.md)
+is the current build and verification entry point.
+
 Baseline: the 0.5.0 release commit (`6acb162`) **plus** the maintainer's
 post-release working-tree changes, which the installed build already
 contains. The only product change among them is the processing-load
@@ -161,6 +168,37 @@ re-read only for new endpoints, endpoints that just became active, a changed
 identical inventory). `examples/device_change_probe.rs` measures reopens,
 underruns and capture gaps on the physical endpoints while a device is added
 or removed.
+
+### 0.3 Delivered and planned: how to read the rest of this plan (10 November 2026)
+
+Sections 1 to 14 below are the plan as drafted on 6 November 2026. They are
+kept as written, as the record of the design intent. Several of their targets
+were not built, or were built differently. The table states what the code does
+today; where it disagrees with a later section, the table is current and the
+section is a proposal. Build and verification steps for what exists are in
+[RUST_BUILD.md](RUST_BUILD.md). Findings and their evidence are in
+[the 10 November 2026 review](RUST_REVIEW_2026-11-10.md).
+
+| Topic (section) | The plan says | Delivered today |
+|---|---|---|
+| Renderer (1, 6.2, 8) | egui with eframe and wgpu | egui and eframe 0.37 with the glow (OpenGL) backend and AccessKit. No wgpu. |
+| UI tests (6.3) | `egui_kittest` driving the UI through AccessKit, with wgpu snapshot images | An in-crate headless harness (`crates/vinemix-ui/src/ui/test_support.rs`, `app_tests.rs`) that runs the real `App` with synthetic input and reads the AccessKit tree. No image snapshots. |
+| Engine and desktop protocol (1, 5.4, O3) | Protocol version 2: negotiation, pushed telemetry, id-based edit patches | Protocol version 1, request and reply. The desktop polls about 30 times a second while visible and once a second otherwise. Two optional request fields, added 10 November 2026, let the engine leave an unchanged configuration and device list out of a reply and skip display-only work ([CONTROL_PROTOCOL.md](CONTROL_PROTOCOL.md)). Nothing is pushed and edits send the whole configuration. `vinemix-ipc` contains no code. |
+| Parameter edits (5.1, O1) | A `ParamBlock` triple-buffer mailbox; no `Runtime` per edit | No mailbox. Since 10 November 2026 an edit that changes only parameters reuses the running `GraphProcessor` and retargets it in place: no DSP state is allocated or transferred. A new `Runtime` object is still built and published for every accepted edit. A change to nodes, cables or streams still builds and adopts a new processor. |
+| Engine persistence (5.5, O2) | A write-behind persistence thread | Not built. The engine still commits each accepted configuration durably before it replies. The desktop's own preferences file is written by a background, coalescing writer (10 November 2026). |
+| Telemetry lock (O3) | Read telemetry from atomics without the configuration mutex | The snapshot copies what it needs under the lock, then runs spectrum analysis and builds the JSON after releasing it. |
+| Block kernels (O4), approximations (O5) | Block-wise kernels; bounded-error math | Not built. Processing is per sample. Only the exact part of O5 exists: the expander skips `pow` when its result is exactly 1. |
+| Spectrum (O6) | `rustfft`; only for EQ nodes on display | The ported radix-2 FFT. It runs only for EQ plots the desktop reports as drawn (10 November 2026). |
+| Application discovery (O7) | Only while needed; cache image paths | Runs only while a visible desktop window has an application-capture node (10 November 2026). No image-path cache. |
+| Mix-format reads (O8) | Cache per endpoint | Done (0.2 above). The O8 row's "Today" column describes the 0.5 engine, not this one. |
+| Hidden window (6.2) | "A hidden window costs nothing" | A hidden desktop repaints at most once a second as a backstop and its engine link waits on a condition variable. It is cheap, not free. |
+| Third-party DSP (1, Phase 6) | Link the pinned C sources first; pure Rust later, as an optional gate | The shipped executables contain Rust translations only, verified bit-exact against the pinned C sources. C and C++ are compiled only into the test-only `vinemix-oracle`. |
+| Realtime guards (5.1) | A `loom` model test; no-alloc zones in debug and CI builds | An allocation-counting integration test of the processor (`crates/vinemix-dsp/tests/realtime_alloc.rs`) and stress tests of the queue and spectrum mailbox. No `loom` models, and the running mixer and device loops are not instrumented as no-alloc zones. |
+| Continuous integration (9) | — | `.github/workflows/verify.yml` has a `rust` job that runs `scripts/verify-rust.ps1`. It had not yet run on GitHub when this table was written. |
+
+A target that appears above as not built is a proposal, not a missing feature
+of the candidate: each needs its own measurement and decision before work
+starts.
 
 ---
 

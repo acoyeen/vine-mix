@@ -82,6 +82,12 @@ pub struct Connection {
     server_pid: u32,
     closed: Arc<AtomicBool>,
     request_timeout: Duration,
+    /// The current exchange has put request bytes on the pipe.
+    sent_any: bool,
+    /// Snapshot parts held from this transport's earlier responses.
+    cache: protocol::SnapshotCache,
+    /// What the window is showing, sent with each request.
+    interest: Option<serde_json::Value>,
 }
 
 /// Remaining time of one request's deadline, honouring cancellation.
@@ -161,6 +167,9 @@ impl Connection {
             server_pid: 0,
             closed: Arc::new(AtomicBool::new(false)),
             request_timeout: Duration::from_secs(3),
+            sent_any: false,
+            cache: protocol::SnapshotCache::default(),
+            interest: None,
         }
     }
 
@@ -170,11 +179,19 @@ impl Connection {
         Arc::clone(&self.closed)
     }
 
+    /// What the window currently shows (`None`: everything, the default).
+    pub fn set_interest(&mut self, interest: Option<serde_json::Value>) {
+        self.interest = interest;
+    }
+
     pub fn set_request_timeout(&mut self, timeout: Duration) {
         self.request_timeout = timeout;
     }
 
     pub fn disconnect(&mut self) {
+        // A new transport may reach a different engine: start from a full
+        // snapshot again.
+        self.cache.clear();
         self.identity_verified = false;
         self.physical_settings = None;
         self.pipe = None;
@@ -287,12 +304,13 @@ impl Connection {
         deadline: &Deadline<'_>,
     ) -> Result<Response, ConnectionError> {
         let id = platform::random_hex_id();
-        let mut message = protocol::request(&id, command, configuration, revision);
+        let mut message = protocol::request_with(&id, command, configuration, revision, self.cache.known(), self.interest.as_ref());
         if message.len() >= MAXIMUM_MESSAGE_BYTES {
             return Err(ConnectionError::InvalidData("The configuration exceeds the control-message limit.".into()));
         }
         message.push('\n');
         let bytes = message.as_bytes();
+        self.sent_any = false;
         let mut offset = 0usize;
         while offset < bytes.len() {
             let pipe = self.pipe.as_ref().map(|p| p.0).unwrap_or_default();
@@ -302,6 +320,7 @@ impl Connection {
             if written == 0 {
                 return Err(ConnectionError::Io("The audio engine closed its control connection.".into()));
             }
+            self.sent_any = true;
             offset += written as usize;
         }
         let mut line: Vec<u8> = Vec::with_capacity(4096);
@@ -328,7 +347,7 @@ impl Connection {
                 break;
             }
         }
-        let response = protocol::parse_response(&line).map_err(ConnectionError::InvalidData)?;
+        let response = protocol::parse_response_cached(&line, &mut self.cache).map_err(ConnectionError::InvalidData)?;
         if response.protocol_version != 1 || response.request_id != id {
             return Err(ConnectionError::InvalidData("The engine control protocol did not match this application.".into()));
         }
@@ -373,22 +392,40 @@ impl Connection {
         let closed = Arc::clone(&self.closed);
         let deadline = Deadline { until: Instant::now() + self.request_timeout, closed: &closed, cancel };
         deadline.check()?;
-        let result = (|| {
-            if self.pipe.is_none() {
-                self.connect(&deadline)?;
-            }
-            if self.expected.is_some() && !self.identity_verified && command != "snapshot" {
-                let handshake = self.exchange("snapshot", None, None, &deadline)?;
-                if !handshake.ok || handshake.snapshot.is_none() || !self.identity_verified {
-                    return Err(ConnectionError::Io("The engine did not verify its workspace before the requested action.".into()));
-                }
-            }
-            self.exchange(command, configuration, revision, &deadline)
-        })();
+        let reused = self.pipe.is_some();
+        let mut result = self.attempt(command, configuration, revision, &deadline);
+        // The engine releases a connection that has been idle (it serves one
+        // client at a time). If a kept connection fails before a single
+        // request byte was accepted, nothing reached the engine, so the same
+        // request is safe to send once on a fresh connection.
+        if reused && !self.sent_any && matches!(result, Err(ConnectionError::Io(_))) {
+            self.disconnect();
+            result = self.attempt(command, configuration, revision, &deadline);
+        }
         if result.is_err() {
             self.disconnect();
         }
         result
+    }
+
+    fn attempt(
+        &mut self,
+        command: &str,
+        configuration: Option<&Configuration>,
+        revision: Option<u64>,
+        deadline: &Deadline<'_>,
+    ) -> Result<Response, ConnectionError> {
+        self.sent_any = false;
+        if self.pipe.is_none() {
+            self.connect(deadline)?;
+        }
+        if self.expected.is_some() && !self.identity_verified && command != "snapshot" {
+            let handshake = self.exchange("snapshot", None, None, deadline)?;
+            if !handshake.ok || handshake.snapshot.is_none() || !self.identity_verified {
+                return Err(ConnectionError::Io("The engine did not verify its workspace before the requested action.".into()));
+            }
+        }
+        self.exchange(command, configuration, revision, deadline)
     }
 }
 

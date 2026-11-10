@@ -366,4 +366,95 @@ mod tests {
         }
         producer.join().unwrap();
     }
+
+    /// RUST-REV-022: flush requests from a third thread and direct consumer
+    /// clears while both ends stay busy. Clears may discard frames, but what
+    /// the consumer does read must still be intact, in order and never
+    /// repeated, and occupancy must never be reported above capacity.
+    #[test]
+    fn clears_during_concurrent_traffic_never_corrupt_or_reorder() {
+        use std::sync::atomic::AtomicBool;
+        use std::time::{Duration, Instant};
+        const CAPACITY: usize = 113;
+        // Frame numbers stay exactly representable in f32.
+        const LIMIT: usize = 12_000_000;
+        const RUN: Duration = Duration::from_millis(400);
+        let (mut p, mut c, m) = frame_queue(CAPACITY);
+        let done = Arc::new(AtomicBool::new(false));
+        let producer = std::thread::spawn(move || {
+            let started = Instant::now();
+            let mut next = 0usize;
+            let mut offered = 0u64;
+            let mut accepted = 0u64;
+            let mut pushes = 0u32;
+            while next < LIMIT && started.elapsed() < RUN {
+                let block = ramp(next, 17);
+                let taken = p.push(&block);
+                offered += 17;
+                accepted += taken as u64;
+                // Frames that did not fit are gone, as in a device callback:
+                // the next block continues after them.
+                next += 17;
+                pushes = pushes.wrapping_add(1);
+                if pushes.is_multiple_of(251) {
+                    p.request_clear();
+                }
+                if taken == 0 {
+                    std::thread::yield_now();
+                }
+            }
+            (offered, accepted, p.stats())
+        });
+        let observer = {
+            let (m, done) = (m.clone(), Arc::clone(&done));
+            std::thread::spawn(move || {
+                let mut rounds = 0u32;
+                let mut largest = 0usize;
+                while !done.load(Ordering::Acquire) {
+                    largest = largest.max(m.size());
+                    if rounds.is_multiple_of(64) {
+                        m.request_clear();
+                    }
+                    rounds = rounds.wrapping_add(1);
+                    std::hint::spin_loop();
+                }
+                largest
+            })
+        };
+        let mut last: Option<usize> = None;
+        let mut read = 0u64;
+        let mut pops_with_data = 0u64;
+        let mut out = [Frame::SILENT; 19];
+        let mut rounds = 0u32;
+        loop {
+            let finished = producer.is_finished();
+            let n = c.pop(&mut out);
+            for f in &out[..n] {
+                let value = f.left as usize;
+                assert_eq!(f.right, -(value as f32), "a frame was torn");
+                assert!(last.is_none_or(|previous| value > previous), "frame {value} after {last:?}: repeated or reordered");
+                last = Some(value);
+                read += 1;
+            }
+            pops_with_data += u64::from(n != 0);
+            rounds = rounds.wrapping_add(1);
+            if rounds.is_multiple_of(97) {
+                c.clear();
+            }
+            if finished && n == 0 {
+                break;
+            }
+        }
+        let (offered, accepted, stats) = producer.join().unwrap();
+        done.store(true, Ordering::Release);
+        let largest = observer.join().unwrap();
+        assert!(largest <= CAPACITY, "occupancy {largest} was reported above capacity {CAPACITY}");
+        assert_eq!(accepted + stats.dropped_frames, offered, "every frame was either accepted or counted as dropped");
+        assert!(read <= accepted, "read {read} of {accepted} accepted");
+        // The run really was concurrent: many separate hand-overs happened.
+        assert!(pops_with_data > 1000 && read > 10_000, "only {pops_with_data} pops returned data ({read} frames)");
+        c.clear();
+        assert_eq!(m.size(), 0);
+        assert!(!m.clear_pending(), "every flush request was acknowledged");
+    }
 }

@@ -305,11 +305,11 @@ pub fn check(trust: &Trust, current: &str, include_prereleases: bool, compatibil
         if cancelled() {
             return Err(Failure::Cancelled);
         }
-        let response = http::get(&format!("https://api.github.com/repos/{REPOSITORY}/releases?per_page=100&page={page}"), false, timeout)?;
+        let response = http::get(&format!("https://api.github.com/repos/{REPOSITORY}/releases?per_page=100&page={page}"), false, timeout, cancelled)?;
         if !response.success() {
             return Err(http_failure(&response));
         }
-        let body = response.read_bounded(2 * 1024 * 1024)?;
+        let body = response.read_bounded(2 * 1024 * 1024, cancelled)?;
         let document = json::parse(&body, 32).map_err(|_| malformed())?;
         let items = document.as_array().filter(|a| a.len() <= 100).ok_or_else(|| Failure::Invalid("The release service returned invalid release information.".into()))?;
         for item in items {
@@ -361,11 +361,11 @@ pub fn check(trust: &Trust, current: &str, include_prereleases: bool, compatibil
             {
                 return Err(Failure::Invalid("The published update manifest has an invalid origin, state or size.".into()));
             }
-            let response = http::get(&expected_url, true, timeout)?;
+            let response = http::get(&expected_url, true, timeout, cancelled)?;
             if !response.success() {
                 return Err(http_failure(&response));
             }
-            let bytes = response.read_bounded(MAXIMUM_ENVELOPE_BYTES)?;
+            let bytes = response.read_bounded(MAXIMUM_ENVELOPE_BYTES, cancelled)?;
             if bytes.len() as u64 != size {
                 return Err(Failure::Invalid("The signed update manifest does not match the published asset length.".into()));
             }
@@ -420,7 +420,7 @@ pub fn download(offer: &Offer, kind: AssetKind, staging_parent: &Path, progress:
     let partial = staging.join(format!("{}.partial", asset.file_name));
     let complete = staging.join(&asset.file_name);
     let result = (|| -> Result<(), Failure> {
-        let response = http::get(&asset.url, true, Duration::from_secs(600))?;
+        let response = http::get(&asset.url, true, Duration::from_secs(600), cancelled)?;
         if !response.success() {
             return Err(Failure::Unavailable(format!("The update download returned HTTP {}.", response.status)));
         }
@@ -430,7 +430,7 @@ pub fn download(offer: &Offer, kind: AssetKind, staging_parent: &Path, progress:
         let mut file = std::fs::OpenOptions::new().write(true).create_new(true).open(&partial).map_err(io)?;
         let mut hash = crypto::Sha256::new().map_err(Failure::Unavailable)?;
         let mut written = 0u64;
-        response.read_with(asset.size.min(MAXIMUM_ASSET_BYTES), |chunk| {
+        response.read_with(asset.size.min(MAXIMUM_ASSET_BYTES), cancelled, |chunk| {
             if cancelled() {
                 return Err(Failure::Cancelled);
             }

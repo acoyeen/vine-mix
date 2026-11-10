@@ -1,14 +1,22 @@
 //! The endpoint catalog: a dedicated COM thread enumerates every capture and
 //! render endpoint, caches the result and wakes on device notifications.
-//! Notifications only advance a generation; they never touch an audio
-//! client. A failed enumeration keeps the last complete inventory.
+//! Notifications only wake that thread; they never touch an audio client. A
+//! failed enumeration keeps the last complete inventory.
+//!
+//! The generation advances only when the inventory actually changed (or on an
+//! explicit refresh). Default-device and property notifications that leave
+//! every endpoint as it was are therefore invisible to streams. When the
+//! inventory does change, the catalog thread also decides, for every open
+//! stream, whether that stream's endpoint is still the selected one
+//! ([`StreamWatch`]): a running stream thread only reads two atomics.
 
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Condvar, Mutex};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::{Arc, Condvar, Mutex, Weak};
 use std::thread::JoinHandle;
 use std::time::Duration;
 
+use vinemix_model::config::DeviceBinding;
 use vinemix_model::status::Endpoint;
 use windows::core::{implement, Interface, GUID, PCWSTR, PWSTR};
 use windows::Win32::Foundation::PROPERTYKEY;
@@ -21,7 +29,7 @@ use windows::Win32::System::Com::{CoCreateInstance, CoTaskMemFree, CLSCTX_ALL, S
 use windows::Win32::System::Variant::{VT_BLOB, VT_LPWSTR, VT_UI4};
 use windows::Win32::UI::Shell::PropertiesSystem::{IPropertyStore, PSGetPropertyKeyFromName};
 
-use crate::policy::{endpoint_state, transport_family, virtual_name};
+use crate::policy::{endpoint_state, stream_still_selected, transport_family, virtual_name};
 use crate::win::{wait_any, Apartment, Event, Wait};
 
 const FRIENDLY_NAME: PROPERTYKEY = PROPERTYKEY {
@@ -232,15 +240,102 @@ pub fn collect_endpoints(enumerator: &IMMDeviceEnumerator, previous: &[Endpoint]
     Some(result)
 }
 
+/// What an open stream depends on. The catalog thread re-evaluates it after
+/// every inventory change and latches `stale` when the stream must reopen.
+#[derive(Debug)]
+pub struct StreamWatch {
+    selection: DeviceBinding,
+    endpoint_id: String,
+    channels: u32,
+    rate: u32,
+    capture: bool,
+    microphone: bool,
+    required_transport: String,
+    stale: AtomicBool,
+}
+
+impl StreamWatch {
+    pub fn new(selection: DeviceBinding, endpoint: &Endpoint, capture: bool, microphone: bool, required_transport: &str) -> Arc<Self> {
+        Arc::new(Self {
+            selection,
+            endpoint_id: endpoint.id.clone(),
+            channels: endpoint.channels,
+            rate: endpoint.rate,
+            capture,
+            microphone,
+            required_transport: required_transport.to_owned(),
+            stale: AtomicBool::new(false),
+        })
+    }
+
+    /// Whether the stream's endpoint stopped being the selected one. A single
+    /// atomic load: safe on the stream thread at any time.
+    #[inline]
+    pub fn is_stale(&self) -> bool {
+        self.stale.load(Ordering::Acquire)
+    }
+
+    fn evaluate(&self, devices: &[Endpoint]) {
+        let valid = stream_still_selected(
+            devices,
+            &self.selection,
+            self.capture,
+            self.microphone,
+            &self.required_transport,
+            &self.endpoint_id,
+            self.channels,
+            self.rate,
+        );
+        if !valid {
+            self.stale.store(true, Ordering::Release);
+        }
+    }
+}
+
+/// The open streams to re-evaluate when the inventory changes.
+#[derive(Debug, Default)]
+pub struct StreamWatches(Mutex<Vec<Weak<StreamWatch>>>);
+
+impl StreamWatches {
+    /// Starts watching, judged immediately against `devices` so a change
+    /// between the caller's own resolution and this call is not missed.
+    pub fn register(&self, watch: &Arc<StreamWatch>, devices: &[Endpoint]) {
+        watch.evaluate(devices);
+        let mut watches = self.0.lock().unwrap_or_else(|e| e.into_inner());
+        watches.retain(|w| w.strong_count() > 0);
+        watches.push(Arc::downgrade(watch));
+    }
+
+    /// Re-evaluates every live watch against a new inventory.
+    pub fn evaluate(&self, devices: &[Endpoint]) {
+        let mut watches = self.0.lock().unwrap_or_else(|e| e.into_inner());
+        watches.retain(|watch| match watch.upgrade() {
+            Some(watch) => {
+                watch.evaluate(devices);
+                true
+            }
+            None => false,
+        });
+    }
+
+    pub fn len(&self) -> usize {
+        self.0.lock().unwrap_or_else(|e| e.into_inner()).iter().filter(|w| w.strong_count() > 0).count()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}
+
 #[implement(IMMNotificationClient)]
 struct Notifications {
-    generation: Arc<AtomicU64>,
     wake: Arc<Event>,
 }
 
 impl Notifications {
+    /// Something may have changed: have the catalog thread look. Whether the
+    /// inventory really changed is decided there, not here.
     fn changed(&self) -> windows::core::Result<()> {
-        self.generation.fetch_add(1, Ordering::Relaxed);
         self.wake.set();
         Ok(())
     }
@@ -278,6 +373,7 @@ struct Shared {
     /// An explicit retry re-reads every mix format.
     reprobe: std::sync::atomic::AtomicBool,
     inventory: Mutex<Inventory>,
+    watches: StreamWatches,
     ready: Condvar,
 }
 
@@ -297,6 +393,7 @@ impl DeviceCatalog {
             generation: Arc::new(AtomicU64::new(1)),
             reprobe: std::sync::atomic::AtomicBool::new(false),
             inventory: Mutex::new(Inventory::default()),
+            watches: StreamWatches::default(),
             ready: Condvar::new(),
         });
         let worker = shared.clone();
@@ -317,8 +414,20 @@ impl DeviceCatalog {
         self.shared.inventory.lock().unwrap_or_else(|e| e.into_inner()).endpoints.clone()
     }
 
+    /// Advances when the inventory changed or a refresh was requested.
     pub fn generation(&self) -> u64 {
         self.shared.generation.load(Ordering::Relaxed)
+    }
+
+    /// Watches an open stream on `endpoint` for `selection`. Called by the
+    /// worker while opening (never from its running loop); the returned
+    /// watch turns stale when the catalog thread finds the endpoint is no
+    /// longer the selected, unchanged one.
+    pub fn watch(&self, selection: DeviceBinding, endpoint: &Endpoint, capture: bool, microphone: bool, required_transport: &str) -> Arc<StreamWatch> {
+        let watch = StreamWatch::new(selection, endpoint, capture, microphone, required_transport);
+        let inventory = self.shared.inventory.lock().unwrap_or_else(|e| e.into_inner());
+        self.shared.watches.register(&watch, &inventory.endpoints);
+        watch
     }
 
     /// Forces a re-enumeration (explicit retry).
@@ -341,8 +450,7 @@ impl Drop for DeviceCatalog {
 fn run(shared: &Shared) {
     let apartment = Apartment::enter();
     let mut enumerator: Option<IMMDeviceEnumerator> = None;
-    let notifications: IMMNotificationClient =
-        Notifications { generation: shared.generation.clone(), wake: shared.wake.clone() }.into();
+    let notifications: IMMNotificationClient = Notifications { wake: shared.wake.clone() }.into();
     let mut registered = false;
     let mut formats = MixFormatCache::new();
     loop {
@@ -370,6 +478,9 @@ fn run(shared: &Shared) {
                     let mut inventory = shared.inventory.lock().unwrap_or_else(|e| e.into_inner());
                     if inventory.endpoints != next {
                         inventory.endpoints = next;
+                        // Open streams learn their verdict before they can
+                        // observe the new generation.
+                        shared.watches.evaluate(&inventory.endpoints);
                         shared.generation.fetch_add(1, Ordering::Relaxed);
                     }
                 }
@@ -395,4 +506,57 @@ fn run(shared: &Shared) {
         }
     }
     let _ = notifications.as_raw();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn endpoint(id: &str, state: &str) -> Endpoint {
+        Endpoint { id: id.into(), direction: "capture".into(), state: state.into(), channels: 2, rate: 48_000, transport: "physical".into(), ..Endpoint::default() }
+    }
+
+    fn binding(id: &str) -> DeviceBinding {
+        DeviceBinding { id: id.into(), ..DeviceBinding::default() }
+    }
+
+    /// RUST-REV-016: the verdict a running stream reads is computed by
+    /// whoever changes the inventory, and only its own endpoint matters.
+    #[test]
+    fn watches_turn_stale_only_for_their_own_endpoint() {
+        let watches = StreamWatches::default();
+        let inventory = vec![endpoint("a", "Active"), endpoint("b", "Active")];
+        let a = StreamWatch::new(binding("a"), &inventory[0], true, true, "");
+        let b = StreamWatch::new(binding("b"), &inventory[1], true, true, "");
+        watches.register(&a, &inventory);
+        watches.register(&b, &inventory);
+        assert!(!a.is_stale() && !b.is_stale());
+        // An unrelated arrival and a change to "b" leave "a" running.
+        let mut changed = vec![endpoint("a", "Active"), endpoint("b", "Active"), endpoint("c", "Active")];
+        changed[1].rate = 44_100;
+        watches.evaluate(&changed);
+        assert!(!a.is_stale(), "an unrelated change must not reopen this stream");
+        assert!(b.is_stale(), "a format change on the stream's own endpoint must");
+        // Staleness latches: a later inventory cannot revive a stream that
+        // was already told to reopen.
+        watches.evaluate(&inventory);
+        assert!(b.is_stale());
+        // Dropped streams are forgotten.
+        drop(b);
+        watches.evaluate(&inventory);
+        assert_eq!(watches.len(), 1);
+        drop(a);
+        assert!(watches.is_empty());
+    }
+
+    #[test]
+    fn a_watch_registered_after_its_endpoint_changed_is_stale_at_once() {
+        let watches = StreamWatches::default();
+        let resolved = endpoint("a", "Active");
+        // The inventory moved on between resolution and registration.
+        let now = vec![endpoint("a", "Unplugged")];
+        let watch = StreamWatch::new(binding("a"), &resolved, true, true, "");
+        watches.register(&watch, &now);
+        assert!(watch.is_stale());
+    }
 }

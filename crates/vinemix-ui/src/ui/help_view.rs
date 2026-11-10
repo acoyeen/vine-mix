@@ -113,6 +113,14 @@ impl HelpState {
         state
     }
 
+    /// Opens directly on `topic` with its practice lesson (interface tests).
+    #[cfg(test)]
+    pub(crate) fn for_topic(topic: &'static str) -> Self {
+        let mut state = Self::new(None);
+        state.select_topic(topic);
+        state
+    }
+
     pub fn show_entry(&mut self, id: &'static str) {
         let Some(entry) = help::ENTRIES.iter().find(|e| e.id == id) else { return };
         self.select_topic("controls");
@@ -194,7 +202,7 @@ fn selector_row(ui: &mut Ui, id: Id, label: &str, choices: &[Choice], selected: 
 }
 
 fn choices(labels: &[&str]) -> Vec<Choice> {
-    labels.iter().map(|l| Choice { label: (*l).to_owned(), enabled: true, help: String::new() }).collect()
+    labels.iter().map(|l| Choice::fixed(l)).collect()
 }
 
 /// A `WorkspaceToolbarButton` sized to its text (min 26 high, 8,3 padding).
@@ -290,7 +298,7 @@ pub fn show(ui: &mut Ui, area: Rect, state: &mut HelpState) -> bool {
     reading_ui.spacing_mut().item_spacing = Vec2::ZERO;
     if compact {
         let (row, _) = reading_ui.allocate_exact_size(Vec2::new(reading.width(), 28.0), Sense::hover());
-        let topic_choices: Vec<Choice> = TOPICS.iter().map(|(_, t, _)| Choice { label: (*t).to_owned(), enabled: true, help: String::new() }).collect();
+        let topic_choices: Vec<Choice> = TOPICS.iter().map(|(_, t, _)| Choice::fixed(t)).collect();
         let current = TOPICS.iter().position(|(id, _, _)| *id == state.topic).unwrap_or(0);
         let (_, picked) = widgets::selector(&mut reading_ui, Id::unique("help-topic-compact"), row, Some(current), TOPICS[current].1, &topic_choices, true, 1.0, theme::TEXT, "Choose help topic");
         if let Some(index) = picked {
@@ -359,7 +367,7 @@ fn reference(ui: &mut Ui, state: &mut HelpState) {
         };
         painter.add(egui::Shape::line(points, Stroke::new(1.6, theme::TEXT)));
         painter.rect_filled(Rect::from_min_size(Pos2::new(header.left(), header.bottom() - 1.0), Vec2::new(width, 1.0)), 0.0, theme::BORDER);
-        let response = response.tip(if expanded { "Choose to collapse this section." } else { "Choose to expand this section and close the others." });
+        let response = response.tip(if expanded { "Collapses this section." } else { "Expands this section and collapses the others." });
         if response.clicked() {
             state.section = if expanded { String::new() } else { section_id.to_owned() };
             if state.highlighted.and_then(|h| help::ENTRIES.iter().find(|e| e.id == h)).is_some_and(|e| e.section_id != state.section) {
@@ -420,7 +428,10 @@ fn reference_row(ui: &mut Ui, state: &mut HelpState, entry: &'static Entry) {
         painter.galley(Pos2::new(surface.left() + 8.0, top + line + 8.0), description, theme::MUTED);
     }
     painter.rect_filled(Rect::from_min_size(Pos2::new(row.left(), row.bottom() - 1.0), Vec2::new(width, 1.0)), 0.0, theme::BORDER);
-    let response = response.tip(format!("{}\n{}\n{}", entry.title, entry.keys, entry.description));
+    // The row shows its title and keys, and its full instructions once
+    // chosen: nothing more to pop up. Assistive technology gets the
+    // instructions as the row's description without having to expand it.
+    widgets::describe(&response, entry.description);
     if response.clicked() {
         state.highlighted = Some(entry.id);
     }
@@ -779,6 +790,7 @@ impl EqualizerLesson {
             graph: &graph,
             endpoints: &[],
             applications: &[],
+            inventory_generation: 0,
             visibility: crate::availability::Visibility::default(),
             can_edit: true,
             preview: true,
@@ -907,7 +919,7 @@ impl FeedbackLesson {
             let meter_response = ui.interact(meter_rect, Id::unique("help-meter"), Sense::hover());
             let lines = self.meter.peak_lines();
             if !lines.is_empty() {
-                meter_response.tip(format!("Audio peaks\n{}", lines.join("\n")));
+                meter_response.tip(format!("Sample peaks\n{}\nPractice values; no audio is measured.", lines.join(" · ")));
             }
             let x = rect.left() + 28.0 + 20.0;
             let mut y = rect.top();
@@ -928,7 +940,7 @@ impl FeedbackLesson {
             }
             y += 3.0 + 12.0;
             painter.galley(Pos2::new(x, y), explanation_g, theme::MUTED);
-            ui.interact(status_rect, Id::unique("help-feedback-status"), Sense::hover()).tip(format!("Sample status\n{status}\n{explanation}"));
+            ui.interact(status_rect, Id::unique("help-feedback-status"), Sense::hover()).tip(format!("Sample status\n{status}"));
             ui.interact(detector_rect, Id::unique("help-feedback-detector"), Sense::hover()).tip(format!("Sample dynamics reading\n{detector}"));
         });
         section(ui, "Reading the display", "", |ui| {

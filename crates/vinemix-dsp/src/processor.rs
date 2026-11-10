@@ -604,6 +604,33 @@ impl GraphProcessor {
         }
     }
 
+    /// Audio-thread switch to a plan with the same indexing as the one this
+    /// processor has been running ([`vinemix_model::plan::same_indexing`]):
+    /// a parameter edit. Every ramp, filter and effect state is already in
+    /// place, so nothing is copied; only an EQ whose coefficients changed
+    /// starts its 10 ms coefficient crossfade, exactly as [`adopt`] does.
+    /// Changed settings are then picked up by `process`, which ramps to them.
+    ///
+    /// Produces the same samples as preparing a new processor for `after`
+    /// and adopting this one into it (see `tests/retarget_parity.rs`),
+    /// without that allocation and copy.
+    ///
+    /// [`adopt`]: GraphProcessor::adopt
+    pub fn retarget(&mut self, before: &GraphPlan, after: &GraphPlan) {
+        debug_assert!(vinemix_model::plan::same_indexing(before, after), "retarget needs identically indexed plans");
+        for (i, (now, then)) in after.nodes.iter().zip(&before.nodes).enumerate() {
+            if now.kind.is_filter() && now.eq != then.eq {
+                let effect = &mut self.effects[i];
+                effect.previous_eq = Effects::INITIAL.previous_eq;
+                effect.previous_eq[..then.eq.len()].copy_from_slice(&then.eq);
+                effect.previous_eq_count = then.eq.len();
+                effect.previous_filters = effect.filters;
+                effect.filters = Effects::INITIAL.filters;
+                effect.eq_transition = 480;
+            }
+        }
+    }
+
     fn inherit_scalars(&mut self, old: &GraphProcessor, before: &GraphPlan, after: &GraphPlan) {
         for (i, j) in matching_nodes(before, after) {
             self.node_ramps[i] = old.node_ramps[j];

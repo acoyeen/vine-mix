@@ -102,9 +102,7 @@ function AssertEngineUnchanged {
             (Hash $enginePath) -cne $expectedEngine) {
             throw 'The original audio engine changed or exited. UI-only activation will not stop, launch, replace or recover an engine.'
         }
-        foreach ($runtime in $state.RuntimeHashes.GetEnumerator()) {
-            if ((Hash (Join-Path $package $runtime.Key)) -cne $runtime.Value) { throw 'An installed runtime library changed independently.' }
-        }
+        Assert-UiActivationRuntime $package $state.RuntimeHashes 'An installed runtime library changed independently.'
     } finally { foreach ($process in $engines) { $process.Dispose() } }
 }
 function AssertSettingsIdentity {
@@ -132,9 +130,7 @@ function AssertCandidate {
     }
     Assert-UiActivationRelease (Get-Item -LiteralPath $candidateUi).VersionInfo.ProductVersion `
         (Get-Item -LiteralPath $uiPath).VersionInfo.ProductVersion $state.Version
-    foreach ($runtime in $state.RuntimeHashes.GetEnumerator()) {
-        if ((Hash (Join-Path $candidate $runtime.Key)) -cne $runtime.Value) { throw 'The staged runtime libraries differ from the unchanged installed runtime.' }
-    }
+    Assert-UiActivationRuntime $candidate $state.RuntimeHashes 'The staged runtime libraries differ from the unchanged installed runtime.'
 }
 function GetSnapshot {
     # The normal desktop owns the only persistent control connection. Request
@@ -181,7 +177,8 @@ function StartUi {
     ReleaseUpdateGuard
     $process = Start-DesktopController -ExecutablePath $uiPath -WorkingDirectory $package -ShortcutPath $ShortcutPath `
         -OnVerifiedProcess { param($identity) $state.NewUiIdentity = $identity }
-    try { $result.newUiId = $process.Id; $result.windowTitle = $process.MainWindowTitle }
+    # windowFramework records which desktop answered: 'wpf' (0.5) or 'rust'.
+    try { $result.newUiId = $process.Id; $result.windowTitle = $process.MainWindowTitle; $result.windowFramework = Get-DesktopWorkspaceFramework $process }
     finally { $process.Dispose() }
 }
 
@@ -198,8 +195,10 @@ try {
     $oldUiIdentity = $identities[$oldUi.Id]
     $engineIdentity = $identities[$oldEngine.Id]
     $state.Version = (Get-Item -LiteralPath $enginePath).VersionInfo.ProductVersion
-    $state.RuntimeHashes = @{}
-    foreach ($name in @('libc++.dll','libunwind.dll','libwinpthread-1.dll')) { $state.RuntimeHashes[$name] = Hash (Join-Path $package $name) }
+    # All three for a 0.5 package, none for a Rust package; either way the
+    # staged candidate must match (local-ui-activation-support.ps1).
+    $state.RuntimeHashes = Get-UiActivationRuntimeHashes $package
+    $result.installedRuntimeLibraries = @($state.RuntimeHashes.GetEnumerator() | Where-Object { $null -ne $_.Value } | ForEach-Object { $_.Key })
     $result.originalEngineIdentity = $engineIdentity
     $result.originalUiIdentity = $oldUiIdentity
     $result.version = $state.Version

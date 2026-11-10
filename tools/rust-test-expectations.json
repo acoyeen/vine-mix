@@ -1,0 +1,50 @@
+{
+  "description": "What a qualifying run of scripts/verify-rust.ps1 must exercise. Keys are <package>/<lib|bin|test>/<target>. 'passed' is an exact count (used for the C/C++ parity comparisons, which must never shrink unnoticed); 'minimumPassed' is a floor, so adding tests needs no change here but losing them does. 'ignored' names every test the suite is allowed to skip: benchmarks and diagnostics that only print measurements, and the two cross-language update tests that the script runs separately against the 0.5 C# serializer. A suite that is missing, unlisted, failing, short of its count, or skipping anything not named here fails qualification. Update this file in the same change that adds, removes or renames tests; `scripts/verify-rust.ps1 -PrintObserved` prints the current tree as a starting point.",
+  "suites": {
+    "vinemix-denoise/lib/vinemix_denoise": { "minimumPassed": 9 },
+    "vinemix-dsp/lib/vinemix_dsp": {
+      "minimumPassed": 24,
+      "ignored": [
+        "effects::denoise::tests::denoise_engine_cost",
+        "effects::dynamics::tests::expander_cost",
+        "spectrum::tests::spectrum_read_cost"
+      ]
+    },
+    "vinemix-dsp/test/realtime_alloc": { "minimumPassed": 3, "ignored": ["parameter_edit_cost"] },
+    "vinemix-dsp/test/retarget_parity": { "minimumPassed": 3 },
+    "vinemix-engine/bin/vinemix-engine": { "minimumPassed": 0 },
+    "vinemix-engine/lib/vinemix_engine": { "minimumPassed": 12 },
+    "vinemix-engine/test/control_pipe": { "minimumPassed": 5 },
+    "vinemix-engine/test/display_interest": { "minimumPassed": 2 },
+    "vinemix-engine/test/edit_cost": { "minimumPassed": 1 },
+    "vinemix-engine/test/engine_lifecycle": { "minimumPassed": 3 },
+    "vinemix-engine/test/snapshot_gating": { "minimumPassed": 2, "ignored": ["inventory_churn", "polling_cost"] },
+    "vinemix-ipc/lib/vinemix_ipc": { "minimumPassed": 0 },
+    "vinemix-model/lib/vinemix_model": { "minimumPassed": 28 },
+    "vinemix-oracle/lib/vinemix_oracle": { "minimumPassed": 0 },
+    "vinemix-oracle/test/availability": { "passed": 1 },
+    "vinemix-oracle/test/denoise_parity": { "passed": 3, "ignored": ["denoise_benchmark"] },
+    "vinemix-oracle/test/graph_parity": { "passed": 5, "ignored": ["processing_benchmark"] },
+    "vinemix-oracle/test/resampler_parity": { "passed": 3 },
+    "vinemix-platform/lib/vinemix_platform": { "minimumPassed": 1 },
+    "vinemix-resample/lib/vinemix_resample": { "minimumPassed": 3 },
+    "vinemix-rt/lib/vinemix_rt": { "minimumPassed": 28 },
+    "vinemix-setup-helper/bin/vinemix-setup-helper": { "minimumPassed": 1 },
+    "vinemix-ui/bin/vinemix": { "minimumPassed": 0 },
+    "vinemix-ui/lib/vinemix_ui": {
+      "minimumPassed": 117,
+      "ignored": [
+        "ui::app::tests::frame_cost",
+        "update::tests::interop_read",
+        "update::tests::interop_write"
+      ]
+    },
+    "vinemix-ui/test/engine_reconnect": { "minimumPassed": 1 },
+    "vinemix-ui/test/source_identity": { "minimumPassed": 8 },
+    "vinemix-update/lib/vinemix_update": { "minimumPassed": 13 },
+    "vinemix-wasapi/lib/vinemix_wasapi": {
+      "minimumPassed": 14,
+      "ignored": ["process::tests::application_enumeration_cost"]
+    }
+  }
+}

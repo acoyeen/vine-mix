@@ -395,6 +395,8 @@ fn voice_chain() -> AudioGraph {
 fn processing_benchmark() {
     const QUANTA: usize = 2_000; // 10 seconds of audio at 48 kHz.
     const RUNS: usize = 7;
+    /// One quantum is 5 ms; anything longer has missed its deadline.
+    const DEADLINE_US: f64 = 5_000.0;
     for (name, graph) in [("voice chain (starter)", voice_chain()), ("effects chain (17 effects)", effects_chain()), ("routing graph (23 nodes)", routing_graph())] {
         let plan = compile_graph(&graph).expect("graph compiles");
         let mut seed = 1u32;
@@ -410,38 +412,56 @@ fn processing_benchmark() {
         }
         let rows_by_quantum: Vec<Vec<Vec<f32>>> =
             frames_by_quantum.iter().map(|q| q.iter().map(|f| f.iter().flat_map(|s| [s.left, s.right]).collect()).collect()).collect();
-        let mut cpp = Vec::new();
-        let mut rust = Vec::new();
+        // Both sides get their per-quantum input views built before the
+        // clock starts: the timed loops contain the process call and nothing
+        // else. (The C++ loop used to allocate its view vector every quantum
+        // inside the timed region while the Rust loop did not.)
+        let cpp_views: Vec<Vec<Option<&[f32]>>> =
+            rows_by_quantum.iter().map(|rows| rows.iter().map(|r| (!r.is_empty()).then_some(r.as_slice())).collect()).collect();
+        let rust_views: Vec<[&[Frame]; 32]> = frames_by_quantum.iter().map(|frames| std::array::from_fn(|i| frames[i].as_slice())).collect();
+        // Every quantum of every run, in microseconds.
+        let mut cpp: Vec<f64> = Vec::with_capacity(QUANTA * RUNS);
+        let mut rust: Vec<f64> = Vec::with_capacity(QUANTA * RUNS);
+        let (mut cpp_totals, mut rust_totals) = (Vec::new(), Vec::new());
         for _ in 0..RUNS {
             let mut reference = Graph::new(&json(&graph)).expect("graph compiles in C++");
-            let start = std::time::Instant::now();
-            for rows in &rows_by_quantum {
-                let inputs: Vec<Option<&[f32]>> = rows.iter().map(|r| (!r.is_empty()).then_some(r.as_slice())).collect();
-                reference.process(&inputs, false);
+            let run = std::time::Instant::now();
+            for inputs in &cpp_views {
+                let start = std::time::Instant::now();
+                reference.process(inputs, false);
+                cpp.push(start.elapsed().as_secs_f64() * 1e6);
             }
-            cpp.push(start.elapsed().as_secs_f64());
+            cpp_totals.push(run.elapsed().as_secs_f64());
             let mut processor = GraphProcessor::new();
             processor.prepare(&plan);
-            let start = std::time::Instant::now();
-            for frames in &frames_by_quantum {
-                let views: [&[Frame]; 32] = std::array::from_fn(|i| frames[i].as_slice());
-                processor.process(&plan, &views, false);
+            let run = std::time::Instant::now();
+            for views in &rust_views {
+                let start = std::time::Instant::now();
+                processor.process(&plan, views, false);
+                rust.push(start.elapsed().as_secs_f64() * 1e6);
             }
-            rust.push(start.elapsed().as_secs_f64());
+            rust_totals.push(run.elapsed().as_secs_f64());
         }
+        let summary = |samples: &mut Vec<f64>| {
+            samples.sort_by(f64::total_cmp);
+            let at = |q: f64| samples[((samples.len() - 1) as f64 * q) as usize];
+            (at(0.5), at(0.99), at(0.999), samples[samples.len() - 1], samples.iter().filter(|&&us| us > DEADLINE_US).count())
+        };
         let median = |v: &mut Vec<f64>| {
             v.sort_by(f64::total_cmp);
             v[v.len() / 2]
         };
-        let (c, r) = (median(&mut cpp), median(&mut rust));
-        let per_quantum = |t: f64| t / QUANTA as f64 * 1e6;
+        let (c, r) = (summary(&mut cpp), summary(&mut rust));
+        let (c_total, r_total) = (median(&mut cpp_totals), median(&mut rust_totals));
+        println!("BENCH {name}: per quantum in us (median / p99 / p99.9 / max / over the 5 ms deadline), {} quanta each", QUANTA * RUNS);
+        println!("  C++   {:8.2} / {:8.2} / {:8.2} / {:8.2} / {}", c.0, c.1, c.2, c.3, c.4);
+        println!("  Rust  {:8.2} / {:8.2} / {:8.2} / {:8.2} / {}", r.0, r.1, r.2, r.3, r.4);
         println!(
-            "BENCH {name}: C++ {:.2} us/quantum ({:.3}% of real time), Rust {:.2} us/quantum ({:.3}% of real time), Rust/C++ = {:.3}",
-            per_quantum(c),
-            c / 10.0 * 100.0,
-            per_quantum(r),
-            r / 10.0 * 100.0,
-            r / c
+            "  share of real time (median run): C++ {:.3}%, Rust {:.3}%; Rust/C++ = {:.3} (median quantum {:.3})",
+            c_total / 10.0 * 100.0,
+            r_total / 10.0 * 100.0,
+            r_total / c_total,
+            r.0 / c.0
         );
     }
 }

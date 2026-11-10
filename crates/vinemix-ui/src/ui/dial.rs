@@ -196,12 +196,30 @@ impl Spec {
         )
     }
 
-    pub fn help(&self, default: f64) -> String {
+    /// Hover help: the control's name and what it does. How to operate a
+    /// dial is the same for every dial, so it lives in Help ("Dials &
+    /// values") and in the accessible descriptions below, not here.
+    pub fn help(&self) -> String {
+        format!("{}\n{}", self.label, self.description)
+    }
+
+    /// Accessible description of the dial face: purpose, range and operation.
+    pub fn face_description(&self, default: f64) -> String {
         format!(
-            "{}\n{}. Drag vertically; Shift for fine adjustment. Arrow keys adjust; Page Up and Page Down adjust by {}. Type a number to edit its exact value. Home or double-click resets to {}.",
+            "{} {}. Drag vertically; Shift for fine adjustment. Arrow keys adjust; Page Up and Page Down adjust by {}. Type a number to edit its exact value. Home or double-click resets to {}.",
             self.description,
             self.range_text(),
             self.format_value(self.large_change),
+            self.format_value(default)
+        )
+    }
+
+    /// Accessible description of the exact-value entry.
+    pub fn entry_description(&self, default: f64) -> String {
+        format!(
+            "{} {}. Enter applies; Tab applies and moves between controls; clicking away applies a valid value. Escape cancels. Double-click resets to {}.",
+            self.description,
+            self.range_text(),
             self.format_value(default)
         )
     }
@@ -287,6 +305,13 @@ pub struct DialState {
     pub draft: Option<String>,
     pub invalid: bool,
     entry_had_focus: bool,
+    /// The entry took focus from a pointer press that is still held: whether
+    /// that was a plain click (select everything) or the start of a drag
+    /// selection (keep it) is decided when the button is released.
+    select_all_on_release: bool,
+    /// Exact entry was started by typing on the dial face: the entry opens
+    /// with that text and the caret after it, so the next key continues it.
+    continue_typing: bool,
 }
 
 /// What happened this frame.
@@ -418,7 +443,11 @@ pub fn show(
                 if direct && !text.is_empty() {
                     state.draft = Some(text);
                     state.invalid = false;
+                    state.continue_typing = true;
                     ui.memory_mut(|m| m.request_focus(id.with("entry")));
+                    // The entry takes focus within this frame; it must not
+                    // insert the same keystroke a second time.
+                    ui.input_mut(|i| i.events.retain(|event| !matches!(event, egui::Event::Text(_))));
                 }
             }
         }
@@ -428,7 +457,7 @@ pub fn show(
     if response.hovered() || state.dragging {
         ui.ctx().set_cursor_icon(if state.dragging { egui::CursorIcon::ResizeVertical } else { egui::CursorIcon::Default });
     }
-    let response = response.tip(spec.help(default));
+    let response = response.tip_described(spec.help(), spec.face_description(default));
     let _ = response;
 
     // Exact entry.
@@ -466,8 +495,38 @@ pub fn show(
     }
     let output = edit.show(&mut super::widgets::field_ui(ui, entry));
     let response: egui::Response = output.response.response;
-    if response.gained_focus() {
-        // Select everything so typing replaces the value.
+    // A bare text field is anonymous to assistive technology.
+    ui.ctx().accesskit_node_builder(entry_id, |node| node.set_label(format!("{} value", spec.label)));
+    let selection = output.cursor_range;
+    let pointer_down = ui.input(|i| i.pointer.primary_down());
+    // Selecting everything makes typing replace the value. It must not fight
+    // a drag selection, though: the press that gives the entry focus also
+    // sets the selection's anchor, and forcing a range over it mid-gesture
+    // collapsed right-to-left drags. So focus from the keyboard (or a click
+    // completed within one frame) selects everything at once, while focus
+    // from a held press waits for the release and then selects everything
+    // only if no selection was dragged (a plain click).
+    let mut select_all = false;
+    if response.gained_focus() && std::mem::take(&mut state.continue_typing) {
+        // Typed on the dial face: keep what was typed and continue after it.
+        let mut text_state = output.state.clone();
+        let end = egui::text::CCursor::new(text.chars().count());
+        text_state.cursor.set_char_range(Some(egui::text::CCursorRange::one(end)));
+        text_state.store(ui.ctx(), entry_id);
+    } else if response.gained_focus() {
+        if pointer_down {
+            state.select_all_on_release = true;
+        } else {
+            select_all = true;
+        }
+    } else if state.select_all_on_release && !pointer_down {
+        state.select_all_on_release = false;
+        select_all = response.has_focus() && selection.is_none_or(|range| range.primary.index == range.secondary.index);
+    }
+    if !response.has_focus() {
+        state.select_all_on_release = false;
+    }
+    if select_all {
         let mut text_state = output.state;
         let length = text.chars().count();
         text_state.cursor.set_char_range(Some(egui::text::CCursorRange::two(egui::text::CCursor::new(0), egui::text::CCursor::new(length))));
@@ -519,12 +578,7 @@ pub fn show(
     let response = if state.invalid {
         response.tip(format!("Value not applied\n{}", spec.entry_requirement()))
     } else {
-        response.tip(format!(
-            "{}\n{}. Enter applies; Tab applies and moves between controls; clicking away applies a valid value. Escape cancels. Double-click resets to {}.",
-            spec.description,
-            spec.range_text(),
-            spec.format_value(default)
-        ))
+        response.tip_described(spec.help(), spec.entry_description(default))
     };
     state.entry_had_focus = response.has_focus();
     outcome.editing |= state.draft.is_some() || state.invalid;
@@ -575,3 +629,7 @@ pub fn tile(ui: &mut Ui, id: Id, spec: &Spec, value: f64, default: f64, state: &
     let entry = Rect::from_min_size(egui::Pos2::new(title.center().x - entry_width / 2.0, slot_top + face_size + 1.0), Vec2::new(entry_width, 28.0));
     show(ui, id, spec, value, default, state, face, entry, 1.0, enabled)
 }
+
+#[cfg(test)]
+#[path = "dial_tests.rs"]
+mod interaction_tests;

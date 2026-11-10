@@ -107,6 +107,11 @@ The first build downloads pinned local tools. The app is staged under
 stay outside the checkout. Offline tests use synthetic audio and temporary data.
 See the [installer guide](installer/README.md) for packaging.
 
+These commands build the released 0.5 application, which is .NET and C++. A
+Rust rewrite is in progress on the `rust-rewrite` branch and has not been
+released; it has its own build and verification steps in
+[Building and verifying the Rust candidate](docs/RUST_BUILD.md).
+
 VineMix is [MIT licensed](LICENSE). Forks are welcome; preserve its licence
 notice and third-party notices. Please also credit **“Based on VineMix by acoyeen”**
 in your app, with a link to [vinemix.app](https://vinemix.app).

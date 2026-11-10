@@ -14,6 +14,10 @@ pub mod help_view;
 pub mod meter;
 pub mod node_search;
 pub mod node_view;
+#[cfg(test)]
+pub mod test_support;
+#[cfg(test)]
+mod tooltip_audit;
 pub mod theme;
 pub mod updates;
 pub mod voice;

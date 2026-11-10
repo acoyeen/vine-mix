@@ -27,6 +27,20 @@ pub fn notice_text(name: &str) -> Option<&'static str> {
     }
 }
 
+/// What this executable was built from, as recorded when it was compiled
+/// (`build.rs`). The release script supplies a verified commit, a digest of
+/// every build input and the build time, then checks that the finished
+/// executable reports the same values. Any other build reports the commit
+/// with a `local` label and no digest.
+pub fn build_identity() -> serde_json::Value {
+    serde_json::json!({
+        "sourceRevision": option_env!("VINEMIX_SOURCE_REVISION"),
+        "sourceSnapshotSha256": option_env!("VINEMIX_SOURCE_SNAPSHOT_SHA256"),
+        "builtUtc": option_env!("VINEMIX_BUILD_TIMESTAMP"),
+        "rustc": option_env!("VINEMIX_RUSTC_VERSION"),
+    })
+}
+
 /// Version and build information for bug reports (`ReleaseInfo.FullInformation`).
 /// The .NET runtime line becomes the Rust toolchain line.
 pub fn full_information() -> String {
@@ -211,7 +225,7 @@ pub fn show_credits(ui: &mut Ui, area: Rect, selected: &mut usize) -> bool {
             });
             ui.add_space(6.0 + 14.0);
             let names = ["MIT licence", "Attribution policy", "Third-party notices"];
-            let choices: Vec<super::widgets::Choice> = names.iter().map(|n| super::widgets::Choice { label: (*n).to_owned(), enabled: true, help: String::new() }).collect();
+            let choices: Vec<super::widgets::Choice> = names.iter().map(|n| super::widgets::Choice::fixed(n)).collect();
             let (rect, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 34.0), Sense::hover());
             let (_, picked) = super::widgets::selector(ui, Id::unique("vinemix-notice"), rect, Some(*selected), names[*selected], &choices, true, 1.0, theme::TEXT, "Notice to read");
             if let Some(index) = picked {
@@ -241,5 +255,32 @@ mod tests {
         assert!(text.contains("Crediting VineMix"));
         assert!(!text.contains("]("));
         assert!(super::display_text("LICENSE").starts_with("MIT License"));
+    }
+
+    /// Only the release script may report a bare commit hash: it is the one
+    /// build that checked the source tree against what was compiled, and it
+    /// always supplies the input digest too. Every other build, this test
+    /// run included, is labelled `local` (RUST-REV-023).
+    #[test]
+    fn a_build_without_a_verified_source_snapshot_says_it_is_local() {
+        let identity = super::build_identity();
+        let text = super::full_information();
+        let revision = text.lines().find_map(|line| line.strip_prefix("Source revision: ")).expect("the revision line");
+        match identity["sourceRevision"].as_str() {
+            None => assert_eq!(revision, "unavailable"),
+            Some(embedded) => {
+                assert_eq!(revision, embedded);
+                let commit = &embedded[..embedded.len().min(40)];
+                assert!(embedded.len() >= 40 && commit.bytes().all(|b| b.is_ascii_hexdigit()), "{embedded}");
+                if identity["sourceSnapshotSha256"].is_null() {
+                    assert!(embedded[40..].starts_with("-local"), "an unverified build claimed the plain revision {embedded}");
+                    assert!(text.contains("Source snapshot SHA-256: unavailable"));
+                } else {
+                    assert!(matches!(&embedded[40..], "" | "-dirty"), "{embedded}");
+                }
+            }
+        }
+        let compiler = text.lines().find_map(|line| line.strip_prefix("Rust: ")).expect("the compiler line");
+        assert!(compiler.chars().next().is_some_and(|c| c.is_ascii_digit()), "the compiler version is recorded: {compiler}");
     }
 }

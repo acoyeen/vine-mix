@@ -80,10 +80,36 @@ pub const ENTRIES: &[Entry] = &[
     e("eq-reset-band", "eq", "Equalizer", "Reset one band position", "Double-click point", "Restore that band's frequency and gain, keeping its shape and width.", "equalizer eq reset point band frequency gain"),
     e("eq-band-actions", "eq", "Equalizer", "Band actions", "Right-click / Shift+F10", "Choose a band shape, enable or disable it, reset it or remove it. Right-click empty space to reset EQ to flat.", "equalizer eq bell shelf notch shape enabled disabled flat context menu"),
     e("menu-keyboard", "menus", "Menus & application", "Use controls by keyboard", "Tab / Shift+Tab", "Move focus. Space or Enter activates a focused button; arrow keys navigate choices. Alt+Down opens a dropdown.", "keyboard accessibility focus buttons dropdown selector menu"),
-    e("menu-help", "menus", "Menus & application", "Read menu help", "Ctrl+Shift+F10", "Show or hide help for the focused menu item.", "tooltip hover menu explanation shortcut help"),
+    e("menu-help", "menus", "Menus & application", "Read help by keyboard", "Ctrl+Shift+F10", "Show or hide the help for the focused control or menu item. Help also appears shortly after you move to a control with Tab or the arrow keys.", "tooltip hover menu explanation shortcut help keyboard focus"),
     e("open-help", "menus", "Menus & application", "Open Help", "F1", "Open Help outside text entry. Escape cancels an active example edit or open choice before closing Help.", "help shortcuts tutorial controls reference close escape"),
     e("close-window", "menus", "Menus & application", "Keep audio running", "Close window", "Closing the main window hides it in the tray. Double-click the tray icon to return.", "hide minimize close background tray continue audio"),
     e("quit-app", "menus", "Menus & application", "Quit VineMix", "Tray menu → Quit VineMix", "Quit closes the interface and stops audio processing.", "quit exit stop application audio engine tray"),
+    // Detail that hover help deliberately leaves out (TWEAK-018): hover text
+    // names a control and its purpose; how to use it and its finer points
+    // are here, where the Settings search also finds them.
+    e("minimap", "view", "View & zoom", "Use the minimap", "Click / drag the minimap", "The minimap in the bottom-right corner shows the whole canvas with the visible part outlined. Click it to centre the view there, or drag to pan. Show or hide it with Show minimap in Settings.", "minimap overview navigate canvas map pan centre"),
+    e("settings-search", "menus", "Menus & application", "Search settings and help", "Type in the Settings menu", "Find a setting or the instructions for a control. Try zoom, devices or dials. Up and Down choose a help result; Enter opens its full instructions. Escape clears your search; Escape again closes the menu.", "settings search find filter help results"),
+    e("close-dialog", "menus", "Menus & application", "Close a window", "Escape / Close", "Close a dialog with its Close button, by pressing Escape, or by clicking the workspace behind it.", "dialog window close dismiss escape"),
+    e("device-lists", "menus", "Menus & application", "Choose an audio device", "Device list on a node", "A device list shows the Windows devices that can be used in that node. Disabled, disconnected and advanced devices appear when enabled under Settings → Audio device visibility. An unavailable saved device stays assigned and reconnects when Windows reports the same device again; VineMix never switches to another device because it has the same name.", "device input output microphone speakers list picker missing unavailable visibility"),
+    e("app-capture", "menus", "Menus & application", "Capture an app", "App list on a Running app node", "App capture takes a copy of one running app's audio; the app keeps playing as before. If the app and VineMix play through the same speakers you hear that app twice.", "application capture app audio loopback doubled"),
+    e("trigger-sockets", "connections", "Sockets & cables", "Use a trigger", "Diamond socket", "A trigger is detector-only audio: it controls a Gate, Expander or Ducking node and is never heard. With no trigger cable a Gate or Expander detects its own input. A connected trigger whose source is silent or unavailable is a silent trigger; the node does not fall back to its own input.", "trigger sidechain detector gate expander ducking silent"),
+    e("cable-details", "connections", "Sockets & cables", "Read a cable", "Hover / right-click cable", "Hovering a cable shows its route, and whether it is off, a linked control or a trigger. A linked control scales the linked level and carries no audio. The cable's menu turns an audio connection on or off, removes it, and shows any level saved by an older version.", "cable connection route linked control trigger muted off saved level"),
+    e("voice-color-pad", "dials", "Dials & values", "Shape Voice Color", "Drag the pad / arrow keys", "Drag the handle: left to right moves Tone from warm to bright, and upward moves Character from natural to broadcast. Hold Shift for fine movement. Arrow keys nudge the handle and Home or a double-click returns to Neutral at the bottom centre. The Tone and Character dials set the same two values exactly.", "voice color colour pad tone character warm bright natural broadcast neutral"),
+    e("peak-meters", "dials", "Dials & values", "Read a peak meter", "Hover a meter", "A node's meter shows its current level. Hovering it shows the highest sample level observed for each channel, and whether a level over 0 dBFS was detected.", "meter peak level clip overload dbfs"),
+    e("dynamics-status", "dials", "Dials & values", "Read gain reduction", "Status line on dynamics nodes", "Compressor, Limiter, Ducking, Expander, Gate, De-esser and Plosive remover show their detector (or trigger) level beside the status line. The strip beneath spans 0–24 dB of reduction. Hovering the status line shows the detector level against the threshold or ceiling.", "gain reduction detector threshold ceiling compressor limiter gate strip"),
+    e("eq-display", "eq", "Equalizer", "Read the EQ display", "Line and shaded spectrum", "The line is the calculated EQ response on the left dB scale. The shaded spectrum is the measured output of that EQ on the right dBFS scale. The Equalizer practice example in Help calculates the response only: it measures and changes no audio.", "equalizer eq spectrum analyzer response curve measured practice"),
+    e("node-reverb", "nodes", "Nodes & effects", "Reverb", "Effects", "Adds a room-like tail. The Audio output blends dry sound and reverb with Mix; the Wet output carries the reverb alone, independent of Mix, in stereo. Bypass passes the dry sound on Audio while Wet fades to silence; the reverb tail keeps advancing while bypassed.", "reverb wet dry mix decay damping pre-delay bypass tail room"),
+    e("node-echo", "nodes", "Nodes & effects", "Echo", "Effects", "Adds 1–8 fading echoes. Time sets the gap before and between echoes: very short times, such as 20 ms, thicken the sound; longer times separate the repeats. Each repeat is half as strong as the one before. Mix blends original sound and echoes on Audio (0% original only, 100% echoes only); the Echo output always carries the echoes alone, and can be routed to Reverb. Changing Time or Repeats smoothly restarts the echoes.", "echo delay repeats feedback time mix wet"),
+    e("node-distortion", "nodes", "Nodes & effects", "Distortion", "Effects", "Drive sets the strength, adding harmonics and loudness. Tone softens high frequencies in the distorted sound. Mix blends original and distorted sound, and Output trims the complete blend, including at Mix 0%. The node adds 0.67 ms of delay, including at Mix 0% and when bypassed; bypass restores the original sound without the Output trim.", "distortion drive tone mix output saturation overdrive warmth delay"),
+    e("node-denoiser", "nodes", "Nodes & effects", "Denoiser", "Effects", "SpeexDSP is the faster, lighter cleanup, with a Reduction amount; it adds 20 ms of delay. RNNoise usually gives cleaner speech, with a Mix between original and denoised sound; it adds 30 ms. The delay is part of the node's path, including when bypassed.", "denoiser noise speex rnnoise delay reduction mix speech"),
+    e("node-dynamics", "nodes", "Nodes & effects", "Compressor and Limiter", "Effects", "A Compressor reduces its own louder passages above Threshold by Ratio, with Attack and Release times and Make-up gain to restore level. A Limiter holds stereo sample peaks under its Ceiling with no lookahead; Bypass removes limiting, and gain applied later in the path can exceed the ceiling.", "compressor limiter threshold ratio attack release makeup ceiling peaks lookahead"),
+    e("node-ducking", "nodes", "Nodes & effects", "Ducking", "Effects", "Lowers this node's audio while a trigger sound is present. Static ducking lowers by a set amount while the trigger is above the threshold. Dynamic ducking lowers more as the trigger gets louder above the threshold. The trigger is detector-only and both channels are reduced together.", "ducking sidechain trigger static dynamic music voice threshold"),
+    e("node-gate", "nodes", "Nodes & effects", "Expander and Gate", "Effects", "An Expander reduces quieter passages below the threshold by Ratio, down to Range. A Gate closes below the threshold: Hold keeps it open briefly, Hysteresis sets a separate, lower closing threshold and Range limits how far the signal is turned down. Both accept an optional trigger.", "expander gate threshold ratio range hold hysteresis trigger"),
+    e("node-stereo", "nodes", "Nodes & effects", "Stereo tools", "Mixing", "Stereo Width: 0% is mono, 100% is the original and higher values widen existing stereo detail, which can raise peaks; mono input stays mono. Pan positions a mono signal from left (-1) through centre (0) to right (1) with equal power, -3 dB per side at the centre; stereo input is combined to mono first. Balance reduces the opposite channel and leaves the centre unchanged. Stereo Combine places its Left and Right inputs on those channels, each combined to mono, and an empty side stays silent. Stereo Split gives left and right as separate centred mono outputs.", "stereo width pan balance combine split mono channel swap"),
+    e("node-crossfade", "nodes", "Nodes & effects", "Crossfade", "Mixing", "Blends stereo inputs A and B: 0% is A only, 100% is B only, and Bypass plays A only. Equal power suits different sources; Linear suits matching signals. If one path is delayed more than the other, add an Alignment Delay to the earlier one.", "crossfade blend a b equal power linear curve"),
+    e("node-alignment", "nodes", "Nodes & effects", "Alignment Delay", "Effects", "Delays one audio path by a precise number of milliseconds or samples to align it with another. At 48 kHz, 48 samples are 1 ms; the delay can be up to 2 seconds. Bypass passes undelayed audio.", "alignment delay latency samples milliseconds phase"),
+    e("node-voice-color", "nodes", "Nodes & effects", "Voice Color", "Effects", "Warm to Bright sets Tone, and Natural to Broadcast sets Character, adding body, clarity and controlled thickening. The bottom centre of the pad is Neutral: the original voice character.", "voice color colour tone character warm bright broadcast neutral"),
+    e("node-linked-control", "nodes", "Nodes & effects", "Linked control", "Controls", "Scales the levels of connected nodes together while keeping their individual settings. 100% is unchanged and 0% is silent. Bypass leaves the linked levels unchanged.", "linked control multiplier level volume group"),
 ];
 
 /// Lowercase, collapse whitespace and drop combining marks.
@@ -155,5 +181,40 @@ mod tests {
         assert_eq!(search("ctrl+0")[0].id, "reset-zoom");
         assert!(search("eq band").iter().all(|e| e.section_id == "eq" || e.description.to_lowercase().contains("band")));
         assert_eq!(search("").len(), ENTRIES.len());
+    }
+
+    /// The detail that hover help no longer carries is findable in Help.
+    #[test]
+    fn details_removed_from_hover_help_are_in_help() {
+        for (query, entry) in [
+            ("minimap", "minimap"),
+            ("drag vertically", "dial-drag"),
+            ("page up", "dial-large-step"),
+            ("escape cancels", "exact-value"),
+            ("reset default", "dial-reset"),
+            ("silent trigger", "trigger-sockets"),
+            ("linked control cable", "cable-details"),
+            ("reverb tail bypass", "node-reverb"),
+            ("echo repeats restart", "node-echo"),
+            ("distortion delay", "node-distortion"),
+            ("rnnoise delay", "node-denoiser"),
+            ("limiter lookahead", "node-dynamics"),
+            ("hysteresis", "node-gate"),
+            ("equal power", "node-crossfade"),
+            ("stereo width peaks", "node-stereo"),
+            ("measured output", "eq-display"),
+            ("escape clears", "settings-search"),
+            ("click the workspace", "close-dialog"),
+            ("same speakers", "app-capture"),
+            ("voice color neutral", "voice-color-pad"),
+        ] {
+            assert!(search(query).iter().any(|e| e.id == entry), "searching {query:?} should find {entry}");
+        }
+        // Every entry id is unique.
+        let mut ids: Vec<&str> = ENTRIES.iter().map(|e| e.id).collect();
+        ids.sort_unstable();
+        let count = ids.len();
+        ids.dedup();
+        assert_eq!(ids.len(), count);
     }
 }

@@ -260,7 +260,7 @@ mod tests {
         std::fs::create_dir_all(&destination).unwrap();
         std::fs::write(source.join("settings.json"), b"{}").unwrap();
         std::fs::write(source.join("ui.json"), b"{}").unwrap();
-        run(&destination, &[source.clone()], &|_| None, &|_| Ok(())).unwrap();
+        run(&destination, std::slice::from_ref(&source), &|_| None, &|_| Ok(())).unwrap();
         assert!(destination.join("migration.complete.json").is_file());
         assert_eq!(std::fs::read(destination.join("settings.json")).unwrap(), b"{}");
         assert!(source.join("settings.json").is_file(), "originals are kept");

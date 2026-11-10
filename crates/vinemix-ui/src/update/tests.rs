@@ -319,11 +319,22 @@ fn malformed_journal_is_contained() {
     assert!(!pending[0].can_resume, "malformed metadata never resumes automatically");
 }
 
-/// Writes Rust records for the C# cross-check (`VINEMIX_INTEROP_DIR` only).
+/// Where the cross-language records are exchanged. These two tests need the
+/// 0.5 C# serializer's side (`VineMix.UpdateWorkerTests --serializer-interop-*`,
+/// driven by `scripts/verify-rust.ps1`), so they are ignored in an ordinary
+/// run and say so. Run on purpose without their fixtures, they fail: neither
+/// can pass without doing its work.
+fn interop_directory() -> PathBuf {
+    let base = std::env::var_os("VINEMIX_INTEROP_DIR").map(PathBuf::from).expect("VINEMIX_INTEROP_DIR must name the interop exchange directory");
+    assert!(base.is_dir(), "the interop exchange directory {} does not exist", base.display());
+    base
+}
+
+/// Writes Rust records for the C# cross-check.
 #[test]
+#[ignore = "cross-language check: needs VINEMIX_INTEROP_DIR (scripts/verify-rust.ps1 provides it)"]
 fn interop_write() {
-    let Some(base) = std::env::var_os("VINEMIX_INTEROP_DIR").map(PathBuf::from) else { return };
-    let directory = base.join("from-rust");
+    let directory = interop_directory().join("from-rust");
     std::fs::create_dir_all(&directory).unwrap();
     let identity = ProcessIdentity { process_id: 4242, start_time_utc_ticks: 639_000_000_000_000_000, image_path: "C:\\Programs\\VineMix\\VineMix.exe".into(), sha256: "a".repeat(64) };
     let data = TransactionData {
@@ -367,14 +378,12 @@ fn interop_write() {
     }
 }
 
-/// Reads records written by the 0.5 C# serializer (`VINEMIX_INTEROP_DIR` only).
+/// Reads records written by the 0.5 C# serializer.
 #[test]
+#[ignore = "cross-language check: needs records from the 0.5 C# serializer (scripts/verify-rust.ps1 provides them)"]
 fn interop_read() {
-    let Some(base) = std::env::var_os("VINEMIX_INTEROP_DIR").map(PathBuf::from) else { return };
-    let directory = base.join("to-rust");
-    if !directory.is_dir() {
-        return;
-    }
+    let directory = interop_directory().join("to-rust");
+    assert!(directory.is_dir(), "the 0.5 C# serializer has not written {}", directory.display());
     let data: TransactionData = serde_json::from_slice(&std::fs::read(directory.join("transaction.json")).unwrap()).unwrap();
     assert_eq!(data.parent.process_id, 77);
     assert_eq!(data.parent.start_time_utc_ticks, 638_999_999_999_999_999);

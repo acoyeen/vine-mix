@@ -347,6 +347,44 @@ The original `status.inputs`, `outputs`, sourcePeaks and A/B peaks remain for
 legacy diagnostics. Node telemetry is authoritative. Clipping flags and peaks
 are consumed by snapshots; do not treat polling faster as additional audio.
 
+### Optional request fields in the Rust engine and desktop (unreleased)
+
+Added on 10 November 2026 to the Rust engine (`crates/vinemix-engine`) and
+desktop (`crates/vinemix-ui`). They are additive to wire version 1: every
+request may carry them, with any command, and a request without them is
+answered exactly as before. The 0.5 C++ engine and WPF desktop neither send
+nor read them, so either side can be paired with an older counterpart.
+
+```json
+{"protocolVersion":1,"requestId":"unique","command":"snapshot",
+ "known":{"configuration":"c1a2b-7","inventory":"i1a2b-3"},
+ "interest":{"spectrum":["eq-1"],"applications":false}}
+```
+
+- Every snapshot from the Rust engine carries
+  `tokens: {"configuration": "...", "inventory": "..."}`. A token is an opaque
+  string that changes whenever the committed configuration, or the endpoint and
+  application lists, change. Tokens from one engine process never match
+  another's.
+- `known.configuration`: when it equals the engine's current token, the reply
+  omits `configuration`. `known.inventory`: when it equals the current token,
+  the reply omits `endpoints` and `applications`. The client keeps what it
+  already holds for that token. A client that has no copy for the token it is
+  sent (after a reconnect, for example) omits `known` and receives everything.
+  Every reply still carries `tokens`, `status` and the other fields.
+- `interest.spectrum`: the EQ node ids whose spectrum the client is drawing.
+  The engine analyses a spectrum only for the listed ids; other EQ nodes report
+  an empty `spectrumDb`. Absent means every EQ, as before.
+- `interest.applications`: `false` means the client is not showing an
+  application list. The engine enumerates running applications only while some
+  request in the last three seconds did not say `false`; in between, the
+  application list it reports is the last one enumerated. Absent means wanted.
+  Capture routes that are already assigned do not depend on this list.
+
+These fields reduce repeated work; they never change what is committed, saved
+or processed. Tokens are not a revision check: edits still use the revision
+rules above.
+
 For EQ nodes, `spectrumDb` contains 128 log-frequency bins over 20 Hz–20 kHz,
 in the −90–0 dBFS display range, measured from post-EQ stereo output. It is empty
 for other kinds and before priming. `spectrumFrame` is the analyzed window's end

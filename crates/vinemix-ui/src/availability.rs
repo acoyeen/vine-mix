@@ -5,6 +5,7 @@
 //! infer availability from signal level.
 
 use vinemix_model::config::{DeviceBinding, GraphNode};
+use vinemix_model::identity;
 use vinemix_model::status::{ApplicationInfo, Endpoint, NodeStatus, PathState};
 
 use crate::graph::{bindings, reasons};
@@ -36,6 +37,12 @@ impl EndpointChoice {
             return "Not assigned".into();
         }
         if self.state == "Active" { self.name.clone() } else { format!("{} · {}", self.name, self.state) }
+    }
+
+    /// Stable identity for list highlighting: the opaque endpoint ID and
+    /// stable ID exactly as reported (never the display name or position).
+    pub fn key(&self) -> String {
+        format!("{}\u{1f}{}", self.id, self.stable_id)
     }
 
     pub fn binding(&self, channel: i32) -> DeviceBinding {
@@ -78,20 +85,18 @@ pub fn is_advanced(endpoint: &Endpoint) -> bool {
 pub fn build(inventory: &[Endpoint], direction: &str, binding: &DeviceBinding, visibility: Visibility) -> Vec<EndpointChoice> {
     let assigned = binding.assigned();
     let directional: Vec<&Endpoint> = inventory.iter().filter(|e| e.direction == direction).collect();
-    // The engine's resolution: active exact ID, then a unique active stable
-    // ID. An unresolved saved endpoint stays visible for recovery.
-    let exact = if assigned && !binding.id.is_empty() { directional.iter().copied().find(|e| e.id == binding.id) } else { None };
-    let mut current: Option<&Endpoint> = exact.filter(|e| e.state == "Active");
-    if current.is_none() && assigned && !binding.stable_id.is_empty() {
-        let candidates: Vec<&Endpoint> =
-            directional.iter().copied().filter(|e| e.state == "Active" && e.stable_id == binding.stable_id).take(2).collect();
-        if candidates.len() == 1 {
-            current = Some(candidates[0]);
-        }
-    }
-    let current = current.or(exact);
+    // The engine's resolution (`vinemix_model::identity`), so the chooser
+    // shows as current exactly the endpoint the engine opens. An unresolved
+    // saved endpoint stays visible for recovery.
+    let exact = if assigned { identity::exact(inventory, binding, direction) } else { None };
+    let resolved = if assigned { identity::resolve(inventory, binding, direction).active() } else { None };
+    let current = resolved.or(exact);
+    // An inactive record that Windows identifies (by stable ID) as an earlier
+    // endpoint ID of a device that is active now is that device, not another
+    // one: it is not offered as a separate, permanently missing choice.
+    let superseded: Vec<&Endpoint> = identity::superseded(inventory, direction).into_iter().map(|i| &inventory[i]).collect();
     let visible = |e: &Endpoint| {
-        if !compatible(e, direction) {
+        if !compatible(e, direction) || superseded.iter().any(|s| std::ptr::eq(*s, e)) {
             return false;
         }
         let available = e.state == "Active"
@@ -113,6 +118,14 @@ pub fn build(inventory: &[Endpoint], direction: &str, binding: &DeviceBinding, v
     });
     current_index = current_index.and_then(|i| order.iter().position(|&o| o == i));
     endpoints = order.into_iter().map(|i| endpoints[i].clone()).collect();
+    // The saved device is not available, but an active device has its name.
+    // A name proves nothing (identical devices share names), so nothing is
+    // switched automatically; the saved row says how to recover.
+    let unresolved = assigned && resolved.is_none();
+    let saved_name = current.map_or(binding.name.as_str(), |e| e.name.as_str()).to_owned();
+    let same_name_available = unresolved
+        && !saved_name.is_empty()
+        && directional.iter().any(|e| e.state == "Active" && !current.is_some_and(|c| std::ptr::eq(c, *e)) && text::eq_ignore_case(&e.name, &saved_name));
     if assigned && current_index.is_none() {
         endpoints.push(Endpoint {
             id: binding.id.clone(),
@@ -152,12 +165,13 @@ pub fn build(inventory: &[Endpoint], direction: &str, binding: &DeviceBinding, v
             "\nThis is a routing cable. Choose a listening device here; use Virtual output for VAC."
         } else if endpoint.state == "Disabled" {
             "\nDisabled in Windows. Enable it in Windows sound settings before use."
+        } else if endpoint.state != "Active" && current_index == Some(index) && same_name_available {
+            "\nSaved device unavailable. A device with the same name is listed, but Windows reports it as a different device. Select it to use it."
         } else if endpoint.state != "Active" {
             "\nUnavailable. Reconnect or enable the device in Windows; saved assignments are retained."
-        } else if direction == "capture" {
-            "\nAvailable Windows input, including streamed and virtual microphones."
         } else {
-            "\nAvailable Windows output, including streamed and virtual listening devices."
+            // An available device needs no explanation beyond its identity.
+            ""
         };
         choices.push(EndpointChoice {
             id: endpoint.id.clone(),
@@ -451,6 +465,118 @@ mod tests {
         assert_eq!(labels, ["Not assigned", "Mic · Device 1", "Mic · Device 2", "Old · Missing"]);
         assert_eq!(selected(&choices, &saved), Some(3));
         assert!(!choices[3].selectable);
+    }
+
+    // ----- RUST-REV-041: reconnected devices in the chooser -----------------
+
+    fn device(id: &str, stable: &str, name: &str, direction: &str, state: &str) -> Endpoint {
+        Endpoint { stable_id: stable.into(), ..endpoint(id, name, direction, state) }
+    }
+
+    fn saved(id: &str, stable: &str) -> DeviceBinding {
+        DeviceBinding { id: id.into(), stable_id: stable.into(), name: "Example headset".into(), channel: -1 }
+    }
+
+    const ALL: Visibility = Visibility { disabled: true, disconnected: true, advanced: true };
+
+    /// `(labels, label of the row shown as current)` — checked forwards and
+    /// with the inventory reversed, which must not change anything.
+    fn chooser(inventory: &[Endpoint], direction: &str, binding: &DeviceBinding, visibility: Visibility) -> (Vec<String>, String) {
+        let view = |inventory: &[Endpoint]| {
+            let choices = build(inventory, direction, binding, visibility);
+            let labels: Vec<String> = choices.iter().map(EndpointChoice::label).collect();
+            let current = selected(&choices, binding).map(|i| labels[i].clone()).unwrap_or_default();
+            (labels, current)
+        };
+        let forwards = view(inventory);
+        let mut reversed = inventory.to_vec();
+        reversed.reverse();
+        assert_eq!(forwards, view(&reversed), "inventory order changed the chooser");
+        forwards
+    }
+
+    #[test]
+    fn reconnected_device_is_one_current_row_when_identity_proves_it() {
+        for direction in ["capture", "render"] {
+            // Same endpoint ID returns: the original choice, active.
+            let inventory = [device("a", "", "Example headset", direction, "Active")];
+            assert_eq!(chooser(&inventory, direction, &saved("a", ""), ALL), (vec!["Not assigned".into(), "Example headset".into()], "Example headset".into()));
+
+            // New endpoint ID with the saved stable ID; Windows still lists the
+            // old ID as missing. One row, current and active — in both
+            // visibility settings.
+            let inventory = [device("a", "s", "Example headset", direction, "Missing"), device("b", "s", "Example headset", direction, "Active")];
+            for visibility in [Visibility::default(), ALL] {
+                let (labels, current) = chooser(&inventory, direction, &saved("a", "s"), visibility);
+                assert_eq!(labels, ["Not assigned", "Example headset"], "{direction} {visibility:?}");
+                assert_eq!(current, "Example headset");
+            }
+            let choices = build(&inventory, direction, &saved("a", "s"), ALL);
+            let current = selected(&choices, &saved("a", "s")).unwrap();
+            assert_eq!(choices[current].id, "b", "the row shown as current is the endpoint the engine opens");
+            assert!(choices[current].selectable);
+
+            // The binding was saved without a stable ID, but the old record
+            // carries it: still one current row.
+            let (labels, current) = chooser(&inventory, direction, &saved("a", ""), ALL);
+            assert_eq!((labels.len(), current.as_str()), (2, "Example headset"));
+
+            // Other nodes' choosers do not show the superseded record either.
+            let (labels, _) = chooser(&inventory, direction, &DeviceBinding::default(), ALL);
+            assert_eq!(labels, ["Not assigned", "Example headset"]);
+        }
+    }
+
+    #[test]
+    fn unproven_same_name_device_stays_separate_and_the_saved_row_explains() {
+        for direction in ["capture", "render"] {
+            // New endpoint ID, no matching stable ID anywhere: the active
+            // device is offered, the saved one stays current and missing.
+            for (inventory, binding) in [
+                (vec![device("b", "t", "Example headset", direction, "Active")], saved("a", "s")),
+                (vec![device("b", "t", "Example headset", direction, "Active")], saved("a", "")),
+                (vec![device("a", "", "Example headset", direction, "Missing"), device("b", "t", "Example headset", direction, "Active")], saved("a", "")),
+            ] {
+                let (labels, current) = chooser(&inventory, direction, &binding, ALL);
+                assert_eq!(labels.len(), 3, "{labels:?}");
+                assert!(current.ends_with("· Missing"), "the saved assignment is kept, not switched by name: {current}");
+                assert!(labels.iter().any(|l| !l.contains("Missing") && l.starts_with("Example headset")), "{labels:?}");
+                let choices = build(&inventory, direction, &binding, ALL);
+                let row = &choices[selected(&choices, &binding).unwrap()];
+                assert!(!row.selectable);
+                assert!(row.help.contains("Windows reports it as a different device") && row.help.contains("Select it"), "{}", row.help);
+                let active = choices.iter().find(|c| c.id == "b").unwrap();
+                assert!(active.selectable && !active.current);
+            }
+
+            // Two active endpoints share the saved stable ID: no guess.
+            let inventory = [
+                device("b", "s", "Example headset", direction, "Active"),
+                device("c", "s", "Example headset", direction, "Active"),
+            ];
+            let (labels, current) = chooser(&inventory, direction, &saved("a", "s"), ALL);
+            assert_eq!(labels.len(), 4, "both candidates and the saved row: {labels:?}");
+            assert!(current.ends_with("· Missing"), "{current}");
+
+            // Distinct devices with one name are never merged.
+            let inventory = [
+                device("m", "p", "Example headset", direction, "Active"),
+                device("n", "q", "Example headset", direction, "Unplugged"),
+            ];
+            let (labels, current) = chooser(&inventory, direction, &saved("m", "p"), ALL);
+            assert_eq!(labels.len(), 3, "{labels:?}");
+            assert!(!current.contains("Unplugged"));
+            // With disconnected devices hidden only the unrelated one goes.
+            let (labels, _) = chooser(&inventory, direction, &saved("m", "p"), Visibility::default());
+            assert_eq!(labels.len(), 2, "{labels:?}");
+
+            // A missing saved device with no same-name candidate keeps the
+            // ordinary unavailable wording.
+            let inventory = [device("x", "y", "Other example", direction, "Active")];
+            let choices = build(&inventory, direction, &saved("a", "s"), ALL);
+            let row = &choices[selected(&choices, &saved("a", "s")).unwrap()];
+            assert!(row.help.contains("saved assignments are retained"), "{}", row.help);
+        }
     }
 
     #[test]

@@ -224,6 +224,21 @@ pub struct MixerState {
     /// Incremented when node-selector inventories change.
     pub inventory_generation: u64,
     preferences_writer: Option<Box<dyn FnMut(&str) -> Result<(), String> + Send>>,
+    /// Where `ui.json` lives for this session (`None` in previews).
+    preferences_path: Option<std::path::PathBuf>,
+    /// Background writer for `preferences_path`, started on the first save.
+    preferences_file: Option<crate::preferences::Writer>,
+    /// The file on disk is the last loaded or saved good data, so a save may
+    /// keep it as the backup. False after an unreadable load.
+    preferences_primary_good: bool,
+    /// An unreadable file could not be copied aside: never overwrite it.
+    preferences_blocked: bool,
+    /// The newest preferences have been handed to the writer.
+    preferences_submitted: bool,
+    /// What happened to unreadable preferences at startup (kept all session).
+    preferences_notice: String,
+    /// EQ nodes whose spectrum plot was drawn, with when (model seconds).
+    spectrum_viewers: std::collections::HashMap<String, f64>,
 }
 
 impl std::fmt::Debug for MixerState {
@@ -305,19 +320,92 @@ impl MixerState {
             layout_edit_blocked: 0,
             inventory_generation: 0,
             preferences_writer: None,
+            preferences_path: None,
+            preferences_file: None,
+            preferences_primary_good: true,
+            preferences_blocked: false,
+            preferences_submitted: false,
+            preferences_notice: String::new(),
+            spectrum_viewers: std::collections::HashMap::new(),
         };
         if !preview {
-            let path = crate::paths::preferences();
-            if path.is_file() {
-                match std::fs::read(&path).map_err(|e| e.to_string()).and_then(|bytes| state.load_ui_preferences_json(&bytes)) {
-                    Ok(()) => {}
-                    Err(_) => {
-                        state.ui_error = "Workspace preferences could not be read. Default navigation, device visibility and Windows animation preferences are being used.".into();
-                    }
-                }
-            }
+            state.load_ui_preferences_file(crate::paths::preferences());
         }
         state
+    }
+
+    /// A non-preview state whose preferences live at `path` (tests use a
+    /// disposable file; the application uses [`crate::paths::preferences`]).
+    pub fn with_preferences_file(path: std::path::PathBuf) -> Self {
+        let mut state = Self::new(true);
+        state.preview = false;
+        state.load_ui_preferences_file(path);
+        state
+    }
+
+    /// Loads `ui.json`. Unreadable data is copied aside before anything can
+    /// replace it; the last good backup is used when there is one.
+    fn load_ui_preferences_file(&mut self, path: std::path::PathBuf) {
+        use crate::preferences::{backup_path, preserve_damaged, read_bounded, ReadOutcome};
+        self.preferences_path = Some(path.clone());
+        let damage = match read_bounded(&path) {
+            ReadOutcome::Missing => return,
+            ReadOutcome::Bytes(bytes) => match self.load_ui_preferences_json(&bytes) {
+                Ok(()) => return,
+                Err(error) => error,
+            },
+            ReadOutcome::Unreadable(error) => error,
+        };
+        crate::paths::lifetime_log::write(&format!("Workspace preferences unreadable: {damage}"));
+        self.preferences_primary_good = false;
+        let kept = match preserve_damaged(&path) {
+            Ok(copy) => format!("The unreadable file was kept as {}.", copy.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()),
+            Err(_) => {
+                self.preferences_blocked = true;
+                "The unreadable file could not be copied aside, so it is left untouched and preference changes last for this session only.".to_owned()
+            }
+        };
+        let restored = match read_bounded(&backup_path(&path)) {
+            ReadOutcome::Bytes(bytes) => self.load_ui_preferences_json(&bytes).is_ok(),
+            _ => false,
+        };
+        self.preferences_notice = if restored {
+            format!("Workspace preferences could not be read. The previous saved copy, including its node groups, was restored. {kept}")
+        } else {
+            format!("Workspace preferences could not be read. Default navigation, device visibility and Windows animation preferences are being used, and saved node groups are not shown. {kept}")
+        };
+        self.update_warning();
+    }
+
+    /// The EQ nodes whose spectrum was drawn in the frame just painted.
+    pub fn note_spectrum_viewers(&mut self, nodes: impl IntoIterator<Item = String>) {
+        let now = self.seconds();
+        for node in nodes {
+            self.spectrum_viewers.insert(node, now);
+        }
+    }
+
+    /// What the engine should compute for display right now: spectra only
+    /// for EQ plots drawn within the last half second of a visible window,
+    /// and the list of running applications only while the window is visible
+    /// and the workspace has an app-capture node to show it in (its picker
+    /// and its "app not detected" notice are the list's only uses).
+    pub fn interest(&mut self) -> serde_json::Value {
+        let now = self.seconds();
+        self.spectrum_viewers.retain(|_, seen| now - *seen <= Self::SPECTRUM_INTEREST_SECONDS);
+        let mut spectrum: Vec<&str> = if self.visible { self.spectrum_viewers.keys().map(String::as_str).collect() } else { Vec::new() };
+        spectrum.sort_unstable();
+        let applications = self.visible && self.desired.config.graph.nodes.iter().any(|node| node.kind == "appInput");
+        serde_json::json!({"spectrum": spectrum, "applications": applications})
+    }
+
+    /// Long enough to bridge frames between polls, short enough that a plot
+    /// scrolled out of view stops costing an FFT almost at once.
+    const SPECTRUM_INTEREST_SECONDS: f64 = 0.5;
+
+    /// The startup notice about unreadable preferences, if any.
+    pub fn preferences_notice(&self) -> &str {
+        &self.preferences_notice
     }
 
     /// A preview whose preferences go to `writer` instead of a file.
@@ -371,7 +459,7 @@ impl MixerState {
     /// Advice in the add menu when capacity is limited (`ProcessingAdditionAdvice`).
     pub fn processing_addition_advice(&self, kind: &str) -> &'static str {
         if self.processing_load.available && self.processing_load.addition_advised && matches!(kind, "distortion" | "denoiser") {
-            "Limited spare audio processing capacity. Adding Distortion or RNNoise may cause interruptions, especially while changing connections."
+            "Limited spare processing capacity: adding this effect may cause interruptions."
         } else {
             ""
         }
@@ -443,22 +531,41 @@ impl MixerState {
             return;
         }
         let json = self.serialize_ui_preferences();
-        let result = if let Some(writer) = self.preferences_writer.as_mut() {
-            writer(&json)
-        } else {
-            let path = crate::paths::preferences();
-            (|| -> Result<(), String> {
-                if let Some(directory) = path.parent() {
-                    std::fs::create_dir_all(directory).map_err(|e| e.to_string())?;
+        if let Some(writer) = self.preferences_writer.as_mut() {
+            // Previews and tests: an immediate, synchronous sink.
+            let result = writer(&json);
+            self.finish_ui_preferences_save(result, true);
+            return;
+        }
+        if self.preferences_blocked {
+            self.finish_ui_preferences_save(Err("the unreadable preferences file is being left untouched".into()), false);
+            return;
+        }
+        if self.preferences_file.is_none() {
+            let path = self.preferences_path.clone().unwrap_or_else(crate::paths::preferences);
+            match crate::preferences::Writer::new(crate::preferences::file_sink(path, self.preferences_primary_good)) {
+                Ok(writer) => self.preferences_file = Some(writer),
+                Err(error) => {
+                    self.finish_ui_preferences_save(Err(error), false);
+                    return;
                 }
-                let temporary = path.with_extension("json.new");
-                std::fs::write(&temporary, json.as_bytes()).map_err(|e| e.to_string())?;
-                std::fs::rename(&temporary, &path).map_err(|e| e.to_string())
-            })()
-        };
+            }
+        }
+        // Storage runs off this thread; the result arrives through
+        // `poll_ui_preferences`, and quit waits for it.
+        if let Some(writer) = &self.preferences_file {
+            writer.submit(json);
+            self.preferences_submitted = true;
+        }
+        self.poll_ui_preferences();
+    }
+
+    fn finish_ui_preferences_save(&mut self, result: Result<(), String>, current: bool) {
         match result {
             Ok(()) => {
-                self.ui_preferences_need_save = false;
+                if current {
+                    self.ui_preferences_need_save = false;
+                }
                 self.ui_error.clear();
             }
             Err(error) => {
@@ -468,11 +575,39 @@ impl MixerState {
         self.update_warning();
     }
 
+    /// Applies the outcome of a completed background save, if one finished.
+    pub fn poll_ui_preferences(&mut self) {
+        let Some(completion) = self.preferences_file.as_mut().and_then(crate::preferences::Writer::poll) else { return };
+        let failed = completion.result.is_err();
+        let current = completion.current && self.preferences_submitted;
+        self.finish_ui_preferences_save(completion.result, current);
+        if failed {
+            // Group changes are part of this file: retry with the next save.
+            self.visual_frames_need_save = true;
+            if self.pending.is_empty() {
+                self.save_status = "Workspace preferences need attention".into();
+            }
+        }
+    }
+
+    /// How long quit and other save boundaries wait for storage to answer.
+    const PREFERENCES_FLUSH: Duration = Duration::from_secs(5);
+
     pub fn ensure_ui_preferences_saved(&mut self) -> Result<(), String> {
+        self.poll_ui_preferences();
         if !self.ui_preferences_need_save {
             return Ok(());
         }
-        self.save_ui_preferences();
+        // Nothing in flight means the last attempt failed or never started.
+        if self.preferences_file.as_ref().is_none_or(crate::preferences::Writer::idle) {
+            self.save_ui_preferences();
+        }
+        if let Some(writer) = &self.preferences_file
+            && !writer.flush(Self::PREFERENCES_FLUSH)
+        {
+            return Err("Workspace preferences, including node groups, are still being written. Storage has not responded; try again in a moment.".into());
+        }
+        self.poll_ui_preferences();
         if self.ui_preferences_need_save {
             return Err(format!(
                 "Workspace preferences, including node groups, could not be saved. Your changes remain in this session. {}",
@@ -484,7 +619,7 @@ impl MixerState {
 
     fn update_warning(&mut self) {
         let snapshot_warning = self.snapshot.as_ref().map(|s| s.warning.clone()).unwrap_or_default();
-        self.warning = [&self.edit_error, &self.save_error, &self.startup_error, &self.ui_error, &snapshot_warning]
+        self.warning = [&self.edit_error, &self.save_error, &self.startup_error, &self.preferences_notice, &self.ui_error, &snapshot_warning]
             .into_iter()
             .filter(|s| !s.trim().is_empty())
             .cloned()
@@ -1170,6 +1305,7 @@ impl MixerState {
         self.snapshot = Some(snapshot);
         self.connected = !self.has_settings_recovery();
         self.refresh_processing_load(None);
+        self.poll_ui_preferences();
         if configuration_changed && !recovery && (self.visual_frames_need_save || self.visual_frames != self.desired.frames) {
             self.save_visual_frames();
         }
@@ -1609,5 +1745,157 @@ mod tests {
         let mut chosen = MixerState::new(true);
         chosen.load_ui_preferences_json(br#"{"automaticallyCheckForUpdates":true}"#).unwrap();
         assert!(chosen.automatically_check_for_updates());
+    }
+
+    /// RUST-REV-010 / RUST-REV-011: the window asks only for what it shows.
+    #[test]
+    fn interest_follows_visibility_and_drawn_spectrum_plots() {
+        let mut state = connected();
+        state.visible = true;
+        let has_app_node = state.graph().nodes.iter().any(|n| n.kind == "appInput");
+        assert_eq!(state.interest(), serde_json::json!({"spectrum": [], "applications": has_app_node}), "no EQ plot is on screen");
+        state.note_spectrum_viewers(["eq-b".to_owned(), "eq-a".to_owned()]);
+        assert_eq!(state.interest()["spectrum"], serde_json::json!(["eq-a", "eq-b"]));
+        // The application list is wanted exactly while an app-capture node
+        // exists in a visible window.
+        if !has_app_node {
+            assert!(state.edit(|w| w.config.graph.nodes.push(crate::graph::new_node("appInput", 0.0, 0.0))));
+        }
+        assert_eq!(state.interest()["applications"], true);
+        assert!(state.edit(|w| w.config.graph.nodes.retain(|n| n.kind != "appInput")));
+        assert_eq!(state.interest()["applications"], false, "no app-capture node, no list");
+        assert!(state.edit(|w| w.config.graph.nodes.push(crate::graph::new_node("appInput", 0.0, 0.0))));
+        // Hidden: nothing is drawn, so nothing is analysed or enumerated.
+        state.visible = false;
+        assert_eq!(state.interest(), serde_json::json!({"spectrum": [], "applications": false}));
+        // Shown again while the plots are still recent.
+        state.visible = true;
+        assert_eq!(state.interest()["spectrum"].as_array().unwrap().len(), 2);
+        assert_eq!(state.interest()["applications"], true);
+        // A plot that is no longer drawn stops being requested.
+        std::thread::sleep(std::time::Duration::from_millis(600));
+        state.note_spectrum_viewers(["eq-a".to_owned()]);
+        assert_eq!(state.interest()["spectrum"], serde_json::json!(["eq-a"]));
+    }
+
+    // ----- RUST-REV-003 / RUST-REV-014: damaged preferences ----------------
+
+    const EXAMPLE_GROUP: &str =
+        r#"{"showMinimap":true,"frames":[{"id":"example-group","name":"Example group","colorKey":"rose","nodeIds":["mic1"]}]}"#;
+
+    fn preferences_directory(name: &str) -> std::path::PathBuf {
+        let path = std::env::temp_dir().join(format!("vinemix-ui-preferences-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&path);
+        std::fs::create_dir_all(&path).unwrap();
+        path
+    }
+
+    fn preserved_copies(directory: &std::path::Path) -> Vec<std::path::PathBuf> {
+        let mut copies: Vec<_> = std::fs::read_dir(directory)
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .filter(|path| path.file_name().is_some_and(|n| n.to_string_lossy().starts_with("ui.json.damaged-")))
+            .collect();
+        copies.sort();
+        copies
+    }
+
+    /// The review's reproduction: a damaged `ui.json` holding a group, then a
+    /// minimap toggle. The original bytes must survive beside the new file.
+    #[test]
+    fn damaged_preferences_are_preserved_before_any_replacement() {
+        let directory = preferences_directory("damaged");
+        let path = directory.join("ui.json");
+        let damaged = format!("{EXAMPLE_GROUP} trailing damage {{");
+        std::fs::write(&path, &damaged).unwrap();
+
+        let mut state = MixerState::with_preferences_file(path.clone());
+        assert!(!state.serialize_ui_preferences().contains("example-group"), "nothing usable was read");
+        assert!(state.preferences_notice().contains("could not be read"), "{}", state.preferences_notice());
+        assert!(state.warning.contains("was kept as ui.json.damaged-"), "{}", state.warning);
+        let copies = preserved_copies(&directory);
+        assert_eq!(copies.len(), 1, "preserved at load, before any save");
+        assert_eq!(std::fs::read_to_string(&copies[0]).unwrap(), damaged);
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), damaged, "loading alone changes nothing");
+
+        state.set_show_minimap(false);
+        state.ensure_ui_preferences_saved().unwrap();
+        let replaced = std::fs::read_to_string(&path).unwrap();
+        assert!(replaced.contains(r#""showMinimap":false"#), "{replaced}");
+        assert_eq!(std::fs::read_to_string(&copies[0]).unwrap(), damaged, "the damaged original, with its group, is still recoverable");
+        assert!(!crate::preferences::backup_path(&path).exists(), "damaged data never becomes the last-good backup");
+        assert!(state.warning.contains("was kept as"), "the recovery notice outlives a successful save: {}", state.warning);
+        drop(state);
+        let _ = std::fs::remove_dir_all(directory);
+    }
+
+    #[test]
+    fn damaged_preferences_recover_groups_from_the_last_good_backup() {
+        let directory = preferences_directory("backup");
+        let path = directory.join("ui.json");
+        std::fs::write(&path, EXAMPLE_GROUP).unwrap();
+        {
+            // Two ordinary saves: the second keeps the first as the backup.
+            let mut state = MixerState::with_preferences_file(path.clone());
+            assert!(state.serialize_ui_preferences().contains("example-group"));
+            state.set_show_minimap(false);
+            state.ensure_ui_preferences_saved().unwrap();
+            state.set_right_click_drag_to_pan(true);
+            state.ensure_ui_preferences_saved().unwrap();
+        }
+        let backup = std::fs::read_to_string(crate::preferences::backup_path(&path)).unwrap();
+        assert!(backup.contains("example-group") && backup.contains(r#""showMinimap":false"#), "{backup}");
+        std::fs::write(&path, b"\0\0 not json").unwrap();
+
+        let mut state = MixerState::with_preferences_file(path.clone());
+        assert!(state.serialize_ui_preferences().contains(r#""name":"Example group""#), "the group returns from the backup");
+        assert!(!state.show_minimap());
+        assert!(state.preferences_notice().contains("previous saved copy"), "{}", state.preferences_notice());
+        assert_eq!(preserved_copies(&directory).len(), 1);
+        // The first save after recovery must not replace the good backup with
+        // the damaged primary.
+        state.set_show_minimap(true);
+        state.ensure_ui_preferences_saved().unwrap();
+        assert_eq!(std::fs::read_to_string(crate::preferences::backup_path(&path)).unwrap(), backup);
+        let saved = std::fs::read_to_string(&path).unwrap();
+        assert!(saved.contains("example-group") && saved.contains(r#""showMinimap":true"#), "{saved}");
+        drop(state);
+        let _ = std::fs::remove_dir_all(directory);
+    }
+
+    #[test]
+    fn oversized_preferences_are_treated_as_unreadable_not_loaded() {
+        let directory = preferences_directory("oversized");
+        let path = directory.join("ui.json");
+        let file = std::fs::File::create(&path).unwrap();
+        file.set_len(crate::preferences::MAXIMUM_BYTES + 1).unwrap();
+        drop(file);
+        let state = MixerState::with_preferences_file(path.clone());
+        assert!(state.preferences_notice().contains("could not be read"));
+        assert_eq!(preserved_copies(&directory).len(), 1);
+        drop(state);
+        let _ = std::fs::remove_dir_all(directory);
+    }
+
+    #[test]
+    fn failed_preference_save_is_reported_and_blocks_the_quit_acknowledgement() {
+        let directory = preferences_directory("failing");
+        // The "file" is a directory, so every write fails.
+        let path = directory.join("ui.json");
+        let mut state = MixerState::with_preferences_file(path.clone());
+        std::fs::create_dir_all(&path).unwrap();
+        state.set_show_minimap(false);
+        let error = state.ensure_ui_preferences_saved().unwrap_err();
+        assert!(error.contains("could not be saved"), "{error}");
+        assert!(state.has_pending_ui_preferences());
+        assert!(state.warning.contains("could not be saved"), "{}", state.warning);
+        // Storage recovers: the same pending change is written and acknowledged.
+        std::fs::remove_dir_all(&path).unwrap();
+        state.ensure_ui_preferences_saved().unwrap();
+        assert!(!state.has_pending_ui_preferences());
+        assert!(std::fs::read_to_string(&path).unwrap().contains(r#""showMinimap":false"#));
+        assert!(state.warning.is_empty(), "{}", state.warning);
+        drop(state);
+        let _ = std::fs::remove_dir_all(directory);
     }
 }

@@ -15,6 +15,12 @@ run, but measured budget overruns are reported separately from functional and
 allocation failures. Review the benchmark JSON and CI summary; a green hosted
 functional run is not a promise of real-time capacity on every computer.
 
+The Rust rewrite on the `rust-rewrite` branch is verified separately by
+`scripts/verify-rust.ps1`, described in
+[Building and verifying the Rust candidate](docs/RUST_BUILD.md).
+`scripts/verify-offline.ps1` compiles no Rust, so its result says nothing about
+the Rust candidate, and the Rust script says nothing about the 0.5 application.
+
 The previous testing document, including the settings-redirection
 investigation, is retained as a sanitized historical record in
 [the historical testing log](docs/history/TESTING_PRE_BETA1.md). Its older names,

@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use eframe::egui::{self, Align2, Color32, Id, Key, PointerButton, Pos2, Rect, Sense, Stroke, Ui, Vec2};
 use vinemix_model::config::GraphNode;
 
-use super::{describe_connection, from_point, gradient_stroke, now, to_point, Canvas, Gesture, Menu, Projection, SocketRef};
+use super::{connection_help, from_point, gradient_stroke, now, to_point, Canvas, Gesture, Menu, Projection, SocketRef};
 use crate::editing;
 use crate::frames;
 use crate::graph::{self, canvas as policy, canvas::DetailLevel};
@@ -153,10 +153,12 @@ impl Canvas {
                 }
             }
         }
-        if let Some(id) = &hovered_edge {
+        if let (Some(id), Some(pointer)) = (&hovered_edge, pointer) {
             if let Some(edge) = graph.edges.iter().find(|e| &e.id == id) {
-                let (title, route, state, purpose) = describe_connection(&graph, edge);
-                background.clone().tip(format!("{route}\n{title}. {state}. {purpose}"));
+                // The help belongs at the cable: anchor it to the hovered
+                // point, not to the canvas (whose edge can be far away).
+                let anchor = Rect::from_center_size(pointer, Vec2::splat(16.0));
+                background.clone().tip_at(anchor, connection_help(&graph, edge));
                 ctx.set_cursor_icon(egui::CursorIcon::PointingHand);
             }
         }
@@ -180,6 +182,7 @@ impl Canvas {
                 graph: &env_graph,
                 endpoints: &endpoints,
                 applications: &applications,
+                inventory_generation: mixer.inventory_generation,
                 visibility: mixer.device_visibility(),
                 can_edit: mixer.can_edit(),
                 preview: mixer.is_preview(),
@@ -783,7 +786,7 @@ impl Canvas {
             Gesture::Minimap { projection, .. } => *projection,
             _ => minimap_projection(&nodes, visible_world, size),
         };
-        let response = ui.interact(rect, Id::unique("vinemix-minimap"), Sense::click_and_drag()).tip("Canvas overview · click to centre, drag to pan");
+        let response = ui.interact(rect, Id::unique("vinemix-minimap"), Sense::click_and_drag()).tip("Minimap\nThe whole canvas, with the part in view outlined.");
         let painter = ui.painter();
         painter.rect(rect, 5.0, theme::WINDOW, Stroke::new(1.0, theme::BORDER), egui::StrokeKind::Inside);
         let clip = painter.with_clip_rect(rect.shrink(5.0));
@@ -1069,33 +1072,35 @@ fn socket_help(graph: &vinemix_model::config::AudioGraph, node: &GraphNode, port
             } else if graph::linked::has_legacy_connection(graph, node) {
                 "Level control\nExisting link retained; use Mix for new level control.".into()
             } else {
-                "Level control\nConnect a Linked control to scale this node's level.".into()
+                "Level control\nLets a Linked control scale this node's level.".into()
             }
         }
+        // A silent or unavailable trigger source is an essential limitation:
+        // the node then sees silence, it does not fall back to its own input.
         "sidechain" => format!(
-            "Trigger\n{}\nA connected silent or unavailable source is a silent trigger.",
+            "Trigger\n{}\nA silent or unavailable source is a silent trigger.",
             if matches!(kind, "gate" | "expander") {
-                "Controls detection without being mixed into the main audio. With no cable, this node detects its own input."
+                "Detector-only audio; never heard. Without a cable the node detects its own input."
             } else {
-                "Uses incoming audio to trigger ducking."
+                "The sound that causes ducking; never heard."
             }
         ),
         _ if port.output => {
             let title = if port.port == "audio" { "Audio output".to_owned() } else { format!("{} output", graph::port_label(port.port, Some(kind))) };
             let body = match port.port {
-                "audio" => "Carries this node's audio to connected audio or trigger inputs",
-                "wet" if kind == "echo" => "Echoes only, independent of Mix. Route to Reverb to add space to the repeats; preserves stereo.",
-                "wet" => "Reverb only, independent of Mix; preserves the effect's stereo signal",
-                _ => "Carries this channel as an independent mono signal",
+                "audio" => "Carries this node's audio.",
+                "wet" if kind == "echo" => "Echoes only, independent of Mix.",
+                "wet" => "Reverb only, independent of Mix.",
+                _ => "This channel as a mono signal.",
             };
             format!("{title}\n{body}")
         }
         _ => {
             let title = if port.port == "audio" { "Audio input".to_owned() } else { format!("{} input", graph::port_label(port.port, Some(kind))) };
             let body = match port.port {
-                "left" | "right" => "Combines incoming channels to mono and places them on this stereo side",
-                "a" | "b" => "Carries this stereo source into the crossfade",
-                _ => "Combines audio from connected outputs",
+                "left" | "right" => "Becomes this stereo side; stereo sources are combined to mono.",
+                "a" | "b" => "One of the two sources to blend.",
+                _ => "Combines audio from connected outputs.",
             };
             format!("{title}\n{body}")
         }

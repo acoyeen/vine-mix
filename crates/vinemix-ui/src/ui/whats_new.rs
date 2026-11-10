@@ -103,6 +103,12 @@ impl WhatsNew {
         Self { progress, pending, existing: existing_workspace, first_frames: None, done: preview, automatic: false, preview }
     }
 
+    /// Nothing pending and nothing read from or written to disk (tests).
+    #[cfg(test)]
+    pub(crate) fn inert() -> Self {
+        Self { progress: Progress::default(), pending: false, existing: false, first_frames: None, done: true, automatic: false, preview: true }
+    }
+
     pub fn should_show_now(&self) -> bool {
         false
     }

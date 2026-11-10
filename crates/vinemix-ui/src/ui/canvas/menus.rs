@@ -403,13 +403,14 @@ impl Canvas {
         // The same advice applies to Distortion and RNNoise.
         let heavy_advice = mixer.processing_addition_advice("distortion");
         let help = |kind: &str| {
-            let mut text = format!("{}\n{}", graph::kind_label(kind), catalog::description(kind));
+            let mut text = format!("{}\n{}", graph::kind_label(kind), catalog::summary(kind));
             let advice = if matches!(kind, "distortion" | "denoiser") { heavy_advice } else { "" };
             if !advice.is_empty() {
-                text += &format!(" {advice}");
+                text += &format!("\n{advice}");
             }
             if !unavailable.is_empty() {
-                text += &format!("\n{unavailable}");
+                // A row that cannot be chosen says why, and only that.
+                text = format!("{}\n{unavailable}", graph::kind_label(kind));
             }
             text
         };

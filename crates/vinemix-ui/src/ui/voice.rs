@@ -107,6 +107,11 @@ pub fn show(ctx: &mut ItemCtx<'_, '_>, world: Rect) {
             }
         }
         if response.has_focus() {
+            // Arrows adjust the pad; without this they would also move focus
+            // to a neighbouring control after the first step.
+            ctx.ui.memory_mut(|m| {
+                m.set_focus_lock_filter(id, egui::EventFilter { tab: false, horizontal_arrows: true, vertical_arrows: true, escape: state.dragging });
+            });
             let (shift, blocked) = ctx.ui.input(|i| (i.modifiers.shift, i.modifiers.ctrl || i.modifiers.alt || i.modifiers.mac_cmd));
             if !blocked {
                 let step = if shift { 0.001 } else { 0.01 };
@@ -175,10 +180,18 @@ pub fn show(ctx: &mut ItemCtx<'_, '_>, world: Rect) {
     painter.text(to_screen(Pos2::new(bounds.left() + 12.0, bounds.bottom() - 28.0)), Align2::LEFT_TOP, "Warm", label_font.clone(), theme::TEXT);
     painter.text(to_screen(Pos2::new(centre, bounds.bottom() - 28.0)), Align2::CENTER_TOP, "Natural", label_font.clone(), theme::TEXT);
     painter.text(to_screen(Pos2::new(bounds.right() - 12.0, bounds.bottom() - 28.0)), Align2::RIGHT_TOP, "Bright", label_font, theme::TEXT);
-    let response = response.tip(format!(
-        "Voice Color\nTone · Warm to Bright\nCharacter · Natural to Broadcast\nNeutral · Original voice character\n{}",
-        description(shown_tone, shown_ambience)
-    ));
+    // A painted control has no semantics of its own: give assistive
+    // technology its name, its current character as the value and how to
+    // operate it. (The Tone and Character dials below set the same values
+    // one axis at a time.)
+    response.widget_info(|| egui::WidgetInfo {
+        current_text_value: Some(description(shown_tone, shown_ambience)),
+        ..egui::WidgetInfo::labeled(egui::accesskit::Role::Slider, enabled, "Voice Color pad")
+    });
+    let response = response.tip_described(
+        format!("Voice Color\nAcross · Warm to Bright. Up · Natural to Broadcast.\n{}", description(shown_tone, shown_ambience)),
+        "Two-axis control. Left and Right arrows move Tone from warm to bright; Up and Down arrows move Character from natural to broadcast. Hold Shift for fine steps. Home returns to Neutral.",
+    );
     if response.hovered() && enabled {
         ctx.ui.ctx().set_cursor_icon(egui::CursorIcon::Crosshair);
     }
