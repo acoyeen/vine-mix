@@ -269,7 +269,7 @@ pub struct DistortionSettings {
 
 impl Default for DistortionSettings {
     fn default() -> Self {
-        Self { drive_db: 6.0, tone_hz: 6000.0, mix: 0.5, output_db: -6.0 }
+        Self { drive_db: 6.0, tone_hz: 6000.0, mix: 0.5, output_db: 0.0 }
     }
 }
 

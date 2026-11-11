@@ -7,6 +7,7 @@
 
 pub mod config;
 pub mod defaults;
+pub mod distortion;
 pub mod identity;
 pub mod json;
 pub mod kind;

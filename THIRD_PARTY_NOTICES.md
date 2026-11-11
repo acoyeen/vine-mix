@@ -95,6 +95,14 @@ the mathematical derivation and shelf mappings published by
 [Andrew Simper, Cytomic, 2013](https://www.cytomic.com/files/dsp/SvfLinearTrapOptimised2.pdf).
 The Rust edition's Voice Color builds its fixed contour filters from the same
 published state-variable and one-pole equations.
+The Rust edition's Distortion uses the same one-pole equations and applies its
+curve by first-order antiderivative antialiasing, as published by Julian
+Parker, Vadim Zavalishin and Efflam Le Bivic ("Reducing the aliasing of
+nonlinear waveshaping using continuous-time convolution", DAFx-16, 2016) and
+by Stefan Bilbao, Fabián Esqueda, Julian Parker and Vesa Välimäki
+("Antiderivative Antialiasing for Memoryless Nonlinearities", IEEE Signal
+Processing Letters, 2017). It is implemented from the published method; no
+third-party source is incorporated.
 The de-essing use case is informed by
 [MathWorks' split-band de-essing explanation](https://www.mathworks.com/help/audio/ug/SplitBandDeEssing.html).
 The reverb uses passive scattering delay paths and allpass diffusion, informed

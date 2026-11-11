@@ -6,8 +6,9 @@
 //! produce the same samples for the same plan and input. Effects are
 //! dispatched through an enum rather than a virtual call per sample.
 //!
-//! Voice Color is the exception: [`effects::voice`] is an original design
-//! that replaced the 0.5 node and is not expected to match it.
+//! Voice Color and Distortion are the exceptions: [`effects::voice`] and
+//! [`effects::distortion`] are original designs that replaced the 0.5 nodes
+//! and are not expected to match them.
 
 pub mod effects;
 pub mod processor;

@@ -202,7 +202,7 @@ fn effect_description(kind: &str, gate: bool, label: &str) -> String {
         ("echo", "Time") => "Sets the gap before and between echoes.",
         ("echo", "Repeats") => "Sets how many echoes follow the original sound.",
         ("echo", "Mix") => "Blends original sound and echoes on the Audio output.",
-        ("distortion", "Drive") => "Sets how strongly the signal is distorted.",
+        ("distortion", "Drive") => "Sets how strongly the sound is distorted, without changing its loudness.",
         ("distortion", "Tone") => "Sets the brightness of the distorted sound.",
         ("distortion", "Mix") => "Blends original and distorted sound.",
         ("distortion", "Output") => "Trims the level after the blend.",

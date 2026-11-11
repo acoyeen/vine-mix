@@ -4,10 +4,12 @@
 //! during runtime preparation. Every later call is bounded, with no
 //! allocation, locking or I/O.
 
-pub mod colour;
 pub mod delay;
 pub mod denoise;
+pub mod distortion;
 pub mod dynamics;
+mod filters;
+pub mod reverb;
 pub mod voice;
 
 use vinemix_model::config::{
@@ -19,10 +21,11 @@ use vinemix_model::GraphKind;
 use vinemix_rt::Frame;
 
 use crate::util::clean_f32;
-use colour::{Distortion, Reverb};
 use delay::{AlignmentDelay, Echo};
 use denoise::Denoise;
+use distortion::Distortion;
 use dynamics::{BandReduction, Expander};
+use reverb::Reverb;
 use voice::VoiceColor;
 
 /// One frame of effect output.
@@ -147,7 +150,6 @@ impl AdvancedEffect {
         match kind {
             GraphKind::Denoiser if algorithm == "rnnoise" => 1440,
             GraphKind::Denoiser => 960,
-            GraphKind::Distortion => 32,
             _ => 0,
         }
     }
@@ -187,7 +189,7 @@ impl AdvancedEffect {
             Engine::Expander(expander) => expander.configure(&node.expander),
             Engine::AlignmentDelay(delay) => delay.configure(node.alignment_delay.samples),
             Engine::Echo(echo) => echo.configure(&node.echo),
-            Engine::Distortion(distortion) => distortion.configure(&node.distortion),
+            Engine::Distortion(distortion) => distortion.configure(&node.saturation),
             Engine::Denoise(denoise) => denoise.configure(&node.denoiser, first),
             Engine::VoiceColor(voice) => voice.configure(&node.voice_contour),
             Engine::Reverb(reverb) => reverb.configure(&node.reverb),
@@ -216,10 +218,7 @@ impl AdvancedEffect {
                 let result = echo.process(input);
                 EffectResult { wet: result.mixed, dry: result.dry, effect_wet: result.wet }
             }
-            Engine::Distortion(distortion) => {
-                let (wet, dry) = distortion.process(input);
-                EffectResult { wet, dry, effect_wet: Frame::SILENT }
-            }
+            Engine::Distortion(distortion) => plain(distortion.process(input)),
             Engine::Expander(expander) => {
                 let signal = detector.map_or(input, |d| Frame::new(clean_f32(d.left), clean_f32(d.right)));
                 plain(expander.process(input, signal))

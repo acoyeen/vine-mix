@@ -13,6 +13,10 @@ notes and counts below describe the earlier effect set.
 **Status:** implemented, offline verified and locally integrated after the
 maintainer requested a review for problems analogous to the earlier Echo report.
 
+**Update, 11 November 2026:** this section describes the 0.5 C++ node. The Rust
+edition's Distortion was redesigned and no longer uses this processor; see
+[DISTORTION.md](DISTORTION.md) and [ISSUE-050](KNOWN_ISSUES.md#issue-050).
+
 Primary sources reviewed on **2026-11-06**:
 
 - [Ableton Saturator](https://www.ableton.com/en/manual/live-audio-effect-reference/#saturator)

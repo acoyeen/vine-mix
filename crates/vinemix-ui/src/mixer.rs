@@ -458,21 +458,21 @@ impl MixerState {
 
     /// Advice in the add menu when capacity is limited (`ProcessingAdditionAdvice`).
     pub fn processing_addition_advice(&self, kind: &str) -> &'static str {
-        if self.processing_load.available && self.processing_load.addition_advised && matches!(kind, "distortion" | "denoiser") {
+        if self.processing_load.available && self.processing_load.addition_advised && kind == "denoiser" {
             "Limited spare processing capacity: adding this effect may cause interruptions."
         } else {
             ""
         }
     }
 
-    /// After an edit that adds Distortion or RNNoise while capacity is limited,
+    /// After an edit that adds RNNoise while capacity is limited,
     /// advise once per 30 s for 10 s (`ConsiderProcessingLoadEdit`).
     fn consider_processing_load_edit(&mut self, before: &vinemix_model::config::AudioGraph, after: &vinemix_model::config::AudioGraph) {
         self.refresh_processing_load(None);
         if !self.processing_load.available || !self.processing_load.addition_advised {
             return;
         }
-        let heavy = |node: &vinemix_model::config::GraphNode| node.kind == "distortion" || (node.kind == "denoiser" && node.denoiser.algorithm == "rnnoise");
+        let heavy = |node: &vinemix_model::config::GraphNode| node.kind == "denoiser" && node.denoiser.algorithm == "rnnoise";
         let added = after.nodes.iter().any(|node| heavy(node) && !before.nodes.iter().any(|old| old.id == node.id && heavy(old)));
         let now = self.seconds();
         if !added || now - self.processing_advised_at < 30.0 {

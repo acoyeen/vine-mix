@@ -85,6 +85,7 @@ released. The review tracker records what remains open.
 
 | ID | Issue | Status |
 | --- | --- | --- |
+| [ISSUE-050](#issue-050) | Distortion's strength and loudness depend on the input level, and it delays the signal | Confirmed by measurement in 0.5; redesigned in the Rust source; listening comparison pending; unreleased |
 | [ISSUE-049](#issue-049) | Voice Color grows quieter, not steadier, and sharper in sibilants as Character rises | Confirmed by measurement in 0.5; redesigned in the Rust source; listening comparison pending; unreleased |
 | [ISSUE-045](#issue-045) | Typing on a focused Rust dial doubles the first digit | Resolved in source; typing regression passes; unreleased |
 | [ISSUE-046](#issue-046) | Escape in Rust Settings search closes the menu instead of clearing the search | Resolved in source; search tests pass; unreleased |
@@ -134,6 +135,62 @@ released. The review tracker records what remains open.
 | [ISSUE-026](#issue-026) | Echo Time changes replay stored repeat mixtures | Resolved in 0.5.0 Beta; listening refinement confirmed by maintainer |
 | [ISSUE-027](#issue-027) | Maximum Distortion graph has insufficient routing-fade timing margin | Optimized, offline verified and integrated; maximum-graph margin remains limited |
 | [ISSUE-028](#issue-028) | Short cables fold back instead of flowing directly between sockets | Resolved in 0.5.0 Beta; detached geometry and rendering verified |
+
+<a id="issue-050"></a>
+## ISSUE-050: Distortion's strength and loudness depend on the input level, and it delays the signal
+
+- **Found:** 2026-11-11, by measurement, after the maintainer said they had
+  been hesitant to use the node and asked for it to be redesigned after Voice
+  Color. **Status:** Confirmed in the 0.5 design, which the published 0.5.0
+  Beta and the 0.5 C++ sources keep. Redesigned in the Rust source;
+  unreleased. No listening comparison has been made.
+- **Evidence:** The Rust port of the 0.5 design (commit `20bf8d8`) was
+  rendered offline on two synthetic speech voices from the Windows speech
+  engine, two generated test voices and steady tones, at Mix 100% and Output
+  0 dB. Speech at −24 dBFS came out 5.4 LU louder at Drive 6 dB and 22 LU
+  louder at 36 dB (ITU-R BS.1770 integrated loudness); the same voice 20 dB
+  quieter came out 33.5 LU louder at 36 dB. The harmonics of a 997 Hz tone at
+  Drive 12 dB measured −15 dB with the tone at −6 dBFS and −70 dB with it at
+  −36 dBFS, so the dial alone does not set the amount of distortion. Speech
+  with peaks at −7 dBFS left with peaks at +4.2 dBFS at Drive 36 dB. Room
+  noise 40 dB below the voice was raised by 34 dB at Drive 36 dB. The output
+  is delayed by 32 frames, bypassed or not. The curve adds odd harmonics only.
+  One node cost 160 to 200 ns per frame. Its aliasing was very low: below
+  −110 dB for every tone and Drive tested except 5 kHz at 36 dB (−75 dB).
+- **Not established:** That the earlier sound was worse to listen to.
+- **Correction (Rust edition):** A new design in
+  `crates/vinemix-dsp/src/effects/distortion.rs`, with the compiled amounts
+  in `crates/vinemix-model/src/distortion.rs`. The four controls, the saved
+  fields, their ranges and the protocol are unchanged, and nothing is
+  migrated. The default Output changes from −6 dB to 0 dB, because Drive no
+  longer adds level; saved nodes keep their value. On the same signals the
+  loudness is 0.1 to 1.0 LU below dry at every Drive, the harmonics are the
+  same at every input level, there is no delay, noise 40 dB below the voice
+  is not raised, and gentle settings add mostly second harmonic. One node
+  costs about 28 ns per frame. [DISTORTION.md](DISTORTION.md) describes the
+  design and its limits.
+- **What is worse:** Aliasing at extreme settings. It is below −100 dB up to
+  Drive 12 dB for tones up to 3 kHz, but about −35 dB for 3 and 5 kHz tones
+  at Drive 36 dB, where the earlier design measured −116 and −75 dB. The
+  earlier design bought that with eight-times oversampling and its delay.
+- **Verification:** `crates/vinemix-dsp/tests/distortion.rs` (18 checks) and
+  the unit tests beside both modules; the allocation guard and the retarget
+  comparison include the node. The C/C++ parity comparison no longer covers
+  this node: a Gain node holds its place in the parity graph, because the
+  0.5 node delays even its bypass path, and all five graph comparisons still
+  pass. Voice Color's filters moved to a file the two nodes share; its 56
+  reference renders are byte-identical before and after. Synthetic signals
+  only.
+- **Also changed:** The desktop no longer warns that adding a Distortion
+  needs substantial processing; the advice remains for RNNoise. The routing
+  fade margin recorded in [ISSUE-027](#issue-027) belongs to the 0.5 node.
+- **Open:** The maintainer's listening comparison of the earlier and new
+  designs (`scripts/render-distortion.ps1`, and the node in the running
+  application). The standard level, the working point, the split and the
+  emphasis are constants in the model file and are expected to be adjusted
+  after that. The defaults for Drive (6 dB) and Mix (50%) are unchanged and
+  are now deliberately gentle; whether a new node should start stronger is
+  the maintainer's choice.
 
 <a id="issue-049"></a>
 ## ISSUE-049: Voice Color grows quieter, not steadier, and sharper in sibilants as Character rises
@@ -686,6 +743,13 @@ checks passed. The median itself exceeds budget: this is a real capacity limit
 on that host, not a single scheduling outlier or evidence of a code regression.
 The exact CPU/contention cause is not established. Both complete reports remain
 in private evidence; the failed run is not replaced by retries until green.
+
+### Rust edition — 11 November 2026
+
+The Rust edition's Distortion was redesigned ([ISSUE-050](#issue-050)) and no
+longer uses this processor. One node measures about 28 ns per frame offline,
+against 160 to 200 ns for the Rust port of the processor described here. The
+30-node routing-fade benchmark above has not been repeated with the new node.
 
 The 0.5.0 files and source tag remain unchanged. Hosted CI separates measured
 capacity from correctness; strict 5-ms qualification remains the local default.

@@ -12,6 +12,7 @@ use crate::config::{
     EqBand, ExpanderSettings, PlosiveSettings, ReverbSettings, VoiceColorSettings,
 };
 use crate::kind::{GraphKind, GraphPort};
+use crate::distortion::Saturation;
 use crate::voice::VoiceContour;
 use crate::limits::{check_gain_db, check_id, MAXIMUM_EQ_BANDS, MAXIMUM_GRAPH_EDGES, MAXIMUM_GRAPH_NODES};
 use crate::{ModelError, SAMPLE_RATE};
@@ -71,6 +72,8 @@ pub struct PlanNode {
     pub reverb: ReverbSettings,
     pub echo: EchoSettings,
     pub distortion: DistortionSettings,
+    /// Distortion's processing amounts for `distortion`.
+    pub saturation: Saturation,
     pub voice_color: VoiceColorSettings,
     /// Voice Color's processing amounts for `voice_color`.
     pub voice_contour: VoiceContour,
@@ -115,6 +118,7 @@ impl PlanNode {
             reverb: ReverbSettings::default(),
             echo: EchoSettings::default(),
             distortion: DistortionSettings::default(),
+            saturation: Saturation::CLEAN,
             voice_color: VoiceColorSettings::default(),
             voice_contour: VoiceContour::NEUTRAL,
         }
@@ -361,6 +365,11 @@ pub fn compile_graph(graph: &AudioGraph) -> Result<GraphPlan, ModelError> {
             if coefficient != Biquad::default() {
                 node.eq.push(coefficient);
             }
+        }
+        if source.kind == "distortion" {
+            // Distortion is an original VineMix design, not the 0.5 engine's:
+            // the gain that keeps its loudness steady is worked out here.
+            node.saturation = Saturation::of(&source.distortion);
         }
         if source.kind == "voiceColor" {
             // Voice Color is an original VineMix design, not the 0.5 engine's:
@@ -716,6 +725,22 @@ mod tests {
         assert!(error(&graph(vec![pass.clone()], vec![])).starts_with("High-pass and low-pass nodes"));
         pass.eq_bands = vec![EqBand::new("lowPass", true, 8000.0, 0.0, 0.7, 0.0)];
         compile_graph(&graph(vec![pass], vec![])).unwrap();
+    }
+
+    #[test]
+    fn distortion_compiles_to_its_amounts() {
+        let mut distortion = GraphNode::new("d", "distortion", "", 0.0, 0.0);
+        distortion.distortion.drive_db = 24.0;
+        distortion.distortion.mix = 1.0;
+        let other = GraphNode::new("g", "gain", "", 0.0, 0.0);
+        let plan = compile_graph(&graph(vec![distortion.clone(), other], vec![])).unwrap();
+        let compiled = plan.nodes.iter().find(|n| n.id == "d").unwrap();
+        assert_eq!(compiled.saturation, Saturation::of(&distortion.distortion));
+        assert!(compiled.saturation.drive_db == 24.0 && compiled.saturation.makeup_db < -14.0 && compiled.saturation.mix == 1.0);
+        // Only a Distortion carries amounts; every other node is clean.
+        assert_eq!(plan.nodes.iter().find(|n| n.id == "g").unwrap().saturation, Saturation::CLEAN);
+        // The default leaves the level alone.
+        assert_eq!(DistortionSettings::default().output_db, 0.0);
     }
 
     #[test]

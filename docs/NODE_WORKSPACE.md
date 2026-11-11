@@ -339,7 +339,7 @@ and screen-space snapping remain unchanged.
 | Plosive remover | Dynamic low-band reduction for bass bursts such as microphone pops; cutoff, threshold and maximum reduction |
 | Reverb | Stereo room tail; wet/dry mix, decay, damping and pre-delay |
 | Echo | Time, exact Repeats count and Mix; finite decaying copies, mixed Audio plus echo-only Echo output; timing/count edits fade and restart the tail |
-| Distortion | Soft saturation from warmth to strong distortion; Drive, Tone, Mix and Output; 32-frame processing/bypass latency |
+| Distortion | Saturation from warmth to strong distortion at a steady loudness; Drive (follows the sound's level), Tone, Mix and Output; no added delay |
 | Balance | Attenuate the opposite stereo channel; centre preserves the original stereo signal |
 | Mono | Average left/right and send the result equally to both channels |
 | Channel Swap | Exchange left and right; bypass restores the original order |

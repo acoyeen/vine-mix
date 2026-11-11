@@ -2,11 +2,18 @@
 //! `compileGraph` / `GraphProcessor`: every node's output buffer and meter
 //! must match bit for bit, quantum after quantum, across live edits.
 //!
-//! One node is outside this comparison by design. Voice Color was redesigned
-//! in Rust (`vinemix_dsp::effects::voice`) and no longer sounds like the 0.5
-//! node, so it sits in the chain bypassed: its validation, its place in the
-//! plan and its bypass path are still compared, and so is every node after
-//! it. Its own behaviour is held by `vinemix-dsp/tests/voice_color.rs`.
+//! Two nodes are outside this comparison by design; both were redesigned in
+//! Rust and no longer sound like the 0.5 nodes.
+//!
+//! Voice Color (`vinemix_dsp::effects::voice`) sits in the chain bypassed: its
+//! validation, its place in the plan and its bypass path are still compared,
+//! and so is every node after it. Its own behaviour is held by
+//! `vinemix-dsp/tests/voice_color.rs`.
+//!
+//! Distortion (`vinemix_dsp::effects::distortion`) is absent. The 0.5 node
+//! delayed its output by 32 frames even when bypassed and the new one adds no
+//! delay, so the two differ in bypass as well; a Gain node holds its place in
+//! the chain. Its own behaviour is held by `vinemix-dsp/tests/distortion.rs`.
 
 #![cfg(oracle_available)]
 
@@ -77,9 +84,8 @@ fn effects_chain() -> AudioGraph {
     let mut echo = node("ec", "echo");
     echo.echo.time_ms = 45.0;
     echo.echo.repeats = 4;
-    let mut distortion = node("ds", "distortion");
-    distortion.distortion.drive_db = 18.0;
-    distortion.distortion.mix = 0.6;
+    // Where Distortion sat before it was redesigned; see the note above.
+    let spacer = node("sp", "gain");
     let mut delay = node("ad", "alignmentDelay");
     delay.alignment_delay.samples = 333;
     let mut limiter = node("lim", "limiter");
@@ -87,7 +93,7 @@ fn effects_chain() -> AudioGraph {
     let mut gain = node("gain", "gain");
     gain.gain_db = 9.0;
     let out = node("out", "output");
-    nodes.extend([high_pass, eq, tone, compressor, denoiser, de_esser, plosive, expander, gate, voice, reverb, echo, distortion, delay, gain, limiter, out]);
+    nodes.extend([high_pass, eq, tone, compressor, denoiser, de_esser, plosive, expander, gate, voice, reverb, echo, spacer, delay, gain, limiter, out]);
     let ids: Vec<String> = nodes.iter().map(|n| n.id.clone()).collect();
     let edges = ids.windows(2).enumerate().map(|(i, pair)| edge(&format!("e{i}"), &pair[0], &pair[1])).collect();
     AudioGraph { nodes, edges, ..AudioGraph::default() }
@@ -310,7 +316,7 @@ fn live_edits_match_reference() {
         pair.edit(
             |g| {
                 g.nodes.remove(13);
-                g.edges.retain(|e| e.from != "ds" && e.to != "ds");
+                g.edges.retain(|e| e.from != "sp" && e.to != "sp");
                 g.edges.push(edge("bridge", "ec", "ad"));
             },
             mode,
@@ -399,8 +405,9 @@ fn voice_chain() -> AudioGraph {
 /// `cargo test -p vinemix-oracle --release --test graph_parity -- --ignored --nocapture`).
 /// In the effects chain the two sides run different Voice Color designs (the
 /// node keeps processing while bypassed), so that row is no longer a
-/// like-for-like comparison of the port; `voice_color_cost` in vinemix-dsp
-/// measures the node on its own.
+/// like-for-like comparison of the port, and it has no Distortion;
+/// `voice_color_cost` and `distortion_cost` in vinemix-dsp measure those
+/// nodes on their own.
 #[test]
 #[ignore = "benchmark"]
 fn processing_benchmark() {
@@ -408,7 +415,7 @@ fn processing_benchmark() {
     const RUNS: usize = 7;
     /// One quantum is 5 ms; anything longer has missed its deadline.
     const DEADLINE_US: f64 = 5_000.0;
-    for (name, graph) in [("voice chain (starter)", voice_chain()), ("effects chain (17 effects)", effects_chain()), ("routing graph (23 nodes)", routing_graph())] {
+    for (name, graph) in [("voice chain (starter)", voice_chain()), ("effects chain (16 effects)", effects_chain()), ("routing graph (23 nodes)", routing_graph())] {
         let plan = compile_graph(&graph).expect("graph compiles");
         let mut seed = 1u32;
         let mut frames_by_quantum: Vec<Vec<Vec<Frame>>> = Vec::with_capacity(QUANTA);

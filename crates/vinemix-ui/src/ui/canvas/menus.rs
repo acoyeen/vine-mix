@@ -400,11 +400,10 @@ impl Canvas {
         }
         widgets::menu_separator(ui);
         let query = self.add_search.trim().to_owned();
-        // The same advice applies to Distortion and RNNoise.
-        let heavy_advice = mixer.processing_addition_advice("distortion");
+        let heavy_advice = mixer.processing_addition_advice("denoiser");
         let help = |kind: &str| {
             let mut text = format!("{}\n{}", graph::kind_label(kind), catalog::summary(kind));
-            let advice = if matches!(kind, "distortion" | "denoiser") { heavy_advice } else { "" };
+            let advice = if kind == "denoiser" { heavy_advice } else { "" };
             if !advice.is_empty() {
                 text += &format!("\n{advice}");
             }

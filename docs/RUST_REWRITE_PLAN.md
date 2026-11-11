@@ -11,8 +11,8 @@ Done and verified:
 
 - **Model and DSP core**: `vinemix-model`, `vinemix-dsp`, `vinemix-denoise`,
   `vinemix-resample` are bit-exact against the pinned 0.5 C/C++ through
-  `vinemix-oracle`. (Since 11 November 2026 Voice Color is a deliberate
-  exception; see section 0.3.)
+  `vinemix-oracle`. (Since 11 November 2026 Voice Color and Distortion are
+  deliberate exceptions; see section 0.3.)
 - **Engine**: `vinemix-engine` (`VineMix.Engine.exe`) with WASAPI and process
   capture, the configuration store, the control protocol and single-instance
   ownership.
@@ -139,7 +139,8 @@ VineMix is in the tray. Now:
   before the first quantum, after stop, and fresh after a restart
   (`tests/engine_lifecycle.rs`);
 - desktop: `processing_load.rs` (presenter, validation, 2 s staleness), mixer
-  advisory after adding Distortion/RNNoise under limited headroom, the footer
+  advisory after adding RNNoise under limited headroom (the 0.5 desktop
+  also advises for Distortion; the redesigned node is light), the footer
   "Audio load" readout with a 248 px reserve, the dismissible notice strip,
   the details window and Add-menu advice. Matched against the local tree's
   `processing-load-*` renders.
@@ -194,7 +195,7 @@ section is a proposal. Build and verification steps for what exists are in
 | Mix-format reads (O8) | Cache per endpoint | Done (0.2 above). The O8 row's "Today" column describes the 0.5 engine, not this one. |
 | Hidden window (6.2) | "A hidden window costs nothing" | A hidden desktop repaints at most once a second as a backstop and its engine link waits on a condition variable. It is cheap, not free. |
 | Third-party DSP (1, Phase 6) | Link the pinned C sources first; pure Rust later, as an optional gate | The shipped executables contain Rust translations only, verified bit-exact against the pinned C sources. C and C++ are compiled only into the test-only `vinemix-oracle`. |
-| Parity with 0.5 (5, Phase 2) | Every node bit-exact against the 0.5 engine | Every node except Voice Color. That node was redesigned in Rust on 11 November 2026 ([VOICE_COLOR.md](VOICE_COLOR.md)) and is held by its own measurements in `crates/vinemix-dsp/tests/voice_color.rs`. In the parity graphs it sits bypassed, so its validation, its bypass path and every node after it are still compared. The 0.5 C++ sources are unchanged. |
+| Parity with 0.5 (5, Phase 2) | Every node bit-exact against the 0.5 engine | Every node except Voice Color and Distortion. Both were redesigned in Rust on 11 November 2026 ([VOICE_COLOR.md](VOICE_COLOR.md), [DISTORTION.md](DISTORTION.md)) and are held by their own measurements in `crates/vinemix-dsp/tests/voice_color.rs` and `distortion.rs`. In the parity graphs Voice Color sits bypassed, so its validation, its bypass path and every node after it are still compared. Distortion is absent, with a Gain node in its place: the 0.5 node delays its bypass path by 32 frames and the new one adds no delay. The 0.5 C++ sources are unchanged. |
 | Realtime guards (5.1) | A `loom` model test; no-alloc zones in debug and CI builds | An allocation-counting integration test of the processor (`crates/vinemix-dsp/tests/realtime_alloc.rs`) and stress tests of the queue and spectrum mailbox. No `loom` models, and the running mixer and device loops are not instrumented as no-alloc zones. |
 | Continuous integration (9) | — | `.github/workflows/verify.yml` has a `rust` job that runs `scripts/verify-rust.ps1`. It had not yet run on GitHub when this table was written. |
 

@@ -148,7 +148,7 @@ connected, rather than replacing that branch with dry audio.
 | `plosive` | `frequencyHz: 150, thresholdDb: -24, reductionDb: 12` | 60–300 Hz; −60–0 dB; 0–24 dB |
 | `reverb` | `mix: 0.2, decaySeconds: 1.2, damping: 0.5, preDelayMs: 15` | 0–1; 0.1–5 s; 0–1; 0–100 ms |
 | `echo` | `timeMs: 300, repeats: 3, mix: 0.25` | 20–2000 ms; integer 1–8; 0–1 |
-| `distortion` | `driveDb: 6, toneHz: 6000, mix: 0.5, outputDb: -6` | 0–36 dB; 500–18000 Hz; 0–1; −24–0 dB |
+| `distortion` | `driveDb: 6, toneHz: 6000, mix: 0.5, outputDb: 0` (`-6` in the 0.5 engine) | 0–36 dB; 500–18000 Hz; 0–1; −24–0 dB |
 | `voiceColor` | `tone: 0, ambience: 0` | −1–1; 0–1 |
 | `expander` | `mode: "expander", thresholdDb: -40, ratio: 2, attackMs: 5, holdMs: 50, releaseMs: 150, rangeDb: 60, hysteresisDb: 3` | Mode `expander` / `gate`; −80–0 dB; 1–20; 0.1–200 ms; 0–1000 ms; 5–2000 ms; 0–80 dB; 0–12 dB |
 | `alignmentDelay` | `samples: 0` | Integer 0–96000, measured at the internal 48 kHz rate |
@@ -179,11 +179,15 @@ and Mix are preserved. This is a deliberate sound-model migration, not an
 exact equivalent to the previous indefinitely decaying feedback loop.
 Desktop/native serialization and activation comparisons share the same rule.
 
-Distortion retains ordinary `audio` ports and uses one oversampled soft-saturation processor, with DC removal and
-Tone filtering on the wet path. Output gain follows the dry/wet blend, so it also
-applies at Mix zero. Bypass uses untrimmed, latency-matched dry audio. Its fixed
-32-frame latency at 48 kHz remains at Mix zero and in Bypass; parallel graph paths
-are not automatically delay-compensated. Missing effect records use the defaults
+Distortion retains ordinary `audio` ports and its four wire fields and ranges.
+Output gain follows the dry/wet blend, so it also applies at Mix zero, and
+Bypass passes untrimmed dry audio. What the fields do is the engine's business,
+not the protocol's. The 0.5 engine runs one oversampled soft-saturation
+processor with a fixed 32-frame latency at 48 kHz, which remains at Mix zero
+and in Bypass; parallel graph paths are not automatically delay-compensated.
+The Rust engine (redesigned on 11 November 2026) adds no latency, ties Drive to
+the level of the sound and keeps the loudness steady; see
+[the Distortion design](DISTORTION.md). Missing effect records use the defaults
 above; older engines do not support graphs containing the new node kinds.
 
 Repeated `output` or `virtualOutput` device bindings are permitted in the current

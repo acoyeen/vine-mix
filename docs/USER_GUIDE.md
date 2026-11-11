@@ -87,7 +87,7 @@ automatically selecting the other source.
 The graph supports up to **32 nodes and 96 connections**. Sources can feed several
 destinations, and each distinct output device has independent buffering and recovery.
 This is routing capacity, not a guarantee for every effect combination. Large
-collections of Distortion or RNNoise nodes need more processing time. When
+collections of RNNoise nodes need more processing time. When
 several branches need the same cleanup, place one Denoiser before the split.
 New outputs start muted; physical outputs require explicit selection. Existing A/B routes migrate with their
 saved levels, mutes, devices and disabled sends.
@@ -454,15 +454,15 @@ Earlier development workspaces convert Feedback to an approximate repeat count
 while keeping Time and Mix; old 35% Feedback becomes 5 repeats. This intentionally
 replaces the previous indefinite feedback decay.
 
-**Distortion** ranges from gentle warmth to strong saturation. **Drive** pushes
-the sound into distortion (0–36 dB); **Tone** sets its brightness (500–18000 Hz);
-**Mix** blends clean and distorted sound; **Output** trims the resulting level
-(−24–0 dB). Output applies to the blend, including Mix at zero. Bypass passes the
-original sound without that trim. Processing adds 32 frames at 48 kHz (about
-0.67 ms), also retained at zero Mix and during Bypass to keep its internal paths
-aligned. Parallel routes do not automatically compensate for this delay.
-Drive can increase loudness as well as distortion; use Output to balance the
-result. Bypass may therefore sound louder than a blend with a low Output setting.
+**Distortion** ranges from gentle warmth to strong saturation. **Drive** sets
+how strongly the sound is saturated (0–36 dB). It follows the level of the
+sound, so it acts the same on a quiet source and on a loud one, and it changes
+the character without changing the loudness. **Tone** sets the brightness of
+the driven sound (500–18000 Hz); **Mix** blends clean and driven sound;
+**Output** trims the resulting level (−24–0 dB), including with Mix at zero.
+Bypass passes the original sound without that trim. The node adds no delay.
+Sibilants and the room noise between words are left clean. See
+[Distortion controls and limits](DISTORTION.md).
 
 **Alignment Delay** offers linked millisecond/sample editing from zero to two
 seconds at 48 kHz. Settings, bypass, reset and copying follow the existing node

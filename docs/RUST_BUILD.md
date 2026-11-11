@@ -135,11 +135,13 @@ prints what the current tree runs as a starting point. Benchmarks are
 cargo test --release -p vinemix-dsp --test realtime_alloc parameter_edit_cost -- --ignored --nocapture
 ```
 
-Voice Color is the one node that is not compared with the 0.5 engine: it is a
-Rust design ([VOICE_COLOR.md](VOICE_COLOR.md)). Its behaviour is held by
-`crates\vinemix-dsp\tests\voice_color.rs`. To listen to it, or to measure it
-on a recording, run `.\scripts\render-voice-color.ps1`, which writes files
-under the ignored `artifacts\voice-color` folder and plays nothing.
+Voice Color and Distortion are the two nodes that are not compared with the
+0.5 engine: they are Rust designs ([VOICE_COLOR.md](VOICE_COLOR.md),
+[DISTORTION.md](DISTORTION.md)). Their behaviour is held by
+`crates\vinemix-dsp\tests\voice_color.rs` and `distortion.rs`. To listen to
+either, or to measure it on a recording, run `.\scripts\render-voice-color.ps1`
+or `.\scripts\render-distortion.ps1`, which write files under the ignored
+`artifacts` folder and play nothing.
 
 The verification script uses synthetic data only. It does not open an audio
 device, read personal settings or start an application session. It does not
