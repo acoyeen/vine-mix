@@ -3,7 +3,7 @@
   "suites": {
     "vinemix-denoise/lib/vinemix_denoise": { "minimumPassed": 9 },
     "vinemix-dsp/lib/vinemix_dsp": {
-      "minimumPassed": 24,
+      "minimumPassed": 28,
       "ignored": [
         "effects::denoise::tests::denoise_engine_cost",
         "effects::dynamics::tests::expander_cost",
@@ -12,6 +12,7 @@
     },
     "vinemix-dsp/test/realtime_alloc": { "minimumPassed": 3, "ignored": ["parameter_edit_cost"] },
     "vinemix-dsp/test/retarget_parity": { "minimumPassed": 3 },
+    "vinemix-dsp/test/voice_color": { "minimumPassed": 17, "ignored": ["voice_color_cost", "voice_color_render"] },
     "vinemix-engine/bin/vinemix-engine": { "minimumPassed": 0 },
     "vinemix-engine/lib/vinemix_engine": { "minimumPassed": 12 },
     "vinemix-engine/test/control_pipe": { "minimumPassed": 5 },
@@ -20,7 +21,7 @@
     "vinemix-engine/test/engine_lifecycle": { "minimumPassed": 3 },
     "vinemix-engine/test/snapshot_gating": { "minimumPassed": 2, "ignored": ["inventory_churn", "polling_cost"] },
     "vinemix-ipc/lib/vinemix_ipc": { "minimumPassed": 0 },
-    "vinemix-model/lib/vinemix_model": { "minimumPassed": 28 },
+    "vinemix-model/lib/vinemix_model": { "minimumPassed": 32, "ignored": ["voice::tests::contour_table"] },
     "vinemix-oracle/lib/vinemix_oracle": { "minimumPassed": 0 },
     "vinemix-oracle/test/availability": { "passed": 1 },
     "vinemix-oracle/test/denoise_parity": { "passed": 3, "ignored": ["denoise_benchmark"] },

@@ -14,6 +14,7 @@ pub mod limits;
 pub mod plan;
 pub mod status;
 pub mod validate;
+pub mod voice;
 
 pub use config::{AudioGraph, Configuration, DeviceBinding, EqBand, GraphEdge, GraphNode, ProcessBinding};
 pub use defaults::{default_configuration, migrate_legacy_graph};

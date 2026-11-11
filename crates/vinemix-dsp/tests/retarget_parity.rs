@@ -7,7 +7,8 @@
 //! after every quantum, including quanta inside the 10 ms ramps and EQ
 //! crossfades that the edits start, and edits that arrive while an earlier
 //! edit is still ramping. The established path is itself checked against the
-//! 0.5 engine by `vinemix-oracle`.
+//! 0.5 engine by `vinemix-oracle` (except Voice Color, which is a Rust design
+//! with its own tests in `voice_color.rs`).
 
 use vinemix_dsp::{GraphProcessor, Inputs};
 use vinemix_model::config::{tone_defaults, AudioGraph, EqBand, GraphEdge, GraphNode};

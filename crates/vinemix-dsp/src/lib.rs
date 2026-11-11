@@ -5,6 +5,9 @@
 //! 0.5 engine with identical operation order and precision, so both engines
 //! produce the same samples for the same plan and input. Effects are
 //! dispatched through an enum rather than a virtual call per sample.
+//!
+//! Voice Color is the exception: [`effects::voice`] is an original design
+//! that replaced the 0.5 node and is not expected to match it.
 
 pub mod effects;
 pub mod processor;

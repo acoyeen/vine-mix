@@ -12,6 +12,7 @@ use crate::config::{
     EqBand, ExpanderSettings, PlosiveSettings, ReverbSettings, VoiceColorSettings,
 };
 use crate::kind::{GraphKind, GraphPort};
+use crate::voice::VoiceContour;
 use crate::limits::{check_gain_db, check_id, MAXIMUM_EQ_BANDS, MAXIMUM_GRAPH_EDGES, MAXIMUM_GRAPH_NODES};
 use crate::{ModelError, SAMPLE_RATE};
 
@@ -71,7 +72,8 @@ pub struct PlanNode {
     pub echo: EchoSettings,
     pub distortion: DistortionSettings,
     pub voice_color: VoiceColorSettings,
-    pub voice_color_gain: f64,
+    /// Voice Color's processing amounts for `voice_color`.
+    pub voice_contour: VoiceContour,
 }
 
 impl PlanNode {
@@ -114,7 +116,7 @@ impl PlanNode {
             echo: EchoSettings::default(),
             distortion: DistortionSettings::default(),
             voice_color: VoiceColorSettings::default(),
-            voice_color_gain: 1.0,
+            voice_contour: VoiceContour::NEUTRAL,
         }
     }
 }
@@ -361,27 +363,10 @@ pub fn compile_graph(graph: &AudioGraph) -> Result<GraphPlan, ModelError> {
             }
         }
         if source.kind == "voiceColor" {
-            let tone = source.voice_color.tone;
-            // The strongest contour is reserved for the top of the pad; the
-            // same curve drives dynamics and room in the processor.
-            let character = source.voice_color.ambience.powf(1.3);
-            // Keep cancelling pole/zero pairs at neutral (no canonicalisation):
-            // identity coefficients would make an epsilon move near zero a
-            // large coefficient jump during interpolation.
-            let band = |kind: &str, frequency: f64, gain: f64, q: f64| {
-                coefficients(&EqBand::new(kind, true, frequency, gain, q, 0.0), false)
-            };
-            node.eq = vec![
-                band("lowShelf", 140.0, 12.0 * character - 12.0 * tone, std::f64::consts::FRAC_1_SQRT_2)?,
-                band("peak", 450.0, -8.0 * character, 0.9)?,
-                band("peak", 3000.0, 12.0 * character + 3.0 * tone, 0.85)?,
-                band("highShelf", 7000.0, 4.0 * character + 9.0 * tone, std::f64::consts::FRAC_1_SQRT_2)?,
-            ];
-            // Warmth adds bass energy, so reserve headroom on that side only.
-            node.voice_color_gain = 10f64.powf((-6.0 * (-tone).max(0.0)) / 20.0);
-            // Only the wet amount moves; delay and decay stay fixed so dragging
-            // the pad never modulates pitch.
-            node.reverb = ReverbSettings { mix: 0.02 * character, decay_seconds: 0.3, damping: 0.65, pre_delay_ms: 8.0 };
+            // Voice Color is an original VineMix design, not the 0.5 engine's:
+            // the pad compiles to gains for the processor's fixed filters
+            // rather than to biquad sections and a room.
+            node.voice_contour = VoiceContour::of(&source.voice_color);
         }
         let comp = &source.compressor;
         range(comp.threshold_db, -60.0, 0.0, "Compressor threshold must be between -60 and 0 dB.")?;
@@ -600,11 +585,9 @@ pub fn graph_signal_channels(plan: &GraphPlan, capture_channels: &[i32]) -> Vec<
         if !node.bypass && node.kind == GraphKind::Pan && node.pan_left != node.pan_right && channels[i] != 0 {
             channels[i] = 2;
         }
-        if !node.bypass
-            && matches!(node.kind, GraphKind::Reverb | GraphKind::VoiceColor)
-            && node.reverb.mix > 0.0
-            && channels[i] != 0
-        {
+        // Voice Color processes both channels alike with linked gains, so a
+        // mono voice stays mono through it; only the room decorrelates.
+        if !node.bypass && node.kind == GraphKind::Reverb && node.reverb.mix > 0.0 && channels[i] != 0 {
             channels[i] = 2;
         }
     }
@@ -736,15 +719,22 @@ mod tests {
     }
 
     #[test]
-    fn voice_color_compiles_fixed_slots() {
+    fn voice_color_compiles_to_its_contour() {
         let mut voice = GraphNode::new("v", "voiceColor", "", 0.0, 0.0);
         let neutral = compile_graph(&graph(vec![voice.clone()], vec![])).unwrap();
-        assert_eq!(neutral.nodes[0].eq.len(), 4, "neutral keeps four slots for interpolation");
-        assert_eq!(neutral.nodes[0].reverb.mix, 0.0);
+        assert!(neutral.nodes[0].eq.is_empty(), "the contour is not a set of biquad sections");
+        assert_eq!(neutral.nodes[0].voice_contour, VoiceContour::NEUTRAL);
         voice.voice_color = VoiceColorSettings { tone: -1.0, ambience: 1.0 };
-        let warm = compile_graph(&graph(vec![voice], vec![])).unwrap();
-        assert!((warm.nodes[0].voice_color_gain - 10f64.powf(-6.0 / 20.0)).abs() < 1e-15);
-        assert!((warm.nodes[0].reverb.mix - 0.02).abs() < 1e-15);
+        let warm = compile_graph(&graph(vec![voice.clone()], vec![])).unwrap();
+        assert_eq!(warm.nodes[0].voice_contour, VoiceContour::of(&voice.voice_color));
+        assert!(warm.nodes[0].voice_contour.low > 0.0 && warm.nodes[0].voice_contour.amount == 1.0);
+        // A mono voice stays mono through the node at any position.
+        let mut mic = GraphNode::new("m", "microphone", "", 0.0, 0.0);
+        mic.mono = true;
+        let plan = compile_graph(&graph(vec![mic, voice], vec![GraphEdge::audio("e", "m", "v")])).unwrap();
+        let mut capture = [0i32; MAXIMUM_GRAPH_NODES];
+        capture[0] = 1;
+        assert_eq!(graph_signal_channels(&plan, &capture)[1], 1);
     }
 
     #[test]

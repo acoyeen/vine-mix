@@ -93,6 +93,8 @@ The de-esser and plosive processor use dynamic shelving attenuators with separat
 band-limited detectors. Their topology-preserving state-variable filters follow
 the mathematical derivation and shelf mappings published by
 [Andrew Simper, Cytomic, 2013](https://www.cytomic.com/files/dsp/SvfLinearTrapOptimised2.pdf).
+The Rust edition's Voice Color builds its fixed contour filters from the same
+published state-variable and one-pole equations.
 The de-essing use case is informed by
 [MathWorks' split-band de-essing explanation](https://www.mathworks.com/help/audio/ug/SplitBandDeEssing.html).
 The reverb uses passive scattering delay paths and allpass diffusion, informed

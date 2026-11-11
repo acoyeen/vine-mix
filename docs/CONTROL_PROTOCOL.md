@@ -200,12 +200,12 @@ record. Older `expander` nodes already in gate mode retain their kind and settin
 and use Gate controls. Reset preserves that legacy gate mode.
 
 Voice Color keeps its existing wire fields and ranges. The UI labels
-`voiceColor.ambience` as **Character**, from Natural to Broadcast; it coordinates
-body/presence EQ, a low-mid cut, parallel compression, envelope-relative density,
-subtle delayed doubling and a small room. `tone` retains Warm–Bright travel. Both zero is
-transparent neutral. Loading does not rewrite either coordinate or migrate the
-configuration format; nonneutral saved coordinates intentionally use the new
-processing. See [the Voice Color mapping](VOICE_COLOR.md).
+`voiceColor.ambience` as **Character**, from Natural to Broadcast, and `tone`
+retains Warm–Bright travel. Both zero is transparent neutral. What the two
+numbers do is the engine's business, not the protocol's: the 0.5 engine and
+the Rust engine (redesigned on 11 November 2026) process the same coordinates
+differently. Loading does not rewrite either coordinate or migrate the
+configuration format. See [the Voice Color mapping](VOICE_COLOR.md).
 
 The existing `compressor` record adds optional `mode: "compress"`,
 `detector: "internal"`, and `ceilingDb: -1`. Mode accepts `compress` / `limit`,

@@ -1,13 +1,11 @@
-//! Distortion, Voice Color and Reverb.
+//! Distortion and Reverb.
 
 use std::f64::consts::PI;
 
 use vinemix_model::config::{DistortionSettings, ReverbSettings};
-use vinemix_model::plan::{Biquad, PlanNode};
 use vinemix_model::SAMPLE_RATE;
 use vinemix_rt::Frame;
 
-use crate::effects::dynamics::{DETECTOR_ATTACK, GAIN_ATTACK_1MS, RELEASE_50MS};
 use crate::util::{denormal, frame, Smooth};
 
 const FACTOR: usize = 8;
@@ -182,146 +180,6 @@ impl Distortion {
 impl Default for Distortion {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
-struct History {
-    z1: f64,
-    z2: f64,
-}
-
-/// One interpolated biquad: coefficients glide over 10 ms on every edit.
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
-struct ColourBand {
-    coefficients: [Smooth; 5],
-    history: [History; 2],
-}
-
-impl ColourBand {
-    fn configure(&mut self, c: &Biquad) {
-        self.coefficients[0].set(c.b0);
-        self.coefficients[1].set(c.b1);
-        self.coefficients[2].set(c.b2);
-        self.coefficients[3].set(c.a1);
-        self.coefficients[4].set(c.a2);
-    }
-
-    fn process(&mut self, left: &mut f64, right: &mut f64) {
-        let b0 = self.coefficients[0].next();
-        let b1 = self.coefficients[1].next();
-        let b2 = self.coefficients[2].next();
-        let a1 = self.coefficients[3].next();
-        let a2 = self.coefficients[4].next();
-        let filter = |input: f64, state: &mut History| {
-            let output = b0 * input + state.z1;
-            state.z1 = denormal(b1 * input - a1 * output + state.z2);
-            state.z2 = denormal(b2 * input - a2 * output);
-            output
-        };
-        *left = filter(*left, &mut self.history[0]);
-        *right = filter(*right, &mut self.history[1]);
-    }
-}
-
-const DOUBLE_SIZE: usize = 913; // Longest tap: 19 ms at 48 kHz.
-
-/// Voice Color: tone contour, soft-knee vocal compression, density and a
-/// short double. Its room is a [`Reverb`] driven by the compiled plan.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct VoiceColor {
-    bands: [ColourBand; 4],
-    gain: Smooth,
-    character: Smooth,
-    double_history: [Frame; DOUBLE_SIZE],
-    double_position: usize,
-    envelope: f64,
-    density_envelope: f64,
-    attenuation: f64,
-}
-
-impl Default for VoiceColor {
-    fn default() -> Self {
-        Self {
-            bands: [ColourBand::default(); 4],
-            gain: Smooth::default(),
-            character: Smooth::default(),
-            double_history: [Frame::SILENT; DOUBLE_SIZE],
-            double_position: 0,
-            envelope: 0.0,
-            density_envelope: 0.0,
-            attenuation: 1.0,
-        }
-    }
-}
-
-impl VoiceColor {
-    pub fn configure(&mut self, node: &PlanNode) {
-        for (band, coefficients) in self.bands.iter_mut().zip(&node.eq) {
-            band.configure(coefficients);
-        }
-        self.gain.set(node.voice_color_gain);
-        self.character.set(node.voice_color.ambience.powf(1.3));
-    }
-
-    pub fn process(&mut self, input: Frame) -> Frame {
-        let mut left = f64::from(input.left);
-        let mut right = f64::from(input.right);
-        for band in &mut self.bands {
-            band.process(&mut left, &mut right);
-        }
-        let trim = self.gain.next();
-        let amount = self.character.next();
-        left *= trim;
-        right *= trim;
-        // Linked peak envelope and gain keep the stereo balance stable. The
-        // soft knee has a continuous slope and no lookahead.
-        const GAIN_RELEASE_120MS: f64 = 0.999_826_403_958_668;
-        const THRESHOLD: f64 = -28.0;
-        const KNEE: f64 = 6.0;
-        const SLOPE: f64 = 1.0 - 1.0 / 4.5;
-        let peak = left.abs().max(right.abs());
-        let coefficient = if peak > self.envelope { DETECTOR_ATTACK } else { RELEASE_50MS };
-        self.envelope = denormal(peak + coefficient * (self.envelope - peak));
-        let above = 20.0 * self.envelope.max(1e-12).log10() - THRESHOLD;
-        let reduction = if above <= -KNEE / 2.0 {
-            0.0
-        } else if above >= KNEE / 2.0 {
-            SLOPE * above
-        } else {
-            SLOPE * (above + KNEE / 2.0) * (above + KNEE / 2.0) / (2.0 * KNEE)
-        };
-        let target = 10f64.powf(-reduction.min(18.0) / 20.0);
-        let coefficient = if target < self.attenuation { GAIN_ATTACK_1MS } else { GAIN_RELEASE_120MS };
-        self.attenuation = target + coefficient * (self.attenuation - target);
-        const MAKEUP: f64 = 1.584_893_192_461_113_6; // Fixed 4 dB, blended by Character.
-        // Parallel compression keeps the direct vocal body under strong speech.
-        let compression = 1.0 + 0.4 * amount * (self.attenuation * MAKEUP - 1.0);
-        left *= compression;
-        right *= compression;
-        // Envelope-relative density: a bounded parallel soft saturation that
-        // never raises input gain, faded out below -80..-60 dBFS.
-        const DENSITY_ATTACK: f64 = 0.997_918_835_299_299_3; // 10 ms
-        const DENSITY_RELEASE: f64 = 0.999_826_403_958_668; // 120 ms
-        let density_peak = left.abs().max(right.abs());
-        let coefficient = if density_peak > self.density_envelope { DENSITY_ATTACK } else { DENSITY_RELEASE };
-        self.density_envelope = denormal(density_peak + coefficient * (self.density_envelope - density_peak));
-        let activity = ((self.density_envelope - 0.0001) / 0.0009).clamp(0.0, 1.0);
-        let active_mix = 0.5 * amount * activity * activity * (3.0 - 2.0 * activity);
-        let normalized = 2.5 * density_peak / self.density_envelope.max(0.0001);
-        let rounded = if normalized > 1e-8 { normalized.tanh() / normalized } else { 1.0 };
-        let density_gain = 1.0 + active_mix * (rounded - 1.0);
-        left *= density_gain;
-        right *= density_gain;
-        // A feedback-free double adds thickness without pitch movement.
-        let left_tap = (self.double_position + DOUBLE_SIZE - 576) % DOUBLE_SIZE;
-        let right_tap = (self.double_position + DOUBLE_SIZE - 912) % DOUBLE_SIZE;
-        let double_mix = 0.12 * amount;
-        let doubled_left = left * (1.0 - double_mix) + f64::from(self.double_history[left_tap].left) * double_mix;
-        let doubled_right = right * (1.0 - double_mix) + f64::from(self.double_history[right_tap].right) * double_mix;
-        self.double_history[self.double_position] = frame(left, right);
-        self.double_position = (self.double_position + 1) % DOUBLE_SIZE;
-        frame(doubled_left, doubled_right)
     }
 }
 

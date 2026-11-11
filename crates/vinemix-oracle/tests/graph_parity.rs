@@ -1,6 +1,12 @@
 //! The Rust graph compiler and processor against the unmodified 0.5 C++
 //! `compileGraph` / `GraphProcessor`: every node's output buffer and meter
 //! must match bit for bit, quantum after quantum, across live edits.
+//!
+//! One node is outside this comparison by design. Voice Color was redesigned
+//! in Rust (`vinemix_dsp::effects::voice`) and no longer sounds like the 0.5
+//! node, so it sits in the chain bypassed: its validation, its place in the
+//! plan and its bypass path are still compared, and so is every node after
+//! it. Its own behaviour is held by `vinemix-dsp/tests/voice_color.rs`.
 
 #![cfg(oracle_available)]
 
@@ -65,6 +71,7 @@ fn effects_chain() -> AudioGraph {
     let mut voice = node("vc", "voiceColor");
     voice.voice_color.tone = -0.4;
     voice.voice_color.ambience = 0.7;
+    voice.bypass = true;
     let mut reverb = node("rv", "reverb");
     reverb.reverb.mix = 0.3;
     let mut echo = node("ec", "echo");
@@ -293,7 +300,7 @@ fn live_edits_match_reference() {
         pair.run(60, false);
         pair.edit(|g| g.nodes[14].alignment_delay.samples = 4_000, mode);
         pair.run(40, false);
-        pair.edit(|g| g.nodes[10].voice_color.tone = 0.8, mode);
+        pair.edit(|g| g.nodes[10].voice_color.tone = 0.8, mode); // bypassed: the edit must be accepted and inaudible
         pair.run(40, false);
         pair.edit(|g| g.nodes[8].bypass = true, mode);
         pair.run(40, false);
@@ -390,6 +397,10 @@ fn voice_chain() -> AudioGraph {
 /// Processing cost of the Rust port against the unmodified 0.5 C++ engine
 /// core on identical input (release builds; run with
 /// `cargo test -p vinemix-oracle --release --test graph_parity -- --ignored --nocapture`).
+/// In the effects chain the two sides run different Voice Color designs (the
+/// node keeps processing while bypassed), so that row is no longer a
+/// like-for-like comparison of the port; `voice_color_cost` in vinemix-dsp
+/// measures the node on its own.
 #[test]
 #[ignore = "benchmark"]
 fn processing_benchmark() {

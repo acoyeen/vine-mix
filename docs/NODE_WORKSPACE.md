@@ -327,7 +327,7 @@ and screen-space snapping remain unchanged.
 | High-pass filter | Cutoff and resonance/Q; starts at 80 Hz and Q 0.70710678; bypass |
 | Low-pass filter | Cutoff and resonance/Q; starts at 12 kHz and Q 0.70710678; bypass |
 | Low / Mid / High | Three gain dials, each −12 to +12 dB: 200 Hz low shelf, 1 kHz bell and 5 kHz high shelf; node bypass |
-| Voice Color | Warm–Bright / Natural–Broadcast grid; body/presence contour, low-mid cut, compression, density and subtle doubling, with a small room; exact Tone/Character values, neutral reset and bypass |
+| Voice Color | Warm–Bright / Natural–Broadcast grid; body/presence contour, low-mid and rumble cut, level steadied against the speaker's own level, density, loudness kept near dry; exact Tone/Character values, neutral reset and bypass |
 | Compressor | Stereo-linked compression of its own main input; threshold, ratio, attack, release and make-up; no detector selector or sidechain input; bypass |
 | Limiter | Sample-peak ceiling and release, with no lookahead; reduction feedback and bypass |
 | Ducking | Static or Dynamic dropdown; threshold, duck amount or ratio, attack and release; separate detector-only Trigger; bypass |
@@ -529,8 +529,8 @@ All three bands remain enabled, while whole-node bypass retains their gains.
 
 **Voice Color** combines tonal balance with a broadcast character on its pad.
 Left is Warm, right is Bright; moving upward from Natural toward Broadcast
-adds body and presence, a low-mid cut, compression, density and subtle delayed
-doubling, with a small room. Bottom centre has flat EQ and transparent processing.
+adds body and presence, clears the low mids and rumble, steadies the level and
+adds density, at about the same loudness. Bottom centre passes the input unchanged.
 The square grid has quarter divisions, with larger semibold axis labels inside
 the surrounding well. The handle stays clear of the labels at every extreme.
 A discreet reset marker replaces the visible Neutral text. The pad is the primary
@@ -544,11 +544,11 @@ Pad editing changes sound without dragging the node; wheel input still zooms
 the canvas. The pad and its controls retain their proportions at every zoom.
 
 Storage retains `tone` from −1 to +1 and `ambience` from 0 to 1; the latter
-now controls the combined Character treatment. Existing nonneutral coordinates
-intentionally sound different with this mapping. Loading does not rewrite the
-saved coordinates, routing, names or layout. The original two-axis interaction
-does not claim to emulate Intellipan's exact sound. See
-[the exact mapping and limitations](VOICE_COLOR.md).
+controls the combined Character treatment. The Rust edition's processing was
+redesigned on 11 November 2026, so existing nonneutral coordinates
+intentionally sound different there. Loading does not rewrite the saved
+coordinates, routing, names or layout. The node does not claim to emulate
+Intellipan's sound. See [the exact mapping and limitations](VOICE_COLOR.md).
 
 All intermediate nodes have a full-width **Bypass** switch at the very bottom,
 below the sockets. It is grey when off and red when on; the label stays Bypass.

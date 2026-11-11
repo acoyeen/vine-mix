@@ -8,6 +8,7 @@ pub mod colour;
 pub mod delay;
 pub mod denoise;
 pub mod dynamics;
+pub mod voice;
 
 use vinemix_model::config::{
     AlignmentDelaySettings, DeEsserSettings, DenoiserSettings, DistortionSettings, EchoSettings, ExpanderSettings,
@@ -18,10 +19,11 @@ use vinemix_model::GraphKind;
 use vinemix_rt::Frame;
 
 use crate::util::clean_f32;
-use colour::{Distortion, Reverb, VoiceColor};
+use colour::{Distortion, Reverb};
 use delay::{AlignmentDelay, Echo};
 use denoise::Denoise;
 use dynamics::{BandReduction, Expander};
+use voice::VoiceColor;
 
 /// One frame of effect output.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -37,7 +39,7 @@ pub struct EffectResult {
 enum Engine {
     Denoise(Box<Denoise>),
     Reverb(Box<Reverb>),
-    VoiceColor(Box<VoiceColor>, Box<Reverb>),
+    VoiceColor(Box<VoiceColor>),
     AlignmentDelay(Box<AlignmentDelay>),
     Echo(Box<Echo>),
     Distortion(Box<Distortion>),
@@ -155,7 +157,7 @@ impl AdvancedEffect {
         let engine = match kind {
             GraphKind::Denoiser => Engine::Denoise(Box::new(Denoise::new())),
             GraphKind::Reverb => Engine::Reverb(Reverb::boxed()),
-            GraphKind::VoiceColor => Engine::VoiceColor(Box::default(), Reverb::boxed()),
+            GraphKind::VoiceColor => Engine::VoiceColor(Box::default()),
             GraphKind::AlignmentDelay => Engine::AlignmentDelay(Box::new(AlignmentDelay::new())),
             GraphKind::Echo => Engine::Echo(Box::new(Echo::new())),
             GraphKind::Distortion => Engine::Distortion(Box::new(Distortion::new())),
@@ -187,10 +189,7 @@ impl AdvancedEffect {
             Engine::Echo(echo) => echo.configure(&node.echo),
             Engine::Distortion(distortion) => distortion.configure(&node.distortion),
             Engine::Denoise(denoise) => denoise.configure(&node.denoiser, first),
-            Engine::VoiceColor(voice, reverb) => {
-                voice.configure(node);
-                reverb.configure(&node.reverb);
-            }
+            Engine::VoiceColor(voice) => voice.configure(&node.voice_contour),
             Engine::Reverb(reverb) => reverb.configure(&node.reverb),
             Engine::Band(band) => {
                 if band.high {
@@ -225,7 +224,7 @@ impl AdvancedEffect {
                 let signal = detector.map_or(input, |d| Frame::new(clean_f32(d.left), clean_f32(d.right)));
                 plain(expander.process(input, signal))
             }
-            Engine::VoiceColor(voice, reverb) => plain(reverb.process(voice.process(input)).mixed),
+            Engine::VoiceColor(voice) => plain(voice.process(input)),
             Engine::Reverb(reverb) => {
                 let result = reverb.process(input);
                 EffectResult { wet: result.mixed, dry: input, effect_wet: result.wet }
@@ -242,10 +241,7 @@ impl AdvancedEffect {
         match (&mut self.engine, &previous.engine) {
             (Engine::Denoise(a), Engine::Denoise(b)) => a.inherit(b),
             (Engine::Reverb(a), Engine::Reverb(b)) => **a = **b,
-            (Engine::VoiceColor(a, ra), Engine::VoiceColor(b, rb)) => {
-                **a = **b;
-                **ra = **rb;
-            }
+            (Engine::VoiceColor(a), Engine::VoiceColor(b)) => **a = **b,
             (Engine::AlignmentDelay(a), Engine::AlignmentDelay(b)) => a.copy_from(b),
             (Engine::Echo(a), Engine::Echo(b)) => a.inherit(b),
             (Engine::Distortion(a), Engine::Distortion(b)) => **a = **b,
@@ -277,10 +273,7 @@ impl AdvancedEffect {
         match &mut self.engine {
             Engine::Denoise(denoise) => denoise.reset(),
             Engine::Reverb(reverb) => reverb.reset(),
-            Engine::VoiceColor(voice, reverb) => {
-                **voice = VoiceColor::default();
-                reverb.reset();
-            }
+            Engine::VoiceColor(voice) => voice.reset(),
             Engine::Echo(echo) => echo.reset(),
             Engine::Distortion(distortion) => distortion.reset(),
             Engine::AlignmentDelay(delay) => delay.reset(),

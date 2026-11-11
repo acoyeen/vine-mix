@@ -367,13 +367,15 @@ the sound. New nodes are not connected automatically.
 
 **Voice Color** combines tonal balance with broadcast character in one pad.
 Move left for Warm, right for Bright, and upward from Natural toward Broadcast
-to add body, presence, a low-mid cut, compression, density and subtle delayed
-doubling with a small room. Larger labels sit inside the pad around a square
+to add body and presence, clear the low mids and rumble, steady the level and
+add density. In the Rust edition the voice stays at about its own loudness
+wherever the pad is, and the treatment follows how loudly you speak rather
+than a fixed threshold. Larger labels sit inside the pad around a square
 grid, clear of the handle. Bottom centre is transparent, with a discreet reset
 marker and no Neutral text. Double-click resets both axes;
 keyboard and exact Tone/Character dials provide precise adjustment. Existing
-coordinates are retained and intentionally use the new sound treatment. This
-original mapping does not reproduce Intellipan's exact sound or alter pitch.
+coordinates are retained and intentionally use the current sound treatment.
+The node does not reproduce Intellipan's sound or alter pitch.
 See [Voice Color controls and mapping](VOICE_COLOR.md).
 
 **Expander** and **Gate** are separate Add/search entries for reducing quiet

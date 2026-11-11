@@ -2,17 +2,23 @@
 
 Voice Color is a self-contained effect in **Add → Effects**, also available by
 searching its name. It accepts and sends stereo audio like the other effects.
-Its two-axis pad combines tonal balance with body, presence and density for a
-broadcast-style voice. The mapping is original; it does not claim to reproduce
-Voicemeeter's Intellipan algorithm or match a particular announcer's voice.
+Its two-axis pad shapes a spoken voice: tonal balance across, and a fuller,
+steadier broadcast delivery upward. The design is VineMix's own. It was first
+built to recall Voicemeeter's voice pad and has since been redesigned from
+first principles (11 November 2026); it does not reproduce Intellipan or any
+other product, and it does not match a particular announcer's voice.
+
+This page describes the node in the Rust edition. The 0.5 C++ engine keeps the
+earlier design, which the [historical reviews](VOICE_COLOR_INTENSITY_REVIEW.md)
+describe. [Why it changed](#why-the-design-changed) is at the end.
 
 ## Controls
 
 | Direction | Control | Result |
 |---|---|---|
-| Left → right | Tone: Warm → Bright | Change the balance of bass, presence and treble |
-| Bottom → top | Character: Natural → Broadcast | Add strong body/presence shaping, a low-mid cut, compression and density, delayed doubling and a small room |
-| Bottom centre | Neutral | Flat EQ and transparent processing |
+| Left → right | Tone: Warm → Bright | Tilt the voice between fuller lows with softer highs and the reverse |
+| Bottom → top | Character: Natural → Broadcast | Add body and presence, clear the low mids and rumble, steady the level and add density |
+| Bottom centre | Neutral | The output is the input, sample for sample |
 
 The square grid has quarter divisions and slightly stronger centre guides.
 Larger, semibold directional labels sit inside the surrounding well, in clear
@@ -33,138 +39,195 @@ The smaller shared numeric dials show **Tone −100% to +100%** and
 **Character 0% to 100%**, with persistent labels and percentage entries. Drag
 vertically, hold Shift for fine adjustment, or type an exact value and press
 Enter; Escape cancels. Double-clicking one dial or its value resets only that
-axis. Arrow/Page keys adjust a focused dial and Home resets it. The workspace
-footer supplies the shared dial instructions. The pad, labels and dials
-stay visible and scale with the rest of the node.
+axis. Arrow/Page keys adjust a focused dial and Home resets it. The pad, labels
+and dials stay visible and scale with the rest of the node.
 
 The standard bottom **Bypass** button is grey when processing, red when
-bypassed. It retains the XY position and uses the normal effect bypass behavior.
-**Right-click → Reset node to defaults** resets both axes and bypass while
-preserving the node's name, position and cables. There is no duplicate Level
-control; use a Mix node for a separate branch volume.
+bypassed. It retains the pad position and uses the normal effect bypass
+behavior. **Right-click → Reset node to defaults** resets both axes and bypass
+while preserving the node's name, position and cables. There is no Level
+control: the node keeps the voice at about its own loudness (see below). Use a
+Mix or Gain node to change volume.
 
-## Parameter mapping
+## What the node does
 
-Configuration continues to store `voiceColor: { tone, ambience }`. Tone `t`
-spans −1 to +1. The stored `ambience` value, called Character `c` in the UI,
-spans 0 to 1. Both default to zero. Numerical editing percentages are normalized
-on storage; there are no independent hidden user-adjustable EQ or dynamics
-settings. The effective Character amount is `a = c^1.3`: its lower half retains
-gentler adjustment while the upper range reaches a deliberately strong effect.
+Configuration stores `voiceColor: { tone, ambience }`. Tone `t` spans −1 to
++1. The stored `ambience` value, called Character `c` in the interface, spans
+0 to 1. Both default to zero. There are no hidden settings.
 
-Processing runs at 48 kHz in this order: four EQ filters, headroom trim,
-parallel compression, envelope-relative density, delayed doubling, then the
-small room.
+Processing runs at 48 kHz, per frame, in this order. Nothing is delayed: there
+is no lookahead and no oversampling.
 
-| EQ stage | Frequency | Q | Gain |
-|---|---:|---:|---|
-| Low shelf | 140 Hz | 0.70710678 | `12 × a − 12 × t` dB |
-| Low-mid bell | 450 Hz | 0.9 | `−8 × a` dB |
-| Broad presence bell | 3,000 Hz | 0.85 | `12 × a + 3 × t` dB |
-| High shelf | 7,000 Hz | 0.70710678 | `4 × a + 9 × t` dB |
-| Warm headroom trim | — | — | `−6 × max(−t, 0)` dB |
+### 1. Contour
 
-At centred Tone, increasing Character raises body and presence while reducing
-muddy low mids. The upper edge is deliberately pronounced; the middle of the pad
-provides a milder treatment. Tone spans a much wider warm/bright range. At maximum
-Character, the low shelf reaches 24 dB at the Warm edge; the presence bell
-reaches 15 dB and the high shelf 13 dB at the Bright edge. These are individual
-filter gains before the headroom trim and dynamics. Trim reduces level toward
-Warm to accommodate its stronger bass boost. Bright has no additional global
-cut because its bass reduction already lowers typical speech levels. Character
-does not add an automatic output cut. This is not a limiter or a loudness match.
+Seven fixed filters, each mixed in by a gain that follows the pad. Because the
+filters themselves never move, the pad can be dragged at any speed without
+zipper noise or unstable intermediate filters.
 
-The compression stage blends `0.4 × a` compressed signal as Character rises;
-at least 60% of the direct signal remains even at the upper edge. This avoids
-the large level loss from putting already-shaped speech through full-wet
-compression. Both channels share the same detector and gain so their relative
-balance is retained.
+| Stage | Filter | Gain at the edge of the pad |
+|---|---|---|
+| Rumble | Second-order high-pass, 75 Hz | Fully in from Character 35% upward |
+| Tone, lows | First-order shelf, 220 Hz | +6 dB at Warm, −5 dB at Bright |
+| Body | Bell, 165 Hz, Q 0.8 | +7 dB at full Character |
+| Low mids | Bell, 420 Hz, Q 0.9 | −5 dB at full Character |
+| Presence | Bell, 3.3 kHz, Q 0.75 | +7 dB at full Character |
+| Tone, highs | First-order shelf, 3.6 kHz | +6 dB at Bright, −5 dB at Warm |
+| Air | First-order shelf, 9 kHz | +5 dB at full Character |
 
-| Compression setting | Value |
-|---|---:|
-| Threshold | −28 dBFS |
-| Ratio | 4.5:1 |
-| Soft knee | 6 dB |
-| Maximum gain reduction | 18 dB |
-| Detector attack / release | 0.5 ms / 50 ms |
-| Gain attack / release | 1 ms / 120 ms |
-| Make-up gain | 4 dB |
+Gains scale in decibels with the pad: half Character is half of each figure.
+The stages overlap, so the combined response is gentler than the list suggests.
+Before the loudness trim it is:
 
-Compression brings louder speech closer to quieter speech, and the make-up gain
-adds level to its processed branch. Its effect depends on the incoming level;
-it is not automatic normalization. The separate Compressor remains available
-when explicit threshold, ratio or timing control is needed.
+| Hz | 30 | 80 | 165 | 420 | 1 k | 3.3 k | 8 k | 16 k |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Character 50% | −15.8 | −0.9 | +2.9 | −1.2 | +0.6 | +3.8 | +2.5 | +2.4 |
+| Character 100% | −15.2 | +1.5 | +6.2 | −1.5 | +2.2 | +7.8 | +5.9 | +5.1 |
+| Warm | +5.9 | +5.6 | +4.6 | +2.1 | +0.3 | −1.6 | −3.8 | −4.8 |
+| Bright | −4.8 | −4.0 | −2.5 | −0.5 | +0.7 | +3.7 | +5.5 | +5.9 |
+| Warm, Character 100% | −9.3 | +7.1 | +10.9 | +0.6 | +2.5 | +6.3 | +2.2 | +0.2 |
+| Bright, Character 100% | −20.0 | −2.6 | +3.7 | −2.0 | +2.8 | +11.5 | +11.4 | +11.0 |
 
-The density stage uses a stereo-linked 10 ms attack / 120 ms release envelope.
-It blends up to 50% (`0.5 × a`) of a soft peak-rounding curve with drive 2.5,
-scaled to the signal's own
-envelope. This retains its character on quiet or already-compressed speech
-without automatic input gain. Its gain stays between 0.5 and 1: it only rounds
-peaks. Activity fades smoothly out between envelope levels of 0.0001 and 0.001
-(−80 to −60 dBFS); silence cannot be amplified into sound. This nonlinear
-colouring intentionally adds some harmonics and is not transparent limiting.
+**Sibilance guard.** The boosts above the vowels (presence, the Bright shelf
+and air) are relaxed while a sibilant is sounding. The node watches how much of
+its input lies above 5.5 kHz: below a quarter, the boosts apply in full; above
+about half, they are removed, within a millisecond, and return over about
+15 ms. Cuts are never altered. Brightening therefore lifts the vowels without
+sharpening "s" and "sh" by the same amount. This is not a de-esser: it removes
+the node's own boost and never cuts below the input.
 
-Delayed doubling blends in a second copy at up to `0.12 × a` wet mix, delayed
-12 ms on the left and 19 ms on the right. There is no feedback or pitch shift.
-The short offsets add thickness and some stereo spread while leaving the direct
-path undelayed. This is a delayed-copy treatment rather than two independent
-vocal performances. A mono sum can change its colour.
+### 2. Level
 
-The room reuses the existing reverb processor with wet mix `0.02 × a`,
-0.3-second decay, 0.65 damping and an 8 ms pre-delay setting. The room network
-adds its own delay after that setting, so 8 ms is not the first audible reflection
-time. Its small maximum mix supports the voice without the former pad's
-prominent room tail. Use the separate Reverb for explicit room control.
+Character steadies the delivery. The node measures the voice against the
+speaker's own level, not against a fixed threshold, so it behaves the same at
+any microphone gain.
 
-At the Natural edge, compression, density, doubling and room mixes are zero. Tone still
-changes the EQ there. At Neutral, all four EQ gains and the trim are zero too,
-giving transparent processing. Fixed EQ slots retain their cancelling pole/zero
-pairs at zero gain so coefficient movement stays continuous through neutral.
+- **The speaker's level** is the average power of the voice while they are
+  talking. It is learned in the first quarter of a second of speech and then
+  averaged over about 2.5 seconds. It follows a louder voice within about a
+  second and a quieter one over about ten.
+- **The noise floor** is tracked separately: it drops to any quieter moment
+  within 50 ms and creeps up over seconds, so it settles on the room between
+  words. Only sound at least 12 dB above it, and above −60 dBFS, counts as
+  speech for the level.
+- **The curve** at full Character is a 3.5:1 compression above 8 dB below the
+  speaker's level (10 dB soft knee), with make-up set so that a sound 6 dB
+  above the speaker's level leaves at the level it came in. The loudest words
+  are held and everything quieter rises, by up to 10 dB. Half Character is
+  half of that, in decibels.
+- **What is not lifted.** The lift fades out for sound more than 20 dB below
+  the speaker's level and is gone by 40 dB below. It also fades out within
+  12 dB of the noise floor and is gone within 3 dB. Pauses, the tail of the
+  room and background noise are not turned up.
+- **Timing.** The detector rises in 1 ms and falls in 25 ms; the gain then
+  moves down in 3 ms and up in 90 ms. Both channels share one detector and one
+  gain. The air band is weighted up in the detector, so a sibilant counts as
+  louder than it is and is lifted less than a vowel of the same level.
+
+### 3. Density
+
+A small amount of second and third harmonic is generated from the part of the
+voice below about 1.4 kHz and added back, scaled by Character. It rounds the
+largest peaks and thickens the lower voice. The amount follows the speaker's
+level, like the dynamics, so it does not depend on microphone gain. Because
+only the band below the consonants is shaped, the harmonics stay well below
+half the sample rate and do not fold back as aliasing; no oversampling is
+needed. On a steady 250 Hz tone at full Character the second, third and fourth
+harmonics measure about 32, 28 and 37 dB below the fundamental.
+
+### 4. Loudness and ceiling
+
+- **Loudness trim.** Each pad position has an output trim, calculated from the
+  contour and a typical long-term speech spectrum when the configuration is
+  compiled, that returns ordinary speech to about its dry loudness. The pad
+  changes the voice's colour and density, not its volume. On the test voices
+  the result lies between about 1.5 LU quieter and 2 LU louder than dry
+  everywhere on the pad.
+- **Ceiling.** The node never adds a peak above −1 dBFS. If its processing
+  would, the gain is reduced at once and recovers over 80 ms. Where the input
+  itself is hotter than −1 dBFS, the limit is the input's own recent peak, so
+  the node never makes a signal peak higher than it arrived. This has no
+  lookahead; it is a safety net, not a substitute for a Limiter node.
+
+At Neutral every stage contributes exactly zero and the output equals the
+input. With Tone only (Character at Natural) the dynamics, density and rumble
+filter are off.
 
 ## Live edits and compatibility
 
-The node uses the normal controller update cadence: continuous edits target
-one configure request every 100 ms, without postponing indefinitely while the
-pointer keeps moving. Requests are serialized and pending edits survive their
-acknowledgements. Parameter and bypass transitions are smoothed over 10 ms when
-the engine adopts a new target. The dynamics stage also uses its detector and
-gain timing above. These times describe control handling and effect behavior,
-not measured microphone-to-headphone latency.
+The node uses the normal controller update cadence. Each amount glides to its
+new value over 10 ms when the engine adopts a new position. Filter history,
+the learned level and the gain carry across ordinary edits, and keep following
+live input at Natural or while bypassed, so restoring Character does not
+reveal stale audio. Reset, or removing and re-adding the node, starts the
+learning again. Processing uses under a kilobyte of fixed state and never
+allocates; one node costs about 0.2% of one core in the offline benchmark
+(about 40 ns per frame on the development machine; the earlier design
+measured about 120 ns there).
 
-Ordinary edits retain filter, dynamics, delayed-copy and room histories.
-The effect state continues following live input at Natural or while bypassed,
-so restoring Character does not reveal frozen old audio. Processing uses bounded
-preallocated state; control validation and plan preparation remain outside the
-audio loop. Tone must be finite and in [−1, 1]; the stored Character value must
-be finite and in [0, 1]. Invalid settings are rejected.
+Tone must be finite and in [−1, 1]; the stored Character value must be finite
+and in [0, 1]. Invalid settings are rejected. Copy/paste, configuration
+copies, saves and loads carry both axes. The configuration format and the
+saved coordinates are unchanged: nothing is migrated or rewritten. Existing
+Voice Color nodes away from Neutral intentionally sound different from the
+earlier design. Neutral and Bypass are transparent, as before.
 
-Copy/paste, configuration copies, saves and loads carry both axes. Existing
-graphs remain version 2, keep their names, layout, cables and saved coordinates,
-and do not acquire a Voice Color node automatically. Older node records that
-omit `voiceColor` receive an unused neutral default. Reset and bypass follow
-the same conventions as the other effects.
-
-The Broadcast treatment uses the existing saved coordinates without rewriting
-settings or changing the configuration format. Existing Voice Color nodes with
-nonzero axes intentionally sound different: the horizontal shaping has changed
-and the vertical axis now controls the whole Character treatment. Neutral and
-bypass retain transparent behavior. Earlier room-led and mild Broadcast mappings
-are historical; their test counts did not establish a convincing audible change
-on spoken voice. The current revision adds volume-matched spoken comparisons
-to the technical checks.
+A mono voice stays mono through the node. The earlier design's delayed double
+and room turned it into stereo; neither exists now. Use the Reverb node for a
+room.
 
 ## Scope and listening
 
-Voice Color does not perform pitch shifting, denoising, de-essing or automatic
-echo cancellation. It has no stereo-position control; its delayed double can
-add stereo width. Use the separate nodes for noise and sibilance control.
-Compression and EQ can bring up room noise or consonants as well as the voice.
+Voice Color does not shift pitch, remove noise or cancel echo, and it has no
+stereo-position control. Its sibilance guard only withholds its own boosts;
+use the De-esser for sibilance that is already too strong. Its dynamics follow
+one speaker's level; a second, much quieter voice in the same microphone will
+be lifted toward the first.
 
-Offline checks cover transparency, tonal direction, compression, delayed-copy
-and room bounds, rapid edits, validation, persistence, copy/reset/bypass and
-detached WPF rendering. See the [current review and evidence](VOICE_COLOR_INTENSITY_REVIEW.md).
-They cannot establish whether the result suits a particular voice. Compare the
-same spoken phrase at Neutral and with moderate Character, then choose the
-Warm–Bright balance. Listen for excessive bass, harsh consonants or distracting
-doubling, and adjust the amount accordingly. This is a coordinated voice effect,
-not a vocal preset matcher or an Intellipan algorithm clone.
+`cargo test -p vinemix-dsp --test voice_color` holds the behaviour above:
+exact transparency at Neutral and in Bypass, the published filter responses
+(within 0.1 dB), loudness within 2.5 LU of dry at fifteen pad positions for
+two test voices, the same treatment 20 dB quieter, a narrower spread of
+loudness, quiet words rising while loud words hold, an unraised room between
+words, sibilants that do not rise with the presence, the peak ceiling, the
+absence of aliasing and of delay, linked channels, silent output for silent
+input, smooth output while the pad moves every 5 ms, and relearning after a
+20 dB drop. Allocation and edit-path checks are in `realtime_alloc` and
+`retarget_parity`.
+
+Those tests use synthetic speech-like signals. They establish what the node
+does, not whether it suits a voice. To hear it:
+
+```powershell
+.\scripts\render-voice-color.ps1
+```
+
+writes, for every 48 kHz WAV file in `artifacts\voice-color\source` (synthetic
+speech is generated there if it is empty), the node's output at seven pad
+positions, a copy of each matched to the dry loudness, and a measurement
+table. Put a recording of your own voice in that folder to hear the node on
+it. The folder is ignored by Git; keep personal recordings out of the
+repository. Nothing is played and no audio device is opened.
+
+## Why the design changed
+
+Measured on the same files (two synthetic speech voices from the Windows
+speech engine and two generated test voices), at full Character and centred
+Tone:
+
+| | Earlier design | This design |
+|---|---|---|
+| Loudness against dry | 5.0 to 6.9 LU quieter | 0.2 LU quieter to 2.2 LU louder |
+| Spread of loudness on a voice with 15 dB between syllables | 9.2 → 7.4 dB | 9.2 → 6.1 dB |
+| Sibilants against the voice | 3 to 6 dB sharper | within 1 dB |
+| Same treatment 20 dB quieter | No: a fixed −28 dBFS threshold | Yes |
+| Mono voice | Becomes stereo; colour changes when summed to mono | Stays mono |
+| Cost per frame | about 120 ns | about 40 ns |
+
+The earlier node grew quieter as Character rose, which made a stronger setting
+sound weaker. Its compressor had a fixed threshold, so it did little on a
+quiet microphone and squashed a hot one. Its "double" was two fixed delays,
+which is a comb filter rather than a second voice. Its density stage shaped
+the full band without oversampling, and its room was too quiet to hear but
+cost most of the node's processing. These are measurements and design
+observations. The maintainer's listening comparison of the two is still to
+come; the figures do not say which sounds better.

@@ -85,6 +85,7 @@ released. The review tracker records what remains open.
 
 | ID | Issue | Status |
 | --- | --- | --- |
+| [ISSUE-049](#issue-049) | Voice Color grows quieter, not steadier, and sharper in sibilants as Character rises | Confirmed by measurement in 0.5; redesigned in the Rust source; listening comparison pending; unreleased |
 | [ISSUE-045](#issue-045) | Typing on a focused Rust dial doubles the first digit | Resolved in source; typing regression passes; unreleased |
 | [ISSUE-046](#issue-046) | Escape in Rust Settings search closes the menu instead of clearing the search | Resolved in source; search tests pass; unreleased |
 | [ISSUE-047](#issue-047) | Arrow keys leave the Rust Voice Color pad and EQ plot after one step | Resolved in source; keyboard regressions pass; unreleased |
@@ -133,6 +134,51 @@ released. The review tracker records what remains open.
 | [ISSUE-026](#issue-026) | Echo Time changes replay stored repeat mixtures | Resolved in 0.5.0 Beta; listening refinement confirmed by maintainer |
 | [ISSUE-027](#issue-027) | Maximum Distortion graph has insufficient routing-fade timing margin | Optimized, offline verified and integrated; maximum-graph margin remains limited |
 | [ISSUE-028](#issue-028) | Short cables fold back instead of flowing directly between sockets | Resolved in 0.5.0 Beta; detached geometry and rendering verified |
+
+<a id="issue-049"></a>
+## ISSUE-049: Voice Color grows quieter, not steadier, and sharper in sibilants as Character rises
+
+- **Found:** 2026-11-11, by measurement, after the maintainer said they had
+  been hesitant to use the node and asked for a redesign. **Status:** Confirmed
+  in the 0.5 design, which the published 0.5.0 Beta and the 0.5 C++ sources
+  keep. Redesigned in the Rust source; unreleased. No listening comparison has
+  been made.
+- **Evidence:** The 0.5 design and the Rust port of it (commit `9f77d14`) were
+  rendered offline on two synthetic speech voices from the Windows speech
+  engine and two generated test voices. At full Character and centred Tone the
+  output was 5.0 to 6.9 LU quieter than the input (ITU-R BS.1770 integrated
+  loudness), and up to 10.5 LU quieter at Warm. The spread of momentary
+  loudness on the two speech-engine voices did not narrow (5.69 to 5.73 dB and
+  6.35 to 6.49 dB). The loudest 10 ms of the 5 to 10 kHz band rose 3 to 6 dB
+  against the speech level, and 9 to 12 dB at the Bright edge. In source: the
+  compressor's threshold is fixed at −28 dBFS, so its effect depends on
+  microphone gain; the "double" is two fixed delays of 12 and 19 ms, a comb
+  filter that also turns a mono voice into stereo; the density stage shapes the
+  full band without oversampling; and the room is mixed at 2%.
+- **Not established:** That the earlier sound was worse to listen to. Earlier
+  rounds increased its strength at the maintainer's request after listening;
+  those requests are consistent with a node that grew quieter as it was turned
+  up, but that is an inference.
+- **Correction (Rust edition):** A new design in
+  `crates/vinemix-dsp/src/effects/voice.rs`, with the pad mapping in
+  `crates/vinemix-model/src/voice.rs`; the pad, the saved `tone` and `ambience`
+  values and the protocol are unchanged, and nothing is migrated. On the same
+  files at full Character the loudness is 0.2 LU below to 2.2 LU above dry,
+  the generated voices' spread narrows from 9.2 to 6.1 dB and from 9.0 to
+  5.0 dB, and sibilants stay within 1 dB. One node costs about 40 ns per frame
+  against about 120 ns. [VOICE_COLOR.md](VOICE_COLOR.md) describes the design
+  and its limits.
+- **Verification:** `crates/vinemix-dsp/tests/voice_color.rs` (17 checks) and
+  the unit tests beside both modules; the allocation guard and the
+  retarget comparison include the node. The C/C++ parity comparison no longer
+  covers this node's sound: it sits bypassed in the parity graphs, and all
+  five graph comparisons still pass. Synthetic signals only.
+- **Open:** The maintainer's listening comparison, on their own voice and
+  microphone, of the earlier and new designs
+  (`scripts/render-voice-color.ps1`, and the node in the running application).
+  The strengths at the edges of the pad are constants in the model file and
+  are expected to be adjusted after that. The harmonics are generated per
+  channel, so an off-centre voice shifts by a fraction of a decibel.
 
 <a id="issue-048"></a>
 ## ISSUE-048: Rust crate notices state MIT terms for crates that publish no licence file
