@@ -69,6 +69,10 @@ struct PendingEdit {
     id: u64,
     apply: Box<EditFn>,
     is_restore: bool,
+    /// Stands for edits the engine is already playing but has not written
+    /// to the settings file (see [`PendingBatch::persist`]). It changes
+    /// nothing when replayed; it leaves the queue with the next save.
+    held: bool,
     frames_before: Option<Vec<Frame>>,
     frames_after: Option<Vec<Frame>>,
 }
@@ -77,6 +81,10 @@ struct PendingEdit {
 pub struct PendingBatch {
     pub configuration: Configuration,
     edits: Vec<u64>,
+    /// False while a control is being dragged: the engine applies the
+    /// configuration so the change is heard, and the settings file is
+    /// written once, by the first batch after the drag ends.
+    pub persist: bool,
 }
 
 impl PendingBatch {
@@ -93,6 +101,9 @@ struct Cadence {
 }
 
 const DISPATCH_INTERVAL: Duration = Duration::from_millis(100);
+
+/// A drag that has not moved for this long is saved where it stands.
+const ADJUSTING_LIMIT: Duration = Duration::from_secs(2);
 
 impl Cadence {
     fn queue(&mut self, now: Duration) {
@@ -158,6 +169,8 @@ pub struct MixerState {
     automatic_assignment_attempts: HashSet<String>,
     automatic_assignment_suppressed: HashSet<String>,
     cadence: Cadence,
+    /// When the newest edit was queued.
+    last_edit_at: Duration,
     clock: Instant,
     // Processing-load presentation (post-0.5 IDEA-057).
     load_presenter: crate::processing_load::Presenter,
@@ -257,6 +270,7 @@ impl MixerState {
             automatic_assignment_attempts: HashSet::new(),
             automatic_assignment_suppressed: HashSet::new(),
             cadence: Cadence::default(),
+            last_edit_at: Duration::ZERO,
             clock: Instant::now(),
             load_presenter: crate::processing_load::Presenter::default(),
             processing_load: crate::processing_load::Presentation::unavailable("Waiting for audio processing measurements."),
@@ -426,6 +440,11 @@ impl MixerState {
             Some(snapshot) => (snapshot.status.processing_load.clone(), snapshot.engine_pid),
             None => (None, 0),
         };
+        if self.preview {
+            // A design preview has no engine to advance the measurement, so
+            // its fixture reading is shown as it stands instead of going stale.
+            self.load_presenter = crate::processing_load::Presenter::default();
+        }
         self.processing_load = self.load_presenter.present(sample.as_ref(), pid, connected, now);
         if !self.processing_load.available || now >= self.processing_advisory_until {
             self.processing_advisory.clear();
@@ -467,13 +486,13 @@ impl MixerState {
 
     /// After an edit that adds RNNoise while capacity is limited,
     /// advise once per 30 s for 10 s (`ConsiderProcessingLoadEdit`).
-    fn consider_processing_load_edit(&mut self, before: &vinemix_model::config::AudioGraph, after: &vinemix_model::config::AudioGraph) {
+    fn consider_processing_load_edit(&mut self, before: &vinemix_model::config::AudioGraph) {
         self.refresh_processing_load(None);
         if !self.processing_load.available || !self.processing_load.addition_advised {
             return;
         }
         let heavy = |node: &vinemix_model::config::GraphNode| node.kind == "denoiser" && node.denoiser.algorithm == "rnnoise";
-        let added = after.nodes.iter().any(|node| heavy(node) && !before.nodes.iter().any(|old| old.id == node.id && heavy(old)));
+        let added = self.desired.config.graph.nodes.iter().any(|node| heavy(node) && !before.nodes.iter().any(|old| old.id == node.id && heavy(old)));
         let now = self.seconds();
         if !added || now - self.processing_advised_at < 30.0 {
             return;
@@ -935,7 +954,7 @@ impl MixerState {
             self.save_visual_frames();
         }
         self.history.record(&before.graph_state(), &self.desired.graph_state());
-        self.consider_processing_load_edit(&before.config.graph, &self.desired.config.graph.clone());
+        self.consider_processing_load_edit(&before.config.graph);
         if self.preview && !self.queue_preview_edits {
             self.save_status = "Preview · changes stay in this window".into();
             self.apply_desired(true);
@@ -977,13 +996,26 @@ impl MixerState {
     fn push_pending(&mut self, apply: Box<EditFn>, is_restore: bool, frames_before: Option<Vec<Frame>>, frames_after: Option<Vec<Frame>>) {
         let id = self.next_edit_id;
         self.next_edit_id += 1;
-        self.pending.push(PendingEdit { id, apply, is_restore, frames_before, frames_after });
+        self.pending.push(PendingEdit { id, apply, is_restore, held: false, frames_before, frames_after });
         let now = self.now();
+        self.last_edit_at = now;
         self.cadence.queue(now);
     }
 
+    /// A control is being dragged and is still moving: its changes are
+    /// played at once and saved together when the drag ends.
+    fn adjusting(&self) -> bool {
+        self.history.in_gesture() && self.now().saturating_sub(self.last_edit_at) < ADJUSTING_LIMIT
+    }
+
     fn pending_save_status(&self) -> String {
-        if self.save_error.is_empty() { "Saving changes…".into() } else { "Changes not saved · retrying…".into() }
+        if !self.save_error.is_empty() {
+            "Changes not saved · retrying…".into()
+        } else if self.adjusting() {
+            "Adjusting · saves when you let go".into()
+        } else {
+            "Saving changes…".into()
+        }
     }
 
     fn automatic_assignments(&self) -> Vec<bindings::Assignment> {
@@ -1001,6 +1033,9 @@ impl MixerState {
 
     pub fn end_edit_gesture(&mut self) {
         self.history.end_gesture();
+        if !self.history.in_gesture() && !self.pending.is_empty() {
+            self.save_status = self.pending_save_status();
+        }
     }
 
     pub fn undo(&mut self) -> bool {
@@ -1148,11 +1183,13 @@ impl MixerState {
             }
             self.apply_desired(true);
         }
-        PendingBatch { configuration: workspace.config, edits: self.pending.iter().map(|e| e.id).collect() }
+        PendingBatch { configuration: workspace.config, edits: self.pending.iter().map(|e| e.id).collect(), persist: !self.adjusting() }
     }
 
     pub fn is_pending_save_due(&self) -> bool {
-        !self.pending.is_empty() && self.cadence.is_due(self.now())
+        // During a drag there is nothing to send once the engine is playing
+        // every edit; what remains is the save, which waits for the release.
+        !self.pending.is_empty() && self.cadence.is_due(self.now()) && !(self.adjusting() && self.pending.iter().all(|e| e.held))
     }
 
     pub fn begin_dispatch(&mut self) {
@@ -1183,6 +1220,14 @@ impl MixerState {
     pub(crate) fn acknowledge_pending(&mut self, batch: &PendingBatch, snapshot: Option<Snapshot>) -> Result<(), String> {
         // Identities, not a prefix count: newer edits may have arrived.
         self.pending.retain(|e| !batch.edits.contains(&e.id));
+        if !batch.persist && !self.pending.iter().any(|e| e.held) {
+            // The engine has these edits but its settings file does not:
+            // something stays queued until a save is confirmed, so quitting,
+            // restarting and updating all still wait for it.
+            let id = self.next_edit_id;
+            self.next_edit_id += 1;
+            self.pending.insert(0, PendingEdit { id, apply: Box::new(|_| Ok(())), is_restore: false, held: true, frames_before: None, frames_after: None });
+        }
         self.cadence.complete(!self.pending.is_empty());
         self.save_error.clear();
         if !self.pending.is_empty() {
@@ -1406,7 +1451,7 @@ impl MixerState {
             workspace.config.graph.pan_y = y;
             workspace.config.graph.zoom = zoom;
         }
-        Ok(PendingBatch { configuration: workspace.config, edits: self.pending.iter().map(|e| e.id).collect() })
+        Ok(PendingBatch { configuration: workspace.config, edits: self.pending.iter().map(|e| e.id).collect(), persist: true })
     }
 
     pub(crate) fn reconcile_unconfirmed_quit(&mut self, saved: &Configuration) {
@@ -1679,6 +1724,57 @@ mod tests {
         assert_eq!(state.save_status, "Preview · no settings are saved");
         assert_eq!(state.snapshot().unwrap().configuration.revision, 3);
         assert!(state.can_undo());
+    }
+
+    /// A dragged control is heard at once and saved once, when it is let go.
+    #[test]
+    fn a_drag_is_applied_live_and_saved_on_release() {
+        let mut state = connected();
+        let mut current = state.snapshot().unwrap().clone();
+        state.begin_edit_gesture(None);
+        for step in 1..=5 {
+            assert!(state.edit(move |w| w.config.graph.nodes[1].gain_db = f64::from(step)));
+            assert_eq!(state.save_status, "Adjusting · saves when you let go");
+            let batch = state.prepare_pending_configuration(&current.configuration);
+            assert!(!batch.persist, "step {step}: applied without writing the settings file");
+            assert_eq!(batch.configuration.graph.nodes[1].gain_db, f64::from(step));
+            current.configuration = batch.configuration.clone();
+            current.configuration.revision += 1;
+            state.acknowledge_pending(&batch, Some(current.clone())).unwrap();
+            assert_eq!(state.pending_edit_count(), 1, "step {step}: one save is still owed, however many edits were played");
+            assert_eq!(state.graph().nodes[1].gain_db, f64::from(step));
+            std::thread::sleep(DISPATCH_INTERVAL + Duration::from_millis(20));
+            assert!(!state.is_pending_save_due(), "step {step}: nothing to send while the control is held still");
+        }
+        state.end_edit_gesture();
+        assert_eq!(state.save_status, "Saving changes…");
+        assert!(state.is_pending_save_due(), "letting go saves");
+        let batch = state.prepare_pending_configuration(&current.configuration);
+        assert!(batch.persist);
+        assert_eq!(batch.configuration.graph.nodes[1].gain_db, 5.0);
+        current.configuration.revision += 1;
+        state.acknowledge_pending(&batch, Some(current.clone())).unwrap();
+        assert_eq!(state.pending_edit_count(), 0);
+        // The whole drag is one step of history.
+        assert!(state.undo());
+        assert_eq!(state.graph().nodes[1].gain_db, 0.0);
+        assert!(!state.can_undo());
+    }
+
+    /// An edit outside a drag is saved by the configure that applies it, and
+    /// a drag left motionless is saved where it stands.
+    #[test]
+    fn single_edits_and_stalled_drags_are_saved() {
+        let mut state = connected();
+        let basis = state.snapshot().unwrap().clone();
+        assert!(state.edit(|w| w.config.graph.nodes[1].gain_db = 3.0));
+        assert_eq!(state.save_status, "Saving changes…");
+        assert!(state.prepare_pending_configuration(&basis.configuration).persist);
+        state.begin_edit_gesture(None);
+        assert!(state.edit(|w| w.config.graph.nodes[1].gain_db = 4.0));
+        assert!(!state.prepare_pending_configuration(&basis.configuration).persist);
+        state.clock -= ADJUSTING_LIMIT; // two seconds pass
+        assert!(state.prepare_pending_configuration(&basis.configuration).persist, "held still: saved without waiting for the release");
     }
 
     #[test]

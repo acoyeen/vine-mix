@@ -607,7 +607,7 @@ fn effects(node: &GraphNode, kind: &str, gate: bool, items: &mut Vec<Item>) {
             b.item(Item::Note("0% Original only · 100% Echoes only"));
         }
         "distortion" => {
-            b.push_dial(e("Drive", 0.0, 36.0, 0.1, "dB", |n| n.distortion.drive_db, setter(|n, v| n.distortion.drive_db = v), false, false, true));
+            b.push_dial(e("Drive", 0.0, vinemix_model::distortion::MAXIMUM_DRIVE_DB, 0.1, "dB", |n| n.distortion.drive_db, setter(|n, v| n.distortion.drive_db = v), false, false, true));
             b.push_dial(e("Tone", 500.0, 18000.0, 10.0, "Hz", |n| n.distortion.tone_hz, setter(|n, v| n.distortion.tone_hz = v), true, false, false));
             b.start_group(2);
             b.push_dial(e("Mix", 0.0, 100.0, 1.0, "%", |n| n.distortion.mix * 100.0, setter(|n, v| n.distortion.mix = v / 100.0), false, false, false));

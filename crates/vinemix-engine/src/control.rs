@@ -53,7 +53,10 @@ pub fn handle(engine: &Engine, request: &Value) -> Value {
             "configure" => {
                 let configuration = Configuration::from_json(model_json::at(request, "configuration")?)?;
                 let expected = read_revision(model_json::at(request, "expectedRevision")?)?;
-                engine.configure(configuration, expected)?;
+                // Optional and additive: `false` applies without writing the
+                // settings file (a control is still being dragged).
+                let persist = object.get("persist").and_then(Value::as_bool).unwrap_or(true);
+                engine.configure(configuration, expected, persist)?;
                 response["snapshot"] = engine.snapshot_for(known, interest);
             }
             "retry" => {
@@ -64,7 +67,10 @@ pub fn handle(engine: &Engine, request: &Value) -> Value {
                 engine.recover(if command == "recoveryRetry" { "retry" } else { &command })?;
                 response["snapshot"] = engine.snapshot_for(known, interest);
             }
-            "shutdown" => response["message"] = json!("Audio engine stopped."),
+            "shutdown" => {
+                engine.flush()?;
+                response["message"] = json!("Audio engine stopped.");
+            }
             _ => return Err(EngineError::Message("Unknown control command.".into())),
         }
         Ok(())
@@ -319,6 +325,9 @@ mod pipe {
                 let _ = CancelIoEx(pipe.0, None);
                 let _ = DisconnectNamedPipe(pipe.0);
             }
+            // A client that left in the middle of a drag never sent the
+            // configure that saves it.
+            engine.flush_logged();
         }
         Ok(())
     }

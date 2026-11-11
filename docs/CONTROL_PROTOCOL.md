@@ -148,7 +148,7 @@ connected, rather than replacing that branch with dry audio.
 | `plosive` | `frequencyHz: 150, thresholdDb: -24, reductionDb: 12` | 60–300 Hz; −60–0 dB; 0–24 dB |
 | `reverb` | `mix: 0.2, decaySeconds: 1.2, damping: 0.5, preDelayMs: 15` | 0–1; 0.1–5 s; 0–1; 0–100 ms |
 | `echo` | `timeMs: 300, repeats: 3, mix: 0.25` | 20–2000 ms; integer 1–8; 0–1 |
-| `distortion` | `driveDb: 6, toneHz: 6000, mix: 0.5, outputDb: 0` (`-6` in the 0.5 engine) | 0–36 dB; 500–18000 Hz; 0–1; −24–0 dB |
+| `distortion` | `driveDb: 6, toneHz: 6000, mix: 0.5, outputDb: 0` (`-6` in the 0.5 engine) | 0–60 dB in the Rust engine (0–36 in the 0.5 engine); 500–18000 Hz; 0–1; −24–0 dB |
 | `voiceColor` | `tone: 0, ambience: 0` | −1–1; 0–1 |
 | `expander` | `mode: "expander", thresholdDb: -40, ratio: 2, attackMs: 5, holdMs: 50, releaseMs: 150, rangeDb: 60, hysteresisDb: 3` | Mode `expander` / `gate`; −80–0 dB; 1–20; 0.1–200 ms; 0–1000 ms; 5–2000 ms; 0–80 dB; 0–12 dB |
 | `alignmentDelay` | `samples: 0` | Integer 0–96000, measured at the internal 48 kHz rate |
@@ -388,6 +388,26 @@ nor read them, so either side can be paired with an older counterpart.
 These fields reduce repeated work; they never change what is committed, saved
 or processed. Tokens are not a revision check: edits still use the revision
 rules above.
+
+Added on 12 November 2026, for `configure` only:
+
+```json
+{"protocolVersion":1,"requestId":"unique","command":"configure",
+ "configuration":{},"expectedRevision":7,"persist":false}
+```
+
+- `persist: false` validates, applies and acknowledges the configuration as
+  usual, with its new revision, but does not write the settings file. The
+  desktop sends it while a control is being dragged, so the change is heard
+  at once without a durable file write ten times a second, and sends an
+  ordinary `configure` when the drag ends. Absent or `true` saves, as before.
+- The engine never leaves such a configuration unwritten for long: it writes
+  it when the next ordinary `configure` arrives, when the client disconnects,
+  on `shutdown` (a failure there is reported as `settings_write_failed` and
+  the engine keeps running) and when it stops. If the engine process is
+  killed in the middle of a drag, that drag is lost and the file holds the
+  last saved configuration.
+- A 0.5 C++ engine ignores the field and saves every `configure`.
 
 For EQ nodes, `spectrumDb` contains 128 log-frequency bins over 20 Hz–20 kHz,
 in the −90–0 dBFS display range, measured from post-EQ stereo output. It is empty

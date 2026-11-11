@@ -43,10 +43,10 @@ const LIMIT_RELEASE: f64 = 0.999_739_617_238_810_2; // 80 ms
 const LEAK: f64 = 0.999_983_333_472_221_5; // 20 s at the control rate
 
 /// The level is the mean power of the driven band while it sounds: anything
-/// above [`GATE`] (-70 dBFS) and within 20 dB of the level so far counts.
+/// above [`GATE`] (-80 dBFS) and within 20 dB of the level so far counts.
 /// Quieter sound lets the level leak away slowly instead, so the node can
 /// follow a source that has dropped for good.
-const GATE: f64 = 1e-7;
+const GATE: f64 = 1e-8;
 const RELATIVE_GATE: f64 = 0.01;
 /// The level is never left more than 15 dB below what is sounding now: a
 /// source that much louder is taken up at once, keeping only the last 25 ms.
@@ -57,7 +57,7 @@ const RELEARN: u32 = 75;
 const CONFIDENT: u32 = 750;
 const LEARNED: u32 = 7_500;
 /// The standardising gain never exceeds this, either way.
-const MAXIMUM_NORMALISE_DB: f64 = 36.0;
+const MAXIMUM_NORMALISE_DB: f64 = 48.0;
 
 /// Sound this far below the learned level (dB) is driven in full, and sound
 /// that far below is left as it is, so the room between words is not raised.
@@ -117,14 +117,23 @@ pub struct Distortion {
     shaped_input: Pair,
     shaped_root: Pair,
     band: Pair,
-    /// Drive and makeup glide in decibels; the linear gains are worked out
-    /// again only while one of them is moving.
+    /// Drive glides in decibels; its linear gain is worked out again only
+    /// while it is moving.
     drive: Smooth,
-    makeup: Smooth,
     drive_db: f64,
-    makeup_db: f64,
     drive_gain: f64,
-    makeup_gain: f64,
+    /// How far the gain to the standard level is from the one the learned
+    /// level asks for (dB): not zero while the level is still being trusted
+    /// in, or when the gain is at its limit. The curve is then driven that
+    /// much less (or more) than Drive says.
+    shortfall_db: f64,
+    /// The drive the curve is really working at, and what a quiet sound
+    /// comes through with at that drive: the gain into the curve times the
+    /// makeup that belongs to it. The gain after the curve is this over the
+    /// gain into it, frame by frame, so the two can never disagree: a jump
+    /// of the dial or of the learned level does not arrive as a burst.
+    effective_db: f64,
+    quiet_gain: f64,
     tone: Smooth,
     mix: Smooth,
     trim: Smooth,
@@ -135,14 +144,11 @@ pub struct Distortion {
     /// Control ticks in the level average, and since the first sound.
     ticks: u32,
     heard: u32,
-    /// Gain to the standard level and back, and the share of the driven
-    /// difference in effect; each moves in a straight line between decisions.
+    /// Gain to the standard level, and the share of the driven difference
+    /// in effect; each moves in a straight line between decisions.
     normalise: f64,
     normalise_target: f64,
     normalise_step: f64,
-    restore_gain: f64,
-    restore_target: f64,
-    restore_step: f64,
     lift: f64,
     lift_target: f64,
     lift_step: f64,
@@ -167,11 +173,11 @@ impl Distortion {
             shaped_root: [(1.0 + distortion::BIAS * distortion::BIAS).sqrt(); 2],
             band: [0.0; 2],
             drive: Smooth::default(),
-            makeup: Smooth::default(),
             drive_db: 0.0,
-            makeup_db: 0.0,
             drive_gain: 1.0,
-            makeup_gain: 1.0,
+            shortfall_db: 0.0,
+            effective_db: 0.0,
+            quiet_gain: 10f64.powf(distortion::makeup_db(0.0) / 20.0),
             tone: Smooth::default(),
             mix: Smooth::default(),
             trim: Smooth::default(),
@@ -182,9 +188,6 @@ impl Distortion {
             normalise: 1.0,
             normalise_target: 1.0,
             normalise_step: 0.0,
-            restore_gain: 1.0,
-            restore_target: 1.0,
-            restore_step: 0.0,
             // Nothing is driven until something has been heard.
             lift: 0.0,
             lift_target: 0.0,
@@ -199,7 +202,6 @@ impl Distortion {
     /// each amount glides to its new value over 10 ms.
     pub fn configure(&mut self, setting: &Saturation) {
         self.drive.set(setting.drive_db);
-        self.makeup.set(setting.makeup_db);
         self.tone.set(setting.tone);
         self.mix.set(setting.mix);
         self.trim.set(setting.trim);
@@ -209,7 +211,6 @@ impl Distortion {
     fn control(&mut self) {
         // Land exactly on the previous targets rather than on a sum of steps.
         self.normalise = self.normalise_target;
-        self.restore_gain = self.restore_target;
         self.lift = self.lift_target;
         if self.power > GATE {
             if self.ticks != 0 && self.power > self.level * SURPRISE {
@@ -229,7 +230,6 @@ impl Distortion {
         if self.ticks == 0 {
             // Nothing heard yet: stay at rest.
             self.normalise_step = 0.0;
-            self.restore_step = 0.0;
             self.lift_step = 0.0;
             return;
         }
@@ -238,25 +238,32 @@ impl Distortion {
         self.heard = (self.heard + 1).min(CONFIDENT);
         let confidence = f64::from(self.heard) / f64::from(CONFIDENT);
         let level_db = 10.0 * self.level.log10();
-        let normalise_db = (confidence * (distortion::STANDARD_DB - level_db)).clamp(-MAXIMUM_NORMALISE_DB, MAXIMUM_NORMALISE_DB);
+        let wanted_db = distortion::STANDARD_DB - level_db;
+        let normalise_db = (confidence * wanted_db).clamp(-MAXIMUM_NORMALISE_DB, MAXIMUM_NORMALISE_DB);
         self.normalise_target = 10f64.powf(normalise_db / 20.0);
-        self.restore_target = 1.0 / self.normalise_target;
+        // Until that gain has arrived the curve is driven less than Drive
+        // says. The makeup is then the one for the lesser drive, so the sound
+        // still leaves at the level it came in at.
+        self.shortfall_db = normalise_db - wanted_db;
         let relative = 10.0 * self.power.max(1e-30).log10() - level_db;
         self.lift_target = smoothstep((relative - LIFT_NONE) / (LIFT_FULL - LIFT_NONE));
         let steps = f64::from(CONTROL);
         self.normalise_step = (self.normalise_target - self.normalise) / steps;
-        self.restore_step = (self.restore_target - self.restore_gain) / steps;
         self.lift_step = (self.lift_target - self.lift) / steps;
     }
 
     pub fn process(&mut self, input: Frame) -> Frame {
         let x: Pair = [f64::from(input.left), f64::from(input.right)];
-        let (drive_db, makeup_db) = (self.drive.next(), self.makeup.next());
-        if drive_db != self.drive_db || makeup_db != self.makeup_db {
+        let drive_db = self.drive.next();
+        if drive_db != self.drive_db {
             self.drive_db = drive_db;
-            self.makeup_db = makeup_db;
             self.drive_gain = 10f64.powf(drive_db / 20.0);
-            self.makeup_gain = 10f64.powf(makeup_db / 20.0);
+        }
+        let effective_db = drive_db + self.shortfall_db;
+        if effective_db != self.effective_db {
+            self.effective_db = effective_db;
+            // Below 0 dB the curve is a straight line and this is constant.
+            self.quiet_gain = 10f64.powf(distortion::makeup_db(effective_db.max(0.0)) / 20.0) * 10f64.powf(effective_db.max(0.0) / 20.0);
         }
         let tone = self.tone.next();
         let amount = self.mix.next();
@@ -272,13 +279,12 @@ impl Distortion {
         }
         self.countdown -= 1;
         self.normalise += self.normalise_step;
-        self.restore_gain += self.restore_step;
         self.lift += self.lift_step;
 
         // The curve's exact average between the previous sample and this one,
         // less the same average of the undriven band: what driving changed.
         let before = self.drive_gain * self.normalise;
-        let after = self.makeup_gain * self.restore_gain;
+        let after = self.quiet_gain / before;
         let mut difference = [0.0; 2];
         for c in 0..2 {
             let v = band[c] * before + distortion::BIAS;

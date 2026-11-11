@@ -479,7 +479,7 @@ pub fn validate(graph: &AudioGraph) -> String {
             || !in_range(node.echo.time_ms, 20.0, 2000.0)
             || !(1..=8).contains(&node.echo.repeats)
             || !in_range(node.echo.mix, 0.0, 1.0)
-            || !in_range(node.distortion.drive_db, 0.0, 36.0)
+            || !in_range(node.distortion.drive_db, 0.0, vinemix_model::distortion::MAXIMUM_DRIVE_DB)
             || !in_range(node.distortion.tone_hz, 500.0, 18000.0)
             || !in_range(node.distortion.mix, 0.0, 1.0)
             || !in_range(node.distortion.output_db, -24.0, 0.0)

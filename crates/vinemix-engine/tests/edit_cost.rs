@@ -78,6 +78,42 @@ fn accepted_edits_compile_once_and_parameter_bursts_keep_audio_running() {
     assert_eq!(snapshot["configuration"]["revision"], revision);
     assert_eq!(snapshot["configuration"]["graph"]["nodes"][1]["eqBands"][0]["frequencyHz"], 109.0, "the last edit is the live one");
 
+    // A dragged control: its configures say `persist: false`. They take
+    // effect, and the settings file is written once, by the configure that
+    // ends the drag.
+    let saved_before = std::fs::read(&settings).unwrap();
+    for step in 0..20u64 {
+        configuration["graph"]["nodes"][1]["gainDb"] = json!(step as f64 * 0.5 - 6.0);
+        let reply = handle(
+            &engine,
+            &json!({"protocolVersion": 1, "command": "configure", "configuration": configuration, "expectedRevision": revision, "persist": false}),
+        );
+        assert_eq!(reply["ok"], true, "drag step {step}: {reply}");
+        revision += 1;
+        assert_eq!(reply["snapshot"]["configuration"]["revision"], revision);
+    }
+    assert_eq!(engine.snapshot()["configuration"]["graph"]["nodes"][1]["gainDb"], 3.5, "the drag is live");
+    assert_eq!(std::fs::read(&settings).unwrap(), saved_before, "nothing was written during the drag");
+    assert_eq!(configure(&engine, &configuration, revision)["ok"], true);
+    revision += 1;
+    let persisted: Value = serde_json::from_slice(&std::fs::read(&settings).unwrap()).unwrap();
+    assert_eq!(persisted["revision"], revision);
+    assert_eq!(persisted["graph"]["nodes"][1]["gainDb"], 3.5, "the release saves where the drag ended");
+
+    // A client that leaves in the middle of a drag: the engine writes what
+    // it is playing (the control server does this when a client disconnects).
+    configuration["graph"]["nodes"][1]["gainDb"] = json!(-2.0);
+    let reply = handle(
+        &engine,
+        &json!({"protocolVersion": 1, "command": "configure", "configuration": configuration, "expectedRevision": revision, "persist": false}),
+    );
+    assert_eq!(reply["ok"], true, "{reply}");
+    revision += 1;
+    engine.flush().unwrap();
+    let persisted: Value = serde_json::from_slice(&std::fs::read(&settings).unwrap()).unwrap();
+    assert_eq!(persisted["revision"], revision);
+    assert_eq!(persisted["graph"]["nodes"][1]["gainDb"], -2.0);
+
     // A topology edit (removing a cable) still goes through the full path.
     let mut rewired = configuration.clone();
     let cables = rewired["graph"]["edges"].as_array_mut().unwrap();

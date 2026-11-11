@@ -48,8 +48,8 @@ const NOISE_RISE: f64 = 0.000_111_104_938_500_194_98; // 1 - exp(-1 / (3 s · co
 /// Sibilance guard: share of the input above [`SIBILANCE_HZ`] at which the
 /// high boosts start to relax, and at which they are fully relaxed.
 const SIBILANCE_HZ: f64 = 5_500.0;
-const GUARD_FROM: f64 = 0.25;
-const GUARD_TO: f64 = 0.55;
+const GUARD_FROM: f64 = 0.2;
+const GUARD_TO: f64 = 0.45;
 /// Extra weight of the air band in the dynamics detector, so a sibilant reads
 /// as louder than it is and is lifted less than a vowel.
 const EMPHASIS: f64 = 4.0;

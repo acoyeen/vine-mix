@@ -67,33 +67,42 @@ zipper noise or unstable intermediate filters.
 | Stage | Filter | Gain at the edge of the pad |
 |---|---|---|
 | Rumble | Second-order high-pass, 75 Hz | Fully in from Character 35% upward |
-| Tone, lows | First-order shelf, 220 Hz | +6 dB at Warm, −5 dB at Bright |
-| Body | Bell, 165 Hz, Q 0.8 | +7 dB at full Character |
-| Low mids | Bell, 420 Hz, Q 0.9 | −5 dB at full Character |
-| Presence | Bell, 3.3 kHz, Q 0.75 | +7 dB at full Character |
-| Tone, highs | First-order shelf, 3.6 kHz | +6 dB at Bright, −5 dB at Warm |
-| Air | First-order shelf, 9 kHz | +5 dB at full Character |
+| Tone, lows | First-order shelf, 220 Hz | +9 dB at Warm, −7.5 dB at Bright |
+| Body | Bell, 165 Hz, Q 0.8 | +10.5 dB at full Character |
+| Low mids | Bell, 420 Hz, Q 0.9 | −7.5 dB at full Character |
+| Presence | Bell, 3.3 kHz, Q 0.75 | +10.5 dB at full Character |
+| Tone, highs | First-order shelf, 3.6 kHz | +9 dB at Bright, −7.5 dB at Warm |
+| Air | First-order shelf, 9 kHz | +7.5 dB at full Character |
 
-Gains scale in decibels with the pad: half Character is half of each figure.
-The stages overlap, so the combined response is gentler than the list suggests.
-Before the loudness trim it is:
+Each axis is nearly a straight line through its first half and bends upward
+towards the edge: at a position `x` from 0 to 1 the gains, in decibels, are
+`x · (1 + 0.5 x²)` of two thirds of each figure. Half of an axis gives 38% of
+the edge figure and three quarters gives 64%, so most of the pad is gentle and
+the last part goes further. The stages overlap, so the combined response is
+gentler than the list suggests. Before the loudness trim it is:
 
 | Hz | 30 | 80 | 165 | 420 | 1 k | 3.3 k | 8 k | 16 k |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| Character 50% | −15.8 | −0.9 | +2.9 | −1.2 | +0.6 | +3.8 | +2.5 | +2.4 |
-| Character 100% | −15.2 | +1.5 | +6.2 | −1.5 | +2.2 | +7.8 | +5.9 | +5.1 |
-| Warm | +5.9 | +5.6 | +4.6 | +2.1 | +0.3 | −1.6 | −3.8 | −4.8 |
-| Bright | −4.8 | −4.0 | −2.5 | −0.5 | +0.7 | +3.7 | +5.5 | +5.9 |
-| Warm, Character 100% | −9.3 | +7.1 | +10.9 | +0.6 | +2.5 | +6.3 | +2.2 | +0.2 |
-| Bright, Character 100% | −20.0 | −2.6 | +3.7 | −2.0 | +2.8 | +11.5 | +11.4 | +11.0 |
+| Character 50% | −15.7 | −0.6 | +3.3 | −1.3 | +0.7 | +4.3 | +2.8 | +2.7 |
+| Character 100% | −14.2 | +4.3 | +9.7 | −0.8 | +5.0 | +12.2 | +10.4 | +8.1 |
+| Warm | +8.9 | +8.5 | +7.4 | +3.9 | +0.9 | −1.9 | −5.2 | −7.1 |
+| Bright | −7.1 | −5.6 | −3.2 | −0.5 | +1.5 | +6.2 | +8.4 | +8.9 |
+| Warm, Character 100% | −5.3 | +12.9 | +17.0 | +3.1 | +6.0 | +10.3 | +5.2 | +1.0 |
+| Bright, Character 100% | −21.3 | −1.3 | +6.5 | −1.3 | +6.6 | +18.4 | +18.8 | +17.1 |
+
+The two corners are strong on purpose. They also raise whatever noise the
+microphone has in the boosted range by the same amount.
 
 **Sibilance guard.** The boosts above the vowels (presence, the Bright shelf
 and air) are relaxed while a sibilant is sounding. The node watches how much of
-its input lies above 5.5 kHz: below a quarter, the boosts apply in full; above
-about half, they are removed, within a millisecond, and return over about
+its input lies above 5.5 kHz: below a fifth, the boosts apply in full; above
+about 45%, they are removed, within a millisecond, and return over about
 15 ms. Cuts are never altered. Brightening therefore lifts the vowels without
-sharpening "s" and "sh" by the same amount. This is not a de-esser: it removes
-the node's own boost and never cuts below the input.
+sharpening "s" and "sh" by the same amount: at full Bright the test voices'
+sibilants stand out up to 3.4 dB more than dry, and at Bright with full
+Character about 6 dB more, where the contour alone would add 8 and 11 dB.
+This is not a de-esser: it removes the node's own boost and never cuts below
+the input.
 
 ### 2. Level
 
@@ -109,11 +118,13 @@ any microphone gain.
   within 50 ms and creeps up over seconds, so it settles on the room between
   words. Only sound at least 12 dB above it, and above −60 dBFS, counts as
   speech for the level.
-- **The curve** at full Character is a 3.5:1 compression above 8 dB below the
-  speaker's level (10 dB soft knee), with make-up set so that a sound 6 dB
-  above the speaker's level leaves at the level it came in. The loudest words
-  are held and everything quieter rises, by up to 10 dB. Half Character is
-  half of that, in decibels.
+- **The curve** at full Character is about a 14:1 compression above 8 dB
+  below the speaker's level (10 dB soft knee), with make-up set so that a
+  sound 6 dB above the speaker's level leaves at the level it came in. The
+  loudest words are held and everything quieter rises, by up to 13 dB. The
+  depth follows Character as `x · (1 + 0.3 x²)`: half Character is about
+  1.6:1 with up to 5.4 dB of lift, and the last part of the axis goes much
+  further.
 - **What is not lifted.** The lift fades out for sound more than 20 dB below
   the speaker's level and is gone by 40 dB below. It also fades out within
   12 dB of the noise floor and is gone within 3 dB. Pauses, the tail of the
@@ -131,8 +142,11 @@ largest peaks and thickens the lower voice. The amount follows the speaker's
 level, like the dynamics, so it does not depend on microphone gain. Because
 only the band below the consonants is shaped, the harmonics stay well below
 half the sample rate and do not fold back as aliasing; no oversampling is
-needed. On a steady 250 Hz tone at full Character the second, third and fourth
-harmonics measure about 32, 28 and 37 dB below the fundamental.
+needed. On a steady 250 Hz tone the second, third and fourth harmonics
+measured about 32, 28 and 37 dB below the fundamental at the depth that full
+Character had before 12 November 2026; full Character is now 1.3 times that
+depth, which was not measured again on a tone (the test holds the second and
+third between 15 and 50 dB below the fundamental).
 
 ### 4. Loudness and ceiling
 
@@ -140,7 +154,7 @@ harmonics measure about 32, 28 and 37 dB below the fundamental.
   contour and a typical long-term speech spectrum when the configuration is
   compiled, that returns ordinary speech to about its dry loudness. The pad
   changes the voice's colour and density, not its volume. On the test voices
-  the result lies between about 1.5 LU quieter and 2 LU louder than dry
+  the result lies between about 2 LU quieter and 2.5 LU louder than dry
   everywhere on the pad.
 - **Ceiling.** The node never adds a peak above −1 dBFS. If its processing
   would, the gain is reduced at once and recovers over 80 ms. Where the input
@@ -216,8 +230,8 @@ Tone:
 
 | | Earlier design | This design |
 |---|---|---|
-| Loudness against dry | 5.0 to 6.9 LU quieter | 0.2 LU quieter to 2.2 LU louder |
-| Spread of loudness on a voice with 15 dB between syllables | 9.2 → 7.4 dB | 9.2 → 6.1 dB |
+| Loudness against dry | 5.0 to 6.9 LU quieter | 0.1 LU quieter to 2.5 LU louder |
+| Spread of loudness on a voice with 15 dB between syllables | 9.2 → 7.4 dB | 9.2 → 5.0 dB |
 | Sibilants against the voice | 3 to 6 dB sharper | within 1 dB |
 | Same treatment 20 dB quieter | No: a fixed −28 dBFS threshold | Yes |
 | Mono voice | Becomes stereo; colour changes when summed to mono | Stays mono |
@@ -231,3 +245,21 @@ the full band without oversampling, and its room was too quiet to hear but
 cost most of the node's processing. These are measurements and design
 observations. The maintainer's listening comparison of the two is still to
 come; the figures do not say which sounds better.
+
+## Changes on 12 November 2026
+
+After trying the node, the maintainer wanted its extremes to be able to go
+further. Each axis now bends upward towards its edge instead of running in a
+straight line: the contour at an edge is one and a half times what it was, in
+decibels, and the dynamics and harmonics at full Character are 1.3 times as
+deep (about 14:1 instead of 3.5:1). Positions in the middle of the pad move
+much less: half Character is 12% more contour and 7% more depth than before.
+The saved coordinates are unchanged, so a saved position near an edge now
+sounds stronger.
+
+The sibilance guard starts and finishes a little earlier (a fifth and 45% of
+the input above 5.5 kHz, from a quarter and 55%), because the stronger Bright
+edge would otherwise sharpen sibilants more. On the test voices full
+Character narrows the spread of loudness from 9.2 to 5.0 dB (it was 6.1), and
+the Bright, full-Character corner makes sibilants stand out about 6 dB more
+than dry (it was under 4). None of this has been compared by ear.

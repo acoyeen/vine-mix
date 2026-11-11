@@ -366,6 +366,9 @@ struct ConfigState {
     runtimes: Vec<Box<Runtime>>,
     next_generation: u64,
     warning: String,
+    /// `configuration` holds changes applied with `persist: false` that the
+    /// settings file does not have yet.
+    unsaved: bool,
 }
 
 /// The device and application lists carried by snapshots.
@@ -481,7 +484,7 @@ impl Engine {
         let endpoints = catalog.enumerate();
         let physical_settings = physical_settings_path(&store);
         let inner = Arc::new(Inner {
-            state: Mutex::new(ConfigState { store, configuration, configuration_generation: 1, runtimes: Vec::new(), next_generation: 0, warning }),
+            state: Mutex::new(ConfigState { store, configuration, configuration_generation: 1, runtimes: Vec::new(), next_generation: 0, warning, unsaved: false }),
             published: AtomicPtr::new(std::ptr::null_mut()),
             active_generation: AtomicU64::new(0),
             stopping: AtomicBool::new(false),
@@ -564,6 +567,7 @@ impl Engine {
         for thread in threads {
             let _ = thread.join();
         }
+        self.flush_logged();
         let mut state = lock(&self.inner);
         self.inner.published.store(std::ptr::null_mut(), Ordering::Release);
         // Shared ports stop and join here, never on the mixer thread.
@@ -576,7 +580,13 @@ impl Engine {
     }
 
     /// Applies a full configuration if `expected_revision` is current.
-    pub fn configure(&self, mut config: Configuration, expected_revision: u64) -> Result<(), EngineError> {
+    ///
+    /// With `persist` false the configuration takes effect but the settings
+    /// file is left alone: a control being dragged sends many of these and
+    /// one persisting configure when the drag ends. Whatever is still
+    /// unwritten is written by [`flush`](Self::flush), which runs when the
+    /// client disconnects and when the engine stops.
+    pub fn configure(&self, mut config: Configuration, expected_revision: u64, persist: bool) -> Result<(), EngineError> {
         let inner = &*self.inner;
         let mut state = lock(inner);
         if !state.store.writable() {
@@ -616,7 +626,12 @@ impl Engine {
         // processor: no effect storage is allocated and no state is copied.
         let share = if ports_unchanged { current.map(|c| c.processor.clone()) } else { None };
         let runtime = if audio_unchanged { None } else { Some(prepare(inner, &mut state, &config, plan, share)?) };
-        state.store.save_validated(validated)?;
+        if persist {
+            state.store.save_validated(validated)?;
+            state.unsaved = false;
+        } else {
+            state.unsaved = true;
+        }
         state.configuration = config;
         state.configuration_generation += 1;
         // Canvas positions, names and reset anchors persist, but they never
@@ -625,6 +640,28 @@ impl Engine {
             publish(inner, &mut state, runtime);
         }
         Ok(())
+    }
+
+    /// Writes a configuration that was applied with `persist: false`.
+    pub fn flush(&self) -> Result<(), EngineError> {
+        let mut state = lock(&self.inner);
+        if !state.unsaved {
+            return Ok(());
+        }
+        if state.store.writable() {
+            let configuration = state.configuration.clone();
+            state.store.save(&configuration)?;
+        }
+        state.unsaved = false;
+        Ok(())
+    }
+
+    /// [`flush`](Self::flush) where nobody is left to tell: the failure is
+    /// recorded in the engine log.
+    pub fn flush_logged(&self) {
+        if let Err(error) = self.flush() {
+            self.inner.log.write(&format!("The latest adjustment could not be saved: {error}"));
+        }
     }
 
     /// Re-enumerates devices and reopens every stream.
@@ -637,6 +674,7 @@ impl Engine {
         let mut state = lock(inner);
         let recovered = state.store.recover(action)?;
         state.configuration = recovered;
+        state.unsaved = false;
         state.configuration_generation += 1;
         *inner.physical_settings.lock().unwrap_or_else(|e| e.into_inner()) = physical_settings_path(&state.store);
         state.warning = state.store.warning().to_owned();

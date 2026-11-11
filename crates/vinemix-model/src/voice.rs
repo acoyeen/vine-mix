@@ -35,7 +35,8 @@ pub const PRESENCE_Q: f64 = 0.75;
 /// First-order shelf above the sibilant range.
 pub const AIR_HZ: f64 = 9_000.0;
 
-/// Gains at the edges of the pad, in decibels.
+/// Gains in decibels per unit of [`reach`]: what the edges of the pad would
+/// give if the pad were a straight line, and what its middle is built on.
 pub const TONE_BOOST_DB: f64 = 6.0;
 pub const TONE_CUT_DB: f64 = -5.0;
 pub const BODY_DB: f64 = 7.0;
@@ -44,6 +45,20 @@ pub const PRESENCE_DB: f64 = 7.0;
 pub const AIR_DB: f64 = 5.0;
 /// Character at which the rumble filter is fully in.
 pub const RUMBLE_FULL_AT: f64 = 0.35;
+/// How much further the last part of each axis goes: the contour at an edge
+/// is this much more, in decibels, than a straight line would reach
+/// (+9 dB of tilt and +10.5 dB of body and presence instead of 6 and 7).
+pub const EDGE_CONTOUR: f64 = 0.5;
+/// The same for the dynamics and harmonics. Full Character holds the
+/// delivery at about 14:1; a straight line would stop at 3.5:1.
+pub const EDGE_DEPTH: f64 = 0.3;
+
+/// A pad axis is nearly a straight line through its first half and bends
+/// upward towards the edge: `x·(1 + edge·x²)`. Settings near the middle keep
+/// the sound they had; the extremes go further.
+pub fn reach(x: f64, edge: f64) -> f64 {
+    x * (1.0 + edge * x * x)
+}
 
 /// The processing amounts for one pad position. `Copy`, so the mixer thread
 /// can store and compare it without touching the heap.
@@ -58,7 +73,8 @@ pub struct VoiceContour {
     pub presence: f64,
     pub high: f64,
     pub air: f64,
-    /// Depth of the dynamics and harmonics, 0 to 1.
+    /// Depth of the dynamics and harmonics: 0 is none and 1 is the
+    /// processor's nominal ratio; full Character is `1 + EDGE_DEPTH`.
     pub amount: f64,
     /// Linear output gain that returns typical speech to its dry loudness.
     pub trim: f64,
@@ -170,8 +186,9 @@ impl VoiceContour {
         if tone == 0.0 && character == 0.0 {
             return Self::NEUTRAL;
         }
-        let warm = (-tone).max(0.0);
-        let bright = tone.max(0.0);
+        let warm = reach((-tone).max(0.0), EDGE_CONTOUR);
+        let bright = reach(tone.max(0.0), EDGE_CONTOUR);
+        let shape = reach(character, EDGE_CONTOUR);
         let mut contour = Self {
             rumble: {
                 let x = (character / RUMBLE_FULL_AT).min(1.0);
@@ -180,11 +197,11 @@ impl VoiceContour {
             // Warm lifts the lows and eases the highs; Bright does the reverse.
             low: gain(TONE_BOOST_DB * warm + TONE_CUT_DB * bright),
             high: gain(TONE_BOOST_DB * bright + TONE_CUT_DB * warm),
-            body: gain(BODY_DB * character),
-            mud: gain(MUD_DB * character),
-            presence: gain(PRESENCE_DB * character),
-            air: gain(AIR_DB * character),
-            amount: character,
+            body: gain(BODY_DB * shape),
+            mud: gain(MUD_DB * shape),
+            presence: gain(PRESENCE_DB * shape),
+            air: gain(AIR_DB * shape),
+            amount: reach(character, EDGE_DEPTH),
             trim: 1.0,
         };
         // Return typical speech to its dry loudness, so the pad changes the
@@ -266,9 +283,31 @@ mod tests {
         assert!(db(full.response(420.0)) - at_1k < -2.0, "mud: {}", db(full.response(420.0)));
         assert!(db(full.response(3_300.0)) - at_1k > 4.0, "presence: {}", db(full.response(3_300.0)));
         assert!(db(full.response(12_000.0)) - at_1k > 3.0, "air: {}", db(full.response(12_000.0)));
-        // No stage is extreme: the strongest point of the contour is modest.
-        let top = (0..200).map(|i| db(full.response(20.0 * 1_000f64.powf(f64::from(i) / 199.0)))).fold(f64::MIN, f64::max);
-        assert!(top < 12.0, "largest boost {top} dB");
+        // The strongest point of the contour, at the edge and halfway there:
+        // the first half of the axis is gentle and the last part goes further.
+        let top = |c: &VoiceContour| (0..200).map(|i| db(c.response(20.0 * 1_000f64.powf(f64::from(i) / 199.0)))).fold(f64::MIN, f64::max);
+        assert!(top(&full) > 11.0 && top(&full) < 14.0, "largest boost at full Character {} dB", top(&full));
+        assert!(top(&at(0.0, 0.5)) < 5.0, "largest boost at half Character {} dB", top(&at(0.0, 0.5)));
+    }
+
+    #[test]
+    fn the_edges_reach_further_than_a_straight_line() {
+        assert_eq!(reach(0.0, EDGE_CONTOUR), 0.0);
+        assert_eq!(reach(1.0, EDGE_CONTOUR), 1.0 + EDGE_CONTOUR);
+        assert!(reach(0.5, EDGE_CONTOUR) < 0.5 * 1.13, "the middle stays close to a straight line");
+        let mut previous = 0.0;
+        for step in 1..=100 {
+            let now = reach(f64::from(step) / 100.0, EDGE_CONTOUR);
+            assert!(now > previous);
+            previous = now;
+        }
+        let full = at(0.0, 1.0);
+        assert!((db(1.0 + full.presence) - PRESENCE_DB * 1.5).abs() < 1e-9);
+        assert!((full.amount - 1.3).abs() < 1e-12);
+        // The dynamics never reach a ratio the processor cannot run at.
+        assert!(full.amount < 1.4, "an amount of 1.4 would be a limiter");
+        let warm = at(-1.0, 0.0);
+        assert!((db(1.0 + warm.low) - TONE_BOOST_DB * 1.5).abs() < 1e-9 && (db(1.0 + warm.high) - TONE_CUT_DB * 1.5).abs() < 1e-9);
     }
 
     #[test]
@@ -299,7 +338,7 @@ mod tests {
             let centre = at(0.0, character);
             if let Some(before) = previous {
                 assert!((centre.trim - before.trim).abs() < 0.02, "trim jumps at character {character}");
-                assert!((centre.presence - before.presence).abs() < 0.02);
+                assert!((centre.presence - before.presence).abs() < 0.06);
             }
             previous = Some(centre);
         }

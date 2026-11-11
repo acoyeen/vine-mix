@@ -74,7 +74,9 @@ fn spectrum(settled: &[f64], frequency: f64) -> Spectrum {
     }
 }
 
-const DRIVES: [f64; 6] = [0.0, 6.0, 12.0, 18.0, 24.0, 36.0];
+/// Drive settings across the range; the last is the maximum.
+const DRIVES: [f64; 8] = [0.0, 6.0, 12.0, 18.0, 24.0, 36.0, 48.0, MAXIMUM];
+const MAXIMUM: f64 = vinemix_model::distortion::MAXIMUM_DRIVE_DB;
 
 /// Six seconds of a low and of a high synthetic voice at -24 dBFS.
 fn low_voice() -> &'static [f64] {
@@ -104,7 +106,7 @@ fn settled_tone(frequency: f64, level_db: f64, drive: f64) -> Spectrum {
 #[test]
 fn mix_zero_is_exactly_the_input() {
     let input = mono(low_voice());
-    for drive in [0.0, 12.0, 36.0] {
+    for drive in [0.0, 12.0, MAXIMUM] {
         let output = render("distortion", set(drive, 6_000.0, 0.0, 0.0), &input);
         assert!(output == input, "drive {drive} changed the sound at Mix 0%");
     }
@@ -116,7 +118,7 @@ fn bypass_passes_the_input_untouched() {
     let output = render(
         "distortion",
         |node| {
-            set(36.0, 2_000.0, 1.0, -12.0)(node);
+            set(MAXIMUM, 2_000.0, 1.0, -12.0)(node);
             node.bypass = true;
         },
         &input,
@@ -126,7 +128,7 @@ fn bypass_passes_the_input_untouched() {
 
 #[test]
 fn the_node_adds_no_delay() {
-    for (drive, mix) in [(12.0, 1.0), (36.0, 1.0), (12.0, 0.5)] {
+    for (drive, mix) in [(12.0, 1.0), (MAXIMUM, 1.0), (12.0, 0.5)] {
         let mut input = vec![0.0; 4_800];
         input[1_000] = 0.25;
         let output = driven(&input, drive, 18_000.0, mix);
@@ -167,11 +169,35 @@ fn a_quieter_source_gets_the_same_treatment() {
         assert!(gain.abs() < 1.5, "a tone at {level} dBFS left {gain:+.2} dB from where it came in");
     }
     let voice = low_voice();
-    let quiet: Vec<f64> = voice.iter().map(|s| s * 0.1).collect();
-    for drive in [12.0, 36.0] {
-        let loud = loudness(&driven(voice, drive, 6_000.0, 1.0));
-        let soft = loudness(&driven(&quiet, drive, 6_000.0, 1.0));
-        assert!((loud - soft - 20.0).abs() < 1.5, "drive {drive}: 20 dB less in became {:.2} dB less out", loud - soft);
+    for less in [20.0, 30.0] {
+        let quiet: Vec<f64> = voice.iter().map(|s| s * from_db(-less)).collect();
+        for drive in [12.0, 36.0, MAXIMUM] {
+            let loud = loudness(&driven(voice, drive, 6_000.0, 1.0));
+            let soft = loudness(&driven(&quiet, drive, 6_000.0, 1.0));
+            assert!((loud - soft - less).abs() < 1.0, "drive {drive}: {less} dB less in became {:.2} dB less out", loud - soft);
+        }
+    }
+}
+
+/// The node has not learned a level when the first sound arrives. Whatever
+/// that sound's level, it leaves at about the level it came in at: a quiet
+/// source at full Drive used to start tens of decibels too loud.
+#[test]
+fn the_first_sound_leaves_at_its_own_level() {
+    let voice = low_voice();
+    for scale_db in [12.0, 0.0, -20.0, -30.0] {
+        let input: Vec<f64> = voice.iter().map(|s| s * from_db(scale_db)).collect();
+        for drive in [12.0, 36.0, MAXIMUM] {
+            let output = driven(&input, drive, 18_000.0, 1.0);
+            // The first syllable, in 20 ms steps.
+            for (index, (dry, wet)) in input[..7_680].chunks(960).zip(output.chunks(960)).enumerate() {
+                if rms(dry) < 0.05 * active_rms(&input) {
+                    continue;
+                }
+                let change = db(rms(wet) / rms(dry));
+                assert!(change < 4.0 && change > -12.0, "a voice at {scale_db:+} dB, drive {drive}: {change:+.1} dB in the first sound, {} ms in", index * 20);
+            }
+        }
     }
 }
 
@@ -184,7 +210,33 @@ fn more_drive_is_more_distortion() {
         previous = s.thd;
     }
     assert!(settled_tone(997.0, -12.0, 0.0).thd < -30.0, "Drive 0 dB is nearly clean");
-    assert!(previous > -14.0, "Drive 36 dB is strong: {previous:.1} dB");
+    assert!(previous > -10.0, "full Drive is strong: {previous:.1} dB");
+}
+
+/// How much of the output is not a scaled copy of the input, in dB relative
+/// to the output: the share that driving changed.
+fn changed(dry: &[f64], wet: &[f64]) -> f64 {
+    let (dry, wet) = (&dry[48_000..], &wet[48_000..]);
+    let cross: f64 = dry.iter().zip(wet).map(|(a, b)| a * b).sum();
+    let own: f64 = dry.iter().map(|a| a * a).sum();
+    let gain = cross / own;
+    let residual: f64 = dry.iter().zip(wet).map(|(a, b)| (b - gain * a) * (b - gain * a)).sum();
+    let total: f64 = wet.iter().map(|b| b * b).sum();
+    10.0 * (residual / total).log10()
+}
+
+/// The Drive range used to end at 36 dB, and two nodes in a row at that
+/// setting gave a strength one node could not. The top of the range now
+/// reaches it: one node at full Drive changes a voice as much as those two.
+#[test]
+fn full_drive_reaches_two_nodes_at_the_earlier_maximum() {
+    for (name, voice) in [("low", low_voice()), ("high", high_voice())] {
+        let earlier = changed(voice, &driven(voice, 36.0, 18_000.0, 1.0));
+        let two = changed(voice, &driven(&driven(voice, 36.0, 18_000.0, 1.0), 36.0, 18_000.0, 1.0));
+        let full = changed(voice, &driven(voice, MAXIMUM, 18_000.0, 1.0));
+        assert!(two > earlier + 1.0, "{name} voice: two nodes change {two:.2} dB, one at 36 dB {earlier:.2} dB");
+        assert!((full - two).abs() < 0.5, "{name} voice: full Drive changes {full:.2} dB of the sound, two nodes at 36 dB changed {two:.2} dB");
+    }
 }
 
 /// The curve treats the two half-waves differently, so gentle settings add
@@ -218,6 +270,10 @@ fn aliasing_stays_far_below_the_harmonics() {
         (5_003.0, 18.0, -55.0),
         (2_999.0, 36.0, -30.0),
         (5_003.0, 36.0, -28.0),
+        (220.0, MAXIMUM, -42.0),
+        (997.0, MAXIMUM, -28.0),
+        (2_999.0, MAXIMUM, -24.0),
+        (5_003.0, MAXIMUM, -24.0),
     ] {
         let s = settled_tone(frequency, -12.0, drive);
         assert!(s.stray < limit, "{frequency} Hz at drive {drive}: {:.1} dB of aliasing, limit {limit}", s.stray);
@@ -231,7 +287,7 @@ fn room_noise_between_words_is_not_raised() {
     for below in [45.0, 60.0] {
         let mut input = voice.to_vec();
         input.extend(room(voice, below, 96_000, 9));
-        for drive in [12.0, 36.0] {
+        for drive in [12.0, 36.0, MAXIMUM] {
             let output = driven(&input, drive, 18_000.0, 1.0);
             let n = input.len();
             // From 100 ms after the last word to the end of the pause.
@@ -241,7 +297,7 @@ fn room_noise_between_words_is_not_raised() {
     }
     // Nor before anything has been heard.
     let waiting = room(voice, 60.0, 96_000, 4);
-    let output = driven(&waiting, 36.0, 18_000.0, 1.0);
+    let output = driven(&waiting, MAXIMUM, 18_000.0, 1.0);
     let change = db(rms(&output[48_000..]) / rms(&waiting[48_000..]));
     assert!(change < 0.5, "noise before the first sound changed by {change:+.2} dB");
 }
@@ -251,7 +307,7 @@ fn room_noise_between_words_is_not_raised() {
 #[test]
 fn speech_after_a_quiet_wait_starts_cleanly() {
     let voice = low_voice();
-    for drive in [12.0, 36.0] {
+    for drive in [12.0, 36.0, MAXIMUM] {
         let mut input = room(voice, 35.0, 144_000, 9);
         input.extend_from_slice(voice);
         let output = driven(&input, drive, 18_000.0, 1.0);
@@ -309,7 +365,7 @@ fn peaks_stay_below_the_ceiling_or_the_input() {
         }
     }
     // For ordinary speech the driven sound's peaks are below the input's.
-    for drive in [12.0, 24.0, 36.0] {
+    for drive in [12.0, 24.0, 36.0, MAXIMUM] {
         assert!(peak(&driven(voice, drive, 18_000.0, 1.0)) < peak(voice), "drive {drive} raised the peaks of speech");
     }
 }
@@ -325,7 +381,7 @@ fn channels_stay_linked() {
     // source where it is. (Strong saturation flattens both channels, which
     // narrows a level difference between them; that is what saturation does.)
     let one_sided: Vec<Frame> = low_voice().iter().map(|&s| Frame::new(s as f32, 0.0)).collect();
-    let output = render("distortion", set(36.0, 6_000.0, 1.0, 0.0), &one_sided);
+    let output = render("distortion", set(MAXIMUM, 6_000.0, 1.0, 0.0), &one_sided);
     assert!(output.iter().all(|f| f.right == 0.0));
     let offset: Vec<Frame> = low_voice().iter().map(|&s| Frame::new(s as f32, (s * 0.5) as f32)).collect();
     let output = render("distortion", set(6.0, 6_000.0, 1.0, 0.0), &offset);
@@ -342,7 +398,7 @@ fn silence_stays_silent_and_tails_end() {
     let mut input = low_voice().to_vec();
     let end = input.len();
     input.extend(std::iter::repeat_n(0.0, 144_000));
-    let output = driven(&input, 36.0, 500.0, 1.0);
+    let output = driven(&input, MAXIMUM, 500.0, 1.0);
     assert!(output[end + 96_000..].iter().all(|&s| s == 0.0), "the node rings on after its input stops");
 }
 
@@ -370,11 +426,12 @@ fn output_trims_the_whole_blend() {
 }
 
 /// Drive is typed in or reset rather than dragged: the whole range in one
-/// step. The makeup glides with it, so the change does not arrive as a burst.
+/// step. The makeup follows Drive frame by frame through the glide, so the
+/// change does not arrive as a burst.
 #[test]
 fn a_large_change_of_drive_arrives_without_a_burst() {
     let input = mono(&sine(220.0, 0.25, 4 * 48_000));
-    for (from, to) in [(0.0, 36.0), (36.0, 0.0), (6.0, 30.0)] {
+    for (from, to) in [(0.0, MAXIMUM), (MAXIMUM, 0.0), (0.0, 36.0), (6.0, 30.0)] {
         let mut rig = Rig::new(&single_effect("distortion", set(from, 18_000.0, 1.0, 0.0)));
         let before = left(&rig.run(&input[..2 * 48_000]));
         rig.edit(&single_effect("distortion", set(to, 18_000.0, 1.0, 0.0)));
@@ -397,7 +454,7 @@ fn control_moves_are_smooth() {
     let input = mono(&sine(200.0, 0.1, 96_000));
     let mut output = Vec::new();
     for block in input.chunks(240) {
-        let (drive, tone, mix, trim) = (noise.next().abs() * 36.0, 500.0 + noise.next().abs() * 17_500.0, noise.next().abs(), -6.0 * noise.next().abs());
+        let (drive, tone, mix, trim) = (noise.next().abs() * MAXIMUM, 500.0 + noise.next().abs() * 17_500.0, noise.next().abs(), -6.0 * noise.next().abs());
         rig.edit(&single_effect("distortion", set(drive, tone, mix, trim)));
         output.extend(rig.run(block));
     }
@@ -532,13 +589,15 @@ fn distortion_report() {
 }
 
 /// The settings used for listening files.
-const SETTINGS: [(&str, f64, f64, f64); 6] = [
+const SETTINGS: [(&str, f64, f64, f64); 8] = [
     ("default", 6.0, 6_000.0, 0.5),
     ("drive-06", 6.0, 6_000.0, 1.0),
     ("drive-12", 12.0, 6_000.0, 1.0),
     ("drive-18", 18.0, 6_000.0, 1.0),
     ("drive-24", 24.0, 6_000.0, 1.0),
     ("drive-36", 36.0, 6_000.0, 1.0),
+    ("drive-48", 48.0, 6_000.0, 1.0),
+    ("drive-60", 60.0, 6_000.0, 1.0),
 ];
 
 /// Writes listening files for supplied recordings.

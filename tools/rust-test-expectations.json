@@ -11,7 +11,7 @@
       ]
     },
     "vinemix-dsp/test/distortion": {
-      "minimumPassed": 18,
+      "minimumPassed": 20,
       "ignored": ["distortion_cost", "distortion_render", "distortion_report"]
     },
     "vinemix-dsp/test/realtime_alloc": { "minimumPassed": 3, "ignored": ["parameter_edit_cost"] },
@@ -26,7 +26,7 @@
     "vinemix-engine/test/snapshot_gating": { "minimumPassed": 2, "ignored": ["inventory_churn", "polling_cost"] },
     "vinemix-ipc/lib/vinemix_ipc": { "minimumPassed": 0 },
     "vinemix-model/lib/vinemix_model": {
-      "minimumPassed": 37,
+      "minimumPassed": 38,
       "ignored": ["distortion::tests::makeup_table", "voice::tests::contour_table"]
     },
     "vinemix-oracle/lib/vinemix_oracle": { "minimumPassed": 0 },
@@ -40,8 +40,9 @@
     "vinemix-setup-helper/bin/vinemix-setup-helper": { "minimumPassed": 1 },
     "vinemix-ui/bin/vinemix": { "minimumPassed": 0 },
     "vinemix-ui/lib/vinemix_ui": {
-      "minimumPassed": 117,
+      "minimumPassed": 122,
       "ignored": [
+        "protocol::cache_tests::snapshot_poll_cost",
         "ui::app::tests::frame_cost",
         "update::tests::interop_read",
         "update::tests::interop_write"

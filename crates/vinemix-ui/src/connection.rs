@@ -88,6 +88,10 @@ pub struct Connection {
     cache: protocol::SnapshotCache,
     /// What the window is showing, sent with each request.
     interest: Option<serde_json::Value>,
+    /// Whether the request being sent asks the engine to save.
+    persist: bool,
+    /// The same, for the next request ([`set_persist`](Self::set_persist)).
+    persist_next: bool,
 }
 
 /// Remaining time of one request's deadline, honouring cancellation.
@@ -170,6 +174,8 @@ impl Connection {
             sent_any: false,
             cache: protocol::SnapshotCache::default(),
             interest: None,
+            persist: true,
+            persist_next: true,
         }
     }
 
@@ -182,6 +188,12 @@ impl Connection {
     /// What the window currently shows (`None`: everything, the default).
     pub fn set_interest(&mut self, interest: Option<serde_json::Value>) {
         self.interest = interest;
+    }
+
+    /// Whether the next request, and only that one, asks the engine to write
+    /// the settings file. False while a control is being dragged.
+    pub fn set_persist(&mut self, persist: bool) {
+        self.persist_next = persist;
     }
 
     pub fn set_request_timeout(&mut self, timeout: Duration) {
@@ -304,7 +316,7 @@ impl Connection {
         deadline: &Deadline<'_>,
     ) -> Result<Response, ConnectionError> {
         let id = platform::random_hex_id();
-        let mut message = protocol::request_with(&id, command, configuration, revision, self.cache.known(), self.interest.as_ref());
+        let mut message = protocol::request_with(&id, command, configuration, revision, self.cache.known(), self.interest.as_ref(), self.persist);
         if message.len() >= MAXIMUM_MESSAGE_BYTES {
             return Err(ConnectionError::InvalidData("The configuration exceeds the control-message limit.".into()));
         }
@@ -389,6 +401,9 @@ impl Connection {
         revision: Option<u64>,
         cancel: &AtomicBool,
     ) -> Result<Response, ConnectionError> {
+        // One request only, sent or not: the next configure saves unless it
+        // is told otherwise again.
+        self.persist = std::mem::replace(&mut self.persist_next, true);
         let closed = Arc::clone(&self.closed);
         let deadline = Deadline { until: Instant::now() + self.request_timeout, closed: &closed, cancel };
         deadline.check()?;

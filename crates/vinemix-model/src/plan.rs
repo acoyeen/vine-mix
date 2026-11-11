@@ -290,7 +290,7 @@ pub fn compile_graph(graph: &AudioGraph) -> Result<GraphPlan, ModelError> {
         range(source.echo.time_ms, 20.0, 2000.0, "Echo time must be between 20 and 2000 ms.")?;
         range(f64::from(source.echo.repeats), 1.0, 8.0, "Echo repeats must be a whole number between 1 and 8.")?;
         range(source.echo.mix, 0.0, 1.0, "Echo mix must be between 0 and 100 percent.")?;
-        range(source.distortion.drive_db, 0.0, 36.0, "Distortion drive must be between 0 and 36 dB.")?;
+        range(source.distortion.drive_db, 0.0, crate::distortion::MAXIMUM_DRIVE_DB, "Distortion drive must be between 0 and 60 dB.")?;
         range(source.distortion.tone_hz, 500.0, 18_000.0, "Distortion tone must be between 500 and 18000 Hz.")?;
         range(source.distortion.mix, 0.0, 1.0, "Distortion mix must be between 0 and 100 percent.")?;
         range(source.distortion.output_db, -24.0, 0.0, "Distortion output must be between -24 and 0 dB.")?;
@@ -736,7 +736,7 @@ mod tests {
         let plan = compile_graph(&graph(vec![distortion.clone(), other], vec![])).unwrap();
         let compiled = plan.nodes.iter().find(|n| n.id == "d").unwrap();
         assert_eq!(compiled.saturation, Saturation::of(&distortion.distortion));
-        assert!(compiled.saturation.drive_db == 24.0 && compiled.saturation.makeup_db < -14.0 && compiled.saturation.mix == 1.0);
+        assert!(compiled.saturation.drive_db == 24.0 && compiled.saturation.mix == 1.0);
         // Only a Distortion carries amounts; every other node is clean.
         assert_eq!(plan.nodes.iter().find(|n| n.id == "g").unwrap().saturation, Saturation::CLEAN);
         // The default leaves the level alone.
@@ -752,7 +752,7 @@ mod tests {
         voice.voice_color = VoiceColorSettings { tone: -1.0, ambience: 1.0 };
         let warm = compile_graph(&graph(vec![voice.clone()], vec![])).unwrap();
         assert_eq!(warm.nodes[0].voice_contour, VoiceContour::of(&voice.voice_color));
-        assert!(warm.nodes[0].voice_contour.low > 0.0 && warm.nodes[0].voice_contour.amount == 1.0);
+        assert!(warm.nodes[0].voice_contour.low > 0.0 && warm.nodes[0].voice_contour.amount == 1.0 + crate::voice::EDGE_DEPTH);
         // A mono voice stays mono through the node at any position.
         let mut mic = GraphNode::new("m", "microphone", "", 0.0, 0.0);
         mic.mono = true;

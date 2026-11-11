@@ -4,6 +4,7 @@
 //! the engine can never disagree about a field's meaning. Presentation and
 //! telemetry records are lenient: a newer engine may add fields.
 
+use serde::Deserialize as _;
 use serde_json::{json, Value};
 use vinemix_model::config::Configuration;
 use vinemix_model::status::{ApplicationInfo, EngineStatus, Endpoint};
@@ -77,7 +78,9 @@ fn text(value: &Value, key: &str) -> String {
 fn list<T: serde::de::DeserializeOwned>(value: &Value, key: &str) -> Result<Vec<T>, String> {
     match value.get(key) {
         None | Some(Value::Null) => Ok(Vec::new()),
-        Some(items) => serde_json::from_value(items.clone()).map_err(|e| format!("The engine sent an unreadable {key} list: {e}")),
+        // Read in place: `&Value` is itself a deserializer, so the reply's
+        // JSON tree is not copied first.
+        Some(items) => Vec::<T>::deserialize(items).map_err(|e| format!("The engine sent an unreadable {key} list: {e}")),
     }
 }
 
@@ -117,7 +120,8 @@ pub fn parse_snapshot_cached(value: &Value, cache: &mut SnapshotCache) -> Result
     };
     let status = match value.get("status") {
         None | Some(Value::Null) => EngineStatus::default(),
-        Some(status) => serde_json::from_value(status.clone()).map_err(|e| format!("The engine status is unreadable: {e}"))?,
+        // Telemetry arrives thirty times a second: read it in place.
+        Some(status) => EngineStatus::deserialize(status).map_err(|e| format!("The engine status is unreadable: {e}"))?,
     };
     Ok(Snapshot {
         settings_state: value.get("settingsState").and_then(Value::as_str).unwrap_or("loaded").to_owned(),
@@ -177,11 +181,14 @@ pub fn request_knowing(
     expected_revision: Option<u64>,
     known: Option<Value>,
 ) -> String {
-    request_with(request_id, command, configuration, expected_revision, known, None)
+    request_with(request_id, command, configuration, expected_revision, known, None, true)
 }
 
 /// A request that names held snapshot parts (`known`) and what the window is
-/// showing (`interest`), so the engine skips work nobody will see.
+/// showing (`interest`), so the engine skips work nobody will see. With
+/// `persist` false a configure is applied without writing the settings file
+/// (a control is still being dragged); an engine that does not know the
+/// field saves as before.
 pub fn request_with(
     request_id: &str,
     command: &str,
@@ -189,6 +196,7 @@ pub fn request_with(
     expected_revision: Option<u64>,
     known: Option<Value>,
     interest: Option<&Value>,
+    persist: bool,
 ) -> String {
     let mut message = json!({"protocolVersion": 1, "requestId": request_id, "command": command});
     if let Some(known) = known {
@@ -202,6 +210,9 @@ pub fn request_with(
     }
     if let Some(revision) = expected_revision {
         message["expectedRevision"] = json!(revision);
+    }
+    if !persist {
+        message["persist"] = json!(false);
     }
     vinemix_model::json::dump(&message)
 }
@@ -266,6 +277,56 @@ mod cache_tests {
         assert!(parse_snapshot_cached(&reduced("c2", "i1"), &mut cache).is_err(), "a new connection has no cache to draw on");
     }
 
+    /// What one poll of a running engine costs this side: a reply that
+    /// leaves out the unchanged configuration and device list and carries
+    /// telemetry for a 20-node canvas with one spectrum plot on screen. Run
+    /// with `cargo test --release -p vinemix-ui --lib snapshot_poll_cost -- --ignored --nocapture`.
+    #[test]
+    #[ignore = "benchmark; prints timings"]
+    fn snapshot_poll_cost() {
+        let mut configuration = vinemix_model::default_configuration();
+        configuration.version = 2;
+        configuration.graph = crate::graph::fresh();
+        while configuration.graph.nodes.len() < 20 {
+            let count = configuration.graph.nodes.len() as f64;
+            configuration.graph.nodes.push(crate::graph::new_node("eq", 100.0 * count, 40.0));
+        }
+        let nodes: Vec<Value> = configuration
+            .graph
+            .nodes
+            .iter()
+            .enumerate()
+            .map(|(index, node)| {
+                let spectrum: Vec<f32> = if index == 3 { (0..512).map(|bin| -90.0 + (bin % 60) as f32).collect() } else { Vec::new() };
+                json!({"id": node.id, "peak": 0.1, "peakLeft": 0.1, "peakRight": 0.08, "channels": 2, "spectrumDb": spectrum, "spectrumFrame": 100, "path": {"state": "Running", "rate": 48000, "channels": 2}})
+            })
+            .collect();
+        let full = json!({
+            "configuration": configuration.to_json(),
+            "endpoints": (0..12).map(|i| json!({"id": format!("example-{i}"), "name": format!("Example device {i}"), "direction": "render", "state": "Active"})).collect::<Vec<_>>(),
+            "applications": [],
+            "tokens": {"configuration": "c1", "inventory": "i1"},
+            "status": {"audioFrames": 240, "nodes": nodes},
+            "settingsState": "loaded",
+        });
+        let mut reply = full.clone();
+        reply.as_object_mut().unwrap().remove("configuration");
+        reply.as_object_mut().unwrap().remove("endpoints");
+        reply.as_object_mut().unwrap().remove("applications");
+        let line = vinemix_model::json::dump(&json!({"protocolVersion": 1, "requestId": "a", "ok": true, "snapshot": reply}));
+        let mut cache = SnapshotCache::default();
+        parse_snapshot_cached(&full, &mut cache).unwrap();
+        let rounds = 2_000;
+        let started = std::time::Instant::now();
+        let mut frames = 0;
+        for _ in 0..rounds {
+            let response = parse_response_cached(line.as_bytes(), &mut cache).unwrap();
+            frames += response.snapshot.unwrap().status.nodes.len();
+        }
+        let each = started.elapsed().as_secs_f64() / f64::from(rounds) * 1e6;
+        println!("one poll reply ({} bytes, {frames} node readings in all): {each:.1} microseconds", line.len());
+    }
+
     #[test]
     fn engines_without_tokens_always_send_and_are_never_cached() {
         let mut cache = SnapshotCache::default();
@@ -280,6 +341,20 @@ mod cache_tests {
         bare.as_object_mut().unwrap().remove("applications");
         assert!(parse_snapshot_cached(&bare, &mut cache).unwrap().endpoints.is_empty());
         assert_eq!(parse_snapshot(&legacy).unwrap().configuration.revision, 3, "the uncached reader is unchanged");
+    }
+
+    /// A dragged control's configure says `persist: false`; every other
+    /// request leaves the field out, so an engine saves as it always has.
+    #[test]
+    fn only_a_dragged_configure_asks_not_to_be_saved() {
+        let configuration = vinemix_model::default_configuration();
+        let dragged: Value = serde_json::from_str(&request_with("a", "configure", Some(&configuration), Some(3), None, None, false)).unwrap();
+        assert_eq!(dragged["persist"], false);
+        assert_eq!(dragged["expectedRevision"], 3);
+        let released: Value = serde_json::from_str(&request_with("a", "configure", Some(&configuration), Some(3), None, None, true)).unwrap();
+        assert!(released.get("persist").is_none());
+        let ordinary: Value = serde_json::from_str(&request("a", "configure", Some(&configuration), Some(3))).unwrap();
+        assert!(ordinary.get("persist").is_none());
     }
 
     #[test]

@@ -289,6 +289,10 @@ both node names and category names. Down/Enter/Escape navigate, add and dismiss.
 The toolbar uses flat controls, with the node count centred beneath the logo
 and Undo/Redo beside the editing controls. **Settings → Activity** opens session
 history. Connection status remains in the header; save status is in the footer.
+In the Rust edition a dragged control is applied at once and saved once, when
+it is released ([protocol](CONTROL_PROTOCOL.md#optional-request-fields-in-the-rust-engine-and-desktop-unreleased)),
+and the footer's right-hand side is the Audio load bar described in the
+[user guide](USER_GUIDE.md).
 Undo/Redo retain up to 100 graph edits for the current controller session:
 nodes, cables, assignments, parameters, mute, bypass, rename and layout edits.
 One pointer drag is one step, regardless of its duration; separate clicks,

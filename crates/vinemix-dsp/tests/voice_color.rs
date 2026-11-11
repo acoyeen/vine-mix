@@ -233,7 +233,7 @@ fn brightening_does_not_sharpen_sibilants() {
     for (name, voice) in [("low", low_voice()), ("high", high_voice())] {
         let dry_ess = band_burst_db(voice, 5_000.0, 10_000.0);
         let dry_bands = band_levels(voice);
-        for (tone, character, presence_gain, ess_limit) in [(0.0, 1.0, 4.0, 2.5), (1.0, 0.0, 2.0, 3.0), (1.0, 1.0, 6.0, 5.0)] {
+        for (tone, character, presence_gain, ess_limit) in [(0.0, 1.0, 4.0, 2.5), (1.0, 0.0, 2.0, 4.0), (1.0, 1.0, 6.0, 7.0)] {
             let output = voiced(voice, tone, character);
             let bands = band_levels(&output);
             // Presence relative to the mid band: the change in colour.

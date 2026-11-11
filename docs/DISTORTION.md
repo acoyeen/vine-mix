@@ -3,7 +3,9 @@
 Distortion is a self-contained effect in **Add → Effects**. It ranges from
 gentle warmth to strong saturation, and it accepts and sends stereo audio like
 the other effects. The design is VineMix's own, redesigned from first
-principles on 11 November 2026; it does not reproduce any other product.
+principles on 11 November 2026; it does not reproduce any other product. The
+top of the Drive range was extended the next day
+([what changed](#changes-on-12-november-2026)).
 
 This page describes the node in the Rust edition. The 0.5 C++ engine keeps the
 earlier design, an oversampled `tanh` curve, which the
@@ -14,7 +16,7 @@ describes. [Why it changed](#why-the-design-changed) is at the end.
 
 | Control | Range | Default | Result |
 |---|---|---|---|
-| Drive | 0 to 36 dB | 6 dB | How strongly the sound is saturated. It changes the character, not the loudness |
+| Drive | 0 to 60 dB | 6 dB | How strongly the sound is saturated. It changes the character, not the loudness |
 | Tone | 500 to 18000 Hz | 6000 Hz | Brightness of the driven sound (a first-order low-pass) |
 | Mix | 0 to 100% | 50% | Blend of the input and the driven sound |
 | Output | −24 to 0 dB | 0 dB | Trims the whole blend, including at Mix 0% |
@@ -46,7 +48,7 @@ fewer harmonics than the rest.
 ### 2. A standard level
 
 The node learns the level of the driven band: its mean power while it sounds.
-Anything above −70 dBFS and within 20 dB of the level so far counts. The level
+Anything above −80 dBFS and within 20 dB of the level so far counts. The level
 is learned in the first quarter of a second of sound and then averaged over
 about 2.5 seconds. The band is brought to a standard level (−22 dBFS) before
 the curve and taken back afterwards.
@@ -60,7 +62,9 @@ and a hot one, at the same Drive, get the same saturation.
 - A source that drops for good is followed down. In the test, a voice that
   fell 20 dB was within 1.5 LU of its settled treatment 24 seconds later.
 - For a quarter of a second from the first sound after the node is created
-  or reset, it moves from the input's own level to the learned one.
+  or reset, it moves from the input's own level to the learned one. Until it
+  arrives the curve is driven less than Drive says, and the sound still
+  leaves at the level it came in at, whatever that level is.
 
 ### 3. The curve
 
@@ -78,33 +82,44 @@ delay line.
 
 On a steady 997 Hz tone at Mix 100%, at any input level:
 
-| Drive | 0 dB | 6 dB | 12 dB | 18 dB | 24 dB | 36 dB |
-|---|---:|---:|---:|---:|---:|---:|
-| Second harmonic (dBc) | −35 | −29 | −24 | −21 | −21 | −30 |
-| Third harmonic (dBc) | −60 | −48 | −36 | −25 | −17 | −11 |
-| All harmonics (dB) | −35 | −29 | −23 | −19 | −15 | −10 |
+| Drive | 0 dB | 6 dB | 12 dB | 18 dB | 24 dB | 36 dB | 48 dB | 60 dB |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Second harmonic (dBc) | −35 | −29 | −24 | −21 | −21 | −30 | −42 | −54 |
+| Third harmonic (dBc) | −60 | −48 | −36 | −25 | −17 | −11 | −10 | −10 |
+| All harmonics (dB) | −35 | −29 | −23 | −19 | −15 | −10 | −8 | −8 |
+
+On a steady tone the harmonics stop growing above about 48 dB: the wave is
+already square. On speech the upper part of the range keeps working, because
+it reaches further down into the quiet parts of each word. A voice at Drive
+36 dB still has its loud syllables squared and its soft ones only bent; at
+60 dB nearly all of it is squared. Measured as the share of the output that
+is no longer a scaled copy of the input, one node at 60 dB changes the test
+voices as much as two nodes in a row at 36 dB each (−2.4 dB against −2.2 dB
+of the output; one node at 36 dB changes −3.8 dB).
 
 ### 4. Loudness
 
 After the curve a makeup gain returns the driven band to the level it came
 in at. Because the curve always sees the same standard level, that gain
-depends on Drive alone, and it is worked out when the configuration is
-compiled: the gain that returns a speech-like signal (a Laplace distribution
-of sample values) at the standard level to its own level.
+depends on Drive alone: it is the gain that returns a speech-like signal (a
+Laplace distribution of sample values) at the standard level to its own
+level. It is tabulated for every whole decibel of Drive, and the processor
+reads the table for the Drive of each frame.
 
-| Drive | 0 dB | 6 dB | 12 dB | 18 dB | 24 dB | 36 dB |
-|---|---:|---:|---:|---:|---:|---:|
-| Makeup (dB) | +0.1 | −5.7 | −10.9 | −15.1 | −18.1 | −21.3 |
-| Gain for sound well below the level (dB) | +0.1 | +0.3 | +1.1 | +2.9 | +5.9 | +14.7 |
+| Drive | 0 dB | 6 dB | 12 dB | 18 dB | 24 dB | 36 dB | 48 dB | 60 dB |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Makeup (dB) | +0.1 | −5.7 | −10.9 | −15.1 | −18.1 | −21.3 | −22.3 | −22.7 |
+| Gain for sound well below the level (dB) | +0.1 | +0.3 | +1.1 | +2.9 | +5.9 | +14.7 | +25.7 | +37.3 |
 
 Saturation holds the loud parts and so lifts the quiet ones; the second row
 is by how much. That lift is withheld from sound far below the learned level:
 it is complete down to 30 dB below, and gone at 45 dB below. Room noise
 between words is therefore not raised, at any Drive. Nothing is driven before
-the node has heard a sound above −70 dBFS.
+the node has heard a sound above −80 dBFS.
 
-On the test voices the driven sound lies between 0.1 and 1.0 LU below the dry
-loudness at every Drive (Tone at its default, Mix 100%).
+On the test voices the driven sound is within 1.0 LU of the dry loudness at
+every Drive (Tone at its default, Mix 100%), and the same holds for the same
+voices 20 and 30 dB quieter.
 
 ### 5. Tone, Mix, ceiling and Output
 
@@ -122,17 +137,18 @@ loudness at every Drive (Tone at its default, Mix 100%).
 
 ## Live edits and compatibility
 
-Each control glides to its new value over 10 ms. Drive and its makeup glide
-together in decibels, so a change across the whole range in one step stays
-within about 5 dB of the settled level on the way. Filter state and the
+Each control glides to its new value over 10 ms. Drive glides in decibels,
+and the gain after the curve is derived from the gain into it on every frame,
+so the two cannot disagree: a change across the whole range in one step stays
+within 5 dB of the settled level on the way. Filter state and the
 learned level carry across edits and keep following live input while the node
 is bypassed. Reset, or removing and re-adding the node, starts the learning
 again. Processing uses under a kilobyte of fixed state and never allocates;
-one node costs about 0.13% of one core in the offline benchmark (about 28 ns
-per frame on the development machine; the earlier design measured 160 to
-200 ns there).
+one node costs about 0.15% of one core in the offline benchmark (28 to 37 ns
+per frame across runs on the development machine; the earlier design
+measured 160 to 200 ns there).
 
-Drive must be in [0, 36] dB, Tone in [500, 18000] Hz, Mix in [0, 1] and
+Drive must be in [0, 60] dB, Tone in [500, 18000] Hz, Mix in [0, 1] and
 Output in [−24, 0] dB. The configuration format is unchanged and nothing is
 migrated. Existing Distortion nodes intentionally sound different from the
 earlier design, and one saved with a low Output to offset the old node's gain
@@ -147,25 +163,29 @@ route around it.
 - **Aliasing at extreme settings.** What is neither the tone nor one of its
   harmonics measures, relative to the tone:
 
-  | Tone | Drive 12 dB | 18 dB | 24 dB | 36 dB |
-  |---|---:|---:|---:|---:|
-  | 220 Hz | −101 | −91 | −85 | −81 |
-  | 997 Hz | −101 | −92 | −85 | −61 |
-  | 3 kHz | −101 | −91 | −65 | −36 |
-  | 5 kHz | −91 | −66 | −48 | −34 |
+  | Tone | Drive 12 dB | 18 dB | 24 dB | 36 dB | 48 dB | 60 dB |
+  |---|---:|---:|---:|---:|---:|---:|
+  | 220 Hz | −101 | −91 | −85 | −81 | −74 | −48 |
+  | 997 Hz | −101 | −92 | −85 | −61 | −38 | −33 |
+  | 3 kHz | −101 | −91 | −65 | −36 | −30 | −29 |
+  | 5 kHz | −91 | −66 | −48 | −34 | −30 | −30 |
 
   Voices have little steady energy in the bottom-right corner of that table; a
-  high, pure tone driven to the top of the range will alias audibly. The
+  pure tone driven to the top of the range will alias audibly, and above
+  36 dB that includes tones in the middle of the voice's range. The
   earlier design, with eight-times oversampling, stayed below −110 dB almost
   everywhere (−75 dB at 5 kHz, Drive 36 dB). This is the one measurement on
   which the new design is worse.
 - **Noise close to the voice.** Noise within about 30 dB of the voice's level
-  is treated as part of the sound and is lifted with it at high Drive
-  (+6 dB at Drive 36 dB). Use a Gate or Denoiser before the node.
+  is treated as part of the sound and is lifted with it at high Drive: noise
+  30 dB below the voice rises by 6 dB at Drive 36 dB, 16 dB at 48 dB and
+  23 dB at 60 dB. (Two nodes in a row at 36 dB raised it by 18 dB.) Noise
+  40 dB below the voice is not raised at any Drive. Use a Gate or Denoiser
+  before the node.
 - **Loudness is matched for speech.** A steady tone at the same Drive comes
   out up to about 1.5 dB louder than it went in. Music has not been measured.
 - **A long silence.** By design, and not separately tested: after a minute or
-  two of room noise alone (above −70 dBFS), the node takes the room for the
+  two of room noise alone (above −80 dBFS), the node takes the room for the
   source. The noise is then driven, at its own loudness; the next loud sound
   is taken up at once.
 - **Stereo.** The level is shared by both channels and the curve is applied
@@ -175,10 +195,13 @@ route around it.
 
 `cargo test -p vinemix-dsp --test distortion` holds the behaviour above: the
 input unchanged at Mix 0% and in Bypass, no delay, loudness within 1.5 LU of
-dry for two test voices at six Drive settings, the same harmonics at input
-levels 42 dB apart, harmonics that grow with Drive, mostly second harmonic at
-gentle settings, the aliasing figures above, room noise left alone after
-speech and before the first sound, a clean start after a quiet wait,
+dry for two test voices at eight Drive settings, the same harmonics at input
+levels 42 dB apart and the same loudness for voices 20 and 30 dB quieter,
+harmonics that grow with Drive, full Drive reaching what two nodes at 36 dB
+reached, mostly second harmonic at gentle settings, the aliasing figures
+above, room noise left alone after speech and before the first sound, a first
+sound that leaves at its own level at four input levels, a clean start after
+a quiet wait,
 following a 20 dB drop and rise, the peak ceiling, linked channels, silent
 output for silent input, the Tone response, the Output trim, a change of
 Drive across its whole range in one step, and smooth output while every
@@ -193,7 +216,7 @@ whether it suits a voice. To hear it:
 ```
 
 writes, for every 48 kHz WAV file in `artifacts\distortion\source` (synthetic
-speech is generated there if it is empty), the node's output at six settings,
+speech is generated there if it is empty), the node's output at eight settings,
 a copy of each matched to the dry loudness, and a loudness table. Put a
 recording of your own voice in that folder to hear the node on it. The folder
 is ignored by Git; keep personal recordings out of the repository. Nothing is
@@ -225,3 +248,29 @@ hand. Its oversampling filters kept aliasing very low at eight times the
 processing and a fixed delay. These are measurements and design observations.
 The maintainer's listening comparison of the two is still to come; the
 figures do not say which sounds better.
+
+## Changes on 12 November 2026
+
+After trying the node, the maintainer wanted it to be able to go further:
+two nodes in a row with Drive and Mix at their maximum gave the strength they
+were after.
+
+- **Drive now reaches 60 dB** (it stopped at 36). Settings from 0 to 36 dB
+  sound as they did. One node at 60 dB changes the test voices about as much
+  as the two nodes did; it is not the same sound, and it has not been
+  compared by ear.
+- **A fault at the start was found and corrected.** For the first quarter of
+  a second after the node was created or reset, the gain back from the
+  standard level lagged the gain to it. A quiet source therefore started far
+  too loud: a voice at −44 dBFS left 38 dB too loud in its first 5 ms, and
+  one at −24 dBFS, 18 dB. The gain after the curve is now derived from the
+  gain into it on every frame, and the first sound leaves within 0.1 dB of
+  its own level in the same measurement. The earlier tests started the node
+  only on a voice near the standard level and measured later than the first
+  5 ms.
+- **The makeup is read from a table for the Drive of each frame**, instead of
+  being worked out once per setting and glided beside Drive.
+- **The level tracker hears down to −80 dBFS** (it was −70), so the soft parts
+  of a very quiet source are counted as they are for a louder one.
+
+The extended range costs aliasing and noise, as the tables above show.

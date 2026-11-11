@@ -261,11 +261,14 @@ impl EngineLink {
             };
             let mut state = self.state();
             let was_connected = state.can_edit();
-            state.accept(snapshot.clone(), false)?;
+            // The model keeps the snapshot. A copy is taken back out only on
+            // the rare poll that also sends edits, not on every one.
+            let frames = snapshot.status.audio_frames;
+            state.accept(snapshot, false)?;
             let now = state.seconds();
-            if !was_connected || now - state.last_poll > 8.0 || state.last_frames != snapshot.status.audio_frames {
+            if !was_connected || now - state.last_poll > 8.0 || state.last_frames != frames {
                 state.last_frame_advance = now;
-                state.last_frames = snapshot.status.audio_frames;
+                state.last_frames = frames;
             }
             state.last_poll = now;
             if !state.has_settings_recovery() && !state.is_update_health_mode() && now - state.last_frame_advance >= 6.0 {
@@ -278,12 +281,16 @@ impl EngineLink {
                 return Ok(true);
             }
             if state.can_edit() && state.is_pending_save_due() {
+                let Some(snapshot) = state.snapshot().cloned() else { return Ok(false) };
                 let batch = state.prepare_pending_configuration(&snapshot.configuration);
                 if batch.is_empty() {
                     return Ok(false);
                 }
                 state.begin_dispatch();
                 drop(state);
+                if let Some(connection) = io.connection.as_mut() {
+                    connection.set_persist(batch.persist);
+                }
                 let configured =
                     self.request(io, "configure", Some(&batch.configuration), Some(snapshot.configuration.revision), None).map_err(|e| e.message())?;
                 self.state().handle_configure_response(&batch, &snapshot, configured)?;

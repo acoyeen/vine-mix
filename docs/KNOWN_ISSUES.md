@@ -85,7 +85,11 @@ released. The review tracker records what remains open.
 
 | ID | Issue | Status |
 | --- | --- | --- |
-| [ISSUE-050](#issue-050) | Distortion's strength and loudness depend on the input level, and it delays the signal | Confirmed by measurement in 0.5; redesigned in the Rust source; listening comparison pending; unreleased |
+| [ISSUE-054](#issue-054) | Audio load details show several percentages that read as a disagreement | Reported by the maintainer; replaced in the Rust source by one figure on a bar; seen in the design preview only; unreleased |
+| [ISSUE-053](#issue-053) | A middle-button drag that starts over a Rust dial turns the dial as well as panning | Reported by the maintainer; resolved in source; pointer regression passes; unreleased |
+| [ISSUE-052](#issue-052) | Dragging a control writes the settings file about ten times a second | Reported by the maintainer; resolved in the Rust source; engine and desktop tests pass; unreleased |
+| [ISSUE-051](#issue-051) | The redesigned Distortion starts far too loud on a quiet source | Found by measurement and resolved in source before any release; unreleased |
+| [ISSUE-050](#issue-050) | Distortion's strength and loudness depend on the input level, and it delays the signal | Confirmed by measurement in 0.5; redesigned in the Rust source; Drive extended to 60 dB on 12 November; listening comparison pending; unreleased |
 | [ISSUE-049](#issue-049) | Voice Color grows quieter, not steadier, and sharper in sibilants as Character rises | Confirmed by measurement in 0.5; redesigned in the Rust source; listening comparison pending; unreleased |
 | [ISSUE-045](#issue-045) | Typing on a focused Rust dial doubles the first digit | Resolved in source; typing regression passes; unreleased |
 | [ISSUE-046](#issue-046) | Escape in Rust Settings search closes the menu instead of clearing the search | Resolved in source; search tests pass; unreleased |
@@ -135,6 +139,113 @@ released. The review tracker records what remains open.
 | [ISSUE-026](#issue-026) | Echo Time changes replay stored repeat mixtures | Resolved in 0.5.0 Beta; listening refinement confirmed by maintainer |
 | [ISSUE-027](#issue-027) | Maximum Distortion graph has insufficient routing-fade timing margin | Optimized, offline verified and integrated; maximum-graph margin remains limited |
 | [ISSUE-028](#issue-028) | Short cables fold back instead of flowing directly between sockets | Resolved in 0.5.0 Beta; detached geometry and rendering verified |
+
+<a id="issue-054"></a>
+## ISSUE-054: Audio load details show several percentages that read as a disagreement
+
+- **Reported:** 2026-11-12, by the maintainer, in the running Rust edition:
+  the details window listed an average load of 5% and a recent peak of 15%
+  among other figures, and it was not clear which to trust. They asked for a
+  bar that fills, a realistic percentage and a simpler presentation.
+  **Status:** Replaced in the Rust source; unreleased. The 0.5 WPF desktop
+  keeps the earlier window.
+- **Cause:** Not a measurement fault. The two figures answer different
+  questions. The average is the share of each 5 ms of sound that processing
+  takes, over the last second. The peak is the single slowest 5 ms of that
+  second, which one interruption by another program decides. The window
+  listed both as plain percentages, with a steady peak, a routing-change
+  peak, overruns and missed deadlines, and long qualifications.
+- **Correction:** The footer shows a bar and one figure, the average. The
+  peak is a mark on the same bar, not a second number. The bar is green,
+  amber from 70% and red at risk, following the engine's own states. Clicking
+  it opens the same bar, larger, with three or four plain sentences and one
+  count of moments that ran late (a late start and an overrun are counted
+  once). The engine's telemetry and its warning policy are unchanged.
+  `crates/vinemix-ui/src/processing_load.rs` and the footer and dialog in
+  `crates/vinemix-ui/src/ui/app.rs`.
+- **Verification:** Unit tests for the wording, the single late count and
+  the stale and invalid cases. The footer and the details window were
+  captured from the design preview (`--preview --preview-fixture`, no engine
+  and no settings) at 5% and at 78% with late moments, and looked at. A
+  preview's fixture reading no longer goes stale after two seconds.
+- **Not verified:** Against the running engine, at other display scales, or
+  with a screen reader. Whether the average is the figure the maintainer
+  wants as the headline is their call; the peak is one line of code away.
+
+<a id="issue-053"></a>
+## ISSUE-053: A middle-button drag that starts over a Rust dial turns the dial as well as panning
+
+- **Reported:** 2026-11-12, by the maintainer, in the running Rust edition.
+  **Status:** Resolved in source; unreleased.
+- **Cause verified:** The dial's face reacted to a drag by any pointer
+  button. The canvas pans on the middle button whatever is under the
+  pointer, so both happened.
+- **Correction:** Only the primary button starts, continues and ends a dial
+  drag (`crates/vinemix-ui/src/ui/dial.rs`). The Voice Color pad, the EQ plot
+  and node dragging already asked for the primary button.
+- **Verification:** `only_the_primary_button_turns_a_dial` drags over a dial
+  face with the middle, secondary and primary buttons at three zoom levels:
+  the first two leave the value and the edit history alone, the third turns
+  the dial. Not tried with a physical mouse.
+
+<a id="issue-052"></a>
+## ISSUE-052: Dragging a control writes the settings file about ten times a second
+
+- **Reported:** 2026-11-12, by the maintainer, who saw the save status
+  flicker while dragging the Voice Color pad and asked for one save when the
+  control is released. **Status:** Resolved in the Rust source; unreleased.
+- **Cause verified:** The desktop sends the whole configuration to the
+  engine every 100 ms while a control moves, so the change is heard, and the
+  engine wrote the settings file, durably, for each one. This applied to
+  every dial, the pad, EQ bands and node positions.
+- **Correction:** A `configure` request may carry `persist: false`
+  ([protocol](CONTROL_PROTOCOL.md)). The engine applies it and leaves the
+  file alone. The desktop sends that while an edit gesture is open and the
+  control has moved in the last two seconds, and an ordinary `configure`
+  when the gesture ends. One entry stays in the desktop's queue of unsaved
+  edits until that save is confirmed, so quitting, restarting the engine and
+  updating still wait for it, and the footer reads "Adjusting · saves when
+  you let go" in the meantime. The engine also writes an unsaved
+  configuration when its client disconnects, on shutdown and when it stops.
+- **Verification:** `a_drag_is_applied_live_and_saved_on_release` and
+  `single_edits_and_stalled_drags_are_saved` in the desktop;
+  `edit_cost.rs` in the engine, which checks that 20 dragged configures
+  leave the file byte-identical, that the release writes the final value,
+  and that a flush writes what a departed client left. Edits made with the
+  keyboard or by typing are saved as before, one write per 100 ms at most.
+- **What it costs:** If the engine process is killed during a drag, that
+  drag is lost; before, at most the last 100 ms was. Not exercised against
+  the running application, or with a 0.5 engine (which ignores the field and
+  saves every time).
+
+<a id="issue-051"></a>
+## ISSUE-051: The redesigned Distortion starts far too loud on a quiet source
+
+- **Found:** 2026-11-12, by measurement, while extending the Drive range. It
+  was present in the redesign committed the day before
+  ([ISSUE-050](#issue-050)) and in the build the maintainer was running.
+  **Status:** Resolved in source; unreleased.
+- **Evidence:** A synthetic voice at −44 dBFS left the node 38 dB too loud in
+  its first 5 ms and several decibels too loud for the next 10 ms; at
+  −24 dBFS the first 5 ms were 18 dB too loud. This happened at any Drive,
+  including 0 dB. It showed first as a 20 dB quieter voice measuring 1.4 LU
+  louder than expected at Drive 60 dB, because the loudness measure includes
+  the start.
+- **Cause verified:** The gain that brings the sound to the standard level
+  and the gain that takes it back were set by separate rules. At the first
+  sound the level estimate is still very low, so the makeup allowed for a
+  drive the curve was not yet receiving while the gain back was still at
+  rest. The earlier tests started the node on a voice near the standard
+  level and looked no earlier than the first 50 ms.
+- **Correction:** The gain after the curve is now the small-signal gain for
+  the drive in effect divided by the gain into the curve, on every frame, so
+  the two cannot disagree. `crates/vinemix-dsp/src/effects/distortion.rs`.
+- **Verification:** `the_first_sound_leaves_at_its_own_level` (voices at
+  +12, 0, −20 and −30 dB, three Drive settings, in 20 ms steps) and
+  `a_quieter_source_gets_the_same_treatment`, now at 20 and 30 dB quieter
+  and within 1 LU. In the trace that showed the fault, every 5 ms step of
+  the first 100 ms is within 0.2 dB of the input at Drive 0. Synthetic
+  signals only.
 
 <a id="issue-050"></a>
 ## ISSUE-050: Distortion's strength and loudness depend on the input level, and it delays the signal
@@ -191,6 +302,16 @@ released. The review tracker records what remains open.
   after that. The defaults for Drive (6 dB) and Mix (50%) are unchanged and
   are now deliberately gentle; whether a new node should start stronger is
   the maintainer's choice.
+- **12 November 2026:** After trying the node the maintainer asked for more
+  at the top: two nodes in a row at full Drive and Mix gave the strength they
+  wanted. Drive now reaches 60 dB; 0 to 36 dB is unchanged. One node at
+  60 dB changes the test voices about as much as those two nodes (−2.4 dB of
+  the output against −2.2 dB; −3.8 dB at 36 dB). At 60 dB aliasing is about
+  −30 dB for tones from 1 to 5 kHz and −48 dB at 220 Hz, and noise 30 dB
+  below the voice rises by 23 dB (18 dB through the two nodes); noise 40 dB
+  below is still not raised. The makeup became a table read for the Drive of
+  each frame. 20 checks. A fault at the start of the node was found and
+  corrected on the way ([ISSUE-051](#issue-051)). Not compared by ear.
 
 <a id="issue-049"></a>
 ## ISSUE-049: Voice Color grows quieter, not steadier, and sharper in sibilants as Character rises
@@ -236,6 +357,16 @@ released. The review tracker records what remains open.
   The strengths at the edges of the pad are constants in the model file and
   are expected to be adjusted after that. The harmonics are generated per
   channel, so an off-centre voice shifts by a fraction of a decibel.
+- **12 November 2026:** After trying the node the maintainer asked for its
+  extremes to go further. Each axis now bends upward towards its edge: the
+  contour at an edge is one and a half times what it was, in decibels (+9 dB
+  of tilt, +10.5 dB of body and presence), and full Character is 1.3 times as
+  deep (about 14:1). Half Character moves by 12% and 7%. On the test voices
+  full Character narrows the spread of loudness from 9.2 to 5.0 dB (6.1
+  before), loudness stays within about 2 LU quieter and 2.5 LU louder than
+  dry across the pad, and the Bright, full-Character corner makes sibilants
+  stand out about 6 dB more than dry (under 4 before), with the guard
+  starting a little earlier. 17 checks. Not compared by ear.
 
 <a id="issue-048"></a>
 ## ISSUE-048: Rust crate notices state MIT terms for crates that publish no licence file

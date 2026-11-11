@@ -71,6 +71,8 @@ pub struct App {
     pub updates: super::updates::UpdatesUi,
     last_load_refresh: f64,
     last_load_details: String,
+    /// Where the footer's load bar is drawn: it glides to each new reading.
+    load_shown: f32,
     dismissed_processing_notice: Option<u64>,
     preview: bool,
     exit_flag: Arc<AtomicBool>,
@@ -114,6 +116,32 @@ fn seconds() -> f64 {
 }
 
 /// Save status in the footer (`CompactSaveStatus`).
+/// The audio-load bar: the full width is 100% of the engine's time. `load`
+/// fills it from the left; `peak` (the busiest moment of the last second)
+/// is a mark on it. Green, then amber from 70%, then red: the same steps as
+/// the engine's own "busy" and "at risk" states, which `state` carries.
+fn load_bar(painter: &egui::Painter, rect: Rect, load: f32, peak: Option<f32>, state: &str) {
+    painter.rect_filled(rect, 1.0, theme::METER_UNLIT);
+    let at = |percent: f32| rect.left() + rect.width() * (percent / 100.0).clamp(0.0, 1.0);
+    let color = match state {
+        "overloaded" => theme::METER_HIGH,
+        "busy" => theme::METER_MID,
+        _ if load >= 100.0 => theme::METER_HIGH,
+        _ if load >= 70.0 => theme::METER_MID,
+        _ => theme::METER_LOW,
+    };
+    if load > 0.0 {
+        // Never less than a sliver, so a working engine is visibly working.
+        let right = at(load).max(rect.left() + 2.0);
+        painter.rect_filled(Rect::from_min_max(rect.min, Pos2::new(right, rect.bottom())), 1.0, color);
+    }
+    if let Some(peak) = peak {
+        let x = at(peak).clamp(rect.left() + 1.0, rect.right() - 1.0);
+        let mark = if peak >= 100.0 { theme::METER_HIGH } else { theme::TEXT };
+        painter.rect_filled(Rect::from_min_max(Pos2::new(x - 1.0, rect.top()), Pos2::new(x + 1.0, rect.bottom())), 0.0, mark);
+    }
+}
+
 fn compact_status(status: &str) -> &str {
     if status.starts_with("Saved ·") {
         "Saved"
@@ -188,6 +216,7 @@ impl App {
             whats_new,
             last_load_refresh: 0.0,
             last_load_details: String::new(),
+            load_shown: 0.0,
             dismissed_processing_notice: None,
             updates: {
                 let mut updates = super::updates::UpdatesUi::default();
@@ -726,22 +755,56 @@ impl App {
             let mixer = self.mixer();
             (mixer.save_status.clone(), mixer.reduced_animation())
         };
-        // The load readout keeps 248 px on the right (232 px button, 6/8 px
+        // The load meter keeps 248 px on the right (232 px control, 6/8 px
         // margins); the save state stays centred with a symmetric reserve.
-        let (label, alert, available) = {
-            let mixer = self.mixer();
-            let load = mixer.processing_load();
-            (load.label.clone(), matches!(load.state, "busy" | "overloaded"), load.available)
-        };
+        let load = self.mixer().processing_load().clone();
+        let alert = matches!(load.state, "busy" | "overloaded");
         let load_rect = Rect::from_min_size(Pos2::new(rect.right() - 8.0 - 232.0, rect.center().y - 13.0), Vec2::new(232.0, 26.0));
-        let style = ButtonStyle { text: if alert { theme::ALERT_TEXT } else { theme::MUTED }, ..ButtonStyle::toolbar(12.0) };
-        let help = if available {
-            "Audio processing load\nOpens recent peaks and missed deadlines for the whole canvas."
+        let help = if load.available {
+            "Audio load\nHow much of its time the audio engine is using. The mark is the busiest moment of the last second. Opens the details."
         } else {
-            "Audio processing load\nMeasurements are unavailable. Opens the details."
+            "Audio load\nThere is no reading right now. Opens the details."
         };
-        let load_button = widgets::button(ui, Id::unique("processing-load"), load_rect, &label, style, true, 1.0);
-        load_button.widget_info(|| egui::WidgetInfo::labeled(egui::accesskit::Role::Button, true, format!("Audio processing load: {}", label.replace("Audio load ", ""))));
+        let load_button = ui.interact(load_rect, Id::unique("processing-load"), Sense::click());
+        load_button.widget_info(|| egui::WidgetInfo::labeled(egui::accesskit::Role::Button, true, format!("Audio load: {}", load.label.replace("Audio load ", ""))));
+        {
+            // The bar glides to each reading; with reduced animation, and
+            // when there is no reading, it is simply drawn where it belongs.
+            let target = if load.available { load.load as f32 } else { 0.0 };
+            if reduced || !load.available || !crate::platform::client_area_animation() {
+                self.load_shown = target;
+            } else {
+                let elapsed = ui.input(|i| i.stable_dt).clamp(0.0, 0.25);
+                self.load_shown += (target - self.load_shown) * (1.0 - (-elapsed / 0.12).exp());
+                if (target - self.load_shown).abs() > 0.05 {
+                    ui.ctx().request_repaint_after(std::time::Duration::from_millis(33));
+                } else {
+                    self.load_shown = target;
+                }
+            }
+            let face = if load_button.is_pointer_button_down_on() {
+                theme::CONTROL_BORDER
+            } else if load_button.hovered() {
+                theme::BUTTON_HOVER
+            } else {
+                Color32::TRANSPARENT
+            };
+            painter.rect_filled(load_rect, 0.0, face);
+            let font = theme::font(12.0, Weight::Regular);
+            let text = if alert { theme::ALERT_TEXT } else { theme::MUTED };
+            let name = painter.text(Pos2::new(load_rect.left() + 8.0, load_rect.center().y), Align2::LEFT_CENTER, "Audio load", font.clone(), text);
+            // Room for "100%" at this size, so the bar keeps its width as the reading changes.
+            let value_left = load_rect.right() - 8.0 - 34.0;
+            painter.text(Pos2::new(load_rect.right() - 8.0, load_rect.center().y), Align2::RIGHT_CENTER, load.value(), font, if alert { theme::ALERT_TEXT } else { theme::TEXT });
+            let bar = Rect::from_min_max(Pos2::new(name.right() + 10.0, load_rect.center().y - 4.0), Pos2::new(value_left - 8.0, load_rect.center().y + 4.0));
+            load_bar(&painter, bar, self.load_shown, load.available.then_some(load.peak as f32), load.state);
+            if load_button.has_focus() {
+                painter.rect_stroke(load_rect.shrink(2.0), 2.0, Stroke::new(1.0, theme::FOCUS), egui::StrokeKind::Inside);
+            }
+            if load_button.hovered() {
+                ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+            }
+        }
         if load_button.tip(help).clicked() && matches!(self.overlay, Overlay::None) {
             self.mixer().refresh_processing_load(None);
             self.overlay = Overlay::ProcessingLoad;
@@ -811,17 +874,28 @@ impl App {
         }
     }
 
-    /// Audio processing load details (`CreateProcessingLoadDetails`).
+    /// Audio load details: the same bar, larger, and a few plain sentences.
     fn processing_load_dialog(&mut self, ui: &mut Ui, area: Rect) -> bool {
-        let details = self.mixer().processing_load().details.clone();
-        let spec = super::dialog::Spec { footer_gap: 12.0, ..super::dialog::Spec::new("processing-load", 580.0f32.min(area.width() - 32.0)) };
+        let load = self.mixer().processing_load().clone();
+        let details = load.details.clone();
+        let spec = super::dialog::Spec { footer_gap: 12.0, ..super::dialog::Spec::new("processing-load", 460.0f32.min(area.width() - 32.0)) };
         let closed = super::dialog::show(
             ui,
             area,
             spec,
             |ui| {
-                super::dialog::text(ui, "Audio processing load", 18.0, Weight::SemiBold, theme::TEXT, None);
-                ui.add_space(14.0);
+                super::dialog::text(ui, "Audio load", 18.0, Weight::SemiBold, theme::TEXT, None);
+                ui.add_space(16.0);
+                let (row, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 24.0), Sense::hover());
+                let alert = matches!(load.state, "busy" | "overloaded");
+                ui.painter().text(row.right_center(), Align2::RIGHT_CENTER, load.value(), theme::font(20.0, Weight::SemiBold), if alert { theme::ALERT_TEXT } else { theme::TEXT });
+                let bar = Rect::from_min_max(Pos2::new(row.left(), row.center().y - 7.0), Pos2::new(row.right() - 68.0, row.center().y + 7.0));
+                load_bar(ui.painter(), bar, if load.available { load.load as f32 } else { 0.0 }, load.available.then_some(load.peak as f32), load.state);
+                let (scale, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 16.0), Sense::hover());
+                let small = theme::font(11.0, Weight::Regular);
+                ui.painter().text(Pos2::new(bar.left(), scale.center().y), Align2::LEFT_CENTER, "0%", small.clone(), theme::MUTED);
+                ui.painter().text(Pos2::new(bar.right(), scale.center().y), Align2::RIGHT_CENTER, "100%", small, theme::MUTED);
+                ui.add_space(12.0);
                 super::dialog::text(ui, &details, 13.0, Weight::Regular, theme::TEXT, None);
             },
             |_| {},

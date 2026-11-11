@@ -342,3 +342,44 @@ fn double_click_on_the_entry_resets_to_the_default() {
     assert_eq!(dial.value, 0.0, "the double-click reset contract is unchanged");
 }
 
+/// Dragging with the given button from the middle of the dial face upwards.
+fn face_drag(dial: &mut Fixture, button: egui::PointerButton) -> (bool, bool) {
+    let from = dial.face.center();
+    let to = from - Vec2::new(0.0, 60.0 * dial.scale);
+    let (mut started, mut ended) = (false, false);
+    let mut frame = |dial: &mut Fixture| {
+        let outcome = dial.frame();
+        started |= outcome.gesture_started;
+        ended |= outcome.gesture_ended;
+    };
+    dial.harness.move_to(from);
+    frame(dial);
+    dial.harness.event(egui::Event::PointerButton { pos: from, button, pressed: true, modifiers: Modifiers::NONE });
+    frame(dial);
+    for step in 1..=6 {
+        dial.harness.move_to(from + (to - from) * (step as f32 / 6.0));
+        frame(dial);
+    }
+    dial.harness.event(egui::Event::PointerButton { pos: to, button, pressed: false, modifiers: Modifiers::NONE });
+    frame(dial);
+    frame(dial);
+    (started, ended)
+}
+
+/// The middle button pans the canvas. Starting that drag over a dial used to
+/// turn the dial as well.
+#[test]
+fn only_the_primary_button_turns_a_dial() {
+    for scale in ZOOMS {
+        for button in [egui::PointerButton::Middle, egui::PointerButton::Secondary] {
+            let mut dial = Fixture::new(scale);
+            let (started, ended) = face_drag(&mut dial, button);
+            assert_eq!(dial.value, VALUE, "zoom {scale}, {button:?}: the value is untouched");
+            assert!(!started && !ended && !dial.state.dragging, "zoom {scale}, {button:?}: no edit gesture");
+        }
+        let mut dial = Fixture::new(scale);
+        let (started, ended) = face_drag(&mut dial, egui::PointerButton::Primary);
+        assert!(dial.value > VALUE, "zoom {scale}: dragging up raises the value");
+        assert!(started && ended && !dial.state.dragging, "zoom {scale}: one complete gesture");
+    }
+}

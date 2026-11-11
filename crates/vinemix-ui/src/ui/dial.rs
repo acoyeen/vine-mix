@@ -386,7 +386,9 @@ pub fn show(
             }
             state.draft = None;
             state.invalid = false;
-        } else if response.drag_started() {
+        } else if response.drag_started_by(egui::PointerButton::Primary) {
+            // Only the primary button turns a dial: a middle-button drag
+            // that begins over one pans the canvas and nothing else.
             response.request_focus();
             state.draft = None;
             state.invalid = false;
@@ -394,7 +396,7 @@ pub fn show(
             state.drag_position = spec.normalize(value);
             outcome.gesture_started = true;
         }
-        if state.dragging && response.dragged() {
+        if state.dragging && response.dragged_by(egui::PointerButton::Primary) {
             let movement = -f64::from(response.drag_delta().y) / f64::from(scale.max(0.01));
             if movement != 0.0 {
                 let fine = ui.input(|i| i.modifiers.shift);
@@ -405,7 +407,7 @@ pub fn show(
                 }
             }
         }
-        if state.dragging && (response.drag_stopped() || !response.dragged() && !ui.input(|i| i.pointer.primary_down())) {
+        if state.dragging && !ui.input(|i| i.pointer.primary_down()) {
             state.dragging = false;
             outcome.gesture_ended = true;
         }

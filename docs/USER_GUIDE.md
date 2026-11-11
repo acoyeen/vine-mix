@@ -303,6 +303,23 @@ Turn off **Settings → Show action notifications** for a quieter footer. This
 saved preference hides routine timed messages immediately; errors and save
 status remain visible, and Activity still retains recent edits and the latest
 message. Notifications are on by default.
+
+While you drag a dial, the Voice Color pad, an EQ band or a node, the change is
+heard at once and the footer reads **Adjusting · saves when you let go**. The
+workspace is saved once, when you release, rather than many times during the
+drag; a drag held still for two seconds is saved where it stands. Only the
+left mouse button turns a dial: a middle-button drag that starts over one pans
+the canvas and leaves the dial alone.
+
+At the right of the footer, **Audio load** is a bar with one figure: how much
+of the time it has to process sound VineMix is using, averaged over the last
+second. The bar is green, amber from 70% and red when sound is at risk. The
+thin mark on the bar is the busiest single moment of that second. It is
+normally well to the right of the bar, because one interruption by another
+program is enough to move it, and it only matters as it nears 100%, where
+sound can break up. Click the bar for the same reading with a short
+explanation and a count of any moments that ran late. This is the audio
+engine's own workload, not your computer's overall CPU usage.
 Drag the title, passive header text or unused toolbar space to move the window;
 buttons keep their normal actions and the canvas keeps its own gestures.
 **Undo / Redo** restore up to 100 graph edits in the current app session. One
@@ -455,9 +472,10 @@ while keeping Time and Mix; old 35% Feedback becomes 5 repeats. This intentional
 replaces the previous indefinite feedback decay.
 
 **Distortion** ranges from gentle warmth to strong saturation. **Drive** sets
-how strongly the sound is saturated (0–36 dB). It follows the level of the
-sound, so it acts the same on a quiet source and on a loud one, and it changes
-the character without changing the loudness. **Tone** sets the brightness of
+how strongly the sound is saturated (0–60 dB; the part above 36 dB is very
+strong and also brings up noise close to the voice). It follows the level of
+the sound, so it acts the same on a quiet source and on a loud one, and it
+changes the character without changing the loudness. **Tone** sets the brightness of
 the driven sound (500–18000 Hz); **Mix** blends clean and driven sound;
 **Output** trims the resulting level (−24–0 dB), including with Mix at zero.
 Bypass passes the original sound without that trim. The node adds no delay.
