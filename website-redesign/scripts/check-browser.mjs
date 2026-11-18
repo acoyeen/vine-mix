@@ -94,12 +94,9 @@ try {
     await page.waitForFunction(() => document.activeElement.id === 'top' && scrollY < 1);
     assert.equal(page.url(), base.href, 'Return-to-top must keep the original URL');
 
-    const play = page.getByRole('button', {name: 'Play animation'});
-    await play.press('Enter');
-    await page.getByRole('button', {name: 'Pause animation'}).press('Space');
-    await page.locator('.download-action').focus();
-    assert(await play.isVisible());
-    assert.notEqual(await page.locator('#background-canvas').getAttribute('data-motion'), 'playing');
+    assert.equal(await page.locator('.arrival-actions a').count(), 1);
+    assert.equal(await page.locator('.arrival-links button, .arrival-links p, .arrival-links h1').count(), 0);
+    assert(await page.locator('.hero-reader[data-reader-ready]').count());
     for (const name of ['VB-CABLE ZIP', 'VAC Lite ZIP'])
       assert(await page.getByRole('link', {name: new RegExp('^' + name)}).count());
     const questions = page.locator('.vm-faq summary');
@@ -155,7 +152,6 @@ try {
   });
 
   await scenario({}, async page => {
-    await page.getByRole('button', {name: 'Play animation'}).click();
     assert.equal(await page.locator('#background-canvas').getAttribute('data-motion'), 'unavailable');
     assert(await page.locator('.atmosphere').evaluate(node => node.classList.contains('shader-failed')));
     await page.locator('.arrival-actions a').click();

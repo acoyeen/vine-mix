@@ -64,6 +64,10 @@ or a keyboard-operable pause, including persistence after focus moves away.
 
 **Resolved on the public site · 19 November 2026.** The word sequence is optional. Keyboard play/pause and continued pause after moving focus passed in all three tested browser engines.
 
+**Maintainer decision · 19 November 2026.** Retired the visible playback
+control and added hero copy. The opening again plays automatically and
+respects the system reduced-motion preference.
+
 ## ISSUE-055: A 0.5 update can cancel before installing 0.6
 
 **Confirmed · 18 November 2026.** On disposable Windows 11 installations,
