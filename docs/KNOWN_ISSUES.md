@@ -5,6 +5,65 @@ belong in [development ideas](IDEAS.md). Recording an issue does not authorize
 implementation or imply that it has been independently reproduced.
 Optional refinements to working controls and layout belong in [tweaks](TWEAKS.md).
 
+<a id="issue-056"></a>
+## ISSUE-056 · Website release discovery can replace the saved download with an older version
+
+**Initial report · Reproduced in isolation on 18 November 2026.** The published 0.6.0
+download controller received a successful feed containing only the genuine
+0.5.0 Beta record. It replaced the saved 0.6.0 installer and labelled the
+older release “Latest Release”. The live GitHub response selected 0.6.0.
+Routine refreshes should preserve a newer saved or verified release. Add a
+version-floor regression test and define how an intentional withdrawal is handled.
+[Website audit](../website-redesign/AUDIT_2026-11-18.md)
+
+**Resolved on the public site · 19 November 2026.** Stable downloads preserve the saved or last verified release floor. Older, equal, newer, incomplete and prerelease cases passed the release checks.
+
+<a id="issue-057"></a>
+## ISSUE-057 · Website driver download names differ from their visible labels
+
+**Initial report · Confirmed on the public site on 18 November 2026.** The visible labels
+“VB-CABLE ZIP” and “VAC Lite ZIP” do not occur intact in the corresponding
+accessible names. Lighthouse flagged both links. Speech-input users should
+be able to use the words on screen. Start each name with its visible label
+and verify both commands with speech input. [Website audit](../website-redesign/AUDIT_2026-11-18.md)
+
+**Resolved on the public site · 19 November 2026.** Both ZIP links now begin with their visible labels. The published page passed the label-in-name check. OS speech input remains untested.
+
+<a id="issue-058"></a>
+## ISSUE-058 · Website share description still calls the stable release a beta
+
+**Initial report · Confirmed in public HTML on 18 November 2026.** The homepage Open
+Graph description calls VineMix a beta while the download panel and GitHub
+offer regular release 0.6.0. Share metadata should describe the current
+product. Use evergreen copy or derive the wording from the release record,
+then check a fresh share preview. [Website audit](../website-redesign/AUDIT_2026-11-18.md)
+
+**Resolved on the public site · 19 November 2026.** Evergreen share metadata and its 1200 × 630 preview image are served publicly. Third-party preview cache refresh timing is external.
+
+<a id="issue-059"></a>
+## ISSUE-059 · Missing website pages offer no way back
+
+**Initial report · Confirmed over HTTPS on 18 November 2026.** A nonexistent public
+page returned HTTP 404 with an empty body for an HTML request. A visitor
+following an old link should see where to find the current site. Supply a
+small recovery page and check its status and links on the live host.
+[Website audit](../website-redesign/AUDIT_2026-11-18.md)
+
+**Resolved on the public site · 19 November 2026.** The canonical domain and a redirect alias both served the recovery page with HTTP 404 for a missing nested path.
+
+<a id="issue-060"></a>
+## ISSUE-060 · Website visitors cannot pause the opening word sequence on the page
+
+**Initial report · Observed on the public site and confirmed in source on 18 November
+2026.** Words change automatically at 350 words per minute alongside the
+navigation and download action. The system reduced-motion preference selects
+a static wordmark. Visitors using normal motion should also be able to stop
+the words while continuing to use the page. Check a stationary presentation
+or a keyboard-operable pause, including persistence after focus moves away.
+[Website audit](../website-redesign/AUDIT_2026-11-18.md)
+
+**Resolved on the public site · 19 November 2026.** The word sequence is optional. Keyboard play/pause and continued pause after moving focus passed in all three tested browser engines.
+
 ## ISSUE-055: A 0.5 update can cancel before installing 0.6
 
 **Confirmed · 18 November 2026.** On disposable Windows 11 installations,

@@ -1,6 +1,7 @@
 import { readFile, writeFile, readdir, mkdir, rename, unlink } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const release = JSON.parse(await readFile(path.join(root, 'release.json'), 'utf8'));
 const values = {
@@ -18,6 +19,11 @@ if ((await readFile(path.join(source, 'index.html'), 'utf8')).includes('{{pipeli
   const styles = await readFile(path.join(source, 'pipeline.css'), 'utf8');
   values.pipelineShell = pipelineShell(`<style>${styles}</style>`);
 }
+const homepage = await readFile(path.join(source, 'index.html'), 'utf8');
+const startup = homepage.match(/<script>([\s\S]*?)<\/script>/);
+if (startup) {
+  values.startupHash = createHash('sha256').update(startup[1].replaceAll('\r\n', '\n')).digest('base64');
+}
 const names = new Set((await readdir(source, { withFileTypes: true }))
   .filter(entry => entry.isFile()).map(entry => entry.name));
 if (!names.has('index.html')) throw new Error('The site source must contain index.html.');
@@ -32,6 +38,17 @@ const files = await Promise.all([...names].map(async name => {
   });
   return { name, content };
 }));
+// Ship one homepage stylesheet while support pages use the smaller shared sheet.
+if (names.has('styles.css') && names.has('story.css')) {
+  const sheets = ['styles.css', 'story.css', 'modules.css', 'downloads.css', 'faq.css'];
+  const byName = new Map(files.map(file => [file.name, file.content]));
+  const content = sheets.map(name => {
+    if (!byName.has(name)) throw Error('Missing homepage stylesheet: ' + name);
+    return byName.get(name);
+  }).join('\n');
+  files.push({ name: 'site.css', content });
+  names.add('site.css');
+}
 await mkdir(output, { recursive: true });
 for (const { name, content } of files) {
   const target = path.join(output, name);

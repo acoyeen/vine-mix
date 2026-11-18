@@ -47,14 +47,6 @@ class VineMixPipeline extends HTMLElement {
   async connectedCallback() {
     if (this.initialized) { this.observe(); return; }
     this.initialized = true;
-    // Font faces are document resources; @font-face inside a shadow tree is
-    // ignored by Chromium. Register namespaced local faces once per document.
-    if (![...document.fonts].some(face => face.family.replaceAll('"', '') === 'Pipeline Plex')) {
-      for (const [weight, file] of [['400','Regular'],['600','SemiBold']]) {
-        const face = new FontFace('Pipeline Plex', `url("${new URL(`./assets/IBM-Plex-Sans-${file}.ttf`, import.meta.url)}")`, {weight,display:'swap'});
-        document.fonts.add(face); face.load().catch(() => {});
-      }
-    }
     this.elapsed = 0;
     this.visible = false;
     if (!this.shadowRoot.querySelector('.stage') || !this.shadowRoot.querySelector('svg')) this.shadowRoot.innerHTML = pipelineShell();
@@ -87,10 +79,16 @@ class VineMixPipeline extends HTMLElement {
       // Only the connection that requested it may build or replace this scene.
       if (signal.aborted || !this.isConnected) return;
       this.nodes = nodes;
+      const diagramWidth = layoutNodes(nodes).width;
       this.nodeElements = this.nodes.map((node, i) => {
         const card = document.createElement('figure');
         card.className = 'node';
-        const image = new Image(); image.src = new URL(`./assets/pipeline/nodes/${node.file}`, import.meta.url); image.alt = '';
+        const image = new Image();
+        const artwork = new URL('./assets/pipeline/nodes/', import.meta.url);
+        const fraction = node.width * .5 / diagramWidth;
+        image.sizes = `(max-width:1200px) ${Math.ceil(2100 * fraction)}px, ${(100 * fraction).toFixed(2)}vw`;
+        image.srcset = `${new URL(node.file.replace(/\.png$/, '.webp'), artwork)} ${Math.floor(node.width / 2)}w, ${new URL(node.file, artwork)} ${node.width}w`;
+        image.src = new URL(`./assets/pipeline/nodes/${node.file}`, import.meta.url); image.alt = '';
         image.width = node.width; image.height = node.height; image.draggable = false;
         const caption = document.createElement('figcaption'); caption.className = 'node-caption';
         const title = document.createElement('h3'); title.textContent = node.label;

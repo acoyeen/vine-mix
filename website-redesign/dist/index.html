@@ -19,29 +19,27 @@
   <meta name="theme-color" content="#080f0d">
   <meta name="description" content="VineMix is an open-source visual audio mixer for Windows. Connect your microphone and apps, then choose what you hear and share.">
   <meta property="og:title" content="VineMix">
-  <meta property="og:description" content="Connect your microphone and apps, then choose what you hear and share. An open-source beta for Windows 11 x64.">
+  <meta property="og:description" content="Connect your microphone and apps, then choose what you hear and share. An open-source audio mixer for Windows 11 x64.">
+  <meta property="og:image" content="https://vinemix.app/assets/vinemix-share.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="VineMix, a visual audio mixer for Windows 11">
+  <meta name="twitter:card" content="summary_large_image">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://vinemix.app/">
   <link rel="canonical" href="https://vinemix.app/">
   <title>VineMix</title>
   <link rel="icon" href="/assets/VineMix.ico" type="image/x-icon">
-  <link rel="preload" href="assets/IBM-Plex-Sans-Regular.ttf" as="font" type="font/ttf" crossorigin>
-  <link rel="preload" href="assets/IBM-Plex-Sans-SemiBold.ttf" as="font" type="font/ttf" crossorigin>
-  <link rel="preload" href="assets/IBM-Plex-Sans-Bold.ttf" as="font" type="font/ttf" crossorigin>
-  <link rel="preload" href="assets/IBM-Plex-Sans-Reader-Variable.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="styles.css">
-  <link rel="stylesheet" href="story.css">
-  <link rel="stylesheet" href="modules.css">
-  <link rel="stylesheet" href="downloads.css">
-  <link rel="stylesheet" href="faq.css">
+  <link rel="preload" href="assets/fonts/IBMPlexSans-SemiBold-Latin1.fff0ab3a88b0.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="site.css">
   <script type="module" src="motion.js"></script>
   <script type="module" src="header.js"></script>
   <script type="module" src="downloads.js"></script>
   <script type="module" src="download-atmosphere.js"></script>
-  <script type="module" src="pipeline.js"></script>
+  <script type="module" src="load-pipeline.js"></script>
 </head>
 <body>
-  <a class="skip-link" href="#sound" data-section-jump>Skip to the product</a>
+  <a class="skip-link" tabindex="0" href="#sound" data-section-jump>Skip to the product</a>
   <main>
     <section class="arrival" id="top" aria-labelledby="arrival-title">
       <div class="atmosphere" aria-hidden="true"><canvas id="background-canvas"></canvas></div>
@@ -89,7 +87,6 @@
           <a class="site-docs" href="https://github.com/acoyeen/vine-mix/blob/v0.6.0/docs/USER_GUIDE.md">Docs<img src="assets/arrow-up-right.svg" alt="" width="14" height="14"></a>
         </nav>
       </header>
-      <h1 class="sr-only" id="arrival-title">VineMix. A visual audio mixer for Windows.</h1>
       <div class="arrival-identity">
         <div class="hero-reader" aria-hidden="true" translate="no">
           <span class="effect-stack" aria-hidden="true">
@@ -137,10 +134,13 @@
         </div>
       </div>
       <div class="arrival-links">
+        <h1 id="arrival-title"><span class="sr-only">VineMix. </span>A visual audio mixer for Windows 11.</h1>
+        <p>Choose what you hear and what your apps receive.</p>
         <div class="arrival-actions">
           <a class="button primary download-action" href="#download" data-section-jump>
             <span class="download-content"><img class="download-icon" src="assets/arrow-down-to-line.svg" alt="" width="20" height="20"><span>Download</span></span>
           </a>
+          <button class="hero-playback" type="button" hidden>Play animation</button>
         </div>
       </div>
       <a class="section-jump scroll-hint" id="scroll-hint" href="#sound" data-section-jump><span>Scroll for more</span><svg class="section-jump__icon" width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3v13m-5-5 5 5 5-5"/></svg></a>
@@ -191,7 +191,7 @@
     </section>
 
     <vine-mix-pipeline id="audio-pipeline">
-      <template shadowrootmode="open"><style>:host{display:block;color:#e9edeb;font-family:"IBM Plex Sans",Pipeline Plex,Arial,sans-serif;--mint:#b5e2c8;--muted:#939e98}
+      <template shadowrootmode="open"><style>:host{display:block;color:#e9edeb;font-family:"IBM Plex Sans",Arial,sans-serif;--mint:#b5e2c8;--muted:#939e98}
 *{box-sizing:border-box}
 .pipeline{min-height:100svh;display:flex;flex-direction:column;justify-content:center;padding:128px 28px 112px;overflow:hidden}
 .intro{width:100%;max-width:1200px;margin:0 auto;display:flex;align-items:end;justify-content:space-between;gap:48px}
@@ -219,11 +219,14 @@ h2{font-size:var(--section-heading-size,clamp(32px,3.5vw,56px));font-weight:var(
 @media(prefers-reduced-motion:reduce){.pulse,.node-flow,.eq-spectrum,.stereo-fill{display:none}}
 @media(forced-colors:active){.pipeline{background:Canvas}.wire{stroke:CanvasText}.pulse,.node-flow,.eq-spectrum,.stereo-fill{display:none}.node img{forced-color-adjust:none}.node-caption h3,.node-caption p{color:CanvasText}}
 @media(max-width:1200px){.stage{width:2100px;max-width:none;margin:100px 0 0}.canvas-scroll{margin-top:32px}.pipeline{padding-left:16px;padding-right:16px}.intro{padding-inline:max(0px,calc(var(--gutter,26px) - 16px))}}
+
+.scroll-cue{display:none}
+@media(max-width:1200px){.scroll-cue{display:block;margin:10px 0 0;color:var(--muted);font-size:14px}}
 </style>
     <section class="pipeline" aria-labelledby="pipeline-heading">
-      <header class="intro"><h2 id="pipeline-heading">A clear path for your voice.</h2></header>
+      <header class="intro"><h2 id="pipeline-heading">A clear path for your voice.</h2><p class="scroll-cue">Scroll sideways to follow the signal →</p></header>
       <p class="sr-only">Illustrated audio route: Physical input, 100 Hz high-pass filter, Denoiser, Expander, Compressor, Equaliser, Virtual output. The moving light represents signal flow. No audio is recorded or played.</p>
-      <noscript><style>.canvas-scroll{display:none}</style><p>Physical input → High-pass filter → Denoiser → Expander → Compressor → Equaliser → Virtual output</p></noscript>
+      <noscript><style>.canvas-scroll,.scroll-cue{display:none}</style><p>Physical input → High-pass filter → Denoiser → Expander → Compressor → Equaliser → Virtual output</p></noscript>
       <div class="canvas-scroll" tabindex="0" role="region" aria-label="Horizontal audio pipeline. Scroll sideways to follow the signal."><div class="stage" role="group" aria-label="Seven-node audio pipeline"><svg class="wires" aria-hidden="true"></svg></div></div>
     </section></template>
       <div class="pipeline-fallback wrap">
@@ -300,7 +303,7 @@ h2{font-size:var(--section-heading-size,clamp(32px,3.5vw,56px));font-weight:var(
       </div>
     </section>
 
-    <section class="vm-downloads" id="download" aria-labelledby="download-title" data-repository="https://github.com/acoyeen/vine-mix">
+    <section class="vm-downloads" id="download" aria-labelledby="download-title" data-saved-version="0.6.0">
       <div class="vm-download-atmosphere" aria-hidden="true"><canvas></canvas></div>
       <div class="vm-download-wrap">
         <header class="vm-download-heading">
@@ -326,11 +329,12 @@ h2{font-size:var(--section-heading-size,clamp(32px,3.5vw,56px));font-weight:var(
                 <a class="vm-download-button" data-download="standalone" href="https://github.com/acoyeen/vine-mix/releases/download/v0.6.0/VineMix-0.6.0-Standalone-x64.exe" aria-label="Download standalone">Download <span aria-hidden="true">↓</span></a>
               </div>
               <div class="vm-download-drivers">
-                <p>Install drivers separately.</p>
+                <p>Microphone to headphones needs no driver. For a virtual connection, choose the driver for your route.</p>
                 <ul aria-label="Official driver downloads">
-                  <li><a href="https://download.vb-audio.com/Download_CABLE/VBCABLE_Driver_Pack45.zip" aria-label="Download VB-CABLE driver ZIP from VB-Audio">VB-CABLE <span class="vm-driver-format">ZIP</span><span aria-hidden="true">↓</span></a></li>
-                  <li><a href="https://software.muzychenko.net/freeware/vac471lite.zip" aria-label="Download Virtual Audio Cable Lite driver ZIP from its publisher">VAC Lite <span class="vm-driver-format">ZIP</span><span aria-hidden="true">↓</span></a></li>
+                  <li><span>Bring app audio into VineMix</span><a href="https://download.vb-audio.com/Download_CABLE/VBCABLE_Driver_Pack45.zip" aria-label="VB-CABLE ZIP from VB-Audio">VB-CABLE <span class="vm-driver-format">ZIP</span><span aria-hidden="true">↓</span></a></li>
+                  <li><span>Send your mix to another app</span><a href="https://software.muzychenko.net/freeware/vac471lite.zip" aria-label="VAC Lite ZIP from the publisher">VAC Lite <span class="vm-driver-format">ZIP</span><span aria-hidden="true">↓</span></a></li>
                 </ul>
+                <p class="driver-terms">VAC Lite is for private home use without income generation. For monetized streams, check the <a href="https://vac.muzychenko.net/en/license.txt">VAC licence</a>. <a href="https://vb-audio.com/Services/licensing.htm">VB-Audio terms</a> apply to VB-CABLE.</p>
               </div>
             </li>
           </ul>
@@ -349,6 +353,7 @@ h2{font-size:var(--section-heading-size,clamp(32px,3.5vw,56px));font-weight:var(
       <nav class="site-footer__links" aria-label="Footer">
         <a href="attribution.html">Attribution</a>
         <a href="credits.html">Credits</a>
+        <a href="credits.html#privacy">Website privacy</a>
         <a href="assets/LICENSE.txt">License</a>
         <a href="#top" data-section-jump="fade">Back to top <span aria-hidden="true">↑</span></a>
       </nav>

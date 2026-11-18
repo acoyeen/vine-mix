@@ -1,28 +1,20 @@
-/* Typography and shared document styles */
-
-/* Match the reader's starting pose before its deferred module executes. */
-@media (prefers-reduced-motion: no-preference) {
-  .has-script .hero-reader:not([data-reader-ready]) .symbol-motion { transform: translate(437px, 2px); }
-  .has-script .hero-reader:not([data-reader-ready]) .lettering-motion { visibility: hidden; }
-}
-
 @font-face {
   font-family: "IBM Plex Sans";
-  src: url("assets/IBM-Plex-Sans-Regular.ttf") format("truetype");
+  src: url("assets/fonts/IBMPlexSans-Regular-Latin1.b5ad7bd39f99.woff2") format("woff2");
   font-weight: 400;
   font-display: swap;
 }
 
 @font-face {
   font-family: "IBM Plex Sans";
-  src: url("assets/IBM-Plex-Sans-SemiBold.ttf") format("truetype");
+  src: url("assets/fonts/IBMPlexSans-SemiBold-Latin1.fff0ab3a88b0.woff2") format("woff2");
   font-weight: 600;
-  font-display: swap;
+  font-display: optional;
 }
 
 @font-face {
   font-family: "IBM Plex Sans";
-  src: url("assets/IBM-Plex-Sans-Bold.ttf") format("truetype");
+  src: url("assets/fonts/IBMPlexSans-Bold-Latin1.914f1400f363.woff2") format("woff2");
   font-weight: 700;
   font-display: swap;
 }
@@ -344,7 +336,7 @@ figcaption {
   position: absolute;
   inset: 0;
   z-index: -1;
-  background: #080f0d url("assets/p-shader-poster.jpg") center/cover;
+  background: #080f0d url("assets/p-shader-poster.webp") center/cover;
   opacity: var(--hero-atmosphere-opacity, 1);
   pointer-events: none;
 }
@@ -371,7 +363,7 @@ figcaption {
 /* The cover-sized poster and resolution-normalized shader have different
    scales. Animated startup reveals only the correctly sized first GPU frame;
    keep the poster for no-script and failed-WebGL rendering. */
-.has-script .atmosphere:not(.shader-failed) { background-image: none; }
+.atmosphere:has(canvas[data-shader-ready]):not(.shader-failed) { background-image: none; }
 .has-script .atmosphere canvas { opacity: 0; transition: opacity .18s ease-out; }
 .has-script .atmosphere canvas[data-shader-ready] { opacity: 1; }
 @media (prefers-reduced-motion: reduce) {
@@ -380,7 +372,7 @@ figcaption {
 
 @media (max-aspect-ratio: 1/1) {
   .atmosphere {
-    background-image: url("assets/p-shader-poster-portrait.jpg");
+    background-image: url("assets/p-shader-poster-portrait.webp");
   }
 }
 
@@ -393,7 +385,7 @@ figcaption {
   max-width: 1400px;
   height: var(--hero-height);
   position: absolute;
-  top: 48%;
+  top: 42%;
   left: 50%;
   transform: translate(-50%,-50%);
   user-select: none;
@@ -477,15 +469,23 @@ figcaption {
 
 .arrival-links {
   position: absolute;
-  top: calc(48% + var(--hero-height)*.5 + 42px);
+  top: calc(42% + var(--hero-height)*.5 + 8px);
   left: 50%;
   transform: translateX(-50%);
-  width: 320px;
+  width: 620px;
   max-width: calc(100% - 32px);
   text-align: center;
 }
 
+.arrival-links h1 { font-weight: 600; margin: 0; font-size: clamp(20px, 3vw, 31px); line-height: 1.2; letter-spacing: -.025em; }
+.arrival-links p { margin: 7px auto 18px; line-height: 1.45; color: #d6e0dc; font-size: 16px; }
+@media (prefers-reduced-motion: no-preference) and (forced-colors: none) {
+  .has-script .hero-playback[hidden] { display: inline-block !important; visibility: hidden; }
+}
+.hero-playback { border: 0; background: transparent; color: inherit; font: inherit; font-size: 14px; text-decoration: underline; text-underline-offset: 4px; cursor: pointer; padding: 8px; }
 .arrival-actions {
+  gap: 12px;
+  align-items: stretch;
   display: flex;
   justify-content: center;
 }
@@ -742,7 +742,7 @@ figcaption {
   }
 
   .arrival-links {
-    top: calc(48% + var(--hero-height)*.5 + 32px);
+    top: calc(42% + var(--hero-height)*.5 + 8px);
   }
 
   .button {
@@ -775,13 +775,13 @@ figcaption {
 
 @media (max-height:650px) {
   .arrival {
-    min-height: max(440px,100svh);
+    min-height: max(560px,100svh);
     --hero-width: min(82vw,500px);
     --hero-height: 130px;
   }
 
   .arrival-links {
-    top: calc(48% + var(--hero-height)*.5 + 24px);
+    top: calc(42% + var(--hero-height)*.5 + 8px);
   }
 
   .scroll-hint {
@@ -791,7 +791,7 @@ figcaption {
 
 @media (max-height:500px) {
   .arrival-links {
-    top: calc(48% + var(--hero-height)*.5 + 20px);
+    top: calc(42% + var(--hero-height)*.5 + 8px);
   }
 
 }

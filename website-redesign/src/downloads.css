@@ -32,10 +32,10 @@
 .vm-download-drivers{margin-top:24px}
 .vm-download-drivers>p{margin-inline:auto;font-size:13px;color:var(--vm-muted)}
 .vm-download-drivers ul{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;margin-top:12px}
-.vm-download-drivers a{display:inline-flex;gap:12px;align-items:center;min-height:40px;padding:8px 12px;border:1px solid #81968b99;border-radius:5px;background:#0a0e0c;color:#d9e5dd;font-size:12px;transition:background-color .2s ease,border-color .2s ease}
+.vm-download-drivers li a{display:inline-flex;gap:12px;align-items:center;min-height:40px;padding:8px 12px;border:1px solid #81968b99;border-radius:5px;background:#0a0e0c;color:#d9e5dd;font-size:12px;transition:background-color .2s ease,border-color .2s ease}
 .vm-driver-format{font:10px/1 ui-monospace,Consolas,monospace;color:var(--vm-muted)}
-.vm-download-drivers a>span[aria-hidden]{color:var(--vm-muted);font-size:17px;line-height:1}
-.vm-download-drivers a:hover{color:var(--vm-text);border-color:#c4dfcf;background:#172a20}
+.vm-download-drivers li a>span[aria-hidden]{color:var(--vm-muted);font-size:17px;line-height:1}
+.vm-download-drivers li a:hover{color:var(--vm-text);border-color:#c4dfcf;background:#172a20}
 .vm-download-resources{display:flex;justify-content:center;align-items:center;gap:8px 28px;flex-wrap:wrap;margin-top:48px;color:var(--vm-muted);font-size:12px}
 .vm-download-resources a{display:inline-flex;align-items:center;min-height:40px}
 .vm-download-resources a:hover{color:var(--vm-mint);text-decoration:underline;text-underline-offset:4px}
@@ -43,7 +43,13 @@
 .vm-sr-only{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 @media(max-width:900px){.vm-downloads{padding:144px 28px 128px}.vm-downloads .vm-download-list{--vm-choice-gap:40px}}
 @media(max-width:640px){.vm-downloads{padding:104px 24px 96px}.vm-download-heading h2{margin-bottom:18px}.vm-downloads .vm-download-list{--vm-choice-gap:52px;grid-template-columns:minmax(0,1fr);margin-top:44px}.vm-download-choice-divider{top:calc(var(--vm-choice-gap) / -2);left:50%}.vm-download-row{gap:20px}.vm-download-row h3{min-height:0;font-size:24px}.vm-download-drivers{margin-top:22px}.vm-download-resources{gap:4px 24px;margin-top:44px}.vm-download-content .vm-driver-source{margin-top:20px}}
-@media(max-width:350px){.vm-downloads{padding-inline:18px}.vm-download-release{font-size:11px}.vm-download-resources{gap:2px 20px}.vm-download-drivers a{gap:9px;padding-inline:10px}}
-@media(prefers-reduced-motion:reduce){.vm-downloads .vm-download-button,.vm-download-drivers a{transition:none}.vm-download-atmosphere[data-ready="true"]{background-image:url("download-atmosphere.svg")}.vm-download-atmosphere canvas{display:none}}
-@media(forced-colors:active){.vm-download-atmosphere{display:none}.vm-download-choice-divider{color:CanvasText}.vm-downloads a:focus-visible,.vm-downloads a.vm-download-button:focus-visible{outline-color:Highlight}.vm-downloads .vm-download-button,.vm-downloads a.vm-download-button:hover,.vm-downloads a.vm-download-button:focus-visible{background:ButtonFace;color:ButtonText;border-color:ButtonText;box-shadow:none}.vm-download-drivers a,.vm-download-drivers a:hover{background:Canvas;color:LinkText;border-color:LinkText}.vm-download-recommended,.vm-driver-format,.vm-download-drivers a>span[aria-hidden]{color:CanvasText}}
+@media(max-width:350px){.vm-downloads{padding-inline:18px}.vm-download-release{font-size:11px}.vm-download-resources{gap:2px 20px}.vm-download-drivers li a{gap:9px;padding-inline:10px}}
+@media(prefers-reduced-motion:reduce){.vm-downloads .vm-download-button,.vm-download-drivers li a{transition:none}.vm-download-atmosphere[data-ready="true"]{background-image:url("download-atmosphere.svg")}.vm-download-atmosphere canvas{display:none}}
+@media(forced-colors:active){.vm-download-atmosphere{display:none}.vm-download-choice-divider{color:CanvasText}.vm-downloads a:focus-visible,.vm-downloads a.vm-download-button:focus-visible{outline-color:Highlight}.vm-downloads .vm-download-button,.vm-downloads a.vm-download-button:hover,.vm-downloads a.vm-download-button:focus-visible{background:ButtonFace;color:ButtonText;border-color:ButtonText;box-shadow:none}.vm-download-drivers li a,.vm-download-drivers li a:hover{background:Canvas;color:LinkText;border-color:LinkText}.vm-download-recommended,.vm-driver-format,.vm-download-drivers li a>span[aria-hidden]{color:CanvasText}}
 
+
+.vm-download-drivers li { display: grid; justify-items: center; gap: 5px; }
+.vm-download-drivers li > span { font-size: 13px; }
+.vm-download-drivers ul { gap: 16px; }
+.vm-download-drivers .driver-terms { margin-top: 16px; max-width: 42ch; }
+.vm-download-drivers .driver-terms a { text-decoration: underline; text-underline-offset: 3px; }

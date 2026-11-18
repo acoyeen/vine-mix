@@ -3,11 +3,14 @@ import { readFile, realpath, stat } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 const root = await realpath(fileURLToPath(new URL('../dist/', import.meta.url)));
+const missingPage = await readFile(path.join(root, '404.html')).catch(() => null);
+const headersFile = await readFile(path.join(root, '_headers'), 'utf8').catch(() => '');
+const policy = headersFile.match(/^\s*Content-Security-Policy: (.+)$/m)?.[1];
 const mime = {
   '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8',
   '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.ico': 'image/x-icon',
-  '.ttf': 'font/ttf', '.woff2': 'font/woff2', '.txt': 'text/plain; charset=utf-8',
+  '.webp': 'image/webp', '.xml': 'application/xml', '.ttf': 'font/ttf', '.woff2': 'font/woff2', '.txt': 'text/plain; charset=utf-8',
 };
 let port = Number(process.env.VINEMIX_SITE_PORT || 4175);
 if (!Number.isInteger(port) || port < 1 || port > 65535) {
@@ -19,6 +22,7 @@ const isInsideRoot = target => {
   return relative !== '' && relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative);
 };
 const server = http.createServer(async (req, res) => {
+  if (policy) res.setHeader('Content-Security-Policy', policy);
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     res.writeHead(405, { Allow: 'GET, HEAD', 'Content-Type':'text/plain; charset=utf-8' });
     res.end('Method not allowed');
@@ -28,16 +32,20 @@ const server = http.createServer(async (req, res) => {
     const pathname = decodeURIComponent(new URL(req.url, 'http://127.0.0.1').pathname);
     const relative = pathname === '/' ? 'index.html' : pathname.slice(1);
     const target = path.resolve(root, relative);
-    if (!isInsideRoot(target) || relative.includes('\\')) throw new Error('Not found');
-    const physicalTarget = await realpath(target);
+    if (relative === '_headers' || !isInsideRoot(target) || relative.includes('\\')) throw new Error('Not found');
+    const physicalTarget = await realpath(target).catch(error => {
+      if (error.code === 'ENOENT' && !path.extname(target)) return realpath(target + '.html');
+      throw error;
+    });
+    if (path.relative(root, physicalTarget).toLowerCase() === '_headers') throw new Error('Not found');
     const info = await stat(physicalTarget);
     if (!isInsideRoot(physicalTarget) || !info.isFile()) throw new Error('Not found');
     const content = req.method === 'HEAD' ? null : await readFile(physicalTarget);
-    res.writeHead(200, { 'Content-Type': mime[path.extname(target).toLowerCase()] || 'application/octet-stream', 'Content-Length': content?.length ?? info.size, 'Cache-Control':'no-cache', 'X-Content-Type-Options':'nosniff', 'Referrer-Policy':'strict-origin-when-cross-origin' });
+    res.writeHead(200, { 'Content-Type': mime[path.extname(physicalTarget).toLowerCase()] || 'application/octet-stream', 'Content-Length': content?.length ?? info.size, 'Cache-Control':'no-cache', 'X-Content-Type-Options':'nosniff', 'Referrer-Policy':'strict-origin-when-cross-origin' });
     res.end(content);
   } catch {
-    res.writeHead(404, { 'Content-Type':'text/plain; charset=utf-8' });
-    res.end(req.method === 'HEAD' ? undefined : 'Not found');
+    res.writeHead(404, { 'Content-Type': missingPage ? 'text/html; charset=utf-8' : 'text/plain; charset=utf-8' });
+    res.end(req.method === 'HEAD' ? undefined : missingPage ?? 'Not found');
   }
 });
 server.on('error', error => {

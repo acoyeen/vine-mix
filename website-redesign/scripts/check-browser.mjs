@@ -4,12 +4,14 @@ import assert from 'node:assert/strict';
 import { pathToFileURL } from 'node:url';
 import path from 'node:path';
 
-const { chromium } = await import(process.env.VINEMIX_PLAYWRIGHT_PATH
+const engines = await import(process.env.VINEMIX_PLAYWRIGHT_PATH
   ? pathToFileURL(path.resolve(process.env.VINEMIX_PLAYWRIGHT_PATH)).href : 'playwright');
 const base = new URL(process.env.VINEMIX_SITE_URL || 'http://127.0.0.1:4175/');
 assert(['127.0.0.1', 'localhost', '[::1]'].includes(base.hostname), 'Use a local preview');
-const browser = await chromium.launch({ headless: true,
-  channel: process.env.VINEMIX_BROWSER_CHANNEL || (process.platform === 'win32' ? 'msedge' : undefined) });
+const engine = process.env.VINEMIX_BROWSER_ENGINE || 'chromium';
+assert(['chromium', 'webkit', 'firefox'].includes(engine));
+const browser = await engines[engine].launch({ headless: true,
+  channel: engine === 'chromium' ? process.env.VINEMIX_BROWSER_CHANNEL || (process.platform === 'win32' ? 'msedge' : undefined) : undefined });
 let scenarios = 0;
 
 async function scenario(options, run, prepare) {
@@ -58,7 +60,17 @@ async function localLinks(page) {
 try {
   await scenario({}, async page => {
     await page.waitForFunction(() => document.querySelector('#sound').classList.contains('is-enhanced'));
-    await page.waitForFunction(() => document.querySelector('vine-mix-pipeline').shadowRoot.querySelectorAll('.node').length === 7);
+    assert.equal(await page.locator('vine-mix-pipeline .node').count(), 0, 'Distant artwork stays deferred');
+    const share = page.locator('meta[property="og:description"]');
+    assert.doesNotMatch(await share.getAttribute('content'), /beta/i);
+    const preview = new URL(await page.locator('meta[property="og:image"]').getAttribute('content'));
+    assert.equal(preview.origin, 'https://vinemix.app');
+    const image = await page.request.get(new URL(preview.pathname, base).href);
+    assert.equal(image.status(), 200);
+    assert.match(image.headers()['content-type'], /^image\/jpeg/);
+    const missing = await page.request.get(new URL('/old/retired-page', base).href);
+    assert.equal(missing.status(), 404);
+    assert.match(await missing.text(), /href="\/#download"/);
     await localLinks(page);
     assert.equal(await page.locator('.vm-faq summary').count(), 8);
     assert.equal(await page.locator('[data-release-state]').textContent(), '(Saved release)');
@@ -72,6 +84,7 @@ try {
     await page.waitForFunction(() => document.activeElement.id === 'sound');
     await page.locator('.story-skip').click();
     await page.waitForFunction(() => document.activeElement.id === 'audio-pipeline');
+    await page.waitForFunction(() => document.querySelector('vine-mix-pipeline').shadowRoot.querySelectorAll('.node').length === 7);
     await page.locator('.site-brand').click();
     await page.waitForFunction(() => document.activeElement.id === 'top' && scrollY < 1);
     await page.locator('.arrival-actions a').click();
@@ -81,6 +94,14 @@ try {
     await page.waitForFunction(() => document.activeElement.id === 'top' && scrollY < 1);
     assert.equal(page.url(), base.href, 'Return-to-top must keep the original URL');
 
+    const play = page.getByRole('button', {name: 'Play animation'});
+    await play.press('Enter');
+    await page.getByRole('button', {name: 'Pause animation'}).press('Space');
+    await page.locator('.download-action').focus();
+    assert(await play.isVisible());
+    assert.notEqual(await page.locator('#background-canvas').getAttribute('data-motion'), 'playing');
+    for (const name of ['VB-CABLE ZIP', 'VAC Lite ZIP'])
+      assert(await page.getByRole('link', {name: new RegExp('^' + name)}).count());
     const questions = page.locator('.vm-faq summary');
     await questions.nth(0).focus();
     await page.keyboard.press('Enter');
@@ -134,6 +155,7 @@ try {
   });
 
   await scenario({}, async page => {
+    await page.getByRole('button', {name: 'Play animation'}).click();
     assert.equal(await page.locator('#background-canvas').getAttribute('data-motion'), 'unavailable');
     assert(await page.locator('.atmosphere').evaluate(node => node.classList.contains('shader-failed')));
     await page.locator('.arrival-actions a').click();
@@ -146,6 +168,7 @@ try {
   }));
 
   await scenario({}, async page => {
+    await page.locator('vine-mix-pipeline').scrollIntoViewIfNeeded();
     await page.waitForFunction(() => document.querySelector('vine-mix-pipeline').shadowRoot.textContent.includes('Node artwork could not load'));
     assert(await page.locator('vine-mix-pipeline').getByText('Physical input → High-pass filter → Denoiser → Expander → Compressor → Equaliser → Virtual output').count());
     await page.locator('.arrival-actions a').click();
@@ -154,10 +177,10 @@ try {
 
   let discoveryFails = false;
   const repository = 'https://github.com/acoyeen/vine-mix';
-  const version = '1.2.3-beta.4';
+  const version = '1.2.3';
   await scenario({}, async page => {
     assert.equal(await page.locator('[data-release-state]').textContent(), '(Latest Release)');
-    assert.equal(await page.locator('[data-release-version]').textContent(), '1.2.3 · Beta 4');
+    assert.equal(await page.locator('[data-release-version]').textContent(), '1.2.3');
     for (const selector of ['[data-release-link]', '[data-download="installer"]', '[data-download="standalone"]', '[data-release-notes]', '[data-checksums]', '[data-installation]'])
       assert((await page.locator(selector).getAttribute('href')).includes(`/v${version}/`) || (await page.locator(selector).getAttribute('href')).endsWith(`/v${version}`));
     const before = await page.locator('.vm-downloads a').evaluateAll(nodes => nodes.map(node => node.href));

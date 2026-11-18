@@ -7,6 +7,7 @@ const status = find('.vm-download-status');
 let inFlight = false;
 let lastAttempt = 0;
 let verified = false;
+let minimumTag = section.dataset.savedVersion;
 let reconnectPending = false;
 
 async function refresh(reconnected = false) {
@@ -19,7 +20,7 @@ async function refresh(reconnected = false) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 12000);
   try {
-    const release = await loadRelease(fetch, controller.signal);
+    const release = await loadRelease(fetch, controller.signal, minimumTag);
     // Commit version, destinations and supporting resources together after validation.
     find('[data-release-version]').textContent = release.label;
     find('[data-release-link]').href = release.url;
@@ -31,6 +32,7 @@ async function refresh(reconnected = false) {
     state.textContent = '(Latest Release)';
     status.hidden = true;
     status.textContent = '';
+    minimumTag = release.tag;
     verified = true;
     reconnectPending = false;
   } catch {

@@ -15,6 +15,13 @@ the public assets and anonymous downloads have been verified, then build,
 check and deploy the site. Updating the fallback before publication can send
 visitors to missing files.
 
+The featured download follows the channel of the saved release. A stable
+baseline accepts complete stable releases at or above that version. Once the
+page verifies a newer version it uses that as its floor until reload. Withdraw
+a release by updating the public release feed and explicitly deploying the
+desired saved version. Older versions and prereleases remain accessible on
+GitHub. The desktop updater manages its own channel selection.
+
 ## Publish an update
 
 ### 0.6.0 production cutover — 18 November 2026
@@ -55,7 +62,7 @@ auto-deployment or authorize publishing development desktop releases.
    the repository, local review screenshots, scripts or recovery backups.
 4. In Cloudflare Workers & Pages, open `vinemix-website`, choose **New deployment**,
    and upload the prepared static files. Keep assets at `/`, HTML handling at
-   `auto-trailing-slash`, and not-found handling at `none`.
+   `auto-trailing-slash`, and not-found handling at `404-page`.
 5. Verify the live site, downloads, mobile layout and redirects after publishing.
    Keep the prior deployment version available for rollback.
 

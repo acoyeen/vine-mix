@@ -21,25 +21,37 @@ let routeMoving = false;
 let scrollFrame = 0;
 let background = null;
 let atmosphereOpacity = '';
-const reader = mountHeroReader(document.querySelector('.hero-reader'));
+const playback = document.querySelector('.hero-playback');
+let reader;
+let playRequested = false;
 const story = mountScrollStory(document.getElementById('sound'));
 
 const pageVisible = () => !pageInactive && !document.hidden;
 
-background = mountPShader(canvas, {
-  onError() {
-    shaderAvailable = false;
-    field?.classList.add('shader-failed');
-    // The node scene can work without WebGL.
-    updateMotion();
-  },
+playback.addEventListener('click', () => {
+  playRequested = !playRequested;
+  if (playRequested && !reader) {
+    reader = mountHeroReader(document.querySelector('.hero-reader'));
+    background = mountPShader(canvas, {
+      onError() {
+        shaderAvailable = false;
+        field.classList.add('shader-failed');
+        updateMotion();
+      }
+    });
+  }
+  updateMotion();
 });
 
 function updateMotion() {
   const paused = reducedMotion.matches;
-  const canPlayBackground = pageVisible() && !paused && heroOwnsMotion && shaderAvailable && !forcedColors.matches;
+  const staticPreference = paused || forcedColors.matches;
+  playback.hidden = staticPreference;
+  playback.textContent = playRequested ? 'Pause animation' : 'Play animation';
+  const heroPlaying = playRequested && pageVisible() && !staticPreference && heroOwnsMotion;
+  const canPlayBackground = heroPlaying && shaderAvailable;
   background?.setPaused(!canPlayBackground);
-  reader.setPaused(!pageVisible() || paused || !heroOwnsMotion);
+  reader?.setPaused(!heroPlaying);
   story.setSuspended(!pageVisible() || paused || forcedColors.matches);
   if (canvas) canvas.dataset.motion = !shaderAvailable ? 'unavailable' : canPlayBackground ? 'playing' : 'paused';
   root.dataset.scene = canPlayBackground ? 'hero' : pageVisible() && !paused && routeMoving ? 'story' : 'static';
@@ -125,7 +137,7 @@ window.addEventListener('pagehide', event => {
   updateMotion();
   if (!event.persisted) {
     background?.destroy();
-    reader.destroy();
+    reader?.destroy();
     story.destroy();
   }
 });

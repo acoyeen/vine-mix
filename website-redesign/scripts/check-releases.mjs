@@ -19,6 +19,10 @@ const upgrade = release('0.6.0');
 const selected = selectRelease([release('0.5.0-beta'), upgrade]);
 assert.equal(selected.tag, 'v0.6.0');
 assert.equal(selected.label, '0.6.0');
+assert.throws(() => selectRelease([release('0.5.0-beta')], '0.6.0'), /No published/);
+assert.equal(selectRelease([upgrade, release('0.7.0-beta'), release('0.8.0', { prerelease: true })], '0.6.0').tag, 'v0.6.0');
+assert.equal(selectRelease([upgrade, release('0.6.1')], '0.6.0').tag, 'v0.6.1');
+assert.throws(() => selectRelease([upgrade, release('0.6.1', { assets: [] })], '0.6.0'), /not ready/);
 for (const filename of ['SHA256SUMS.txt', 'VineMix-0.6.0-Updates.json']) {
   const incomplete = { ...upgrade, assets: upgrade.assets.filter(asset => asset.name !== filename) };
   assert.throws(() => selectRelease([release('0.5.0-beta'), incomplete]), /not ready/);
@@ -78,7 +82,7 @@ function eventTarget() {
 const selectors = ['[data-release-state]', '.vm-download-status', '[data-release-version]', '[data-release-link]',
   '[data-download="installer"]', '[data-download="standalone"]', '[data-release-notes]', '[data-checksums]', '[data-installation]'];
 const nodes = new Map(selectors.map(selector => [selector, { href: `saved:${selector}`, textContent: 'Saved', hidden: true }]));
-const doc = Object.assign(eventTarget(), { hidden: false, querySelector: () => ({ querySelector: selector => nodes.get(selector) }) });
+const doc = Object.assign(eventTarget(), { hidden: false, querySelector: () => ({ dataset: { savedVersion: '0.3.0-beta.5' }, querySelector: selector => nodes.get(selector) }) });
 const win = eventTarget();
 const timers = new Map(), intervals = [];
 let clock = 1000000, fetchCalls = 0, timerId = 0;
@@ -165,6 +169,12 @@ try {
   assert.equal(fetchCalls, 8, 'A failed reconnect retry must stop rather than form a retry loop');
   assert.equal(state.textContent, '(Last checked release)');
   assert.equal(nodes.get('[data-release-version]').textContent, '0.4.0 · Beta 2');
+  const newestLinks = linkSnapshot();
+  result = async () => response([release('0.4.0-beta.1')]);
+  win.emit('online');
+  await settle();
+  assert.deepEqual(linkSnapshot(), newestLinks);
+  assert.equal(state.textContent, '(Last checked release)');
   assert.equal(timers.size, 0, 'Completed attempts must clear their timeout');
   assert.equal(intervals.length, 1);
   assert.equal(intervals[0].delay, 5 * 60 * 1000);

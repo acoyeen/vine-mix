@@ -1,4 +1,4 @@
-:host{display:block;color:#e9edeb;font-family:"IBM Plex Sans",Pipeline Plex,Arial,sans-serif;--mint:#b5e2c8;--muted:#939e98}
+:host{display:block;color:#e9edeb;font-family:"IBM Plex Sans",Arial,sans-serif;--mint:#b5e2c8;--muted:#939e98}
 *{box-sizing:border-box}
 .pipeline{min-height:100svh;display:flex;flex-direction:column;justify-content:center;padding:128px 28px 112px;overflow:hidden}
 .intro{width:100%;max-width:1200px;margin:0 auto;display:flex;align-items:end;justify-content:space-between;gap:48px}
@@ -26,3 +26,6 @@ h2{font-size:var(--section-heading-size,clamp(32px,3.5vw,56px));font-weight:var(
 @media(prefers-reduced-motion:reduce){.pulse,.node-flow,.eq-spectrum,.stereo-fill{display:none}}
 @media(forced-colors:active){.pipeline{background:Canvas}.wire{stroke:CanvasText}.pulse,.node-flow,.eq-spectrum,.stereo-fill{display:none}.node img{forced-color-adjust:none}.node-caption h3,.node-caption p{color:CanvasText}}
 @media(max-width:1200px){.stage{width:2100px;max-width:none;margin:100px 0 0}.canvas-scroll{margin-top:32px}.pipeline{padding-left:16px;padding-right:16px}.intro{padding-inline:max(0px,calc(var(--gutter,26px) - 16px))}}
+
+.scroll-cue{display:none}
+@media(max-width:1200px){.scroll-cue{display:block;margin:10px 0 0;color:var(--muted);font-size:14px}}

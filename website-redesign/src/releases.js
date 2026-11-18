@@ -24,9 +24,18 @@ function compare(a, b) {
   }
   return 0;
 }
-export function selectRelease(releases) {
+export function selectRelease(releases, minimumTag) {
   if (!Array.isArray(releases)) throw Error('Invalid release response');
-  const candidates = releases.filter(r => r && !r.draft && r.published_at && version(r.tag_name));
+  const minimum = minimumTag === undefined ? null : version(minimumTag);
+  if (minimumTag !== undefined && !minimum) throw Error('Invalid saved version');
+  const candidates = releases.filter(release => {
+    if (!release || release.draft || !release.published_at) return false;
+    const parsed = version(release.tag_name);
+    if (!parsed) return false;
+    if (!minimum) return true;
+    if (!minimum.pre.length && (parsed.pre.length || release.prerelease)) return false;
+    return compare(parsed, minimum) >= 0;
+  });
   candidates.sort((a, b) => compare(version(b.tag_name), version(a.tag_name)));
   const release = candidates[0];
   if (!release) throw Error('No published version found');
@@ -53,7 +62,7 @@ export function selectRelease(releases) {
     docs: `${REPOSITORY}/blob/${encodeURIComponent(tag)}/docs/INSTALLATION_AND_UPDATES.md` };
 }
 
-export async function loadRelease(fetcher = fetch, signal) {
+export async function loadRelease(fetcher = fetch, signal, minimumTag) {
   const releases = [];
   // Read pagination rather than assuming the first release or /latest includes betas.
   for (let page = 1; page <= 10; page++) {
@@ -64,7 +73,7 @@ export async function loadRelease(fetcher = fetch, signal) {
     const items = await response.json();
     if (!Array.isArray(items)) throw Error('Invalid release response');
     releases.push(...items);
-    if (!/rel="next"/.test(response.headers.get('link') || '')) return selectRelease(releases);
+    if (!/rel="next"/.test(response.headers.get('link') || '')) return selectRelease(releases, minimumTag);
   }
   throw Error('Release history exceeds discovery limit');
 }
