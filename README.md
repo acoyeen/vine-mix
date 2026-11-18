@@ -4,7 +4,7 @@
 Windows 11 x64. Connect microphones, apps and effects with cables, then send
 your mix to headphones, a recording app or a virtual microphone.
 
-**[Download VineMix for Windows](https://vinemix.app/#download)** · [All GitHub releases and checksums](https://github.com/acoyeen/vine-mix/releases) · [0.6.0 release notes](docs/releases/0.6.0.md)
+**[Download VineMix for Windows](https://vinemix.app/#download)** · [0.6.0 packages and checksums](https://github.com/acoyeen/vine-mix/releases/tag/v0.6.0) · [Upgrade from 0.5](docs/INSTALLATION_AND_UPDATES.md#upgrading-from-05-to-06)
 
 ![VineMix's voice starter, with example devices and both outputs muted](docs/images/workspace.png)
 

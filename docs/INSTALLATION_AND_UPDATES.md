@@ -12,6 +12,13 @@ installation and shortcuts. Standalone users keep their launcher path.
 Both editions use the existing workspace and device assignments. Check
 your listening and virtual outputs after the restart.
 
+If 0.5 reports **“The audio engine closed its control connection”**, it can
+cancel the update before replacing any files. Wait for **Saved**, then choose
+**Quit VineMix** from Settings or the tray. Download your matching 0.6 package
+from the [release page](https://github.com/acoyeen/vine-mix/releases/tag/v0.6.0).
+Run Setup in its existing installation folder, or replace your standalone
+launcher at its original path. Reopen VineMix and check your routes.
+
 If the release service is unavailable, use the matching package from the
 published release. Quit VineMix first. Run Setup in its existing folder or
 replace the standalone launcher, according to how you currently run VineMix.

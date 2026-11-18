@@ -20,7 +20,12 @@ fn desktop_connection_survives_an_engine_side_idle_release() {
     let directory = std::env::temp_dir().join(format!("vinemix-ui-reconnect-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&directory);
     std::fs::create_dir_all(&directory).unwrap();
-    let engine = Engine::new(Some(directory.join("settings.json"))).unwrap();
+    // Engine startup installs the application's file logger. Keep test
+    // assertion messages visible in the Windows verification report.
+    let test_hook = std::panic::take_hook();
+    let engine = Engine::new(Some(directory.join("settings.json")));
+    std::panic::set_hook(test_hook);
+    let engine = engine.unwrap();
     let pipe = format!(r"\\.\pipe\VineMix.ReconnectTest.{}", std::process::id());
     let limits = Timeouts { idle: Duration::from_millis(300), request: Duration::from_secs(2), response: Duration::from_secs(2) };
     let cancel = AtomicBool::new(false);

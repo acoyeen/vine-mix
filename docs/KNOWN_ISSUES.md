@@ -5,6 +5,20 @@ belong in [development ideas](IDEAS.md). Recording an issue does not authorize
 implementation or imply that it has been independently reproduced.
 Optional refinements to working controls and layout belong in [tweaks](TWEAKS.md).
 
+## ISSUE-055: A 0.5 update can cancel before installing 0.6
+
+**Confirmed · 18 November 2026.** On disposable Windows 11 installations,
+0.5 discovered the public 0.6 release and verified its download. During
+Install and restart, the old client could report that the audio engine closed
+its control connection. The update journal recorded cancellation before file
+replacement. The expected result is a completed restart into 0.6.
+
+Use the [manual upgrade instructions](INSTALLATION_AND_UPDATES.md) if this
+occurs. Both matching packages preserved the saved workspace in testing.
+The 0.5 client and its engine coordinate shutdown before the new package
+runs. A follow-up should distinguish a lost shutdown acknowledgement from a
+failed shutdown using the original engine identity and the settled workspace.
+
 **Release update — 6 November 2026:** Published [0.5.0 Beta](releases/0.5.0-beta.md)
 includes the accepted keyboard/zoom improvements (ISSUE-003/005), restart
 hardening (ISSUE-011), decimal history correction (ISSUE-024), Settings sizing

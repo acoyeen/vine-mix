@@ -13,6 +13,15 @@ for discovery, saved-workspace continuity, audio, interrupted handoffs, rollback
 and a second launch. Exercise the Rust client's next update as well.
 Hardware, installed upgrade and listening checks need separate evidence.
 
+For 0.6.0, separate Windows 11 installations exercised both distributions.
+The shipped worker completed updates from the post-approval checkpoint,
+resumed after interruption and rolled back after a failed health check.
+Rollback retained a later workspace edit. Both manual package upgrades
+passed. The emulated microphone and speakers ran after upgrading, and a
+normal restart retained the same workspace and preferences. Physical-device
+and listening checks and live screen-reader testing remain open. See the
+[release notes](docs/releases/0.6.0.md) for the 0.5 handoff limitation.
+
 The [0.5 qualification guide](docs/RELEASE_0.5.0_QUALIFICATION.md) and
 `scripts/verify-offline.ps1` cover the retained C#/C++ reference.
 
