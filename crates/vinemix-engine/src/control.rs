@@ -13,7 +13,7 @@
 use serde_json::{json, Value};
 use vinemix_model::config::{read_revision, Configuration};
 use vinemix_model::json as model_json;
-use vinemix_model::limits::MAXIMUM_CONTROL_MESSAGE_BYTES;
+use vinemix_model::limits::{MAXIMUM_CONTROL_MESSAGE_BYTES, MAXIMUM_CONTROL_RESPONSE_BYTES};
 
 use crate::engine::{Engine, EngineError, Interest, Known};
 
@@ -95,12 +95,59 @@ pub fn respond(engine: &Engine, line: &[u8]) -> (String, bool) {
         Ok(request) => {
             let response = handle(engine, &request);
             let shutdown = response["ok"] == json!(true) && request.get("command").and_then(Value::as_str) == Some("shutdown");
-            (model_json::dump(&response) + "\n", shutdown)
+            (encode_response(&response, request.get("lengthPrefixedResponse").and_then(Value::as_bool) == Some(true)), shutdown)
         }
         Err(error) => {
             let response = json!({"protocolVersion": 1, "requestId": "", "ok": false, "error": error.to_string()});
             (model_json::dump(&response) + "\n", false)
         }
+    }
+}
+
+/// Keep normal protocol-v1 replies byte-compatible. A client that advertises
+/// length framing can receive a larger full snapshot in bounded pipe writes.
+fn encode_response(response: &Value, length_framing: bool) -> String {
+    let mut body = model_json::dump(response);
+    if length_framing && body.len() > MAXIMUM_CONTROL_MESSAGE_BYTES {
+        if body.len() > MAXIMUM_CONTROL_RESPONSE_BYTES {
+            return model_json::dump(&json!({
+                "protocolVersion": 1, "requestId": response.get("requestId"),
+                "ok": false, "errorCode": "snapshot_too_large",
+                "error": "This audio inventory exceeds the supported 16 MiB snapshot limit."
+            })) + "\n";
+        }
+        return format!("~{}\n{body}\n", body.len());
+    }
+    body.push('\n');
+    body
+}
+
+#[cfg(test)]
+mod frame_tests {
+    use super::*;
+
+    #[test]
+    fn large_inventory_uses_the_negotiated_byte_count() {
+        let mut configuration = vinemix_model::defaults::default_configuration();
+        for i in 0..9 {
+            configuration.graph.nodes.push(vinemix_model::config::GraphNode::new(&format!("app{i}"), "appInput", "Example", 0.0, 0.0));
+        }
+        let mut remaining = vinemix_model::limits::MAXIMUM_SETTINGS_BYTES - crate::store::settings_text(&configuration).len();
+        for node in configuration.graph.nodes.iter_mut().filter(|n| n.kind == "appInput") {
+            let count = remaining.min(32768);
+            node.app.executable_path = "x".repeat(count);
+            remaining -= count;
+        }
+        assert_eq!(remaining, 0);
+        assert_eq!(crate::store::settings_text(&configuration).len(), vinemix_model::limits::MAXIMUM_SETTINGS_BYTES);
+        vinemix_model::validate::validate_configuration(&configuration).unwrap();
+        let applications: Vec<_> = (0..1000).map(|i| json!({"name":format!("Application {i}"), "executablePath":"C:/Apps/Example.exe", "processId":i})).collect();
+        let response = json!({"ok":true,"requestId":"r","snapshot":{"configuration":configuration.to_json(),"applications":applications}});
+        let wire = encode_response(&response, true);
+        let (prefix, body) = wire.split_once('\n').unwrap();
+        assert_eq!(prefix, format!("~{}", body.len() - 1));
+        assert_eq!(serde_json::from_str::<Value>(body).unwrap(), response);
+        assert!(!encode_response(&response, false).starts_with('~'));
     }
 }
 

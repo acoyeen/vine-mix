@@ -33,6 +33,7 @@ fn main() {
     println!("cargo::rerun-if-changed=cpp");
     println!("cargo::rerun-if-changed={}", native.join("src").display());
     println!("cargo::rerun-if-changed={}", native.join("include").display());
+    println!("cargo::rerun-if-changed={}", native.join("vendor").display());
 
     let release = |build: &mut cc::Build| {
         build.opt_level(3).debug(false).define("NDEBUG", None).warnings(false);
@@ -74,7 +75,6 @@ fn main() {
     let mut rn = cc::Build::new();
     rnnoise_defines(&mut rn);
     for file in [
-        "denoise.c",
         "rnn.c",
         "pitch.c",
         "kiss_fft.c",
@@ -88,6 +88,7 @@ fn main() {
     ] {
         rn.file(src.join(file));
     }
+    rn.file("cpp/rnnoise_reference.c");
     rn.file(third.join("src/rnnoise_data.c"));
     rn.compile("oracle_rnnoise");
     let mut sse = cc::Build::new();

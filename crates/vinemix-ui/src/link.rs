@@ -286,7 +286,7 @@ impl EngineLink {
                 if batch.is_empty() {
                     return Ok(false);
                 }
-                state.begin_dispatch();
+                state.begin_dispatch(&batch);
                 drop(state);
                 if let Some(connection) = io.connection.as_mut() {
                     connection.set_persist(batch.persist);
@@ -324,7 +324,19 @@ impl EngineLink {
 
     fn spawn(self: &Arc<Self>, name: &str, work: impl FnOnce(Arc<Self>) + Send + 'static) {
         let link = Arc::clone(self);
-        let _ = std::thread::Builder::new().name(name.into()).spawn(move || work(link));
+        if let Err(error) = std::thread::Builder::new().name(name.into()).spawn(move || work(link)) {
+            self.worker_start_failed(name, &error);
+        }
+    }
+
+    fn worker_start_failed(&self, name: &str, error: &std::io::Error) {
+        let message = format!("{name} could not start: {error}");
+        if name == "VineMix restart" {
+            self.state().set_restarting(false);
+            self.post(LinkEvent::RestartFinished { success: false, message });
+        } else {
+            self.post(LinkEvent::Message { text: message, error: true });
+        }
     }
 
     /// Retry assigned devices (`RetryAsync`).
@@ -915,6 +927,15 @@ mod wait_tests {
 
     fn link() -> Arc<EngineLink> {
         EngineLink::preview(MixerState::new(true), Box::new(|| {}))
+    }
+
+    #[test]
+    fn failed_restart_worker_releases_restart_state() {
+        let link = link();
+        link.state().set_restarting(true);
+        link.worker_start_failed("VineMix restart", &std::io::Error::other("test failure"));
+        assert!(!link.state().is_restarting_engine());
+        assert!(matches!(link.take_events().as_slice(), [LinkEvent::RestartFinished { success: false, .. }]));
     }
 
     /// RUST-REV-012: waits are interruptible instead of polled.

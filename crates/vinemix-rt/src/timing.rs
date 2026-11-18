@@ -109,7 +109,13 @@ impl CaptureBufferReader {
         reserve_engine_frames: usize,
     ) -> usize {
         output.fill(Frame::SILENT);
-        if !ready || queue.clear_pending() || queue.size() > SAMPLE_RATE as usize / 10 {
+        let block = output.len().max(period_engine_frames);
+        let reserve = StreamBufferPolicy::CAPTURE_RESERVE_FRAMES.max(reserve_engine_frames);
+        let prime = block.saturating_add(reserve).min(queue.capacity());
+        // A long-period endpoint may deliver a whole period at once. Allow
+        // one such packet above the priming target before discarding backlog.
+        let stale = (SAMPLE_RATE as usize / 10).max(prime.saturating_add(block)).min(queue.capacity());
+        if !ready || queue.clear_pending() || queue.size() > stale {
             queue.clear();
             self.reset();
             return 0;
@@ -118,11 +124,7 @@ impl CaptureBufferReader {
             return 0;
         }
         if !self.primed {
-            let block = output.len().max(period_engine_frames);
-            let reserve = StreamBufferPolicy::CAPTURE_RESERVE_FRAMES
-                .max(reserve_engine_frames)
-                .min(usize::MAX - block);
-            if queue.size() < block + reserve {
+            if queue.size() < prime {
                 return 0;
             }
             self.primed = true;
@@ -147,6 +149,24 @@ impl CaptureBufferReader {
 mod tests {
     use super::*;
     use crate::frame_queue::frame_queue;
+
+    #[test]
+    fn capture_primes_with_short_and_long_device_periods() {
+        for period in [240, 480, 4800] {
+            for reserve in [360, 720] {
+                let (mut producer, mut consumer, _) = frame_queue(9600);
+                let mut reader = CaptureBufferReader::default();
+                let packet = vec![Frame::new(0.25, 0.5); period];
+                let mut block = [Frame::SILENT; QUANTUM_FRAMES];
+                // Periods arrive as complete device packets.
+                while producer.size() < period + reserve {
+                    assert_eq!(producer.push(&packet), period);
+                }
+                assert_eq!(reader.read(&mut consumer, &mut block, true, period, reserve), QUANTUM_FRAMES);
+                assert_eq!(block[0], packet[0]);
+            }
+        }
+    }
 
     #[test]
     fn documented_budgets() {

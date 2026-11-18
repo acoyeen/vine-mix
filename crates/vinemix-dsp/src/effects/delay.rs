@@ -75,12 +75,34 @@ impl AlignmentDelay {
     /// Copies all state, including the history (audio thread, no allocation).
     pub fn copy_from(&mut self, other: &Self) {
         self.history.copy_from_slice(&other.history);
+        self.copy_cursor(other);
+    }
+
+    fn copy_cursor(&mut self, other: &Self) {
         self.position = other.position;
         self.current = other.current;
         self.destination = other.destination;
         self.requested = other.requested;
         self.remaining = other.remaining;
         self.configured = other.configured;
+    }
+
+    /// Move the full history to the successor. The retiring processor only
+    /// runs its existing plan for the 480-frame graph fade. Each delay tap
+    /// can read at most 480 older frames before it starts reading new input.
+    pub fn adopt(&mut self, previous: &mut Self, preserve_fade: bool) {
+        if preserve_fade {
+            self.copy_cursor(previous);
+            for delay in [self.current, self.destination, self.requested] {
+                let delay = delay as usize;
+                let start = (self.position + ALIGNMENT_CAPACITY - delay) % ALIGNMENT_CAPACITY;
+                let count = delay.min(TRANSITION);
+                let first = count.min(ALIGNMENT_CAPACITY - start);
+                self.history[start..start + first].copy_from_slice(&previous.history[start..start + first]);
+                self.history[..count - first].copy_from_slice(&previous.history[..count - first]);
+            }
+        }
+        std::mem::swap(self, previous);
     }
 
     pub fn reset(&mut self) {
@@ -335,6 +357,39 @@ impl Default for Echo {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn adoption_preserves_future_output_on_both_sides_of_a_fade() {
+        let sample = |i: usize| Frame::new(i as f32, -(i as f32));
+        for preserve_fade in [false, true] {
+            let mut previous = AlignmentDelay::new();
+            previous.configure(32);
+            // Wrap the ring. Start an edit, then queue a third tap as the
+            // current fade nears completion; all three taps matter.
+            for i in 0..ALIGNMENT_CAPACITY + 7 {
+                previous.process(sample(i));
+            }
+            previous.configure(96_000);
+            for i in 0..400 {
+                previous.process(sample(i));
+            }
+            previous.configure(620);
+            let mut expected = AlignmentDelay::new();
+            expected.copy_from(&previous);
+            let mut successor = AlignmentDelay::new();
+            let history = previous.history.as_ptr();
+            successor.adopt(&mut previous, preserve_fade);
+            assert_eq!(successor.history.as_ptr(), history);
+            for i in 0..ALIGNMENT_CAPACITY + 480 {
+                let input = sample(i + 1234);
+                let value = expected.process(input);
+                assert_eq!(successor.process(input), value);
+                if preserve_fade && i < TRANSITION {
+                    assert_eq!(previous.process(input), value);
+                }
+            }
+        }
+    }
 
     #[test]
     fn alignment_delays_by_exact_samples() {

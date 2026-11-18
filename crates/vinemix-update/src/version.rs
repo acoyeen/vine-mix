@@ -2,7 +2,7 @@
 
 use std::cmp::Ordering;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug)]
 pub struct SemanticVersion {
     text: String,
     pub major: u32,
@@ -71,6 +71,14 @@ impl std::fmt::Display for SemanticVersion {
     }
 }
 
+impl PartialEq for SemanticVersion {
+    fn eq(&self, other: &Self) -> bool {
+        self.cmp(other) == Ordering::Equal
+    }
+}
+
+impl Eq for SemanticVersion {}
+
 impl PartialOrd for SemanticVersion {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
@@ -111,7 +119,7 @@ mod tests {
 
     #[test]
     fn precedence() {
-        let v = |s| SemanticVersion::parse(s).unwrap();
+        let v = |s: &str| SemanticVersion::parse(s).unwrap();
         assert!(v("0.5.0-beta") > v("0.4.0-beta"));
         assert!(v("0.3.0-beta.10") > v("0.3.0-beta.9"));
         assert!(v("1.0.0") > v("1.0.0-rc.1"));
@@ -119,6 +127,12 @@ mod tests {
         assert!(SemanticVersion::parse("01.0.0").is_none());
         assert!(SemanticVersion::parse("1.0.0-01").is_none());
         assert!(SemanticVersion::parse("1.0").is_none());
-        assert_eq!(v("1.2.3+build.5").cmp(&v("1.2.3")), Ordering::Equal);
+        for version in ["1.2.3", "1.2.3-beta.2"] {
+            let plain = v(version);
+            let built = v(&format!("{version}+build.5"));
+            assert_eq!(built, plain);
+            assert_eq!(built.cmp(&plain), Ordering::Equal);
+            assert_eq!(built.to_string(), format!("{version}+build.5"));
+        }
     }
 }

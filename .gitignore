@@ -34,6 +34,7 @@ docs/design/*.png
 docs/review-images/
 
 /target/
+__pycache__/
 
 # Reference C sources for the test-only parity oracle (vinemix-oracle); the
 # archives and hashes are listed in CMakeLists.txt. Not needed to build VineMix.

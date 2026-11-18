@@ -306,7 +306,8 @@ impl Canvas {
             let label = if edge.muted { "Turn connection on" } else { "Turn connection off" };
             if item(ui, label, "", mixer.can_edit(), "") {
                 let message = if edge.muted { "Connection turned on." } else { "Connection turned off." };
-                self.change_edge(mixer, &edge, |edges, i| edges[i].muted = !edges[i].muted, message, false);
+                let muted = !edge.muted;
+                self.change_edge(mixer, &edge, move |edges, i| edges[i].muted = muted, message, false);
                 close = true;
             }
         }

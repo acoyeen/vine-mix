@@ -105,14 +105,24 @@ impl Drop for Fixture {
 struct FakePlatform {
     events: Rc<RefCell<Vec<String>>>,
     parent_live: Cell<bool>,
+    parent_polls_remaining: Cell<usize>,
+    parent_exits: Cell<bool>,
     healthy: bool,
     smoke_passes: bool,
+    smoke_timeout: bool,
+    smoke_process: RefCell<Option<ProcessIdentity>>,
+    smoke_exits: Cell<bool>,
     candidate: RefCell<Option<ProcessIdentity>>,
 }
 
 impl FakePlatform {
     fn new() -> Self {
-        Self { events: Rc::new(RefCell::new(Vec::new())), parent_live: Cell::new(true), healthy: true, smoke_passes: true, candidate: RefCell::new(None) }
+        Self {
+            events: Rc::new(RefCell::new(Vec::new())), parent_live: Cell::new(true),
+            parent_polls_remaining: Cell::new(usize::MAX), parent_exits: Cell::new(true),
+            healthy: true, smoke_passes: true, smoke_timeout: false, smoke_process: RefCell::new(None),
+            smoke_exits: Cell::new(true), candidate: RefCell::new(None),
+        }
     }
     fn event(&self, name: &str) {
         self.events.borrow_mut().push(name.into());
@@ -131,15 +141,28 @@ impl Platform for FakePlatform {
         let events = Rc::clone(&self.events);
         Ok(Lock::new(move || events.borrow_mut().push("lock-released".into())))
     }
-    fn is_same_live_process(&self, identity: &ProcessIdentity) -> bool {
-        if self.candidate.borrow().as_ref().is_some_and(|c| c.same(identity)) {
-            return self.healthy;
-        }
-        self.parent_live.get()
+    fn watch_live_process(&self, identity: &ProcessIdentity) -> Box<dyn Fn() -> bool + '_> {
+        let candidate = self.candidate.borrow().as_ref().is_some_and(|c| c.same(identity));
+        self.event(if candidate { "verify-candidate" } else { "verify-parent" });
+        Box::new(move || {
+            if candidate { return self.healthy; }
+            self.event("poll-parent");
+            let remaining = self.parent_polls_remaining.get();
+            self.parent_polls_remaining.set(remaining.saturating_sub(1));
+            self.parent_live.get() && remaining > 0
+        })
     }
     fn wait_for_exit(&self, identity: &ProcessIdentity, _: Duration) -> files::Result<bool> {
+        if self.smoke_process.borrow().as_ref().is_some_and(|p| p.same(identity)) {
+            self.event("smoke-exit");
+            return Ok(self.smoke_exits.get());
+        }
         let parent = self.candidate.borrow().as_ref().is_none_or(|c| !c.same(identity));
-        self.event(if parent && identity.process_id == std::process::id() as i32 { "parent-exit" } else { "engine-exit" });
+        if parent && identity.process_id == std::process::id() as i32 {
+            self.event("parent-exit");
+            return Ok(self.parent_exits.get());
+        }
+        self.event("engine-exit");
         Ok(true)
     }
     fn verify_worker(&self, _: &Verified) -> files::Result<()> {
@@ -166,8 +189,16 @@ impl Platform for FakePlatform {
         self.event("setup");
         Ok(0)
     }
-    fn run_smoke(&self, _: &Verified, _: &Path, _: &mut dyn FnMut(ProcessIdentity) -> files::Result<()>) -> files::Result<bool> {
+    fn run_smoke(&self, context: &Verified, _: &Path, started: &mut dyn FnMut(ProcessIdentity) -> files::Result<()>) -> files::Result<bool> {
         self.event("smoke");
+        if self.smoke_timeout {
+            let mut identity = context.data.parent.clone();
+            identity.process_id += 8;
+            identity.sha256 = sha(NEW);
+            *self.smoke_process.borrow_mut() = Some(identity.clone());
+            started(identity)?;
+            return Err("Timed out while the smoke process was still running.".into());
+        }
         Ok(self.smoke_passes)
     }
     fn candidate_engine_hash(&self, _: &Verified, _: &Path) -> files::Result<String> {
@@ -317,6 +348,77 @@ fn malformed_journal_is_contained() {
     let pending = transaction::find_pending(Some(&fixture.trust), Some(&fixture.root), &|_| true).unwrap();
     assert_eq!(pending.len(), 1);
     assert!(!pending[0].can_resume, "malformed metadata never resumes automatically");
+}
+
+#[test]
+fn committed_shutdown_timeout_can_resume_after_normal_exit() {
+    let fixture = Fixture::new("exit-retry");
+    fixture.commit();
+    let platform = FakePlatform::new();
+    platform.parent_exits.set(false);
+    assert_eq!(fixture.run(&platform), 1);
+    let journal = fixture.journal();
+    assert_eq!(journal.phase, Phase::RecoveryRequired);
+    assert_eq!(journal.resume_phase, Some(Phase::WaitingForExit));
+    let pending = transaction::find_pending(Some(&fixture.trust), Some(&fixture.root), &|_| false).unwrap();
+    assert!(pending[0].can_resume);
+    assert_eq!(fixture.target(), OLD);
+    platform.parent_exits.set(true);
+    assert_eq!(fixture.run(&platform), 0);
+    assert_eq!(fixture.journal().phase, Phase::Completed);
+}
+
+#[test]
+fn smoke_timeout_retains_identity_and_waits_before_rollback() {
+    let fixture = Fixture::new("smoke-retry");
+    fixture.commit();
+    let platform = FakePlatform { smoke_timeout: true, ..FakePlatform::new() };
+    platform.smoke_exits.set(false);
+    assert_eq!(fixture.run(&platform), 1);
+    let journal = fixture.journal();
+    assert_eq!(journal.phase, Phase::RecoveryRequired);
+    assert_eq!(journal.resume_phase, Some(Phase::RollingBack));
+    assert_eq!(journal.smoke_process.as_ref(), platform.smoke_process.borrow().as_ref());
+    assert!(platform.has("smoke-exit"));
+    assert_eq!(fixture.target(), NEW);
+    platform.smoke_exits.set(true);
+    assert_eq!(fixture.run(&platform), 3);
+    assert_eq!(fixture.target(), OLD);
+    assert_eq!(platform.events.borrow().iter().filter(|e| *e == "smoke").count(), 1);
+}
+
+#[test]
+fn approval_polls_one_verified_parent_process() {
+    let fixture = Fixture::new("process-watch");
+    let platform = FakePlatform::new();
+    platform.parent_polls_remaining.set(4);
+    assert_eq!(fixture.run(&platform), 2);
+    let events = platform.events.borrow();
+    assert_eq!(events.iter().filter(|e| *e == "verify-parent").count(), 1);
+    assert_eq!(events.iter().filter(|e| *e == "poll-parent").count(), 5);
+}
+
+#[test]
+fn incomplete_checked_copies_never_publish_or_replace_the_destination() {
+    let fixture = Fixture::new("copy-retry");
+    let source = fixture.base.join("source");
+    std::fs::write(&source, NEW).unwrap();
+    for (private, root) in [(true, &fixture.context.directory), (false, &fixture.install)] {
+        let destination = root.join("checkpoint");
+        let copy = if private { files::copy_private_checked } else { files::copy_checked };
+        let size = NEW.len() as u64;
+        assert!(copy(&source, &destination, size, &sha(OLD)).is_err());
+        assert!(!destination.exists());
+        // A killed process can leave an unpublished sibling. It never reserves the checkpoint.
+        let abandoned = root.join(".vinemix-copy-abandoned.tmp");
+        std::fs::write(&abandoned, b"partial").unwrap();
+        copy(&source, &destination, size, &sha(NEW)).unwrap();
+        assert_eq!(std::fs::read(&destination).unwrap(), NEW);
+        assert_eq!(std::fs::read(&abandoned).unwrap(), b"partial");
+        std::fs::write(&destination, b"unrelated").unwrap();
+        assert!(copy(&source, &destination, size, &sha(NEW)).is_err());
+        assert_eq!(std::fs::read(&destination).unwrap(), b"unrelated");
+    }
 }
 
 /// Where the cross-language records are exchanged. These two tests need the

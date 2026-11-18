@@ -51,6 +51,7 @@ pub const ALL: &[Highlight] = &[
     h("0.5.0-beta", "Clearer cables and meters", "Meters blend smoothly through green, yellow and red. Cables blend their socket colours, effect returns use light blue, and short connections curve naturally. Midpoint markers follow detail level and disappear on disabled connections."),
     h("0.5.0-beta", "Independent routes to the same output", "Several output nodes can share a destination and keep separate levels and mutes. Duplicate output preserves its device but starts muted. Overload indicators also account for the combined signal."),
     h("0.5.0-beta", "More reliable workspace edits", "Fixed an unwanted Undo reset after level changes and clarified device-status handling. Renamed nodes update their accessibility labels while Find node still recognises the original node type."),
+    h("0.6.0", "VineMix moves to Rust", "The desktop, audio engine and standalone launcher now run on Rust. Keep using the same workspace, device assignments and original VineMix shortcut."),
 ];
 
 /// Highlights after `previous` up to `current`.
@@ -239,5 +240,6 @@ mod tests {
         assert_eq!(since(Some("0.4.0-beta"), "0.5.0-beta").len(), 8);
         assert_eq!(since(None, "0.3.0-beta.2").len(), 1);
         assert!(since(Some("0.5.0-beta"), "0.5.0-beta").is_empty());
+        assert_eq!(since(Some("0.5.0-beta"), "0.6.0")[0].version, "0.6.0");
     }
 }

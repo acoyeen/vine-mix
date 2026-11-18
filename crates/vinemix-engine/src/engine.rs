@@ -430,7 +430,7 @@ struct Inner {
     maintenance_wake: vinemix_wasapi::win::Event,
     /// The settings file's physical location, refreshed by maintenance so
     /// that snapshots never open the file while holding the state lock.
-    physical_settings: Mutex<String>,
+    physical_settings: Mutex<Option<String>>,
     log: crate::log::Log,
     started: AtomicBool,
 }
@@ -510,6 +510,9 @@ impl Engine {
 
     pub fn start(&self) -> Result<(), EngineError> {
         let inner = &self.inner;
+        // Hold the lifecycle mutex through publication, thread creation and
+        // any rollback. A concurrent stop must join this mixer before reclaiming.
+        let mut threads = self.threads.lock().unwrap_or_else(|e| e.into_inner());
         if inner.started.swap(true, Ordering::AcqRel) {
             return Ok(());
         }
@@ -529,7 +532,6 @@ impl Engine {
             }
             let mixer = inner.clone();
             let maintenance = inner.clone();
-            let mut threads = self.threads.lock().unwrap_or_else(|e| e.into_inner());
             threads.push(
                 std::thread::Builder::new()
                     .name("vinemix-mixer".into())
@@ -547,7 +549,7 @@ impl Engine {
         })();
         if result.is_err() {
             // A half-started engine must not stay alive.
-            self.stop();
+            self.stop_locked(&mut threads);
         }
         result
     }
@@ -562,9 +564,13 @@ impl Engine {
 
     /// Stops audio, joins threads and stops every device worker.
     pub fn stop(&self) {
+        let mut threads = self.threads.lock().unwrap_or_else(|e| e.into_inner());
+        self.stop_locked(&mut threads);
+    }
+
+    fn stop_locked(&self, threads: &mut Vec<JoinHandle<()>>) {
         request_stop(&self.inner);
-        let threads: Vec<_> = self.threads.lock().unwrap_or_else(|e| e.into_inner()).drain(..).collect();
-        for thread in threads {
+        for thread in threads.drain(..) {
             let _ = thread.join();
         }
         self.flush_logged();
@@ -589,6 +595,7 @@ impl Engine {
     pub fn configure(&self, mut config: Configuration, expected_revision: u64, persist: bool) -> Result<(), EngineError> {
         let inner = &*self.inner;
         let mut state = lock(inner);
+        verify_workspace_location(&state.store)?;
         if !state.store.writable() {
             return Err(message("Choose workspace recovery before changing the configuration."));
         }
@@ -649,6 +656,7 @@ impl Engine {
             return Ok(());
         }
         if state.store.writable() {
+            verify_workspace_location(&state.store)?;
             let configuration = state.configuration.clone();
             state.store.save(&configuration)?;
         }
@@ -672,6 +680,7 @@ impl Engine {
     pub fn recover(&self, action: &str) -> Result<(), EngineError> {
         let inner = &*self.inner;
         let mut state = lock(inner);
+        verify_workspace_location(&state.store)?;
         let recovered = state.store.recover(action)?;
         state.configuration = recovered;
         state.unsaved = false;
@@ -940,8 +949,12 @@ fn refresh_output_ports(inner: &Inner, state: &mut ConfigState) {
     }
 }
 
-fn physical_settings_path(store: &ConfigurationStore) -> String {
-    store.physical_path().map_or_else(|_| store.path().to_string_lossy().into_owned(), |p| p.to_string_lossy().into_owned())
+fn verify_workspace_location(store: &ConfigurationStore) -> Result<(), EngineError> {
+    store.physical_path().map(|_| ()).map_err(|_| message("Cannot verify the physical settings location. Workspace changes are paused."))
+}
+
+fn physical_settings_path(store: &ConfigurationStore) -> Option<String> {
+    store.physical_path().ok().map(|p| p.to_string_lossy().into_owned())
 }
 
 fn applications_wanted(inner: &Inner) -> bool {
@@ -1517,8 +1530,7 @@ fn maintenance_loop(inner: &Inner) {
                 let state = lock(inner);
                 state.store.path().to_path_buf()
             };
-            let resolved = vinemix_platform::physical_path(&physical)
-                .map_or_else(|_| physical.to_string_lossy().into_owned(), |p| p.to_string_lossy().into_owned());
+            let resolved = vinemix_platform::physical_path(&physical).ok().map(|p| p.to_string_lossy().into_owned());
             *inner.physical_settings.lock().unwrap_or_else(|e| e.into_inner()) = resolved;
         }
         {

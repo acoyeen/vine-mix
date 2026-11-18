@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.0
+
+- Move the Windows desktop, audio engine and Setup helper to Rust. Retain the
+  familiar app identity, Windows installer registration, standalone launcher
+  and saved workspace format.
+- See [upgrade instructions and release notes](docs/releases/0.6.0.md).
+
 ## 0.5.0-beta — 6 November 2026
 
 - Add Echo with finite repeats and an effect-only Echo output, and Distortion

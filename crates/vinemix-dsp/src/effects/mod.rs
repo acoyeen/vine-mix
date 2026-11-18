@@ -252,8 +252,7 @@ impl AdvancedEffect {
         self.configured = previous.configured;
     }
 
-    /// Engine-only ownership transfer. Echo moves its long history instead of
-    /// copying it; every other kind inherits.
+    /// Engine-only ownership transfer of long delay and echo histories.
     pub fn adopt(&mut self, previous: &mut Self, preserve_fade: bool) {
         if self.kind != previous.kind {
             return;
@@ -262,6 +261,11 @@ impl AdvancedEffect {
             (Engine::Echo(a), Engine::Echo(b)) => {
                 a.adopt(b, preserve_fade);
                 self.settings.echo = previous.settings.echo;
+                self.configured = previous.configured;
+            }
+            (Engine::AlignmentDelay(a), Engine::AlignmentDelay(b)) => {
+                a.adopt(b, preserve_fade);
+                self.settings = previous.settings;
                 self.configured = previous.configured;
             }
             _ => self.inherit(previous),

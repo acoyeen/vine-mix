@@ -24,7 +24,7 @@
   <meta property="og:url" content="https://vinemix.app/">
   <link rel="canonical" href="https://vinemix.app/">
   <title>VineMix</title>
-  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/assets/VineMix.ico" type="image/x-icon">
   <link rel="preload" href="assets/IBM-Plex-Sans-Regular.ttf" as="font" type="font/ttf" crossorigin>
   <link rel="preload" href="assets/IBM-Plex-Sans-SemiBold.ttf" as="font" type="font/ttf" crossorigin>
   <link rel="preload" href="assets/IBM-Plex-Sans-Bold.ttf" as="font" type="font/ttf" crossorigin>
@@ -254,7 +254,7 @@ h2{font-size:var(--section-heading-size,clamp(32px,3.5vw,56px));font-weight:var(
           <p>See how it works, adapt it to your setup, or build something new from the source.</p>
         </article>
         <article>
-          <h3>In beta. Built in the open.</h3>
+          <h3>Built in the open.</h3>
           <p>You don't have to write code to contribute. Share an idea or feedback and help shape what comes next.</p>
         </article>
       </div>
@@ -266,7 +266,7 @@ h2{font-size:var(--section-heading-size,clamp(32px,3.5vw,56px));font-weight:var(
         <div class="vm-faq__questions">
           <details name="vinemix-faq">
             <summary>Will VineMix work on my PC?</summary>
-            <div class="vm-faq__answer"><p>VineMix is built for Windows 11 on x64 PCs. There are no native macOS, Linux or ARM builds. The app includes its .NET runtime, so you don’t need to install that separately.</p></div>
+            <div class="vm-faq__answer"><p>VineMix is built for Windows 11 on x64 PCs. There are no native macOS, Linux or ARM builds. Both downloads include everything needed to run the mixer.</p></div>
           </details>
           <details name="vinemix-faq">
             <summary>Is VineMix free?</summary>
@@ -290,11 +290,11 @@ h2{font-size:var(--section-heading-size,clamp(32px,3.5vw,56px));font-weight:var(
           </details>
           <details name="vinemix-faq">
             <summary>Should I choose the installer or standalone version?</summary>
-            <div class="vm-faq__answer"><p>Choose the installer for its own app folder, shortcuts and guided setup for the drivers required for virtual inputs and outputs. Choose standalone if you prefer to launch a single EXE without installing the app; any virtual audio drivers are installed separately. Both use the same mixer and save settings on your PC.</p><p>The current beta is unsigned, so Windows may show an unknown publisher warning. Check the download against the checksum on its matching release page before deciding to run it.</p></div>
+            <div class="vm-faq__answer"><p>Choose the installer for its own app folder, shortcuts and guided setup for the drivers required for virtual inputs and outputs. Choose standalone if you prefer to launch a single EXE without installing the app; any virtual audio drivers are installed separately. Both use the same mixer and save settings on your PC.</p><p>Windows may show an unknown-publisher warning for packages without an Authenticode signature. Check the download against the checksum on its matching release page before deciding to run it.</p></div>
           </details>
           <details name="vinemix-faq">
-            <summary>Is the beta ready for everyday use?</summary>
-            <div class="vm-faq__answer"><p>It’s available to try, but bugs and compatibility issues are still possible. Long sessions, device recovery and latency still need further testing. Try your own setup before relying on it for an important call, recording or live stream.</p></div>
+            <summary>How do I update my existing mixer?</summary>
+            <div class="vm-faq__answer"><p>In VineMix 0.5 and later, open Settings and choose Check for updates. When a newer version is offered, choose Download update, then Install and restart when you can pause audio. Open your usual shortcut or standalone launcher afterwards. Your workspace and device assignments stay in the same place.</p></div>
           </details>
         </div>
       </div>

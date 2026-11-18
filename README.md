@@ -4,10 +4,7 @@
 Windows 11 x64. Connect microphones, apps and effects with cables, then send
 your mix to headphones, a recording app or a virtual microphone.
 
-**[Download 0.5.0 Beta](https://github.com/acoyeen/vine-mix/releases/tag/v0.5.0-beta)**
-· [Setup](https://github.com/acoyeen/vine-mix/releases/download/v0.5.0-beta/VineMix-0.5.0-beta-Setup-x64.exe)
-· [Standalone EXE](https://github.com/acoyeen/vine-mix/releases/download/v0.5.0-beta/VineMix-0.5.0-beta-Standalone-x64.exe)
-· [What's new](docs/releases/0.5.0-beta.md)
+**[Download VineMix for Windows](https://vinemix.app/#download)** · [All GitHub releases and checksums](https://github.com/acoyeen/vine-mix/releases) · [0.6.0 release notes](docs/releases/0.6.0.md)
 
 ![VineMix's voice starter, with example devices and both outputs muted](docs/images/workspace.png)
 
@@ -30,7 +27,7 @@ Audio processing runs locally. VineMix supports up to 32 nodes and 96 connection
 ## Get started
 
 1. Install **Setup**, or open the **Standalone EXE** in File Explorer. Both
-   include the required .NET runtime.
+   are self-contained. Existing 0.5 users can check for newer releases in **Settings → Check for updates**.
 2. Choose your microphone on **Microphone** and headphones on **Listening output**.
 3. Both outputs start muted. Start with low headphone volume, then unmute
    Listening output when ready and adjust its Level gradually.
@@ -72,13 +69,12 @@ use **Quit VineMix** in Settings or the tray menu to stop it.
 **Settings → Check for updates** offers verified downloads and an explicit
 **Install and restart** action. Updating briefly pauses audio.
 
-## About this beta
+## Compatibility
 
-The app and Setup are not Windows Authenticode signed. Checksums and signed
-update metadata are included on the release page. Automated checks cover
-processing, editing, recovery and packages; hardware, long-session and broader
-accessibility testing remain incomplete. See the
-[0.5.0 qualification record](docs/RELEASE_0.5.0_QUALIFICATION.md).
+VineMix 0.6 uses a Rust desktop and audio engine. Setup and standalone use
+the existing VineMix workspace. For upgrade and rollback behaviour see
+[installation and updates](docs/INSTALLATION_AND_UPDATES.md). Each published
+release provides checksums and signed update metadata.
 
 Per-app capture also leaves the app's original playback audible. Parallel paths
 have no automatic delay compensation, and Distortion uses more processing time
@@ -88,29 +84,25 @@ audio processing budget; 32 nodes is routing capacity, not a performance guarant
 
 ## Learn more
 
-- [User guide](docs/USER_GUIDE.md) and [installation, updates and recovery](docs/BETA_TESTER_GUIDE.md)
+- [User guide](docs/USER_GUIDE.md) and [installation, updates and recovery](docs/INSTALLATION_AND_UPDATES.md)
 - [Device troubleshooting](docs/DEVICE_VISIBILITY.md) and [application capture](docs/APP_AUDIO.md)
 - [Changelog](CHANGELOG.md), [testing](TESTING.md) and [contributing](CONTRIBUTING.md)
 - [Third-party notices](THIRD_PARTY_NOTICES.md) and [distribution conditions](docs/DISTRIBUTION.md)
 
 ## Build from source
 
-Use Windows 11 x64 and PowerShell 7. Clone the `vine-mix` repository, then run:
+Use Windows x64, the pinned Rust toolchain and LLVM-MinGW. The
+[build guide](docs/RUST_BUILD.md) covers prerequisites, local builds,
+offline verification and packaging. From a prepared checkout:
 
 ```powershell
-pwsh -File .\scripts\build.ps1
-pwsh -File .\scripts\verify-offline.ps1
+. .\scripts\rust-env.ps1
+$rust = Initialize-RustEnvironment -Project (Get-Location)
+cargo build --locked --target $rust.target
+.\scripts\verify-rust.ps1 -Offline
 ```
 
-The first build downloads pinned local tools. The app is staged under
-`artifacts\VineMix-<version>-Installed`; generated caches and raw test evidence
-stay outside the checkout. Offline tests use synthetic audio and temporary data.
-See the [installer guide](installer/README.md) for packaging.
-
-These commands build the released 0.5 application, which is .NET and C++. A
-Rust rewrite is in progress on the `rust-rewrite` branch and has not been
-released; it has its own build and verification steps in
-[Building and verifying the Rust candidate](docs/RUST_BUILD.md).
+The C# and C++ sources remain as compatibility references for 0.5 updates and audio parity tests.
 
 VineMix is [MIT licensed](LICENSE). Forks are welcome; preserve its licence
 notice and third-party notices. Please also credit **“Based on VineMix by acoyeen”**

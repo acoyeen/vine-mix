@@ -303,8 +303,11 @@ impl Platform for WindowsPlatform {
         }))
     }
 
-    fn is_same_live_process(&self, identity: &ProcessIdentity) -> bool {
-        identity.is_live()
+    fn watch_live_process(&self, identity: &ProcessIdentity) -> Box<dyn Fn() -> bool + '_> {
+        let process = u32::try_from(identity.process_id).ok().and_then(Process::open).filter(|process| {
+            ProcessIdentity::of(process).and_then(std::result::Result::ok).is_some_and(|current| identity.same(&current))
+        });
+        Box::new(move || process.as_ref().is_some_and(|p| !p.has_exited()))
     }
 
     fn wait_for_exit(&self, identity: &ProcessIdentity, timeout: Duration) -> Result<bool> {

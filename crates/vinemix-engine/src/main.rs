@@ -64,6 +64,7 @@ const HELP: &str = "VineMix Engine
 ";
 
 fn run() -> Result<ExitCode, String> {
+    vinemix_platform::checked_development_instance()?;
     let mut settings: Option<PathBuf> = None;
     let mut validation: Option<PathBuf> = None;
     let mut list_devices = false;

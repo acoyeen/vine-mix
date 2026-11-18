@@ -1,0 +1,29 @@
+name: Rust dependency advisories
+
+on:
+  push:
+    branches: [main, rust-rewrite]
+    paths: [Cargo.lock, .github/workflows/rust-advisories.yml]
+  pull_request:
+    paths: [Cargo.lock, .github/workflows/rust-advisories.yml]
+  schedule:
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      # This tool analyses the lockfile across targets. The Windows compiler
+      # pinned in rust-toolchain.toml is unnecessary on this Linux runner.
+      - run: cargo +stable install cargo-audit --version 0.23.0 --locked
+        working-directory: ${{ runner.temp }}
+      - run: cargo +stable audit --file "$GITHUB_WORKSPACE/Cargo.lock"
+        working-directory: ${{ runner.temp }}

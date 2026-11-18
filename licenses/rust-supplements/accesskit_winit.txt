@@ -1,6 +1,6 @@
 Crate: accesskit_winit
 Manifest-License: Apache-2.0
 Used-Under: Apache-2.0
-Text: Apache-2.0.txt
-Basis: The package published on crates.io contains no licence file. Its manifest names Apache-2.0 only.
-Review: Pending: confirm against https://github.com/AccessKit/accesskit that binaries need no further notice (a NOTICE file, or separate terms for code derived from another project).
+Text: AccessKit-and-Chromium.txt
+Basis: The published manifest offers Apache-2.0 and the upstream repository supplies its text. AccessKit also identifies Chromium-derived code. Both upstream notices follow.
+Review: 2026-11-18. Checked the upstream revision identified by the published crate. https://github.com/AccessKit/accesskit/blob/f3026222559c7f5f46d8f25cb7404de68eb149f0/LICENSE-APACHE

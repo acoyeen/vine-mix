@@ -716,7 +716,9 @@ pub fn read_node(value: &Value) -> Result<GraphNode, ModelError> {
         eq_bands: nested(value, "eqBands", d.eq_bands, |v| read_array(v, read_eq_band))?,
         compressor: nested(value, "compressor", d.compressor, read_compressor)?,
         ducking: nested(value, "ducking", d.ducking, read_ducking)?,
-        dynamics_ui_version: json::value_i32(value, "dynamicsUiVersion", d.dynamics_ui_version)?,
+        dynamics_ui_version: nested(value, "dynamicsUiVersion", d.dynamics_ui_version, |v| {
+            json::read_integer_setting(v, 0, 1, "Unknown dynamics interface version.").map(|version| version as i32)
+        })?,
         expander: nested(value, "expander", d.expander, read_expander)?,
         alignment_delay: nested(value, "alignmentDelay", d.alignment_delay, read_alignment_delay)?,
         denoiser: nested(value, "denoiser", d.denoiser, read_denoiser)?,
@@ -1040,6 +1042,17 @@ pub fn graph_json(graph: &AudioGraph) -> Value {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn dynamics_ui_version_is_a_bounded_integer_before_conversion() {
+        assert_eq!(read_node(&json!({})).unwrap().dynamics_ui_version, 0);
+        for version in [0, 1] {
+            assert_eq!(read_node(&json!({"dynamicsUiVersion": version})).unwrap().dynamics_ui_version, version);
+        }
+        for invalid in [json!(1.5), json!(-1), json!(2), json!(4294967296u64)] {
+            assert!(read_node(&json!({"dynamicsUiVersion": invalid})).is_err());
+        }
+    }
 
     #[test]
     fn default_round_trips() {

@@ -383,3 +383,25 @@ fn only_the_primary_button_turns_a_dial() {
         assert!(started && ended && !dial.state.dragging, "zoom {scale}: one complete gesture");
     }
 }
+
+#[test]
+fn assistive_range_actions_change_the_dial_value() {
+    use egui::accesskit::{Action, ActionData, ActionRequest, TreeId};
+    let mut fixture = Fixture::new(1.0);
+    fixture.harness.enable_accessibility();
+    fixture.frame();
+    let node = fixture.harness.accessible("Level").unwrap();
+    assert_eq!((node.min_numeric_value(), node.max_numeric_value(), node.numeric_value_step()), (Some(-60.0), Some(12.0), Some(0.1)));
+    for (action, data, expected) in [
+        (Action::SetValue, Some(ActionData::NumericValue(-4.0)), -4.0),
+        (Action::Increment, None, -3.9),
+        (Action::Decrement, None, -4.0),
+        (Action::SetValue, Some(ActionData::NumericValue(50.0)), 12.0),
+    ] {
+        fixture.harness.event(egui::Event::AccessKitActionRequest(ActionRequest {
+            action, target_tree: TreeId::ROOT, target_node: id().with("face").accesskit_id(), data,
+        }));
+        fixture.frame();
+        assert!((fixture.value - expected).abs() < 1e-10);
+    }
+}

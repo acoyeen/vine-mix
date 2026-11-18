@@ -41,11 +41,15 @@ export function selectRelease(releases) {
   const installer = asset(`VineMix-${number}-Setup-x64.exe`);
   const standalone = asset(`VineMix-${number}-Standalone-x64.exe`);
   // Never combine files from different releases or silently call an older release latest.
-  if (!installer || !standalone) throw Error('Latest release packages are not ready');
+  const checksums = asset('SHA256SUMS.txt');
+  const rustDistribution = compare(version(tag), version('0.6.0-0')) >= 0;
+  if (!installer || !standalone || (rustDistribution && (!checksums || !asset(`VineMix-${number}-Updates.json`)))) {
+    throw Error('Latest release packages are not ready');
+  }
   const url = `${REPOSITORY}/releases/tag/${encodeURIComponent(tag)}`;
   const label = number.replace(/-(alpha|beta|rc)(?:\.(\d+))?$/i, (_, channel, n) => ` · ${channel.toUpperCase() === 'RC' ? 'RC' : channel[0].toUpperCase() + channel.slice(1)}${n === undefined ? '' : ` ${n}`}`);
   return { tag, label, url, installer, standalone,
-    checksums: asset('SHA256SUMS.txt') || url,
+    checksums: checksums || url,
     docs: `${REPOSITORY}/blob/${encodeURIComponent(tag)}/docs/INSTALLATION_AND_UPDATES.md` };
 }
 

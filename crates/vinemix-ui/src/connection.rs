@@ -28,7 +28,53 @@ use crate::platform::{self, OwnedHandle};
 use crate::protocol::{self, Response};
 use crate::text;
 
-pub const MAXIMUM_MESSAGE_BYTES: usize = 256 * 1024;
+pub const MAXIMUM_MESSAGE_BYTES: usize = vinemix_model::limits::MAXIMUM_CONTROL_MESSAGE_BYTES;
+
+#[derive(Default)]
+struct ReplyFrame {
+    bytes: Vec<u8>,
+    declared: Option<usize>,
+}
+
+impl ReplyFrame {
+    fn push(&mut self, chunk: &[u8]) -> Result<bool, ConnectionError> {
+        self.bytes.extend_from_slice(chunk);
+        if self.declared.is_none() && self.bytes.first() == Some(&b'~') {
+            // "~" followed by a decimal byte count and newline. The same
+            // ReadFile may also deliver part or all of the reply.
+            let header = self.bytes.iter().take(12).position(|&byte| byte == b'\n');
+            let Some(end) = header else {
+                return if self.bytes.len() < 12 { Ok(false) } else { Err(ConnectionError::InvalidData("Invalid snapshot length header.".into())) };
+            };
+            let length = std::str::from_utf8(&self.bytes[1..end]).ok()
+                .filter(|s| !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit()))
+                .and_then(|s| s.parse::<usize>().ok())
+                .filter(|n| *n > MAXIMUM_MESSAGE_BYTES && *n <= vinemix_model::limits::MAXIMUM_CONTROL_RESPONSE_BYTES)
+                .ok_or_else(|| ConnectionError::InvalidData("Unsupported snapshot length.".into()))?;
+            self.declared = Some(length);
+            self.bytes.drain(..=end);
+        }
+        let limit = self.declared.unwrap_or(MAXIMUM_MESSAGE_BYTES);
+        if self.bytes.len() > limit + 1 {
+            return Err(ConnectionError::InvalidData("The engine response exceeds the control-message limit.".into()));
+        }
+        // Only inspect the new bytes. Scanning an accumulated large reply
+        // after every ReadFile would make transfer quadratic.
+        let from = self.bytes.len().saturating_sub(chunk.len());
+        if let Some(index) = self.bytes[from..].iter().position(|&byte| byte == b'\n') {
+            let size = from + index;
+            if size + 1 != self.bytes.len() || self.declared.is_some_and(|expected| size != expected) {
+                return Err(ConnectionError::InvalidData("The engine sent an invalid response boundary.".into()));
+            }
+            self.bytes.pop();
+            return Ok(true);
+        }
+        if self.bytes.len() > limit {
+            return Err(ConnectionError::InvalidData("The engine response exceeds its declared length.".into()));
+        }
+        Ok(false)
+    }
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ConnectionError {
@@ -335,7 +381,7 @@ impl Connection {
             self.sent_any = true;
             offset += written as usize;
         }
-        let mut line: Vec<u8> = Vec::with_capacity(4096);
+        let mut frame = ReplyFrame::default();
         let mut receive = [0u8; 4096];
         loop {
             let pipe = self.pipe.as_ref().map(|p| p.0).unwrap_or_default();
@@ -346,20 +392,11 @@ impl Connection {
             if count == 0 {
                 return Err(ConnectionError::Io("The audio engine closed its control connection.".into()));
             }
-            let newline = receive[..count].iter().position(|&b| b == b'\n');
-            let take = newline.unwrap_or(count);
-            if line.len() + take > MAXIMUM_MESSAGE_BYTES {
-                return Err(ConnectionError::InvalidData("The engine response exceeds the control-message limit.".into()));
-            }
-            line.extend_from_slice(&receive[..take]);
-            if let Some(newline) = newline {
-                if newline + 1 != count {
-                    return Err(ConnectionError::InvalidData("The engine sent an unsolicited control message.".into()));
-                }
+            if frame.push(&receive[..count])? {
                 break;
             }
         }
-        let response = protocol::parse_response_cached(&line, &mut self.cache).map_err(ConnectionError::InvalidData)?;
+        let response = protocol::parse_response_cached(&frame.bytes, &mut self.cache).map_err(ConnectionError::InvalidData)?;
         if response.protocol_version != 1 || response.request_id != id {
             return Err(ConnectionError::InvalidData("The engine control protocol did not match this application.".into()));
         }
@@ -381,7 +418,7 @@ impl Connection {
                 self.physical_settings = Some(physical.to_string_lossy().into_owned());
             }
             let reported = normalize_physical(&snapshot.physical_settings_path);
-            if !text::eq_ignore_case(&reported, self.physical_settings.as_deref().unwrap_or_default()) {
+            if !verified_physical_match(&reported, self.physical_settings.as_deref()) {
                 return Err(ConnectionError::Io(
                     "The engine opened a different physical settings location. Saving has been blocked to protect your workspace.".into(),
                 ));
@@ -444,6 +481,10 @@ impl Connection {
     }
 }
 
+fn verified_physical_match(reported: &str, local: Option<&str>) -> bool {
+    !reported.is_empty() && local.is_some_and(|expected| text::eq_ignore_case(reported, expected))
+}
+
 pub(crate) fn normalize_physical(path: &str) -> String {
     if let Some(rest) = path.strip_prefix(r"\\?\UNC\") {
         format!(r"\\{rest}")
@@ -451,5 +492,36 @@ pub(crate) fn normalize_physical(path: &str) -> String {
         rest.to_owned()
     } else {
         path.to_owned()
+    }
+}
+
+#[cfg(test)]
+mod reply_frame_tests {
+    use super::*;
+
+    #[test]
+    fn unresolved_remote_path_cannot_match_a_verified_desktop() {
+        assert!(!verified_physical_match("", Some(r"C:\VineMix\settings.json")));
+        assert!(!verified_physical_match("", None));
+        assert!(verified_physical_match(r"c:\vinemix\settings.json", Some(r"C:\VineMix\settings.json")));
+    }
+
+    #[test]
+    fn extended_response_is_bounded_and_can_split_mid_header_or_body() {
+        let body = "x".repeat(MAXIMUM_MESSAGE_BYTES + 123);
+        let wire = format!("~{}\n{body}\n", body.len());
+        let mut frame = ReplyFrame::default();
+        assert!(!frame.push(&wire.as_bytes()[..2]).unwrap());
+        let mut complete = false;
+        for chunk in wire.as_bytes()[2..].chunks(237) {
+            assert!(!complete);
+            complete = frame.push(chunk).unwrap();
+        }
+        assert!(complete);
+        assert_eq!(frame.bytes, body.as_bytes());
+        assert!(ReplyFrame::default().push(b"~999999999\n").is_err());
+        assert!(ReplyFrame::default().push(b"~300000\n{}\n").is_err());
+        assert!(ReplyFrame::default().push(b"{}\nextra").is_err());
+        assert!(ReplyFrame::default().push(b"{}\n").unwrap());
     }
 }

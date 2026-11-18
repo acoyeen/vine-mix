@@ -618,10 +618,10 @@ pub mod clipboard {
     struct Open;
 
     impl Open {
-        fn new() -> Option<Self> {
+        fn new(owner: Option<windows::Win32::Foundation::HWND>) -> Option<Self> {
             for _ in 0..10 {
-                // SAFETY: no owner window; closed by Drop.
-                if unsafe { OpenClipboard(None) }.is_ok() {
+                // SAFETY: the caller supplies the UI thread's active window when writing.
+                if unsafe { OpenClipboard(owner) }.is_ok() {
                     return Some(Self);
                 }
                 std::thread::sleep(std::time::Duration::from_millis(10));
@@ -645,32 +645,97 @@ pub mod clipboard {
     }
 
     pub fn set(name: &str, text: &str) -> Result<(), String> {
-        let id = format(name).ok_or("The clipboard is busy.")?;
-        let units: Vec<u16> = text.encode_utf16().chain(std::iter::once(0)).collect();
-        let _open = Open::new().ok_or("The clipboard is busy.")?;
-        // SAFETY: the clipboard is open; ownership of the global block passes
-        // to the system on success and is freed here on failure.
-        unsafe {
-            EmptyClipboard().map_err(|_| "The clipboard is busy.")?;
-            let memory = GlobalAlloc(GMEM_MOVEABLE, units.len() * 2).map_err(|_| "The clipboard is busy.")?;
-            let target = GlobalLock(memory).cast::<u16>();
-            if target.is_null() {
-                let _ = GlobalFree(Some(memory));
-                return Err("The clipboard is busy.".into());
-            }
-            std::ptr::copy_nonoverlapping(units.as_ptr(), target, units.len());
-            let _ = GlobalUnlock(memory);
-            if SetClipboardData(id, Some(HANDLE(memory.0))).is_err() {
-                let _ = GlobalFree(Some(memory));
-                return Err("The clipboard is busy.".into());
-            }
+        // SAFETY: queried on the UI thread while the Copy command is active.
+        let owner = unsafe { windows::Win32::UI::Input::KeyboardAndMouse::GetActiveWindow() };
+        set_with_owner(owner, name, text)
+    }
+
+    fn set_with_owner(owner: windows::Win32::Foundation::HWND, name: &str, text: &str) -> Result<(), String> {
+        if owner.0.is_null() {
+            return Err("The workspace window must be active to copy nodes.".into());
         }
-        Ok(())
+        let id = format(name).ok_or("The clipboard format could not be registered.")?;
+        let units: Vec<u16> = text.encode_utf16().chain(std::iter::once(0)).collect();
+        // Prepare the entire payload before replacing the user's clipboard.
+        // SAFETY: the block owns exactly units.len() UTF-16 elements.
+        let memory = unsafe { GlobalAlloc(GMEM_MOVEABLE, units.len() * 2) }.map_err(|_| "There is not enough memory to copy the selection.")?;
+        let result = (|| -> Result<(), String> {
+            // SAFETY: memory is held until transfer or cleanup below.
+            unsafe {
+                let target = GlobalLock(memory).cast::<u16>();
+                if target.is_null() {
+                    return Err("The selected nodes could not be prepared for copying.".into());
+                }
+                std::ptr::copy_nonoverlapping(units.as_ptr(), target, units.len());
+                let _ = GlobalUnlock(memory);
+            }
+            let _open = Open::new(Some(owner)).ok_or("The clipboard is busy. Try Copy again.")?;
+            // SAFETY: the clipboard is open with a valid owner. Windows takes memory on success.
+            unsafe {
+                EmptyClipboard().map_err(|_| "Windows could not replace the clipboard contents.")?;
+                SetClipboardData(id, Some(HANDLE(memory.0))).map_err(|_| "Windows did not accept the copied node group.")?;
+            }
+            Ok(())
+        })();
+        if result.is_err() {
+            // SAFETY: no transfer occurred on any error path.
+            unsafe { let _ = GlobalFree(Some(memory)); }
+        }
+        result
+    }
+
+    #[cfg(test)]
+    #[test]
+    fn copy_without_an_owner_stops_before_opening_the_clipboard() {
+        assert!(set_with_owner(Default::default(), "VineMix.Test.NodeGroup", "fixture").unwrap_err().contains("window must be active"));
+    }
+
+    #[cfg(test)]
+    #[test]
+    #[ignore = "Requires a Windows session permitted to create a private window station and desktop"]
+    fn copy_round_trips_in_a_private_window_station() {
+        use windows::core::w;
+        use windows::Win32::System::StationsAndDesktops::{
+            CreateDesktopW, CreateWindowStationW, GetProcessWindowStation, SetProcessWindowStation, SetThreadDesktop,
+        };
+        use windows::Win32::UI::Input::KeyboardAndMouse::SetActiveWindow;
+        use windows::Win32::UI::WindowsAndMessaging::{CreateWindowExW, DestroyWindow, WS_OVERLAPPEDWINDOW};
+
+        const CHILD: &str = "VINEMIX_PRIVATE_CLIPBOARD_TEST";
+        if std::env::var_os(CHILD).is_none() {
+            // A window station owns the clipboard process-wide. Isolate its
+            // selection from concurrent tests and the interactive desktop.
+            let result = std::process::Command::new(std::env::current_exe().unwrap())
+                .args(["--ignored", "--exact", "platform::clipboard::copy_round_trips_in_a_private_window_station", "--nocapture"])
+                .env(CHILD, "1")
+                .output().unwrap();
+            assert!(result.status.success() && String::from_utf8_lossy(&result.stdout).contains("1 passed"), "{}", String::from_utf8_lossy(&result.stderr));
+            return;
+        }
+        let station_name = wide(&format!("VineMixClipboardTest{}", std::process::id()));
+        // SAFETY: this test child is disposable. OS handles are released on
+        // its exit. No clipboard call is made until a distinct station and
+        // its own desktop have been selected and verified.
+        unsafe {
+            let original = GetProcessWindowStation().unwrap();
+            let station = CreateWindowStationW(PCWSTR(station_name.as_ptr()), 0, 0x10000000, None).unwrap();
+            assert_ne!(station, original);
+            SetProcessWindowStation(station).unwrap();
+            let desktop = CreateDesktopW(w!("Test"), PCWSTR::null(), None, Default::default(), 0x10000000, None).unwrap();
+            SetThreadDesktop(desktop).unwrap();
+            assert_eq!(GetProcessWindowStation().unwrap(), station);
+            let window = CreateWindowExW(Default::default(), w!("STATIC"), w!("Copy test"), WS_OVERLAPPEDWINDOW,
+                0, 0, 10, 10, None, None, None, None).unwrap();
+            let _ = SetActiveWindow(window);
+            set("VineMix.Test.NodeGroup", "fixture").unwrap();
+            assert_eq!(get("VineMix.Test.NodeGroup").as_deref(), Some("fixture"));
+            DestroyWindow(window).unwrap();
+        }
     }
 
     pub fn get(name: &str) -> Option<String> {
         let id = format(name)?;
-        let _open = Open::new()?;
+        let _open = Open::new(None)?;
         // SAFETY: the clipboard is open; the handle stays owned by the system.
         unsafe {
             let handle = GetClipboardData(id).ok()?;

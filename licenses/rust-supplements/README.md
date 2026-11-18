@@ -21,11 +21,15 @@ Each `<crate>.txt` is a header:
 `cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30`), copied
 unchanged from a dependency that ships it.
 
-The supplements written on 10 November 2026 all choose Apache-2.0, because its
-text is the same for every work and could be reproduced without access to the
-upstream repositories. Their `Review` fields are still `Pending`: confirm each
-against its repository, and replace the choice with the upstream MIT text
-where that is preferred.
+On 18 November 2026 the 14 supplements were checked against the published
+crate metadata and upstream source. Each supplement links the reviewed
+revision. The AccessKit entries reproduce its Chromium notice alongside its
+Apache licence. Font-specific notices are included in the generated inventory.
+For egui packages whose recorded source revision was unavailable, the shipped
+Rust source was compared with the 0.37.0 tag. The epaint manifest differed
+from that tag, and its published licence expression was checked separately.
+
+The release build uses `--require-reviewed` to reject pending supplements.
 
 A supplement is removed when its crate is no longer shipped or starts
 publishing its own licence file; the generator reports both.

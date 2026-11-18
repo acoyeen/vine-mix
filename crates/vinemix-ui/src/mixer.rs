@@ -71,16 +71,86 @@ struct PendingEdit {
     is_restore: bool,
     /// Stands for edits the engine is already playing but has not written
     /// to the settings file (see [`PendingBatch::persist`]). It changes
-    /// nothing when replayed; it leaves the queue with the next save.
-    held: bool,
+    /// only the fields changed by the gesture and leaves on durable save.
+    held: Option<std::sync::Arc<Adjustment>>,
     frames_before: Option<Vec<Frame>>,
     frames_after: Option<Vec<Frame>>,
+}
+
+/// Desired control values that are audible but still owe a disk write.
+#[derive(Clone, Debug, Default)]
+struct Adjustment {
+    fields: std::collections::BTreeMap<String, std::collections::BTreeMap<String, serde_json::Value>>,
+}
+
+impl Adjustment {
+    fn for_nodes(before: &Configuration, after: &Configuration, previous: Option<&Self>) -> Option<Self> {
+        // Structural and non-node changes must go straight to durable storage.
+        let mut comparable = before.clone();
+        comparable.graph.nodes.clone_from(&after.graph.nodes);
+        if &comparable != after || before.graph.nodes.len() != after.graph.nodes.len() {
+            return None;
+        }
+        let mut adjustment = previous.cloned().unwrap_or_default();
+        for (old, new) in before.graph.nodes.iter().zip(&after.graph.nodes) {
+            if old.id != new.id || old.kind != new.kind {
+                return None;
+            }
+            if old != new {
+                let fields = adjustment.fields.entry(new.id.clone()).or_default();
+                Self::record(fields, "", &vinemix_model::config::node_json(old), &vinemix_model::config::node_json(new));
+            }
+        }
+        Some(adjustment)
+    }
+
+    fn record(fields: &mut std::collections::BTreeMap<String, serde_json::Value>, path: &str, old: &serde_json::Value, new: &serde_json::Value) {
+        if old == new {
+            return;
+        }
+        if let (Some(old), Some(new)) = (old.as_object(), new.as_object()) {
+            for (key, value) in new {
+                Self::record(fields, &format!("{path}/{key}"), old.get(key).unwrap_or(&serde_json::Value::Null), value);
+            }
+        } else if let (Some(old), Some(new)) = (old.as_array(), new.as_array())
+            && old.len() == new.len() && !fields.contains_key(path)
+        {
+            for (index, (old, new)) in old.iter().zip(new).enumerate() {
+                Self::record(fields, &format!("{path}/{index}"), old, new);
+            }
+        } else {
+            let prefix = format!("{path}/");
+            fields.retain(|key, _| !key.starts_with(&prefix));
+            fields.insert(path.to_owned(), new.clone());
+        }
+    }
+
+    fn apply(&self, config: &mut Configuration) -> Result<(), String> {
+        for (id, fields) in &self.fields {
+            let node = config.graph.nodes.iter_mut().find(|node| &node.id == id)
+                .ok_or("A node changed before its adjustment could be saved.")?;
+            let mut json = vinemix_model::config::node_json(node);
+            let mut changed = false;
+            for (path, value) in fields {
+                let current = json.pointer_mut(path).ok_or("The adjusted control no longer exists.")?;
+                if current != value {
+                    *current = value.clone();
+                    changed = true;
+                }
+            }
+            if changed {
+                *node = vinemix_model::config::read_node(&json).map_err(|e| e.to_string())?;
+            }
+        }
+        Ok(())
+    }
 }
 
 #[derive(Clone, Debug)]
 pub struct PendingBatch {
     pub configuration: Configuration,
     edits: Vec<u64>,
+    adjustment: Option<std::sync::Arc<Adjustment>>,
     /// False while a control is being dragged: the engine applies the
     /// configuration so the change is heard, and the settings file is
     /// written once, by the first batch after the drag ends.
@@ -202,6 +272,7 @@ pub struct MixerState {
     show_minimap: bool,
     automatically_check_for_updates: bool,
     registered_startup: Option<bool>,
+    startup_retry: Option<(bool, Duration)>,
     pub connection_status: String,
     pub warning: String,
     edit_error: String,
@@ -222,6 +293,7 @@ pub struct MixerState {
     layout_locked: bool,
     visual_frames: Vec<Frame>,
     visual_frames_need_save: bool,
+    unconfirmed_edit_batch: Option<PendingBatch>,
     unconfirmed_quit_batch: Option<PendingBatch>,
     unconfirmed_update_batch: Option<PendingBatch>,
     quit_recovery_configuration: Option<Workspace>,
@@ -302,6 +374,7 @@ impl MixerState {
             // Opt-in: automatic checks contact GitHub, so they start off.
             automatically_check_for_updates: false,
             registered_startup: None,
+            startup_retry: None,
             connection_status: "Connecting to the audio engine…".into(),
             warning: String::new(),
             edit_error: String::new(),
@@ -322,6 +395,7 @@ impl MixerState {
             layout_locked: false,
             visual_frames: Vec::new(),
             visual_frames_need_save: false,
+            unconfirmed_edit_batch: None,
             unconfirmed_quit_batch: None,
             unconfirmed_update_batch: None,
             quit_recovery_configuration: None,
@@ -357,13 +431,23 @@ impl MixerState {
         state
     }
 
-    /// Loads `ui.json`. Unreadable data is copied aside before anything can
+    /// Loads `ui.json`. Unreadable data is moved aside before anything can
     /// replace it; the last good backup is used when there is one.
     fn load_ui_preferences_file(&mut self, path: std::path::PathBuf) {
         use crate::preferences::{backup_path, preserve_damaged, read_bounded, ReadOutcome};
         self.preferences_path = Some(path.clone());
         let damage = match read_bounded(&path) {
-            ReadOutcome::Missing => return,
+            ReadOutcome::Missing => {
+                // A previous launch may have moved a damaged primary aside without writing new preferences.
+                if let ReadOutcome::Bytes(bytes) = read_bounded(&backup_path(&path)) {
+                    if self.load_ui_preferences_json(&bytes).is_ok() {
+                        self.preferences_primary_good = false;
+                        self.preferences_notice = "Workspace preferences were restored from the previous saved copy.".into();
+                        self.update_warning();
+                    }
+                }
+                return;
+            },
             ReadOutcome::Bytes(bytes) => match self.load_ui_preferences_json(&bytes) {
                 Ok(()) => return,
                 Err(error) => error,
@@ -376,7 +460,7 @@ impl MixerState {
             Ok(copy) => format!("The unreadable file was kept as {}.", copy.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()),
             Err(_) => {
                 self.preferences_blocked = true;
-                "The unreadable file could not be copied aside, so it is left untouched and preference changes last for this session only.".to_owned()
+                "The unreadable file could not be moved aside, so it is left untouched and preference changes last for this session only.".to_owned()
             }
         };
         let restored = match read_bounded(&backup_path(&path)) {
@@ -880,6 +964,7 @@ impl MixerState {
     pub(crate) fn finish_recovery(&mut self, command: &str, snapshot: Snapshot) -> Result<(), String> {
         if matches!(command, "restoreBackup" | "startFresh") && snapshot.is_settings_usable() {
             self.pending.clear();
+            self.unconfirmed_edit_batch = None;
             self.canvas_view = None;
             self.history.clear();
             self.recovery_pending = None;
@@ -996,7 +1081,7 @@ impl MixerState {
     fn push_pending(&mut self, apply: Box<EditFn>, is_restore: bool, frames_before: Option<Vec<Frame>>, frames_after: Option<Vec<Frame>>) {
         let id = self.next_edit_id;
         self.next_edit_id += 1;
-        self.pending.push(PendingEdit { id, apply, is_restore, held: false, frames_before, frames_after });
+        self.pending.push(PendingEdit { id, apply, is_restore, held: None, frames_before, frames_after });
         let now = self.now();
         self.last_edit_at = now;
         self.cadence.queue(now);
@@ -1167,6 +1252,7 @@ impl MixerState {
 
     /// The coalesced configuration for the next configure request.
     pub fn prepare_pending_configuration(&mut self, basis: &Configuration) -> PendingBatch {
+        self.reconcile_dispatched(basis);
         self.reconcile_unconfirmed_update(basis);
         self.reconcile_unconfirmed_quit(basis);
         let (mut workspace, conflict) = self.replay_pending(Workspace::from_config(basis.clone()));
@@ -1183,21 +1269,29 @@ impl MixerState {
             }
             self.apply_desired(true);
         }
-        PendingBatch { configuration: workspace.config, edits: self.pending.iter().map(|e| e.id).collect(), persist: !self.adjusting() }
+        let adjustment = if self.adjusting() {
+            let held = self.pending.iter().find_map(|edit| edit.held.as_deref());
+            Adjustment::for_nodes(basis, &workspace.config, held).map(std::sync::Arc::new)
+        } else {
+            None
+        };
+        PendingBatch { configuration: workspace.config, edits: self.pending.iter().map(|e| e.id).collect(), persist: adjustment.is_none(), adjustment }
     }
 
     pub fn is_pending_save_due(&self) -> bool {
         // During a drag there is nothing to send once the engine is playing
         // every edit; what remains is the save, which waits for the release.
-        !self.pending.is_empty() && self.cadence.is_due(self.now()) && !(self.adjusting() && self.pending.iter().all(|e| e.held))
+        !self.pending.is_empty() && self.cadence.is_due(self.now()) && !(self.adjusting() && self.pending.iter().all(|e| e.held.is_some()))
     }
 
-    pub fn begin_dispatch(&mut self) {
+    pub fn begin_dispatch(&mut self, batch: &PendingBatch) {
+        self.unconfirmed_edit_batch = Some(batch.clone());
         let now = self.now();
         self.cadence.begin_dispatch(now);
     }
 
     pub fn handle_configure_response(&mut self, batch: &PendingBatch, basis: &Snapshot, response: Response) -> Result<(), String> {
+        self.unconfirmed_edit_batch = None;
         let now = self.now();
         if response.ok {
             return self.acknowledge_pending(batch, response.snapshot);
@@ -1220,13 +1314,18 @@ impl MixerState {
     pub(crate) fn acknowledge_pending(&mut self, batch: &PendingBatch, snapshot: Option<Snapshot>) -> Result<(), String> {
         // Identities, not a prefix count: newer edits may have arrived.
         self.pending.retain(|e| !batch.edits.contains(&e.id));
-        if !batch.persist && !self.pending.iter().any(|e| e.held) {
-            // The engine has these edits but its settings file does not:
-            // something stays queued until a save is confirmed, so quitting,
-            // restarting and updating all still wait for it.
+        if let Some(adjustment) = &batch.adjustment {
             let id = self.next_edit_id;
             self.next_edit_id += 1;
-            self.pending.insert(0, PendingEdit { id, apply: Box::new(|_| Ok(())), is_restore: false, held: true, frames_before: None, frames_after: None });
+            let replay = adjustment.clone();
+            self.pending.insert(0, PendingEdit {
+                id,
+                apply: Box::new(move |workspace| replay.apply(&mut workspace.config)),
+                is_restore: false,
+                held: Some(adjustment.clone()),
+                frames_before: None,
+                frames_after: None,
+            });
         }
         self.cadence.complete(!self.pending.is_empty());
         self.save_error.clear();
@@ -1301,6 +1400,7 @@ impl MixerState {
             snapshot.configuration.graph = crate::graph::from_legacy(&snapshot.configuration);
             snapshot.configuration.version = 2;
         }
+        self.reconcile_dispatched(&snapshot.configuration);
         self.reconcile_unconfirmed_update(&snapshot.configuration);
         self.reconcile_unconfirmed_quit(&snapshot.configuration);
         let initial = self.snapshot.is_none();
@@ -1403,6 +1503,27 @@ impl MixerState {
                 };
                 configuration_changed = true;
             }
+            let fills = bindings::find_stable_id_fills(&self.desired.config.graph, &self.endpoints);
+            if !fills.is_empty() && bindings::apply_stable_ids(&mut self.desired.config.graph, &fills) > 0 {
+                if !self.preview || self.queue_preview_edits {
+                    let replay = fills.clone();
+                    self.push_pending(
+                        Box::new(move |w| {
+                            bindings::apply_stable_ids(&mut w.config.graph, &replay);
+                            Ok(())
+                        }),
+                        false,
+                        None,
+                        None,
+                    );
+                }
+                self.save_status = if self.preview && !self.queue_preview_edits {
+                    "Preview · changes stay in this window".into()
+                } else {
+                    self.pending_save_status()
+                };
+                configuration_changed = true;
+            }
         }
         if !self.has_settings_recovery() && configuration_changed && !self.history.is_compatible(&self.desired.graph_state()) {
             self.reset_history_after_conflict("Another change affected a node or connection in the edit history.");
@@ -1413,17 +1534,31 @@ impl MixerState {
         if self.has_settings_recovery() {
             self.save_status = "Recovery required · nothing is being saved".into();
         }
-        if !self.preview && self.can_edit() && self.registered_startup != Some(registered) {
-            match crate::platform::startup::set_enabled(registered) {
-                Ok(()) => self.startup_error.clear(),
-                Err(error) => {
-                    self.startup_error = format!("Could not update start at login: {error}");
-                    self.update_warning();
-                }
-            }
-            self.registered_startup = Some(registered);
+        if !self.preview && self.can_edit() {
+            self.sync_startup(registered, crate::platform::startup::set_enabled);
         }
         Ok(())
+    }
+
+    fn sync_startup(&mut self, desired: bool, set: impl FnOnce(bool) -> Result<(), String>) {
+        let now = self.now();
+        if self.registered_startup == Some(desired) && self.startup_retry.is_none()
+            || self.startup_retry.is_some_and(|(value, retry)| value == desired && now < retry)
+        {
+            return;
+        }
+        match set(desired) {
+            Ok(()) => {
+                self.registered_startup = Some(desired);
+                self.startup_retry = None;
+                self.startup_error.clear();
+            }
+            Err(error) => {
+                self.startup_retry = Some((desired, now + Duration::from_secs(30)));
+                self.startup_error = format!("Could not update start at login: {error}");
+            }
+        }
+        self.update_warning();
     }
 
     /// The connection failed: show it and wait for reconnection.
@@ -1438,6 +1573,7 @@ impl MixerState {
     // ----- strict replay (restart, quit, update) -------------------------
 
     pub(crate) fn prepare_restart_configuration(&mut self, basis: &Configuration) -> Result<PendingBatch, String> {
+        self.reconcile_dispatched(basis);
         self.reconcile_unconfirmed_update(basis);
         self.reconcile_unconfirmed_quit(basis);
         let mut workspace = Workspace::from_config(basis.clone());
@@ -1451,7 +1587,16 @@ impl MixerState {
             workspace.config.graph.pan_y = y;
             workspace.config.graph.zoom = zoom;
         }
-        Ok(PendingBatch { configuration: workspace.config, edits: self.pending.iter().map(|e| e.id).collect(), persist: true })
+        Ok(PendingBatch { configuration: workspace.config, edits: self.pending.iter().map(|e| e.id).collect(), persist: true, adjustment: None })
+    }
+
+    fn reconcile_dispatched(&mut self, configuration: &Configuration) {
+        if let Some(batch) = self.unconfirmed_edit_batch.take()
+            && batch.configuration.revision.checked_add(1) == Some(configuration.revision)
+            && crate::protocol::same_saved_configuration(&batch.configuration, configuration)
+        {
+            let _ = self.acknowledge_pending(&batch, None);
+        }
     }
 
     pub(crate) fn reconcile_unconfirmed_quit(&mut self, saved: &Configuration) {
@@ -1761,6 +1906,58 @@ mod tests {
         assert!(!state.can_undo());
     }
 
+    #[test]
+    fn acknowledged_adjustment_replays_only_touched_fields_after_an_engine_crash() {
+        let mut state = connected();
+        let mut old = state.snapshot().unwrap().clone();
+        state.begin_edit_gesture(None);
+        state.edit(|w| w.config.graph.nodes[1].gain_db = 3.0);
+        let batch = state.prepare_pending_configuration(&old.configuration);
+        let mut played = old.clone();
+        played.configuration = batch.configuration.clone();
+        played.configuration.revision += 1;
+        state.acknowledge_pending(&batch, Some(played)).unwrap();
+        old.configuration.graph.nodes[1].name = "Other edit".into();
+        state.connection_lost("Restarted".into(), String::new());
+        state.accept(old.clone(), false).unwrap();
+        state.end_edit_gesture();
+        let save = state.prepare_pending_configuration(&old.configuration);
+        assert!(save.persist);
+        assert_eq!(save.configuration.graph.nodes[1].gain_db, 3.0);
+        assert_eq!(save.configuration.graph.nodes[1].name, "Other edit");
+    }
+
+    #[test]
+    fn lost_configure_reply_preserves_committed_mute_and_newer_edit() {
+        let mut state = connected();
+        let mut committed = state.snapshot().unwrap().clone();
+        let target = !committed.configuration.graph.edges[0].muted;
+        state.edit(move |w| w.config.graph.edges[0].muted = target);
+        let batch = state.prepare_pending_configuration(&committed.configuration);
+        state.begin_dispatch(&batch);
+        state.edit(|w| w.config.graph.nodes[0].gain_db = -8.0);
+        committed.configuration = batch.configuration.clone();
+        committed.configuration.revision += 1;
+        state.connection_lost("Disconnected".into(), String::new());
+        state.accept(committed.clone(), false).unwrap();
+        assert_eq!(state.pending_edit_count(), 1);
+        let next = state.prepare_pending_configuration(&committed.configuration);
+        assert_eq!(next.configuration.graph.edges[0].muted, target);
+        assert_eq!(next.configuration.graph.nodes[0].gain_db, -8.0);
+    }
+
+    #[test]
+    fn failed_startup_registration_can_retry_after_backoff() {
+        let mut state = MixerState::new(true);
+        state.sync_startup(true, |_| Err("busy".into()));
+        assert_eq!(state.registered_startup, None);
+        state.sync_startup(true, |_| panic!("retry was not throttled"));
+        state.clock -= Duration::from_secs(31);
+        state.sync_startup(true, |_| Ok(()));
+        assert_eq!(state.registered_startup, Some(true));
+        assert!(state.startup_error.is_empty());
+    }
+
     /// An edit outside a drag is saved by the configure that applies it, and
     /// a drag left motionless is saved where it stands.
     #[test]
@@ -1912,7 +2109,10 @@ mod tests {
         let copies = preserved_copies(&directory);
         assert_eq!(copies.len(), 1, "preserved at load, before any save");
         assert_eq!(std::fs::read_to_string(&copies[0]).unwrap(), damaged);
-        assert_eq!(std::fs::read_to_string(&path).unwrap(), damaged, "loading alone changes nothing");
+        assert!(!path.exists(), "the primary was moved intact");
+        let another = MixerState::with_preferences_file(path.clone());
+        assert_eq!(preserved_copies(&directory), copies);
+        drop(another);
 
         state.set_show_minimap(false);
         state.ensure_ui_preferences_saved().unwrap();
@@ -1968,8 +2168,12 @@ mod tests {
         drop(file);
         let state = MixerState::with_preferences_file(path.clone());
         assert!(state.preferences_notice().contains("could not be read"));
-        assert_eq!(preserved_copies(&directory).len(), 1);
+        let copies = preserved_copies(&directory);
+        assert_eq!(copies.len(), 1);
         drop(state);
+        let reopened = MixerState::with_preferences_file(path);
+        assert_eq!(preserved_copies(&directory), copies);
+        drop(reopened);
         let _ = std::fs::remove_dir_all(directory);
     }
 

@@ -62,7 +62,7 @@ fn fmod_one(x: f64) -> f64 {
 
 /// Whether libsamplerate accepts `ratio` (`src_is_valid_ratio`).
 pub fn is_valid_ratio(ratio: f64) -> bool {
-    !(ratio < 1.0 / SRC_MAX_RATIO || ratio > SRC_MAX_RATIO)
+    (1.0 / SRC_MAX_RATIO..=SRC_MAX_RATIO).contains(&ratio)
 }
 
 /// libsamplerate error codes the converter can report.
@@ -512,5 +512,22 @@ mod tests {
         assert_eq!(AdaptiveResampler::new(0, 48_000, 16).unwrap_err(), ResamplerError::InvalidRates);
         assert_eq!(AdaptiveResampler::new(1, 48_000, 16).unwrap_err(), ResamplerError::UnsupportedRatio);
         assert_eq!(AdaptiveResampler::new(48_000, 48_000, 0).unwrap_err(), ResamplerError::InvalidDimensions);
+    }
+
+    #[test]
+    fn nonfinite_ratios_leave_stream_history_intact() {
+        let mut converter = SincConverter::new();
+        let input = [0.25; 512];
+        let mut output = [0.0; 256];
+        converter.process(&input, &mut output, 1.0).unwrap();
+        let mut expected = converter.clone();
+        for ratio in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert_eq!(converter.set_ratio(ratio), Err(SrcError::BadSrcRatio));
+            assert_eq!(converter.process(&input, &mut output, ratio), Err(SrcError::BadSrcRatio));
+        }
+        let mut reference = [0.0; 256];
+        assert_eq!(converter.process(&input, &mut output, 1.1), expected.process(&input, &mut reference, 1.1));
+        assert_eq!(output, reference);
+        assert_eq!(converter, expected);
     }
 }

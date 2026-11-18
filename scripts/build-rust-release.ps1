@@ -24,10 +24,9 @@ param(
     [string]$OutputDirectory = '',
     [string]$InnoSetupDirectory = '',
     [string]$DriverCacheDirectory = '',
+    [string]$ToolsDirectory = '',
+    [string]$PythonPath = '',
     [switch]$SkipInstaller,
-    # Builds the standalone with the orange "VineMix (Rust)" identity, to run
-    # beside an installed 0.5 without confusing the two.
-    [switch]$RustEdition,
     # Builds from a tree that differs from its commit. Every identity then says
     # "dirty" and the receipt is not a release-candidate receipt.
     [switch]$AllowDirty
@@ -48,7 +47,12 @@ function Assert-FileVersion([string]$Path, [string]$Version, [string]$Numeric) {
     # Released update workers parse the FileVersion string; it must be numeric.
     $info = [Diagnostics.FileVersionInfo]::GetVersionInfo($Path)
     $fixed = '{0}.{1}.{2}.{3}' -f $info.FileMajorPart, $info.FileMinorPart, $info.FileBuildPart, $info.FilePrivatePart
-    if ($info.FileVersion -cne $Numeric -or $fixed -ne $Numeric -or ($info.ProductVersion -split '\+')[0] -cne $Version) {
+    # Inno Setup pads its editable string resources. Older workers parse the
+    # numeric text; verify it as well as the fixed file version.
+    $padding = [char[]]@(' ', [char]0)
+    $fileText = ([string]$info.FileVersion).TrimEnd($padding)
+    $productText = ([string]$info.ProductVersion).TrimEnd($padding)
+    if ($fileText -cne $Numeric -or $fixed -ne $Numeric -or ($productText -split '\+')[0] -cne $Version) {
         throw "Release version metadata mismatch for $Path"
     }
 }
@@ -60,12 +64,16 @@ if (-not $StageDirectory) { $StageDirectory = Join-Path $env:LOCALAPPDATA ('Vine
 $stage = [IO.Path]::GetFullPath($StageDirectory)
 if (Test-Path -LiteralPath $stage) { throw 'Choose a new StageDirectory; earlier candidates are retained.' }
 if (-not $OutputDirectory) { $OutputDirectory = Join-Path $stage 'output' }
-$output = [IO.Path]::GetFullPath($OutputDirectory)
+$finalOutput = [IO.Path]::GetFullPath($OutputDirectory).TrimEnd('\')
+if ($finalOutput -ieq $stage -or (Test-Path -LiteralPath $finalOutput)) { throw 'Choose a fresh output directory separate from the stage.' }
+if (-not $ToolsDirectory) { $ToolsDirectory = Join-Path $project '.tools' }
+$ToolsDirectory = [IO.Path]::GetFullPath($ToolsDirectory)
+if ($PythonPath) { $python = $PythonPath; $pythonArgs = @() } else { $python = 'py'; $pythonArgs = @('-3') }
 
 # The exact Rust release, target and LLVM-MinGW; never the first llvm-mingw-*
 # directory found, nor whatever target the installed Rust defaults to.
 . (Join-Path $PSScriptRoot 'rust-env.ps1')
-$toolchain = Initialize-RustEnvironment -Project $project
+$toolchain = Initialize-RustEnvironment -Project $project -ToolsDirectory $ToolsDirectory
 $target = $toolchain.target
 
 # Source identity, before anything is compiled or created.
@@ -79,16 +87,50 @@ if (-not $source.inputsMatchCommit -and -not $AllowDirty) {
 }
 $revision = if ($source.inputsMatchCommit) { $source.gitHead } else { $source.gitHead + '-dirty' }
 $buildTime = [DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ssZ')
-$null = New-Item -ItemType Directory -Force -Path $stage, $output
+$null = New-Item -ItemType Directory -Path $stage
+$finalParent = Split-Path -Parent $finalOutput
+$null = New-Item -ItemType Directory -Force -Path $finalParent
+# The final directory appears in one rename, only after every check has passed.
+$output = Join-Path $finalParent ('.vinemix-building-' + [guid]::NewGuid().ToString('N'))
+$null = New-Item -ItemType Directory -Path $output
+$targetDirectory = Join-Path $stage 'cargo'
+$cargoHome = if ($env:CARGO_HOME) { $env:CARGO_HOME } else { Join-Path $env:USERPROFILE '.cargo' }
+$rustupHome = if ($env:RUSTUP_HOME) { $env:RUSTUP_HOME } else { Join-Path $env:USERPROFILE '.rustup' }
+$mappings = [ordered]@{}
+# rustc applies the last matching prefix, so place specific mappings last.
+foreach ($pair in @(
+    ,@($env:USERPROFILE, '/build/home')
+    ,@($cargoHome, '/build/cargo')
+    ,@($rustupHome, '/build/rustup')
+    ,@($project, '/build/vinemix')
+    ,@($stage, '/build/stage')
+    ,@($ToolsDirectory, '/build/tools')
+)) { $mappings[[IO.Path]::GetFullPath($pair[0])] = $pair[1] }
+# Cargo's encoded flags replace target.rustflags. Preserve the checked-in
+# CRT linkage explicitly and refuse additional flags supplied by the caller.
+if ($env:RUSTFLAGS -or $env:CARGO_ENCODED_RUSTFLAGS) { throw 'Clear inherited Rust compiler flags for a release build.' }
+$rustFlags = @('-C', 'target-feature=+crt-static') + @(
+    foreach ($prefix in $mappings.Keys) { '--remap-path-prefix=' + $prefix + '=' + $mappings[$prefix] }
+)
+$oldVars = @{}
+foreach ($name in @('VINEMIX_SOURCE_REVISION','VINEMIX_SOURCE_SNAPSHOT_SHA256','VINEMIX_BUILD_TIMESTAMP',
+                     'VINEMIX_RUNTIME_ZIP','VINEMIX_RUNTIME_MANIFEST','CARGO_ENCODED_RUSTFLAGS')) {
+    $oldVars[$name] = [Environment]::GetEnvironmentVariable($name)
+}
+try {
+$env:CARGO_ENCODED_RUSTFLAGS = $rustFlags -join [char]31
 
-function Assert-BuildIdentity([string]$SmokeDirectory, [string]$Name) {
+function Assert-BuildIdentity([string]$SmokeDirectory, [string]$Mode) {
     # The executable that just ran reports what was compiled into it.
     $report = Get-Content -LiteralPath (Join-Path $SmokeDirectory 'results.json') -Raw -Encoding UTF8 | ConvertFrom-Json
     $build = if ($report.PSObject.Properties['build']) { $report.build } else { $null }
-    if (-not $report.passed -or $report.version -cne $version -or $null -eq $build -or
+    # Newer PowerShell turns ISO timestamp strings into DateTime objects.
+    $reportedTime = $build.builtUtc
+    if ($reportedTime -is [DateTime]) { $reportedTime = $reportedTime.ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ') }
+    if (-not $report.passed -or $report.mode -cne $Mode -or $report.version -cne $version -or $null -eq $build -or
         [string]$build.sourceRevision -cne $revision -or [string]$build.sourceSnapshotSha256 -cne $source.sourceSnapshotSha256 -or
-        [string]$build.builtUtc -cne $buildTime) {
-        throw ($Name + ' does not report the source identity of this build; it may be a stale binary.')
+        [string]$reportedTime -cne $buildTime) {
+        throw ($Mode + ' desktop did not pass the expected mode and source-identity checks.')
     }
 }
 
@@ -97,13 +139,13 @@ $env:VINEMIX_SOURCE_SNAPSHOT_SHA256 = $source.sourceSnapshotSha256
 $env:VINEMIX_BUILD_TIMESTAMP = $buildTime
 Push-Location $project
 try {
-    & cargo build --release --locked --target $target -p vinemix-ui -p vinemix-engine -p vinemix-setup-helper
+    & cargo build --release --locked --target $target --target-dir $targetDirectory -p vinemix-ui -p vinemix-engine -p vinemix-setup-helper
     if ($LASTEXITCODE -ne 0) { throw 'cargo build failed.' }
     # Checked, not rewritten: a release never modifies its own source tree.
-    & py -3 (Join-Path $project 'tools\rust-notices.py') --check
+    & $python @pythonArgs (Join-Path $project 'tools\rust-notices.py') --check --require-reviewed
     if ($LASTEXITCODE -ne 0) { throw 'licenses\Rust-crates.txt does not match the locked dependencies. Run "py -3 tools\rust-notices.py", review and commit the result.' }
 } finally { Pop-Location }
-$built = Join-Path $project ('target\' + $target + '\release')
+$built = Join-Path $targetDirectory ($target + '\release')
 
 # Notices shipped with every distribution (Rust build allowlist).
 $licenseNames = @('IBM-Plex-OFL.txt', 'libsamplerate-LICENSE', 'libsamplerate-source-notices.txt', 'SpeexDSP-COPYING.txt',
@@ -132,33 +174,33 @@ if ($LASTEXITCODE -ne 0 -or -not $engineVersion.Contains($version)) { throw 'The
 $smoke = Join-Path $stage ('smoke-installed-' + [Guid]::NewGuid().ToString('N'))
 & (Join-Path $payload 'VineMix.exe') --release-smoke $smoke | Out-Null
 if ($LASTEXITCODE -ne 0) { throw 'The installed release smoke check failed. See ' + $smoke }
-Assert-BuildIdentity $smoke 'The installed desktop'
+Assert-BuildIdentity $smoke 'Installed'
 
 # Standalone single-file executable.
 $runtime = Join-Path $stage 'runtime-source'
 Copy-Checked (Join-Path $built 'vinemix-engine.exe') (Join-Path $runtime 'VineMix.Engine.exe')
 Copy-Notices $runtime
 $packed = Join-Path $stage 'runtime'
-& py -3 (Join-Path $project 'tools\pack-runtime.py') $runtime $packed
+& $python @pythonArgs (Join-Path $project 'tools\pack-runtime.py') $runtime $packed
 if ($LASTEXITCODE -ne 0) { throw 'Runtime packing failed.' }
 $env:VINEMIX_RUNTIME_ZIP = Join-Path $packed 'VineMix.Runtime.zip'
 $env:VINEMIX_RUNTIME_MANIFEST = Join-Path $packed 'VineMix.Runtime.manifest.json'
 Push-Location $project
 try {
-    $features = if ($RustEdition) { 'standalone,rust-edition' } else { 'standalone' }
-    & cargo build --release --locked --target $target -p vinemix-ui --features $features --target-dir (Join-Path $project 'target\standalone')
+    $features = 'standalone'
+    & cargo build --release --locked --target $target -p vinemix-ui --features $features --target-dir $targetDirectory
     if ($LASTEXITCODE -ne 0) { throw 'The standalone build failed.' }
 } finally {
     Pop-Location
     Remove-Item Env:VINEMIX_RUNTIME_ZIP, Env:VINEMIX_RUNTIME_MANIFEST -ErrorAction SilentlyContinue
 }
 $standalone = Join-Path $output ('VineMix-' + $version + '-Standalone-x64.exe')
-Copy-Checked (Join-Path $project ('target\standalone\' + $target + '\release\vinemix.exe')) $standalone
+Copy-Checked (Join-Path $built 'vinemix.exe') $standalone
 Assert-FileVersion $standalone $version $numeric
 $smoke = Join-Path $stage ('smoke-standalone-' + [Guid]::NewGuid().ToString('N'))
 & $standalone --release-smoke $smoke | Out-Null
 if ($LASTEXITCODE -ne 0) { throw 'The standalone release smoke check failed. See ' + $smoke }
-Assert-BuildIdentity $smoke 'The standalone desktop'
+Assert-BuildIdentity $smoke 'Standalone'
 
 if (-not $SkipInstaller) {
     $support = Join-Path $payload 'SetupSupport'
@@ -169,12 +211,12 @@ if (-not $SkipInstaller) {
     & (Join-Path $support 'VineMix.SetupHelper.exe') --self-test
     if ($LASTEXITCODE -ne 0) { throw 'Installer helper policy tests failed.' }
     Copy-Checked (Join-Path $project 'installer\drivers.json') (Join-Path $support 'drivers.json')
-    if (-not $InnoSetupDirectory) { $InnoSetupDirectory = Join-Path $project '.tools\innosetup-7.1.0' }
+    if (-not $InnoSetupDirectory) { $InnoSetupDirectory = Join-Path $ToolsDirectory 'innosetup-7.1.0' }
     $compiler = Join-Path $InnoSetupDirectory 'ISCC.exe'
     if (-not (Test-Path -LiteralPath $compiler -PathType Leaf)) { throw 'Inno Setup 7.1.0 (ISCC.exe) is required; pass -InnoSetupDirectory.' }
     Copy-Checked (Join-Path $InnoSetupDirectory 'license.txt') (Join-Path $support 'Inno-Setup-LICENSE.txt')
     $drivers = Get-Content -LiteralPath (Join-Path $project 'installer\drivers.json') -Raw -Encoding UTF8 | ConvertFrom-Json
-    $cache = if ($DriverCacheDirectory) { [IO.Path]::GetFullPath($DriverCacheDirectory) } else { Join-Path $project '.tools\downloads' }
+    $cache = if ($DriverCacheDirectory) { [IO.Path]::GetFullPath($DriverCacheDirectory) } else { Join-Path $ToolsDirectory 'downloads\installer-drivers' }
     foreach ($driver in $drivers.drivers) {
         $archive = Join-Path $cache $driver.archiveName
         if (-not (Test-Path -LiteralPath $archive -PathType Leaf) -or (Hash $archive) -ne $driver.archiveSha256.ToUpperInvariant()) {
@@ -197,9 +239,17 @@ if (-not $SkipInstaller) {
         ('/DVbArchiveHash=' + $vb.archiveSha256), ('/DVacArchiveHash=' + $vac.archiveSha256), (Join-Path $project 'installer\VineMix.iss'))
     & $compiler @arguments 2>&1 | Tee-Object -FilePath (Join-Path $stage 'compiler.log') | Out-Null
     if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $installer)) { throw 'Installer compilation failed. See compiler.log in the stage directory.' }
+    Assert-FileVersion $installer $version $numeric
 }
 
-Remove-Item Env:VINEMIX_SOURCE_REVISION, Env:VINEMIX_SOURCE_SNAPSHOT_SHA256, Env:VINEMIX_BUILD_TIMESTAMP -ErrorAction SilentlyContinue
+$packages = @((Get-Item -LiteralPath $standalone))
+if (-not $SkipInstaller) { $packages += Get-Item -LiteralPath $installer }
+# Scan uncompressed inputs before treating an opaque installer as distributable.
+$scanFiles = @((Get-ChildItem -LiteralPath $payload -File -Recurse).FullName) + @($packages.FullName)
+$scanArgs = @((Join-Path $project 'tools\check-release-paths.py'))
+foreach ($prefix in $mappings.Keys) { $scanArgs += @('--prefix', $prefix) }
+& $python @pythonArgs @scanArgs -- @scanFiles
+if ($LASTEXITCODE -ne 0) { throw 'A release artifact contains a private build path.' }
 
 # The receipt describes one source state only if nothing changed meanwhile.
 $sourceAfter = & $sourceScript -Project $project
@@ -215,7 +265,7 @@ function Get-OutputRecord([string]$Root, [string]$Label, $File) {
 $produced = New-Object Collections.Generic.List[object]
 foreach ($file in Get-ChildItem -LiteralPath $payload -File -Recurse | Sort-Object FullName) { $produced.Add((Get-OutputRecord $payload 'payload' $file)) }
 foreach ($file in Get-ChildItem -LiteralPath $packed -File -Recurse | Sort-Object FullName) { $produced.Add((Get-OutputRecord $packed 'runtime' $file)) }
-foreach ($file in Get-ChildItem -LiteralPath $output -File -Filter '*.exe' | Sort-Object FullName) { $produced.Add((Get-OutputRecord $output 'output' $file)) }
+foreach ($file in $packages) { $produced.Add((Get-OutputRecord $output 'output' $file)) }
 $inputs = [ordered]@{}
 foreach ($name in @('Cargo.lock', 'Cargo.toml', 'rust-toolchain.toml', '.cargo\config.toml', 'tools\rust-pins.json', 'release.json', 'installer\drivers.json')) {
     $inputs[$name.Replace('\', '/')] = Get-Sha256Lower (Join-Path $project $name)
@@ -264,6 +314,7 @@ $receipt = [ordered]@{
         'Source tree identical before and after the build',
         'Version resources of every executable match release.json',
         'Installed and standalone desktop executables report this revision, snapshot digest and build time',
+        'Final packages and uncompressed payload checked for private build paths',
         'Third-party notices match the locked dependencies'
     )
     outputs = $produced.ToArray()
@@ -271,12 +322,18 @@ $receipt = [ordered]@{
 $receiptPath = Join-Path $output ('VineMix-' + $version + '-build-receipt.json')
 Write-Utf8 $receiptPath (($receipt | ConvertTo-Json -Depth 8) + "`n")
 
-foreach ($file in Get-ChildItem -LiteralPath $output -File -Filter '*.exe') {
+foreach ($file in $packages) {
     Write-Utf8 ($file.FullName + '.sha256') ((Hash $file.FullName) + '  ' + $file.Name + "`n")
     Write-Host ($file.Name + '  ' + (Hash $file.FullName))
 }
+[IO.Directory]::Move($output, $finalOutput)
+$receiptPath = Join-Path $finalOutput (Split-Path -Leaf $receiptPath)
+Write-Host ('Output: ' + $finalOutput)
 Write-Host ('Source: ' + $revision + '  snapshot ' + $source.sourceSnapshotSha256)
 Write-Host ('Receipt: ' + (Split-Path -Leaf $receiptPath) + '  ' + (Hash $receiptPath))
 Write-Host ('Stage: ' + $stage)
 if (-not $source.inputsMatchCommit) { Write-Host 'This build came from inputs that differ from its commit (-AllowDirty). It is not a release candidate.' }
 Write-Host 'Unpublished release candidates built. No application session or driver was installed or launched.'
+} finally {
+    foreach ($name in $oldVars.Keys) { [Environment]::SetEnvironmentVariable($name, $oldVars[$name]) }
+}

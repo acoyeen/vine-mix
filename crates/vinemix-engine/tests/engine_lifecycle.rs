@@ -168,3 +168,25 @@ fn processing_load_telemetry() {
     eventually(&engine, &|v| v["available"] == true);
     engine.stop();
 }
+
+#[test]
+fn concurrent_stops_complete_before_restart() {
+    let settings = temp_settings("concurrent-stop");
+    let engine = Engine::new(Some(settings.clone())).unwrap();
+    for _ in 0..3 {
+        engine.start().unwrap();
+        let barrier = std::sync::Barrier::new(3);
+        std::thread::scope(|scope| {
+            for _ in 0..2 {
+                scope.spawn(|| {
+                    barrier.wait();
+                    engine.stop();
+                });
+            }
+            barrier.wait();
+        });
+        assert!(engine.stopping());
+    }
+    drop(engine);
+    let _ = std::fs::remove_dir_all(settings.parent().unwrap());
+}

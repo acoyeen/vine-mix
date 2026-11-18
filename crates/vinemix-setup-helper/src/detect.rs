@@ -9,7 +9,7 @@ use windows::Win32::Devices::DeviceAndDriverInstallation::{
     CM_Get_DevNode_Status, SetupDiDestroyDeviceInfoList, SetupDiEnumDeviceInfo, SetupDiGetClassDevsW, SetupDiGetDeviceRegistryPropertyW,
     SetupGetInfDriverStoreLocationW, CM_DEVNODE_STATUS_FLAGS, CM_PROB, CR_SUCCESS, DIGCF_ALLCLASSES, SPDRP_DRIVER, SPDRP_HARDWAREID, SP_DEVINFO_DATA,
 };
-use windows::Win32::Foundation::{CloseHandle, GetLastError, ERROR_INSUFFICIENT_BUFFER, ERROR_INVALID_DATA, ERROR_INVALID_PARAMETER, ERROR_NO_MORE_ITEMS, HANDLE};
+use windows::Win32::Foundation::{CloseHandle, GetLastError, ERROR_INSUFFICIENT_BUFFER, ERROR_INVALID_DATA, ERROR_INVALID_PARAMETER, ERROR_NO_MORE_FILES, ERROR_NO_MORE_ITEMS, HANDLE};
 use windows::Win32::Security::{GetTokenInformation, TokenUser, TOKEN_QUERY, TOKEN_USER};
 use windows::Win32::Storage::FileSystem::{CreateFileW, GetFinalPathNameByHandleW, FILE_FLAG_BACKUP_SEMANTICS, FILE_NAME_NORMALIZED, FILE_SHARE_DELETE, FILE_SHARE_READ, FILE_SHARE_WRITE, OPEN_EXISTING};
 use windows::Win32::System::Diagnostics::ToolHelp::{CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W, TH32CS_SNAPPROCESS};
@@ -260,20 +260,29 @@ fn process_user(process: HANDLE) -> Option<String> {
 fn processes_named(names: &[&str]) -> Result<Vec<u32>, ()> {
     // SAFETY: snapshot owned below.
     let snapshot = Handle(unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) }.map_err(|_| ())?);
+    collect_processes(names, |first, entry| {
+        // SAFETY: the snapshot and initialized entry remain valid for both queries.
+        unsafe { if first { Process32FirstW(snapshot.0, entry) } else { Process32NextW(snapshot.0, entry) } }
+    })
+}
+
+fn collect_processes(names: &[&str], mut read: impl FnMut(bool, &mut PROCESSENTRY32W) -> windows::core::Result<()>) -> Result<Vec<u32>, ()> {
     let mut entry = PROCESSENTRY32W { dwSize: std::mem::size_of::<PROCESSENTRY32W>() as u32, ..Default::default() };
     let mut found = Vec::new();
-    // SAFETY: valid snapshot and entry.
-    let mut more = unsafe { Process32FirstW(snapshot.0, &mut entry) }.is_ok();
-    while more {
+    let mut first = true;
+    loop {
+        match read(first, &mut entry) {
+            Ok(()) => {}
+            Err(error) if error.code() == ERROR_NO_MORE_FILES.to_hresult() => return Ok(found),
+            Err(_) => return Err(()),
+        }
+        first = false;
         let length = entry.szExeFile.iter().position(|&c| c == 0).unwrap_or(entry.szExeFile.len());
         let name = String::from_utf16_lossy(&entry.szExeFile[..length]);
         if names.iter().any(|n| n.eq_ignore_ascii_case(&name)) {
             found.push(entry.th32ProcessID);
         }
-        // SAFETY: as above.
-        more = unsafe { Process32NextW(snapshot.0, &mut entry) }.is_ok();
     }
-    Ok(found)
 }
 
 /// The current user's VineMix or Audio Mixer sessions and install path safety.
@@ -316,4 +325,38 @@ pub fn read_application(install_directory: Option<&Path>) -> Result<ApplicationR
     let mut result = policy::evaluate_processes(&items, succeeded, resolved.as_deref());
     result.install_path_safe = install_path_safe;
     Ok(result)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use windows::Win32::Foundation::ERROR_ACCESS_DENIED;
+
+    #[test]
+    fn process_snapshot_distinguishes_end_from_truncated_enumeration() {
+        for records in [0, 1] {
+            for (stop, complete) in [(ERROR_NO_MORE_FILES, true), (ERROR_ACCESS_DENIED, false)] {
+                let mut count = 0;
+                let result = collect_processes(&["VineMix.exe"], |first, entry| {
+                    assert_eq!(first, count == 0);
+                    if count == records {
+                        return Err(windows::core::Error::from_hresult(stop.to_hresult()));
+                    }
+                    count += 1;
+                    entry.th32ProcessID = 41;
+                    for (dest, unit) in entry.szExeFile.iter_mut().zip("VineMix.exe".encode_utf16()) {
+                        *dest = unit;
+                    }
+                    Ok(())
+                });
+                if complete {
+                    assert_eq!(result.unwrap(), vec![41; records]);
+                } else {
+                    assert!(result.is_err());
+                    let outcome = policy::evaluate_processes(&[], false, None);
+                    assert!(!outcome.succeeded && outcome.running_installed);
+                }
+            }
+        }
+    }
 }

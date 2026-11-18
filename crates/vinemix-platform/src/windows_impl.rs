@@ -49,7 +49,7 @@ pub fn current_user_sid() -> Result<String, String> {
 /// never shares a pipe, lock or show event with the user's normal session.
 pub fn user_scope() -> Result<String, String> {
     let sid = current_user_sid()?;
-    Ok(match development_instance() {
+    Ok(match checked_development_instance()? {
         Some(instance) => format!("{sid}.dev-{instance}"),
         None => sid,
     })
@@ -57,8 +57,19 @@ pub fn user_scope() -> Result<String, String> {
 
 /// The validated development instance name, if one is set.
 pub fn development_instance() -> Option<String> {
-    let value = std::env::var("VINEMIX_DEV_INSTANCE").ok()?;
-    (!value.is_empty() && value.len() <= 32 && value.bytes().all(|b| b.is_ascii_alphanumeric())).then_some(value)
+    checked_development_instance().ok().flatten()
+}
+
+/// Distinguishes an ordinary launch from an invalid isolation request.
+/// The executables check this before accessing user data or named objects.
+pub fn checked_development_instance() -> Result<Option<String>, String> {
+    parse_development_instance(std::env::var_os("VINEMIX_DEV_INSTANCE"))
+}
+
+fn parse_development_instance(value: Option<OsString>) -> Result<Option<String>, String> {
+    let Some(value) = value else { return Ok(None) };
+    let value = value.into_string().ok().filter(|s| !s.is_empty() && s.len() <= 32 && s.bytes().all(|b| b.is_ascii_alphanumeric()));
+    value.map(Some).ok_or_else(|| "VINEMIX_DEV_INSTANCE must contain 1 to 32 ASCII letters or digits.".to_owned())
 }
 
 /// `\\.\pipe\VineMix.Control.<SID>`.
@@ -69,7 +80,7 @@ pub fn pipe_name() -> Result<String, String> {
 /// `%LOCALAPPDATA%\VineMix` (`VineMix.dev-<instance>` for a development
 /// instance, so test runs never touch an installed copy's data).
 pub fn application_data_directory() -> Result<PathBuf, String> {
-    application_data_directory_from(std::env::var_os("LOCALAPPDATA"), development_instance().as_deref())
+    application_data_directory_from(std::env::var_os("LOCALAPPDATA"), checked_development_instance()?.as_deref())
 }
 
 /// [`application_data_directory`] for an explicit `LOCALAPPDATA` value. The
@@ -298,5 +309,20 @@ mod data_directory_tests {
             let result = application_data_directory_from(unusable.clone(), None);
             assert!(result.is_err(), "{unusable:?} must not resolve, got {result:?}");
         }
+    }
+}
+
+#[cfg(test)]
+mod development_instance_tests {
+    use super::*;
+
+    #[test]
+    fn rejects_invalid_isolation_requests_instead_of_selecting_the_default() {
+        assert_eq!(parse_development_instance(None).unwrap(), None);
+        assert_eq!(parse_development_instance(Some("Qa17".into())).unwrap().as_deref(), Some("Qa17"));
+        for bad in ["", "qa-audio", "../qa", "123456789012345678901234567890123"] {
+            assert!(parse_development_instance(Some(bad.into())).is_err());
+        }
+        assert!(parse_development_instance(Some(OsString::from_wide(&[0xd800]))).is_err());
     }
 }

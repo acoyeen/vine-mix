@@ -3,7 +3,7 @@ import { selectRelease, loadRelease, REPOSITORY, FEED } from '../src/releases.js
 
 const release = (number, changes = {}) => ({
   tag_name: `v${number}`, draft: false, published_at: '2026-10-26T00:00:00Z',
-  assets: [`VineMix-${number}-Setup-x64.exe`, `VineMix-${number}-Standalone-x64.exe`, 'SHA256SUMS.txt'].map(name => ({
+  assets: [`VineMix-${number}-Setup-x64.exe`, `VineMix-${number}-Standalone-x64.exe`, 'SHA256SUMS.txt', `VineMix-${number}-Updates.json`].map(name => ({
     name, size: 100, state: 'uploaded', browser_download_url: `${REPOSITORY}/releases/download/v${number}/${name}`,
   })), ...changes,
 });
@@ -15,6 +15,14 @@ assert.equal(selectRelease([release('0.4.0-beta'), release('0.4.1-beta')]).tag, 
 assert.equal(selectRelease([release('0.4.1-beta'), release('0.5.0-beta')]).tag, 'v0.5.0-beta');
 assert.equal(selectRelease([release('0.5.0-beta'), release('1.0.0')]).tag, 'v1.0.0');
 assert.throws(() => selectRelease(retired), /not ready/);
+const upgrade = release('0.6.0');
+const selected = selectRelease([release('0.5.0-beta'), upgrade]);
+assert.equal(selected.tag, 'v0.6.0');
+assert.equal(selected.label, '0.6.0');
+for (const filename of ['SHA256SUMS.txt', 'VineMix-0.6.0-Updates.json']) {
+  const incomplete = { ...upgrade, assets: upgrade.assets.filter(asset => asset.name !== filename) };
+  assert.throws(() => selectRelease([release('0.5.0-beta'), incomplete]), /not ready/);
+}
 
 assert.equal(selectRelease([release('0.3.0-beta.9'), release('0.3.0-beta.10')]).label, '0.3.0 · Beta 10');
 assert.equal(selectRelease([release('0.3.0-beta.10'), release('0.3.0')]).tag, 'v0.3.0');
@@ -33,7 +41,7 @@ assert.throws(() => selectRelease([invalidSize]), /not ready/);
 const unsafe = release('0.3.0');
 unsafe.assets[0].browser_download_url = 'https://example.invalid/setup.exe';
 assert.throws(() => selectRelease([unsafe]), /not ready/);
-const older = release('0.3.0'); older.assets.pop();
+const older = release('0.3.0'); older.assets = older.assets.filter(asset => asset.name !== 'SHA256SUMS.txt');
 assert.equal(selectRelease([older]).checksums, `${REPOSITORY}/releases/tag/v0.3.0`);
 
 let requests = [];

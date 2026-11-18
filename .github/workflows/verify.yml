@@ -2,7 +2,7 @@ name: Windows build and offline verification
 
 on:
   push:
-    branches: [main]
+    branches: [main, rust-rewrite]
   pull_request:
   workflow_dispatch:
 
@@ -99,7 +99,7 @@ jobs:
   rust:
     name: Rust candidate (build, lint, tests, parity)
     runs-on: windows-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     defaults:
       run:
         shell: pwsh
@@ -147,6 +147,8 @@ jobs:
         run: ./scripts/fetch-reference-sources.ps1
       - name: Verify the Rust candidate
         run: ./scripts/verify-rust.ps1 -ResultDirectory "$env:RUNNER_TEMP/vinemix-rust-verification"
+      - name: Build and smoke-test the installed and standalone Rust packages
+        run: ./scripts/build-rust-release.ps1 -SkipInstaller -StageDirectory "$env:RUNNER_TEMP/vinemix-rust-package"
       - name: Save pinned local tools
         if: steps.tools.outputs.cache-hit != 'true'
         continue-on-error: true

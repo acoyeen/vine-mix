@@ -2,7 +2,7 @@
 //!
 //! * Reads are bounded: an oversized file is treated as unreadable instead of
 //!   being loaded whole.
-//! * An unreadable file is copied aside (`ui.json.damaged-…`) before anything
+//! * An unreadable regular file is moved aside (`ui.json.damaged-…`) before anything
 //!   may replace it, and is never used to overwrite the last good copy.
 //! * Each successful save first keeps the previous good file as `ui.json.bak`,
 //!   then replaces `ui.json` with flushed data by rename.
@@ -55,31 +55,31 @@ pub fn backup_path(path: &Path) -> PathBuf {
     sibling(path, ".bak")
 }
 
-/// Copies an unreadable preferences file to a new `…damaged-<time>[-n]` name
-/// beside it and returns that path. Never overwrites an earlier copy.
+/// Moves the damaged primary to a sibling without overwriting earlier evidence.
+/// Moving within the directory avoids reading or duplicating oversized files.
 pub fn preserve_damaged(path: &Path) -> Result<PathBuf, String> {
+    use std::os::windows::ffi::OsStrExt;
+    use windows::core::PCWSTR;
+    use windows::Win32::Foundation::{ERROR_ALREADY_EXISTS, ERROR_FILE_EXISTS};
+    use windows::Win32::Storage::FileSystem::MoveFileW;
+
+    let wide = |path: &Path| path.as_os_str().encode_wide().chain(Some(0)).collect::<Vec<_>>();
+    let metadata = std::fs::symlink_metadata(path).map_err(|error| error.to_string())?;
+    if !metadata.is_file() {
+        return Err("The preferences path is not a regular file.".into());
+    }
+    let original = wide(path);
     let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs());
     for attempt in 0..100u32 {
         let suffix = if attempt == 0 { format!(".damaged-{stamp}") } else { format!(".damaged-{stamp}-{attempt}") };
         let target = sibling(path, &suffix);
-        let mut destination = match std::fs::OpenOptions::new().write(true).create_new(true).open(&target) {
-            Ok(file) => file,
-            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
-            Err(error) => return Err(error.to_string()),
-        };
-        let copied = (|| -> std::io::Result<()> {
-            let mut source = std::fs::File::open(path)?;
-            std::io::copy(&mut source, &mut destination)?;
-            destination.sync_all()
-        })();
-        return match copied {
-            Ok(()) => Ok(target),
-            Err(error) => {
-                drop(destination);
-                let _ = std::fs::remove_file(&target);
-                Err(error.to_string())
-            }
-        };
+        let destination = wide(&target);
+        // SAFETY: both buffers live through the call. MoveFileW refuses existing destinations.
+        match unsafe { MoveFileW(PCWSTR(original.as_ptr()), PCWSTR(destination.as_ptr())) } {
+            Ok(()) => return Ok(target),
+            Err(e) if [ERROR_ALREADY_EXISTS.to_hresult(), ERROR_FILE_EXISTS.to_hresult()].contains(&e.code()) => continue,
+            Err(e) => return Err(e.to_string()),
+        }
     }
     Err("Too many preserved copies already exist.".into())
 }
@@ -285,7 +285,7 @@ mod tests {
         assert_ne!(first, second);
         assert_eq!(std::fs::read(&first).unwrap(), b"first damaged");
         assert_eq!(std::fs::read(&second).unwrap(), b"second damaged");
-        assert_eq!(std::fs::read(&path).unwrap(), b"second damaged", "the original stays in place");
+        assert!(!path.exists(), "a later launch cannot preserve the same damaged file twice");
         let _ = std::fs::remove_dir_all(dir);
     }
 

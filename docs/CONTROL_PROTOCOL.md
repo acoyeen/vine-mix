@@ -11,8 +11,14 @@ The native engine is `VineMix.Engine.exe`; the WPF controller is
 to the current user and SYSTEM and rejects remote clients. No audio crosses this
 connection.
 
-Messages are UTF-8 JSON, one object per newline, maximum 256 KiB. One request is
-outstanding per connection. Property names are camelCase. Visible UI snapshots
+Requests are newline-terminated UTF-8 JSON with a 256 KiB limit. Ordinary
+replies are also one JSON object per line. A Rust desktop request advertises
+"lengthPrefixedResponse": true. For replies larger than 256 KiB, the Rust
+engine then sends a tilde, the decimal UTF-8 payload length and a newline,
+followed by exactly that many JSON bytes and a terminating newline. The payload
+limit is 16 MiB. An oversized reply returns the snapshot_too_large error.
+Clients that omit the flag retain legacy framing. One request is outstanding
+per connection. Property names are camelCase. Visible UI snapshots
 are requested at approximately 30 Hz; hidden/offline polling is slower.
 
 ```json

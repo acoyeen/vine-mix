@@ -12,7 +12,7 @@ a Git work tree is rejected rather than described by a parent repository.
 The snapshot digest covers what a Rust release is built from: the workspace
 manifests and lock file, the toolchain pins, every crate, the build helpers,
 release metadata, the notices and installer inputs, the update trust file and
-the release scripts themselves. Tracked files and untracked files that are
+the release scripts, signing tool and compatible update verifier. Tracked files and untracked files that are
 not ignored are both included, because Cargo compiles either.
 #>
 [CmdletBinding()]
@@ -23,7 +23,8 @@ if (-not $Project) { $Project = Join-Path $PSScriptRoot '..' }
 $project = [IO.Path]::GetFullPath($Project).TrimEnd('\')
 $scope = @('Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', '.cargo', 'crates', 'tools', 'release.json', 'LICENSE',
     'ATTRIBUTION.md', 'THIRD_PARTY_NOTICES.md', 'licenses', 'installer', 'updates', 'scripts/build-rust-release.ps1',
-    'scripts/rust-env.ps1', 'scripts/get-rust-source-identity.ps1')
+    'scripts/rust-env.ps1', 'scripts/get-rust-source-identity.ps1', 'scripts/prepare-update-release.ps1',
+    'scripts/update-release-tools', 'desktop/VineMix.UpdateCore')
 
 function Invoke-SourceGit([string[]]$Arguments) {
     # File names are reported as UTF-8, unquoted, one per line.
@@ -103,7 +104,7 @@ $identity = [ordered]@{
     linkedWorktree = $linked
     sourceSnapshotSha256 = $snapshot
     snapshotFormat = 'SHA-256 of UTF-8 lines "<sha256>  <size>  <path>" (or "missing  <path>"), ordinal path order, LF line ends'
-    scope = 'Workspace manifests and lock file, toolchain pins, crates, tools, release.json, root notices, licenses, installer, updates and the Rust release scripts; tracked files plus untracked files that are not ignored.'
+    scope = 'Workspace manifests and lock file, toolchain pins, crates, tools, release.json, root notices, licenses, installer, updates, Rust release scripts, signing tool and update verifier; tracked files plus untracked files that are not ignored.'
     fileCount = $files.Count
     files = $files.ToArray()
 }

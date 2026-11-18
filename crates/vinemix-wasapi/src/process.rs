@@ -456,9 +456,12 @@ impl Shared {
         self.guarded.lock().unwrap_or_else(|e| e.into_inner())
     }
 
-    fn state(&self, status: &str, message: &str, pid: u32, reason: &str) {
-        self.running.store(status == "Running", Ordering::Release);
+    fn state(&self, serial: u64, status: &str, message: &str, pid: u32, reason: &str) {
         let mut guarded = self.lock();
+        if self.serial.load(Ordering::Acquire) != serial {
+            return;
+        }
+        self.running.store(status == "Running", Ordering::Release);
         let path = &mut guarded.path;
         path.state = status.into();
         path.message = message.into();
@@ -660,7 +663,7 @@ fn capture(shared: &Shared, producer: &mut Producer, pid: u32, selection: &Proce
     let _stop = Stop(&client);
     producer.request_clear();
     shared.lock().path.reconnects += 1;
-    shared.state("Running", "Capturing app audio; original playback remains unchanged", pid, "");
+    shared.state(selected_serial, "Running", "Capturing app audio; original playback remains unchanged", pid, "");
     let events = [shared.stop_event.handle(), shared.control_event.handle(), process.0, audio_event.handle()];
     let mut last_packet = Instant::now();
     let fade_length = SAMPLE_RATE / 100;
@@ -774,13 +777,13 @@ fn run(shared: &Shared, mut producer: Producer) {
         }
         let mut delay = 1000u32;
         if selection.executable_path.is_empty() {
-            shared.state("Unassigned", "Choose a running application", 0, "");
+            shared.state(selected_serial, "Unassigned", "Choose a running application", 0, "");
             delay = FOREVER;
         } else if !process_capture_available() {
-            shared.state("Unsupported", "App capture requires Windows build 20348 or later", 0, "");
+            shared.state(selected_serial, "Unsupported", "App capture requires Windows build 20348 or later", 0, "");
             delay = FOREVER;
         } else if !apartment.ok() {
-            shared.state("Error", "Windows audio initialization failed", 0, "");
+            shared.state(selected_serial, "Error", "Windows audio initialization failed", 0, "");
             delay = FOREVER;
         } else {
             let mut ambiguous = false;
@@ -791,10 +794,10 @@ fn run(shared: &Shared, mut producer: Producer) {
                     } else {
                         ("Waiting for application", "app_not_found")
                     };
-                    shared.state("Waiting", message, 0, reason);
+                    shared.state(selected_serial, "Waiting", message, 0, reason);
                 }
                 Some(pid) => {
-                    shared.state("Opening", "Opening app audio", pid, "");
+                    shared.state(selected_serial, "Opening", "Opening app audio", pid, "");
                     let result = capture(shared, &mut producer, pid, &selection, selected_serial);
                     shared.running.store(false, Ordering::Release);
                     producer.request_clear();
@@ -814,7 +817,7 @@ fn run(shared: &Shared, mut producer: Producer) {
                             } else {
                                 "stream_failure"
                             };
-                            shared.state("Error", &process_failure_message(code), pid, reason);
+                            shared.state(selected_serial, "Error", &process_failure_message(code), pid, reason);
                             // An unanswered activation is not retried in a
                             // loop; a deliberate retry can reopen it.
                             delay = if code == hresult_from_win32(ERROR_TIMEOUT) {
@@ -839,6 +842,18 @@ fn run(shared: &Shared, mut producer: Producer) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_stale_process_lookup_cannot_clear_a_new_assignment() {
+        let (producer, _consumer, monitor) = vinemix_rt::frame_queue(64);
+        let worker = ProcessCaptureWorker::new(producer, monitor).unwrap();
+        // Drive both operations explicitly without opening an application.
+        worker.stop();
+        let previous = worker.shared.serial.load(Ordering::Acquire);
+        worker.configure(ProcessBinding { executable_path: "example.exe".into(), ..Default::default() });
+        worker.shared.state(previous, "Unassigned", "", 0, "");
+        assert_eq!(worker.status().state, "Resolving");
+    }
 
     /// Writes over the stack region a returned activation frame occupied.
     #[inline(never)]

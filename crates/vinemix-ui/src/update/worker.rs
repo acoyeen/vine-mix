@@ -15,7 +15,8 @@ use super::transaction::{self, Verified};
 /// Worker side effects, replaceable in tests (`IUpdateWorkerPlatform`).
 pub trait Platform {
     fn acquire_lock(&self) -> Result<Lock>;
-    fn is_same_live_process(&self, identity: &ProcessIdentity) -> bool;
+    /// Verify the identity once and poll the retained process object.
+    fn watch_live_process(&self, identity: &ProcessIdentity) -> Box<dyn Fn() -> bool + '_>;
     fn wait_for_exit(&self, identity: &ProcessIdentity, timeout: Duration) -> Result<bool>;
     fn verify_worker(&self, context: &Verified) -> Result<()>;
     fn check_file_version(&self, path: &Path, numeric_version: &str) -> Result<()>;
@@ -137,7 +138,8 @@ fn run_inner(
     }
     let mut committed = transaction::try_signal(&context, "commit.json")?.is_some();
     if matches!(journal.phase, Phase::Prepared | Phase::Ready) && !committed {
-        if UtcTime::now() > context.data.created_utc.plus_seconds(30 * 60) || !platform.is_same_live_process(&context.data.parent) {
+        let parent_live = platform.watch_live_process(&context.data.parent);
+        if UtcTime::now() > context.data.created_utc.plus_seconds(30 * 60) || !parent_live() {
             return Err("The original application is no longer available to approve this update.".into());
         }
         guard_original_target(&context)?;
@@ -149,7 +151,7 @@ fn run_inner(
         files::write_json(&context.directory.join("ready.json"), &context.signal(false, ""))?;
         let started = Instant::now();
         while transaction::try_signal(&context, "commit.json")?.is_none() {
-            if transaction::try_signal(&context, "abort.json")?.is_some() || started.elapsed() > Duration::from_secs(5 * 60) || !platform.is_same_live_process(&context.data.parent) {
+            if transaction::try_signal(&context, "abort.json")?.is_some() || started.elapsed() > Duration::from_secs(5 * 60) || !parent_live() {
                 journal.phase = Phase::Cancelled;
                 journal.message = "The update was cancelled before the application closed.".into();
                 commit_journal!();
@@ -207,6 +209,7 @@ fn run_inner(
         } else {
             let mut record = |identity: ProcessIdentity| -> Result<()> {
                 journal.setup_process = Some(identity);
+                *journal_slot = Some(journal.clone());
                 save(&context, &mut journal)
             };
             code = platform.run_setup(&context, &mut record)?;
@@ -255,6 +258,7 @@ fn run_inner(
         let evidence = context.directory.join(format!("smoke-{}", crate::platform::random_hex_id()));
         let mut record = |identity: ProcessIdentity| -> Result<()> {
             journal.smoke_process = Some(identity);
+            *journal_slot = Some(journal.clone());
             save(&context, &mut journal)
         };
         let passed = platform.run_smoke(&context, &evidence, &mut record)?;
@@ -275,19 +279,20 @@ fn run_inner(
             return Err("The candidate launch was interrupted. Manual recovery must confirm no candidate is running before restoring the backup.".into());
         };
         let started = Instant::now();
+        let candidate_live = platform.watch_live_process(&candidate);
         let mut health = None;
         while started.elapsed() < Duration::from_secs(120) {
             if let Some(signal) = transaction::try_signal(&context, "health.json")? {
                 health = Some(signal);
                 break;
             }
-            if !platform.is_same_live_process(&candidate) {
+            if !candidate_live() {
                 break;
             }
             platform.delay(100);
         }
         let healthy = health.as_ref().is_some_and(|h| h.success && h.process_id == candidate.process_id && h.start_time_utc_ticks == candidate.start_time_utc_ticks)
-            && platform.is_same_live_process(&candidate);
+            && candidate_live();
         if !healthy {
             return Err("The updated application did not confirm saved-workspace, engine-protocol and advancing-audio health. The retained backup will be restored after the candidate exits normally.".into());
         }
@@ -312,6 +317,10 @@ fn recover(context: &Verified, journal: &mut Journal, platform: &dyn Platform, e
     let attempt = (|| -> Result<i32> {
         let can_restore = journal.backup.is_some() && journal.candidate.is_some() && matches!(journal.phase, Phase::CandidateInstalled | Phase::AwaitingHealth | Phase::RollingBack);
         if can_restore {
+            // A retry must continue waiting on the already launched process.
+            journal.phase = Phase::RollingBack;
+            journal.message = message.clone();
+            save(context, journal)?;
             if let Some(candidate) = &journal.candidate_process {
                 if !platform.wait_for_exit(candidate, Duration::from_secs(30))? {
                     return Err("The candidate is still running. No process was killed and no application files were restored. Quit it normally before recovery.".into());
@@ -325,9 +334,6 @@ fn recover(context: &Verified, journal: &mut Journal, platform: &dyn Platform, e
             if !platform.wait_for_candidate_audio_exit(context, journal.candidate_engine_sha256.as_deref(), Duration::from_secs(45))? {
                 return Err("A candidate audio engine is still running. No process was killed and the prior application files were not restored.".into());
             }
-            journal.phase = Phase::RollingBack;
-            journal.message = message.clone();
-            save(context, journal)?;
             let original = journal.backup.clone().ok_or("The update recovery inventory is missing.")?;
             let candidate = journal.candidate.clone().ok_or("The update phase has no recorded candidate payload.")?;
             restore(context, &original, &candidate, platform)?;
@@ -338,8 +344,8 @@ fn recover(context: &Verified, journal: &mut Journal, platform: &dyn Platform, e
             *reopen_previous = true;
             return Ok(3);
         }
-        journal.phase = Phase::RecoveryRequired;
         journal.resume_phase = safe_resume(context, journal);
+        journal.phase = Phase::RecoveryRequired;
         journal.message = message.clone();
         save(context, journal)?;
         Ok(1)

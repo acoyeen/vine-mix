@@ -378,7 +378,31 @@ pub fn show(
     let response = ui.interact(face, face_id, if enabled { Sense::click_and_drag() } else { Sense::hover() });
     response.widget_info(|| egui::WidgetInfo::slider(enabled, value, &spec.label));
     let focused = response.has_focus();
+    ui.ctx().accesskit_node_builder(face_id, |node| {
+        use egui::accesskit::Action;
+        node.set_min_numeric_value(spec.minimum);
+        node.set_max_numeric_value(spec.maximum);
+        node.set_numeric_value_step(spec.small_change);
+        if enabled {
+            node.add_action(Action::SetValue);
+            if value < spec.maximum { node.add_action(Action::Increment); }
+            if value > spec.minimum { node.add_action(Action::Decrement); }
+        }
+    });
     if enabled {
+        let requested = ui.input(|input| {
+            use egui::accesskit::{Action, ActionData};
+            let explicit = input.accesskit_action_requests(face_id, Action::SetValue).filter_map(|request| match request.data {
+                Some(ActionData::NumericValue(v)) if v.is_finite() => Some(v),
+                _ => None,
+            }).last();
+            let steps = input.num_accesskit_action_requests(face_id, Action::Increment) as f64
+                - input.num_accesskit_action_requests(face_id, Action::Decrement) as f64;
+            explicit.or_else(|| (steps != 0.0).then_some(value + steps * spec.small_change))
+        });
+        if let Some(next) = requested.map(|v| spec.bound(v)) && next != value {
+            outcome.changed = Some(next);
+        }
         if response.double_clicked() {
             state.dragging = false;
             if value != default {

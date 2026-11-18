@@ -1,15 +1,10 @@
-# Building and verifying the Rust candidate
+# Building and verifying VineMix 0.6
 
-This is the contributor entry point for the Rust rewrite of VineMix on the
-`rust-rewrite` branch. It describes what the code does today. Design intent
-and proposals live in [the rewrite plan](RUST_REWRITE_PLAN.md); open defects
-and review findings live in [the 10 November 2026 review](RUST_REVIEW_2026-11-10.md)
-and [the known-issues log](KNOWN_ISSUES.md).
-
-The Rust candidate has not been released. The root `README.md`, `TESTING.md`
-and the distribution guides describe the released 0.5 application, which is
-.NET (WPF) and C++. Both trees live in this repository; the 0.5 sources remain
-the behavioural reference.
+VineMix 0.6 uses Rust for the Windows desktop, engine and Setup helper.
+The 0.5 C#/C++ sources remain the behavioural reference for parity tests
+and compatibility with installed updaters. The [rewrite plan](RUST_REWRITE_PLAN.md)
+records design intent and [known issues](KNOWN_ISSUES.md) records observed
+behaviour.
 
 ## What is in the workspace
 
@@ -190,6 +185,32 @@ What **About** shows as the source revision:
 | `<commit>-local` | Built by Cargo directly; the tree looked clean when the build script last ran |
 | `<commit>-local-dirty` | Built by Cargo directly from a tree with changes |
 | `unavailable` | Built outside a Git checkout |
+
+### Prepare a signed update
+
+Build the full installer and standalone from a clean checkout. Their output
+directory must be new. The release script moves completed packages into place
+after both smoke checks, the private-path scan and the source recheck.
+CI exercises both desktop builds with `-SkipInstaller`. A signed update
+requires the full build and both executable hashes.
+
+Supply the resulting Rust receipt to the same signing tool used by the 0.5
+updater. The current checkout must match the commit and fingerprint in that
+receipt. For example, with `$version`, `$packages`, `$signingKey`, `$notes`
+and `$signedOutput` set to the intended release and local paths:
+
+```powershell
+.\scripts\prepare-update-release.ps1 `
+  -InstallerPath (Join-Path $packages "VineMix-$version-Setup-x64.exe") `
+  -StandalonePath (Join-Path $packages "VineMix-$version-Standalone-x64.exe") `
+  -RustReceiptPath (Join-Path $packages "VineMix-$version-build-receipt.json") `
+  -PrivateKeyPath $signingKey -NotesPath $notes -OutputDirectory $signedOutput
+```
+
+The signer verifies the package metadata, sizes and hashes, requires a key
+from the existing public trust map and validates the resulting envelope with
+the legacy update parser before staging the signed output. The receipt and
+signing key stay local.
 
 ## Third-party notices
 

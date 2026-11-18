@@ -19,15 +19,15 @@ internal static class Program
             for (int i = 0; i < args.Length; i += 2)
                 if (i + 1 >= args.Length || !options.TryAdd(args[i], args[i + 1])) throw new InvalidOperationException("Invalid preparation arguments.");
             string Get(string key) => options.TryGetValue("--" + key, out string? value) ? value : throw new InvalidOperationException("A required preparation argument is missing.");
-            Prepare(Get("project"), Get("release"), Get("trust"), Get("setup"), Get("setup-receipt"), Get("standalone"),
-                Get("standalone-receipt"), Get("private-key"), Get("notes"), Get("output"), Get("source-hash"), Get("git-head"), Get("git-dirty"));
+            Prepare(Get("project"), Get("release"), Get("trust"), Get("setup"), options.GetValueOrDefault("--setup-receipt"), Get("standalone"),
+                options.GetValueOrDefault("--standalone-receipt"), Get("private-key"), Get("notes"), Get("output"), Get("source-hash"), Get("git-head"), Get("git-dirty"), options.GetValueOrDefault("--rust-receipt"));
             Console.WriteLine("Signed update information prepared and verified locally. Nothing was published."); return 0;
         }
         catch (InvalidOperationException error) { Console.Error.WriteLine(error.Message); return 1; }
         catch { Console.Error.WriteLine("Release preparation failed while validating files, metadata or signing material. No release was published."); return 1; }
     }
-    private static void Prepare(string project, string releasePath, string trustPath, string setupPath, string setupReceiptPath,
-        string standalonePath, string standaloneReceiptPath, string keyPath, string notesPath, string outputPath, string sourceHash, string gitHead, string gitDirty)
+    private static void Prepare(string project, string releasePath, string trustPath, string setupPath, string? setupReceiptPath,
+        string standalonePath, string? standaloneReceiptPath, string keyPath, string notesPath, string outputPath, string sourceHash, string gitHead, string gitDirty, string? rustReceiptPath)
     {
         project = Path.GetFullPath(project); outputPath = Path.GetFullPath(outputPath); keyPath = Path.GetFullPath(keyPath);
         if (Inside(keyPath, project) || Inside(keyPath, outputPath)) throw new InvalidOperationException("The private signing key must stay outside the source checkout and release output.");
@@ -37,21 +37,33 @@ internal static class Program
         using var release = Document(releasePath, "Release metadata", 32768);
         string version = Text(release.RootElement, "version"), numeric = Text(release.RootElement, "numericVersion");
         _ = SemanticVersion.Parse(version);
-        using var setupReceipt = Document(setupReceiptPath, "Setup receipt", 8 * 1024 * 1024);
-        using var standaloneReceipt = Document(standaloneReceiptPath, "Standalone receipt", 8 * 1024 * 1024);
-        ValidateReceipt(setupReceipt.RootElement, version, numeric, sourceHash, gitHead);
-        ValidateReceipt(standaloneReceipt.RootElement, version, numeric, sourceHash, gitHead);
-        if (Text(setupReceipt.RootElement, "product") != "VineMix" || Text(setupReceipt.RootElement, "architecture") != "x64"
-            || Text(standaloneReceipt.RootElement, "buildMode") != "Standalone") throw new InvalidOperationException("The package receipts do not identify the required Setup and standalone distributions.");
         var setup = Asset(setupPath, version, "Setup", numeric);
         var standalone = Asset(standalonePath, version, "Standalone", numeric);
-        if (setupReceipt.RootElement.GetProperty("size").GetInt64() != setup.Size || !HashEquals(Text(setupReceipt.RootElement, "sha256"), setup.Sha256))
-            throw new InvalidOperationException("Setup bytes do not match their build receipt.");
-        var standaloneFiles = standaloneReceipt.RootElement.GetProperty("files");
-        if (standaloneFiles.ValueKind != JsonValueKind.Array || standaloneFiles.GetArrayLength() != 1) throw new InvalidOperationException("The standalone receipt must contain exactly one executable.");
-        var entry = standaloneFiles[0];
-        if (Text(entry, "path") != standalone.FileName || entry.GetProperty("size").GetInt64() != standalone.Size || !HashEquals(Text(entry, "sha256"), standalone.Sha256))
-            throw new InvalidOperationException("Standalone bytes do not match their build receipt.");
+        if (rustReceiptPath is not null)
+        {
+            if (setupReceiptPath is not null || standaloneReceiptPath is not null)
+                throw new InvalidOperationException("Supply one Rust build receipt or the two legacy receipts.");
+            using var rustReceipt = Document(rustReceiptPath, "Rust build receipt", 8 * 1024 * 1024);
+            ValidateRustReceipt(rustReceipt.RootElement, version, numeric, sourceHash, gitHead, gitDirty, setup, standalone);
+        }
+        else
+        {
+            if (setupReceiptPath is null || standaloneReceiptPath is null)
+                throw new InvalidOperationException("Both legacy package receipts are required.");
+            using var setupReceipt = Document(setupReceiptPath, "Setup receipt", 8 * 1024 * 1024);
+            using var standaloneReceipt = Document(standaloneReceiptPath, "Standalone receipt", 8 * 1024 * 1024);
+            ValidateReceipt(setupReceipt.RootElement, version, numeric, sourceHash, gitHead);
+            ValidateReceipt(standaloneReceipt.RootElement, version, numeric, sourceHash, gitHead);
+            if (Text(setupReceipt.RootElement, "product") != "VineMix" || Text(setupReceipt.RootElement, "architecture") != "x64"
+                || Text(standaloneReceipt.RootElement, "buildMode") != "Standalone") throw new InvalidOperationException("The package receipts do not identify the required Setup and standalone distributions.");
+            if (setupReceipt.RootElement.GetProperty("size").GetInt64() != setup.Size || !HashEquals(Text(setupReceipt.RootElement, "sha256"), setup.Sha256))
+                throw new InvalidOperationException("Setup bytes do not match their build receipt.");
+            var standaloneFiles = standaloneReceipt.RootElement.GetProperty("files");
+            if (standaloneFiles.ValueKind != JsonValueKind.Array || standaloneFiles.GetArrayLength() != 1) throw new InvalidOperationException("The standalone receipt must contain exactly one executable.");
+            var entry = standaloneFiles[0];
+            if (Text(entry, "path") != standalone.FileName || entry.GetProperty("size").GetInt64() != standalone.Size || !HashEquals(Text(entry, "sha256"), standalone.Sha256))
+                throw new InvalidOperationException("Standalone bytes do not match their build receipt.");
+        }
         byte[] notesBytes = Read(notesPath, "Release notes", 65536);
         string notes = new UTF8Encoding(false, true).GetString(notesBytes);
         if (notes.Length > 32768) throw new InvalidOperationException("Release notes exceed the updater's text limit.");
@@ -86,6 +98,32 @@ internal static class Program
             scope = "Local signed-manifest preparation only. No GitHub upload, release publication, installer execution or application activation."
         };
         File.WriteAllBytes(Path.Combine(outputPath, "preparation-receipt.json"), JsonSerializer.SerializeToUtf8Bytes(receipt, Json));
+    }
+    private static void ValidateRustReceipt(JsonElement receipt, string version, string numeric, string sourceHash,
+        string gitHead, string gitDirty, UpdateAsset setup, UpdateAsset standalone)
+    {
+        var source = receipt.GetProperty("source");
+        var build = receipt.GetProperty("build");
+        if (gitDirty != "false" || receipt.GetProperty("format").GetInt32() != 1 ||
+            Text(receipt, "product") != "VineMix" || Text(receipt, "version") != version ||
+            Text(receipt, "numericVersion") != numeric || !receipt.GetProperty("releaseCandidate").GetBoolean() ||
+            !source.GetProperty("inputsMatchCommit").GetBoolean() || source.GetProperty("gitDirty").GetBoolean() ||
+            source.GetProperty("inputsDirty").GetBoolean() || Text(source, "gitHead") != gitHead ||
+            Text(receipt, "embeddedSourceRevision") != gitHead || !HashEquals(Text(source, "sourceSnapshotSha256"), sourceHash) ||
+            Text(receipt.GetProperty("toolchain"), "target") != "x86_64-pc-windows-gnullvm" ||
+            Text(build, "profile") != "release" || !build.GetProperty("installerBuilt").GetBoolean() ||
+            Text(build, "standaloneFeatures") != "standalone")
+            throw new InvalidOperationException("Rust build receipt must describe this clean, matching x64 release and both distributions.");
+        var records = receipt.GetProperty("outputs").EnumerateArray()
+            .Where(entry => Text(entry, "path").StartsWith("output/", StringComparison.Ordinal)).ToArray();
+        if (records.Length != 2) throw new InvalidOperationException("Rust build receipt must identify exactly two distributable packages.");
+        foreach (var asset in new[] { setup, standalone })
+        {
+            var matches = records.Where(entry => Text(entry, "path") == "output/" + asset.FileName).ToArray();
+            if (matches.Length != 1 || matches[0].GetProperty("size").GetInt64() != asset.Size ||
+                !HashEquals(Text(matches[0], "sha256"), asset.Sha256))
+                throw new InvalidOperationException("Package bytes do not match the Rust build receipt.");
+        }
     }
     private static void ValidateReceipt(JsonElement receipt, string version, string numeric, string sourceHash, string gitHead)
     {
@@ -176,6 +214,28 @@ internal static class Program
         string version = "1.2.3-beta.2";
         UpdateAsset Asset(string kind) { string name = $"VineMix-{version}-{kind}-x64.exe"; return new() { FileName = name, Url = UpdateTrust.AssetUrl(version, name), Size = 17, Sha256 = new string('a', 64) }; }
         var manifest = new UpdateManifest { Version = version, NumericVersion = "1.2.3.2", Notes = "Synthetic notes.", Installer = Asset("Setup"), Standalone = Asset("Standalone") };
+        string head = new('b', 40), digest = new('c', 64);
+        var rustReceipt = JsonSerializer.SerializeToElement(new {
+            format = 1, product = "VineMix", version, numericVersion = manifest.NumericVersion,
+            releaseCandidate = true, embeddedSourceRevision = head,
+            source = new { gitDirty = false, inputsDirty = false, inputsMatchCommit = true, gitHead = head, sourceSnapshotSha256 = digest },
+            toolchain = new { target = "x86_64-pc-windows-gnullvm" },
+            build = new { profile = "release", installerBuilt = true, standaloneFeatures = "standalone" },
+            outputs = new[] { manifest.Installer, manifest.Standalone }.Select(asset => new { path = "output/" + asset.FileName, size = asset.Size, sha256 = asset.Sha256 })
+        });
+        void CheckRust(string snapshot, string dirty, UpdateAsset alternate) =>
+            ValidateRustReceipt(rustReceipt, version, manifest.NumericVersion, snapshot, head, dirty, manifest.Installer, alternate);
+        CheckRust(digest, "false", manifest.Standalone);
+        foreach (Action rejection in new Action[] {
+            () => CheckRust(digest, "true", manifest.Standalone),
+            () => CheckRust(new string('d', 64), "false", manifest.Standalone),
+            () => CheckRust(digest, "false", manifest.Standalone with { Size = manifest.Standalone.Size + 1 })
+        })
+        {
+            try { rejection(); }
+            catch (InvalidOperationException) { continue; }
+            throw new InvalidOperationException("Rust build receipt inconsistency was accepted.");
+        }
         byte[] envelope = Sign(manifest, key, "fixture-key");
         var offer = trust.Verify(envelope, version, new() { Architecture = "x64", WindowsBuild = 30000 });
         if (offer.Manifest != manifest || !offer.EnvelopeBytes.SequenceEqual(envelope)) throw new InvalidOperationException("Fixture envelope roundtrip failed.");
@@ -189,6 +249,6 @@ internal static class Program
         if (!Version.TryParse("1.2.3.2             ", out var paddedVersion)
             || !Version.TryParse("1.2.3.2", out var expectedVersion) || paddedVersion != expectedVersion)
             throw new InvalidOperationException("The worker's version predicate rejected padded Setup metadata.");
-        Console.WriteLine("PASS: release signing roundtrip, tamper rejection and padded Setup metadata; no release key, packages, network or settings used.");
+        Console.WriteLine("PASS: Rust build receipt checks, release signing roundtrip, tamper rejection and padded Setup metadata; no release key, packages, network or settings used.");
     }
 }

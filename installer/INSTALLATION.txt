@@ -71,6 +71,11 @@ Virtual audio drivers
   be selected on an input node; Setup only bundles the two named driver packages.
 
 Upgrade and repair
+  In version 0.5, use Settings > Check for updates. Download the offered 0.6
+  update and wait for Saved, then choose Install and restart. Audio pauses
+  during the restart. Your existing workspace and driver selections stay in place.
+  For a manual standalone update, quit VineMix and replace the existing launcher
+  with the new standalone executable.
   Run a newer installer and use the existing installation folder. Save your work
   and quit a copy running from that folder first. Setup will not force it closed.
   Running the same version again repairs its application files. Downgrading an

@@ -20,11 +20,8 @@ use crate::platform::wide;
 use crate::ui::app::Command;
 
 const CALLBACK: u32 = WM_APP + 1;
-#[cfg(not(feature = "rust-edition"))]
 const ICON: &[u8] = include_bytes!("../assets/branding/tray.ico");
-#[cfg(feature = "rust-edition")]
-const ICON: &[u8] = include_bytes!("../assets/branding/tray-rust.ico");
-const TIP: &str = if cfg!(feature = "rust-edition") { "VineMix (Rust)" } else { "VineMix" };
+const TIP: &str = "VineMix";
 
 struct Shared {
     sender: Sender<Command>,

@@ -4,6 +4,17 @@ Published 27 October 2026 at **https://vinemix.app/** using Cloudflare Workers
 Static Assets. Worker name: `vinemix-website`. No Worker script, application
 server or database is required. The browser runs the existing animations.
 
+## Download fallback after a desktop release
+
+The live download panel checks GitHub for published release assets. From 0.6
+onward it requires both Windows packages, checksums and the signed-update
+metadata link before replacing all download URLs together. The app verifies
+the signature. Pages loaded without JavaScript or with GitHub unavailable use
+the version in this directory’s `release.json`. Advance that file only after
+the public assets and anonymous downloads have been verified, then build,
+check and deploy the site. Updating the fallback before publication can send
+visitors to missing files.
+
 ## Publish an update
 
 The initial deployment was a direct upload through the Cloudflare dashboard.

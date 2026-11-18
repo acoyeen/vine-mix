@@ -210,3 +210,42 @@ fn retarget_starts_an_eq_crossfade_only_when_coefficients_changed() {
     assert_eq!(processor.effects[1].previous_filters, filters, "the old filter state keeps running during the crossfade");
     assert_eq!(processor.effects[1].filters, Effects::INITIAL.filters);
 }
+
+#[test]
+fn edits_halfway_through_an_eq_fade_keep_the_audible_branch() {
+    let mut graph = chain(&[("mic", "microphone"), ("eq", "eq")]);
+    graph.nodes[1].eq_bands = vec![vinemix_model::config::EqBand::new("highPass", false, 2000.0, 0.0, 0.707, 0.0)];
+    let flat = compile_graph(&graph).unwrap();
+    graph.nodes[1].eq_bands[0].enabled = true;
+    let first = compile_graph(&graph).unwrap();
+    graph.nodes[1].eq_bands[0].frequency_hz = 2500.0;
+    let final_plan = compile_graph(&graph).unwrap();
+    let input = constant(0.5);
+    for adopt in [false, true] {
+        let mut running = GraphProcessor::new();
+        running.prepare(&flat);
+        for _ in 0..10 {
+            run(&mut running, &flat, &input);
+        }
+        running.retarget(&flat, &first);
+        run(&mut running, &first, &input);
+        let previous = running.output(1)[QUANTUM_FRAMES - 1].left;
+        if adopt {
+            let mut replacement = GraphProcessor::new();
+            replacement.prepare(&final_plan);
+            replacement.adopt(&mut running, &first, &final_plan, true);
+            running = replacement;
+        } else {
+            running.retarget(&first, &final_plan);
+        }
+        run(&mut running, &final_plan, &input);
+        // A half-scale signal fading across 480 samples steps by about 0.001.
+        assert!((previous - running.output(1)[0].left).abs() < 0.002);
+        for _ in 0..2 {
+            run(&mut running, &final_plan, &input);
+        }
+        let effect = &running.effects[1];
+        assert_eq!(effect.eq_transition, 0);
+        assert_eq!(effect.target_eq[..effect.target_eq_count], final_plan.nodes[1].eq);
+    }
+}

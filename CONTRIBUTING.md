@@ -12,12 +12,11 @@ identifiers such as `VINEMIX_OFFLINE_TESTS` in their language-appropriate forms.
 See [name compatibility](docs/REBRAND_COMPATIBILITY.md) before changing legacy
 settings, process, clipboard or upgrade identifiers.
 
-Build on Windows 11 x64 with PowerShell 7 using `scripts/build.ps1`, then run
-`scripts/verify-offline.ps1`. See [README.md](README.md) and [TESTING.md](TESTING.md)
-for setup and the distinction between offline checks and hardware qualification.
-For the Rust rewrite, build and verify as described in
-[docs/RUST_BUILD.md](docs/RUST_BUILD.md); a change to Rust code is checked by
-`scripts/verify-rust.ps1`, not by the scripts above.
+Build on Windows 11 x64 with the pinned Rust toolchain described in
+[the build guide](docs/RUST_BUILD.md). Run `scripts/verify-rust.ps1` for
+Rust changes. The retained C#/C++ 0.5 reference has its own
+`scripts/verify-offline.ps1` checks. [TESTING.md](TESTING.md) explains how
+to qualify the Windows packages and in-place update.
 
 Keep changes focused. Preserve saved-graph compatibility, current-user pipe
 access, bounded audio queues and the rule that the audio callback does not

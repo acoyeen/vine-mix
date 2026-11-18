@@ -127,16 +127,16 @@ impl Supervisor {
             }
             self.process = None;
         }
-        let Some(engine) = self.engine_path.clone() else { return false };
-        let session = platform::current_session_id();
-        for pid in platform::processes_named(ENGINE_FILE_NAME) {
-            let Some(candidate) = Process::open(pid) else { continue };
-            if candidate.session() == Some(session) && candidate.image_path().is_some_and(|p| text::same_path(&p, &engine)) {
-                self.process = Some(candidate);
-                return true;
-            }
+        // A different instance can run the same executable in the same logon
+        // session. Only the scoped pipe can identify an independently launched
+        // engine. Its per-scope mutex also serializes simultaneous starts.
+        let Some((pid, _)) = verified_identity() else { return false };
+        let Some(candidate) = Process::open(pid) else { return false };
+        if !self.is_owned(&candidate) {
+            return false;
         }
-        false
+        self.process = Some(candidate);
+        true
     }
 
     fn start_arguments(&self) -> Vec<String> {
@@ -288,4 +288,24 @@ impl Supervisor {
 /// The engine shipped next to this executable.
 pub fn resolve_engine_path() -> Result<PathBuf, String> {
     crate::runtime::resolve_engine_path(None)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn same_binary_and_session_do_not_establish_instance_ownership() {
+        let pid = std::process::id();
+        let process = Process::open(pid).unwrap();
+        let executable = process.image_path().unwrap();
+        let identity = (pid, process.start_time().unwrap());
+        let mut first = Supervisor::new(Some(executable.clone()), PathBuf::from("instance-a.json"));
+        first.launched_identity = Some(identity);
+        first.process = Some(process);
+        let mut second = Supervisor::new(Some(executable), PathBuf::from("instance-b.json"));
+        second.process = Process::open(pid);
+        assert!(first.is_running());
+        assert!(!second.is_running(), "a sibling's process must not suppress launching our engine");
+    }
 }

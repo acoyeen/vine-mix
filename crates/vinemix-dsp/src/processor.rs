@@ -64,6 +64,9 @@ struct Effects {
     previous_filters: [[FilterState; 2]; MAXIMUM_EQ_BANDS],
     previous_eq: [Biquad; MAXIMUM_EQ_BANDS],
     previous_eq_count: usize,
+    target_eq: [Biquad; MAXIMUM_EQ_BANDS],
+    target_eq_count: usize,
+    eq_pending: bool,
     eq_transition: u32,
     compression_gain: f64,
     limiter_gain: f64,
@@ -88,6 +91,9 @@ impl Effects {
         previous_filters: [[FilterState { z1: 0.0, z2: 0.0 }; 2]; MAXIMUM_EQ_BANDS],
         previous_eq: [Biquad { b0: 1.0, b1: 0.0, b2: 0.0, a1: 0.0, a2: 0.0 }; MAXIMUM_EQ_BANDS],
         previous_eq_count: 0,
+        target_eq: [Biquad { b0: 1.0, b1: 0.0, b2: 0.0, a1: 0.0, a2: 0.0 }; MAXIMUM_EQ_BANDS],
+        target_eq_count: 0,
+        eq_pending: false,
         eq_transition: 0,
         compression_gain: 1.0,
         limiter_gain: 1.0,
@@ -105,6 +111,31 @@ impl Effects {
         fade_position: Ramp { current: 0.0, target: 0.0, step: 0.0, remaining: 0 },
         fade_curve: Ramp { current: 0.0, target: 0.0, step: 0.0, remaining: 0 },
     };
+
+    fn change_eq(&mut self, before: &[Biquad], after: &[Biquad]) {
+        if self.eq_transition != 0 {
+            // Finish both audible filter branches. The latest published plan
+            // supplies the coalesced destination when the fade has finished.
+            self.eq_pending = true;
+            return;
+        }
+        if self.eq_pending {
+            self.eq_pending = false;
+            if self.target_eq[..self.target_eq_count] == *after {
+                return;
+            }
+            self.previous_eq = self.target_eq;
+            self.previous_eq_count = self.target_eq_count;
+        } else {
+            self.previous_eq[..before.len()].copy_from_slice(before);
+            self.previous_eq_count = before.len();
+        }
+        self.target_eq[..after.len()].copy_from_slice(after);
+        self.target_eq_count = after.len();
+        self.previous_filters = self.filters;
+        self.filters = Self::INITIAL.filters;
+        self.eq_transition = RAMP_FRAMES;
+    }
 }
 
 /// Per-node meter for one quantum.
@@ -319,6 +350,9 @@ impl GraphProcessor {
             [0.0; 2]
         };
         let input = inputs[i];
+        if self.effects[i].eq_pending && self.effects[i].eq_transition == 0 {
+            self.effects[i].change_eq(&[], &node.eq);
+        }
         let clip_sink = sink && !defer_sink_clipping;
         let ceiling = node.ceiling;
         // A round-to-nearest float conversion must not round above the
@@ -366,7 +400,12 @@ impl GraphProcessor {
             if filter {
                 let mut old_left = left;
                 let mut old_right = right;
-                for (band, coefficient) in node.eq.iter().enumerate() {
+                let sections = if effect.eq_transition != 0 {
+                    &effect.target_eq[..effect.target_eq_count]
+                } else {
+                    &node.eq[..]
+                };
+                for (band, coefficient) in sections.iter().enumerate() {
                     left = biquad(left, coefficient, &mut effect.filters[band][0]);
                     right = biquad(right, coefficient, &mut effect.filters[band][1]);
                 }
@@ -592,7 +631,7 @@ impl GraphProcessor {
     }
 
     /// Audio-thread adoption of an already-built plan: like [`inherit`], but
-    /// Echo history moves instead of being copied.
+    /// Echo and Alignment Delay transfer their long histories to the successor.
     ///
     /// [`inherit`]: GraphProcessor::inherit
     pub fn adopt(&mut self, old: &mut GraphProcessor, before: &GraphPlan, after: &GraphPlan, preserve_fade: bool) {
@@ -609,6 +648,7 @@ impl GraphProcessor {
     /// a parameter edit. Every ramp, filter and effect state is already in
     /// place, so nothing is copied; only an EQ whose coefficients changed
     /// starts its 10 ms coefficient crossfade, exactly as [`adopt`] does.
+    /// When a fade is already audible, the latest change follows it.
     /// Changed settings are then picked up by `process`, which ramps to them.
     ///
     /// Produces the same samples as preparing a new processor for `after`
@@ -620,13 +660,7 @@ impl GraphProcessor {
         debug_assert!(vinemix_model::plan::same_indexing(before, after), "retarget needs identically indexed plans");
         for (i, (now, then)) in after.nodes.iter().zip(&before.nodes).enumerate() {
             if now.kind.is_filter() && now.eq != then.eq {
-                let effect = &mut self.effects[i];
-                effect.previous_eq = Effects::INITIAL.previous_eq;
-                effect.previous_eq[..then.eq.len()].copy_from_slice(&then.eq);
-                effect.previous_eq_count = then.eq.len();
-                effect.previous_filters = effect.filters;
-                effect.filters = Effects::INITIAL.filters;
-                effect.eq_transition = 480;
+                self.effects[i].change_eq(&then.eq, &now.eq);
             }
         }
     }
@@ -637,13 +671,7 @@ impl GraphProcessor {
             self.effects[i] = old.effects[j];
             let (now, then) = (&after.nodes[i], &before.nodes[j]);
             if now.kind.is_filter() && now.eq != then.eq {
-                let effect = &mut self.effects[i];
-                effect.previous_eq = Effects::INITIAL.previous_eq;
-                effect.previous_eq[..then.eq.len()].copy_from_slice(&then.eq);
-                effect.previous_eq_count = then.eq.len();
-                effect.previous_filters = old.effects[j].filters;
-                effect.filters = Effects::INITIAL.filters;
-                effect.eq_transition = 480;
+                self.effects[i].change_eq(&then.eq, &now.eq);
             }
         }
         for i in 0..after.edges.len() {

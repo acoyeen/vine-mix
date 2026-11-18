@@ -28,6 +28,7 @@ unsafe extern "C" {
     pub fn speex_preprocess_ctl(state: *mut c_void, request: c_int, value: *mut c_void) -> c_int;
 
     pub fn rnnoise_create(model: *mut c_void) -> *mut c_void;
+    pub fn am_oracle_rnnoise_create_baseline() -> *mut c_void;
     pub fn rnnoise_destroy(state: *mut c_void);
     pub fn rnnoise_process_frame(state: *mut c_void, out: *mut f32, input: *const f32) -> f32;
 
@@ -99,16 +100,22 @@ impl Graph {
         unsafe { am_oracle_process(self.0, pointers.as_ptr(), c_int::from(defer)) }
     }
 
-    pub fn output(&self, node: usize) -> &[f32] {
-        // SAFETY: the processor owns 240 stereo frames per node slot.
-        unsafe { std::slice::from_raw_parts(am_oracle_output(self.0, node as c_int), QUANTUM * 2) }
+    pub fn output(&self, node: usize) -> Option<&[f32]> {
+        if node >= NODES {
+            return None;
+        }
+        // SAFETY: the live processor owns 240 stereo frames in this checked slot.
+        Some(unsafe { std::slice::from_raw_parts(am_oracle_output(self.0, node as c_int), QUANTUM * 2) })
     }
 
-    pub fn meter(&self, node: usize) -> [f32; 6] {
+    pub fn meter(&self, node: usize) -> Option<[f32; 6]> {
+        if node >= NODES {
+            return None;
+        }
         let mut out = [0.0f32; 6];
-        // SAFETY: six-float output buffer.
+        // SAFETY: a checked processor slot and a six-float output buffer.
         unsafe { am_oracle_meter(self.0, node as c_int, out.as_mut_ptr()) };
-        out
+        Some(out)
     }
 
     pub fn reset(&mut self) {

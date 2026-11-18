@@ -266,6 +266,15 @@ pub fn require_private(path: &Path) -> Result<()> {
     result
 }
 
+/// Removes only the unique sibling this operation successfully created.
+struct PendingCopy(PathBuf);
+
+impl Drop for PendingCopy {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(&self.0);
+    }
+}
+
 fn copy_checked_impl(source: &Path, destination: &Path, size: u64, digest: &str, private: bool) -> Result<()> {
     no_reparse(source)?;
     no_reparse(destination)?;
@@ -273,10 +282,13 @@ fn copy_checked_impl(source: &Path, destination: &Path, size: u64, digest: &str,
     if input.metadata().map(|m| m.len()).unwrap_or(u64::MAX) != size {
         return Err("An update file changed size before copying.".into());
     }
+    let temporary = destination.with_file_name(format!(".vinemix-copy-{}.tmp", crate::platform::random_hex_id()));
+    let pending;
     {
         let mut buffer = vec![0u8; 1 << 16];
         if private {
-            let handle = create_private_file(destination)?;
+            let handle = create_private_file(&temporary)?;
+            pending = PendingCopy(temporary);
             loop {
                 let read = input.read(&mut buffer).map_err(|e| format!("An update file could not be read. {e}"))?;
                 if read == 0 {
@@ -286,14 +298,19 @@ fn copy_checked_impl(source: &Path, destination: &Path, size: u64, digest: &str,
             }
             flush(&handle)?;
         } else {
-            let mut output = std::fs::OpenOptions::new().write(true).create_new(true).open(destination).map_err(|e| format!("An update file could not be created. {e}"))?;
+            let mut output = std::fs::OpenOptions::new().write(true).create_new(true).open(&temporary).map_err(|e| format!("An update file could not be created. {e}"))?;
+            pending = PendingCopy(temporary);
             std::io::copy(&mut input, &mut output).map_err(|e| format!("An update file could not be copied. {e}"))?;
             output.flush().map_err(|e| format!("An update file could not be copied. {e}"))?;
             output.sync_all().map_err(|e| format!("An update file could not be copied. {e}"))?;
         }
     }
-    if file_size(destination)? != size || !equal_hash(&hash(destination)?, digest) {
+    if file_size(&pending.0)? != size || !equal_hash(&hash(&pending.0)?, digest) {
         return Err("An update file changed while copying.".into());
+    }
+    // Same-volume, write-through publication without replacing an existing file.
+    if !vinemix_platform::move_write_through(&pending.0, destination) {
+        return Err("A verified update copy could not be published at its destination.".into());
     }
     Ok(())
 }

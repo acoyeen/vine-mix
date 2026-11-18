@@ -99,7 +99,7 @@ pub fn show_about(ui: &mut Ui, area: Rect, copied: &mut bool) -> AboutAction {
         |ui| {
             dialog::heading(ui, "About VineMix");
             ui.add_space(5.0);
-            dialog::text(ui, "Local audio routing · Beta", 12.0, Weight::Regular, theme::MUTED, None);
+            dialog::text(ui, "Local audio routing", 12.0, Weight::Regular, theme::MUTED, None);
             ui.add_space(24.0);
             dialog::selectable(ui, &information, 13.0, theme::TEXT);
             ui.add_space(16.0);

@@ -27,7 +27,7 @@ use windows::Win32::Media::Audio::{
 use windows::Win32::System::Com::StructuredStorage::PROPVARIANT;
 use windows::Win32::System::Com::{CoCreateInstance, CoTaskMemFree, CLSCTX_ALL, STGM_READ};
 use windows::Win32::System::Variant::{VT_BLOB, VT_LPWSTR, VT_UI4};
-use windows::Win32::UI::Shell::PropertiesSystem::{IPropertyStore, PSGetPropertyKeyFromName};
+use windows::Win32::UI::Shell::PropertiesSystem::IPropertyStore;
 
 use crate::policy::{endpoint_state, stream_still_selected, transport_family, virtual_name};
 use crate::win::{wait_any, Apartment, Event, Wait};
@@ -47,6 +47,17 @@ const INTERFACE_NAME: PROPERTYKEY = PROPERTYKEY {
 const FORM_FACTOR: PROPERTYKEY = PROPERTYKEY {
     fmtid: GUID::from_values(0x1da5d803, 0xd492, 0x4edd, [0x8c, 0x23, 0xe0, 0xc0, 0xff, 0xee, 0x7f, 0x0e]),
     pid: 0,
+};
+/// `PKEY_AudioEndpoint_StableId` (Mmdeviceapi.h, Windows 11 24H2 SDK
+/// 10.0.26100): an opaque `VT_LPWSTR` that Windows tries to keep when it
+/// replaces an endpoint ID after a driver or OS update. It is read by key:
+/// the property system has no canonical name for it, so a name lookup
+/// (`PSGetPropertyKeyFromName("System.AudioEndpoint.StableId")`) fails with
+/// TYPE_E_ELEMENTNOTFOUND and left every stable ID empty. Older Windows
+/// reports the property as absent, which `string_property` treats as `None`.
+const STABLE_ID: PROPERTYKEY = PROPERTYKEY {
+    fmtid: GUID::from_values(0x1da5d803, 0xd492, 0x4edd, [0x8c, 0x23, 0xe0, 0xc0, 0xff, 0xee, 0x7f, 0x0e]),
+    pid: 12,
 };
 /// `PKEY_AudioEngine_DeviceFormat`: the shared-mode format chosen in Sound
 /// settings, readable without activating an audio client.
@@ -136,10 +147,6 @@ fn device_id(device: &IMMDevice) -> Option<String> {
 /// activated for an endpoint that is new to `formats`, has just become active
 /// or whose device format changed; otherwise the cached mix format is kept.
 pub fn collect_endpoints(enumerator: &IMMDeviceEnumerator, previous: &[Endpoint], formats: &mut MixFormatCache) -> Option<Vec<Endpoint>> {
-    let mut stable_key = PROPERTYKEY::default();
-    let name = crate::win::wide("System.AudioEndpoint.StableId");
-    // SAFETY: valid NUL-terminated name and output pointer.
-    let has_stable_key = unsafe { PSGetPropertyKeyFromName(PCWSTR(name.as_ptr()), &mut stable_key).is_ok() };
     let mut result = Vec::new();
     for (flow, direction) in [(eCapture, "capture"), (eRender, "render")] {
         // SAFETY: COM calls on a live enumerator.
@@ -167,10 +174,8 @@ pub fn collect_endpoints(enumerator: &IMMDeviceEnumerator, previous: &[Endpoint]
                 if let Some(name) = string_property(&store, &FRIENDLY_NAME) {
                     endpoint.name = name;
                 }
-                if has_stable_key {
-                    if let Some(stable) = string_property(&store, &stable_key) {
-                        endpoint.stable_id = stable;
-                    }
+                if let Some(stable) = string_property(&store, &STABLE_ID) {
+                    endpoint.stable_id = stable;
                 }
                 let description = string_property(&store, &DESCRIPTION);
                 let interface = string_property(&store, &INTERFACE_NAME);
@@ -547,6 +552,28 @@ mod tests {
         assert_eq!(watches.len(), 1);
         drop(a);
         assert!(watches.is_empty());
+    }
+
+    /// Live and read-only (Windows 11 24H2 or later): the inventory carries
+    /// Windows' stable ID for every endpoint, and Windows resolves each one
+    /// back to the same endpoint, which is what lets a binding follow a
+    /// device whose endpoint ID was replaced. Opens no stream.
+    /// `cargo test -p vinemix-wasapi -- --ignored live_inventory_reads_stable_ids`
+    #[test]
+    #[ignore = "live Windows 11 24H2+ audio inventory"]
+    fn live_inventory_reads_stable_ids() {
+        let _apartment = Apartment::enter();
+        // SAFETY: COM is initialised on this thread for the call's duration.
+        let enumerator: IMMDeviceEnumerator = unsafe { CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL) }.expect("enumerator");
+        let endpoints = collect_endpoints(&enumerator, &[], &mut MixFormatCache::new()).expect("inventory");
+        assert!(!endpoints.is_empty(), "no audio endpoints on this machine");
+        for endpoint in &endpoints {
+            assert!(!endpoint.stable_id.is_empty(), "{} ({}) has no stable ID", endpoint.name, endpoint.id);
+            let wide = crate::win::wide(&endpoint.stable_id);
+            // SAFETY: valid NUL-terminated ID on a live enumerator.
+            let device = unsafe { enumerator.GetDevice(PCWSTR(wide.as_ptr())) }.expect("Windows resolves the stable ID");
+            assert_eq!(device_id(&device).as_deref(), Some(endpoint.id.as_str()), "{}", endpoint.name);
+        }
     }
 
     #[test]

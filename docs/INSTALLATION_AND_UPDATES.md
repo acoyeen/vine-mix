@@ -1,10 +1,21 @@
 # VineMix installation and updates
 
-Updated 6 November 2026 for **0.5.0 · Beta**. VineMix is an
-MIT-licensed open-source beta for Windows 11 x64. Download versioned packages,
-checksums and matching source from [GitHub Releases](https://github.com/acoyeen/vine-mix/releases).
-See the [beta test guide](BETA_TESTER_GUIDE.md) for installation instructions and
-[current qualification](RELEASE_0.5.0_QUALIFICATION.md) for verification and limits.
+VineMix runs on Windows 11 x64. Download the installer or standalone
+executable, source and checksums from [GitHub Releases](https://github.com/acoyeen/vine-mix/releases).
+
+## Upgrading from 0.5 to 0.6
+
+In 0.5, open **Settings → Check for updates**. When 0.6 is offered, select
+**Download update**. Wait for your workspace to show **Saved**, then choose
+**Install and restart** when you can pause audio. Setup users keep their
+installation and shortcuts. Standalone users keep their launcher path.
+Both editions use the existing workspace and device assignments. Check
+your listening and virtual outputs after the restart.
+
+If the release service is unavailable, use the matching package from the
+published release. Quit VineMix first. Run Setup in its existing folder or
+replace the standalone launcher, according to how you currently run VineMix.
+Working virtual audio drivers can stay installed.
 
 ## Packages and files
 
@@ -12,16 +23,15 @@ See the [beta test guide](BETA_TESTER_GUIDE.md) for installation instructions an
 updaters can roll back because of metadata or process-identity defects.
 Corrected 0.4.0 installations can use the in-app update. For a manual upgrade,
 wait for Saved, choose **Quit VineMix**,
-then run 0.5.0 Beta Setup using the existing folder. Do not uninstall first.
-Standalone users should quit and replace their launcher with the 0.5.0 Beta download.
+then run the newer Setup using the existing folder. Do not uninstall first.
+Standalone users should quit and replace their launcher with the matching standalone download.
 Keep optional drivers unchanged if they already work. Intermediate betas are not
 required. See the [update investigation](UPDATE_INVESTIGATION_2026-10-24.md).
 
 The Windows 11 x64 Setup installs the matched desktop and engine together under
 `%LOCALAPPDATA%\Programs\VineMix`, creates shortcuts, and registers an uninstall
 entry. The single standalone EXE prepares its bundled runtime files automatically
-without registering an application installation. Both include .NET and preserve
-required third-party notices.
+without registering an application installation. The 0.6 builds include the Rust engine and third-party notices.
 
 Both launch the same app and use `%LOCALAPPDATA%\VineMix` for workspace,
 preferences, backups and logs. They coordinate one desktop and engine session for
@@ -107,7 +117,6 @@ separate from Windows Authenticode signing. If the update service is unavailable
 retry later or use the matching GitHub release for a manual update. The client
 never contains a repository credential.
 
-[Current qualification](RELEASE_0.5.0_QUALIFICATION.md) records the scope of update
-checks. Component fixtures do not prove the complete delivered upgrade and
+[Release testing](../TESTING.md) describes the checks for each distribution. Component fixtures do not prove the complete delivered upgrade and
 rollback flow. [Earlier design notes](INSTALLATION_UPDATE_DESIGN_HISTORY.md)
 remain historical research, not current installation instructions.

@@ -2,5 +2,5 @@ Crate: eframe
 Manifest-License: MIT OR Apache-2.0
 Used-Under: Apache-2.0
 Text: Apache-2.0.txt
-Basis: The package published on crates.io contains no licence file. Apache-2.0 reads the same for every work, so its text is reproduced exactly; the MIT alternative would need the copyright line from the source repository, which has not been copied into this distribution.
-Review: Pending: confirm against https://github.com/emilk/egui (LICENSE-APACHE, LICENSE-MIT) and decide whether to keep Apache-2.0 or reproduce the upstream MIT text instead.
+Basis: The published manifest offers Apache-2.0 and the upstream repository supplies its text.
+Review: 2026-11-18. Checked the upstream revision identified by the published crate. https://github.com/emilk/egui/blob/3c6eb8261c3293ad9c7ea1ed58487e038860ebef/LICENSE-APACHE

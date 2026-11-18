@@ -57,6 +57,7 @@ try {
   await writeFile(path.join(fixture, 'dist/index.html'), '<!doctype html><title>VineMix test</title>');
   await writeFile(path.join(fixture, 'dist/assets/font.woff2'), Buffer.from([0x77, 0x4f, 0x46, 0x32]));
   await writeFile(path.join(fixture, 'dist/assets/nodes.json'), '{"example":true}');
+  await writeFile(path.join(fixture, 'dist/assets/VineMix.ico'), Buffer.from([0, 0, 1, 0]));
   await writeFile(path.join(fixture, 'private/evidence.txt'), 'private fixture must never be served');
   await symlink(path.join(fixture, 'private'), path.join(fixture, 'dist/escape'), process.platform === 'win32' ? 'junction' : 'dir');
 
@@ -80,6 +81,7 @@ try {
   assert.equal(head.body.length, 0);
   assert.equal(head.headers['content-length'], page.headers['content-length']);
   assert.equal((await request(port, '/assets/font.woff2')).headers['content-type'], 'font/woff2');
+  assert.equal((await request(port, '/assets/VineMix.ico')).headers['content-type'], 'image/x-icon');
   const json = await request(port, '/assets/nodes.json?cache=example');
   assert.equal(json.headers['content-type'], 'application/json; charset=utf-8');
   assert.deepEqual(JSON.parse(json.body), { example: true });

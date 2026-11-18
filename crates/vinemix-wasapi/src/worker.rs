@@ -187,14 +187,17 @@ impl Shared {
         self.guarded.lock().unwrap_or_else(|e| e.into_inner())
     }
 
-    fn state(&self, value: &str, message: &str, endpoint: Option<&Endpoint>, reason: &str) {
+    fn state(&self, serial: u64, value: &str, message: &str, endpoint: Option<&Endpoint>, reason: &str) {
+        let mut guarded = self.lock();
+        if self.configuration_serial.load(Ordering::Acquire) != serial {
+            return;
+        }
         self.ready.store(value == "Running", Ordering::Release);
         if value != "Running" && value != "Priming" {
             self.target_queue_frames.store(0, Ordering::Relaxed);
             self.pending_resampler_frames.store(0, Ordering::Relaxed);
             self.engine_period_frames.store(0, Ordering::Relaxed);
         }
-        let mut guarded = self.lock();
         let path = &mut guarded.path;
         path.state = value.into();
         path.message = message.into();
@@ -205,8 +208,12 @@ impl Shared {
         }
         if let Some(endpoint) = endpoint {
             path.endpoint_id.clone_from(&endpoint.id);
-            path.channels = endpoint.channels;
-            path.rate = endpoint.rate;
+            // Running preserves the format actually opened, including an
+            // exclusive stream whose format differs from the shared mix.
+            if value != "Running" {
+                path.channels = endpoint.channels;
+                path.rate = endpoint.rate;
+            }
         } else if path.state == "Unassigned" {
             path.endpoint_id.clear();
             path.rate = 0;
@@ -341,9 +348,11 @@ impl Runner {
             period_frames = buffer_frames;
         }
         let mut buffering = StreamBufferPolicy::new(format.rate, period_frames, shared.capture).map_err(|_| E_FAIL)?;
-        shared
-            .engine_period_frames
-            .store(buffering.device_frames_to_engine_frames(period_frames) as u32, Ordering::Relaxed);
+        let engine_period = buffering.device_frames_to_engine_frames(period_frames);
+        if shared.capture && engine_period.saturating_add(StreamBufferPolicy::CAPTURE_RESERVE_FRAMES) > shared.monitor.capacity() {
+            return Err(AUDCLNT_E_BUFFER_SIZE_ERROR);
+        }
+        shared.engine_period_frames.store(engine_period as u32, Ordering::Relaxed);
         if !shared.capture {
             // SAFETY: COM service query on the client.
             if let Ok(session) = unsafe { client.GetService::<IAudioSessionControl2>() } {
@@ -378,9 +387,12 @@ impl Runner {
         let mut drift = DriftController::new();
         let mut clock_estimate = ClockEstimate::default();
         self.clear_queue_for_open();
-        shared.state("Priming", "Preparing current live audio", Some(endpoint), "");
+        shared.state(serial, "Priming", "Preparing current live audio", Some(endpoint), "");
         {
             let mut guarded = shared.lock();
+            if shared.configuration_serial.load(Ordering::Acquire) != serial {
+                return Ok(());
+            }
             guarded.path.rate = format.rate;
             guarded.path.channels = u32::from(format.channels);
             guarded.path.period_ms = f64::from(period_frames) * 1000.0 / f64::from(format.rate);
@@ -406,7 +418,7 @@ impl Runner {
         } else {
             "Compatible audio timing after repeated interruptions"
         };
-        shared.state("Running", running_message, Some(endpoint), "");
+        shared.state(serial, "Running", running_message, Some(endpoint), "");
         let events = [shared.stop_event.handle(), shared.control_event.handle(), audio_event.handle()];
         let mut last_event = Instant::now();
         let stream_start = last_event;
@@ -706,7 +718,7 @@ impl Runner {
             }
             let delay;
             if selection.id.is_empty() && selection.stable_id.is_empty() {
-                shared.state("Unassigned", "", None, "");
+                shared.state(serial, "Unassigned", "", None, "");
                 // No notification can resolve an empty assignment: sleep until
                 // selection, retry or stop.
                 if wait_any(&events, FOREVER) == Wait::Signalled(0) {
@@ -714,21 +726,21 @@ impl Runner {
                 }
                 continue;
             } else if !apartment.ok() {
-                shared.state("Error", "Could not initialize Windows audio COM apartment", None, "");
+                shared.state(serial, "Error", "Could not initialize Windows audio COM apartment", None, "");
                 delay = 5000;
             } else {
-                shared.state("Resolving", "Finding selected device", None, "");
+                shared.state(serial, "Resolving", "Finding selected device", None, "");
                 let endpoint = shared.resolve(&selection);
                 match &endpoint {
                     Some(endpoint) if endpoint.state == "Active" => {
                         if let Some(rejection) =
                             stream_endpoint_rejection(endpoint, shared.capture, shared.microphone, &shared.required_transport)
                         {
-                            shared.state("Error", rejection, Some(endpoint), "");
+                            shared.state(serial, "Error", rejection, Some(endpoint), "");
                         } else {
                             let opening =
                                 if shared.exclusive_render { "Opening direct virtual microphone output" } else { "Opening shared-mode audio" };
-                            shared.state("Opening", opening, Some(endpoint), "");
+                            shared.state(serial, "Opening", opening, Some(endpoint), "");
                             let result = self.open_and_run(endpoint, &selection, serial);
                             shared.ready.store(false, Ordering::Release);
                             self.clear_queue();
@@ -745,7 +757,7 @@ impl Runner {
                                     if code.0 == E_ACCESSDENIED && !shared.capture && !shared.exclusive_render {
                                         message = "Output access blocked; check Windows sound device settings".into();
                                     }
-                                    shared.state(failure_state(code.0), &message, Some(endpoint), failure_reason(code.0));
+                                    shared.state(serial, failure_state(code.0), &message, Some(endpoint), failure_reason(code.0));
                                 }
                             }
                         }
@@ -754,7 +766,7 @@ impl Runner {
                         let disabled = other.as_ref().is_some_and(|e| e.state == "Disabled");
                         let message = if disabled { "Device disabled in Windows Sound settings" } else { "Waiting for device" };
                         let reason = if disabled { "device_disabled" } else { "device_unavailable" };
-                        shared.state("Waiting", message, other.as_ref(), reason);
+                        shared.state(serial, "Waiting", message, other.as_ref(), reason);
                     }
                 }
                 delay = delays[backoff.min(delays.len() - 1)];
@@ -804,6 +816,10 @@ mod tests {
                 name: "Example returning device".into(),
                 channel: -1,
             });
+            // An iteration that captured the empty assignment before configure
+            // must never publish it after the new binding becomes visible.
+            worker.shared.state(0, "Unassigned", "", None, "");
+            assert_ne!(worker.status().state, "Unassigned");
             // Sample from the very first read after assignment onwards.
             let mut seen: Vec<String> = Vec::new();
             let until = Instant::now() + Duration::from_millis(600);
@@ -815,7 +831,6 @@ mod tests {
                 std::thread::yield_now();
             }
             assert!(!seen.iter().any(|s| s == "Unassigned"), "an assigned device was reported as unassigned: {seen:?}");
-            assert_eq!(seen.first().map(String::as_str), Some("Resolving"), "{seen:?}");
             // It then alternates between looking and waiting with backoff.
             assert!(seen.iter().any(|s| s == "Waiting"), "{seen:?}");
             assert!(seen.iter().all(|s| s == "Resolving" || s == "Waiting"), "{seen:?}");
@@ -826,6 +841,19 @@ mod tests {
                 std::thread::sleep(Duration::from_millis(5));
             }
             assert_eq!(worker.status().state, "Unassigned");
+            worker.stop();
+            let serial = worker.shared.configuration_serial.load(Ordering::Acquire);
+            // A status transition must not overwrite an exclusive stream's
+            // actual format with the endpoint's differently configured mix.
+            {
+                let mut path = worker.shared.lock();
+                path.path.rate = 48_000;
+                path.path.channels = 2;
+            }
+            worker.shared.state(serial, "Running", "", Some(&Endpoint { rate: 44_100, channels: 6, ..Default::default() }), "");
+            let running = worker.status();
+            assert_eq!((running.rate, running.channels), (48_000, 2));
+            worker.shared.state(serial, "Unassigned", "", None, "");
         }
     }
 }

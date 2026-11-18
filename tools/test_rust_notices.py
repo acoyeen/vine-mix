@@ -167,6 +167,16 @@ class NoticeTests(unittest.TestCase):
         _, errors, pending = self.fixture.generate()
         self.assertEqual(errors, [])
         self.assertEqual(pending, ["waiting"])
+        previous_roots = notices.ROOTS[:]
+        notices.ROOTS[:] = ["app"]
+        self.addCleanup(lambda: notices.ROOTS.__setitem__(slice(None), previous_roots))
+        metadata = os.path.join(self.fixture.root, "metadata.json")
+        with open(metadata, "w", encoding="utf-8") as handle:
+            json.dump(self.fixture.metadata(), handle)
+        output = os.path.join(self.fixture.root, "out", "notices.txt")
+        args = ["--metadata", metadata, "--output", output, "--supplements", self.fixture.supplements]
+        self.assertEqual(notices.main(args), 0)
+        self.assertEqual(notices.main(args + ["--check", "--require-reviewed"]), 1)
 
     def test_supplement_for_a_changed_manifest_licence_needs_a_new_review(self):
         self.fixture.add("moved", "Apache-2.0")

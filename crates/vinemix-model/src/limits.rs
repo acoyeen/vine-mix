@@ -8,6 +8,9 @@ pub const MAXIMUM_GRAPH_EDGES: usize = 96;
 pub const MAXIMUM_EQ_BANDS: usize = 8;
 pub const MAXIMUM_SETTINGS_BYTES: usize = 262_144;
 pub const MAXIMUM_CONTROL_MESSAGE_BYTES: usize = 256 * 1024;
+/// Maximum payload for an explicitly negotiated length-prefixed snapshot.
+/// Requests and ordinary v1 reply lines retain their original limit.
+pub const MAXIMUM_CONTROL_RESPONSE_BYTES: usize = 16 * 1024 * 1024;
 pub const CONFIGURATION_VERSION: i32 = 2;
 pub const CONTROL_PROTOCOL_VERSION: i32 = 1;
 

@@ -70,6 +70,9 @@ fn code(value: i32) -> ExitCode {
 
 #[allow(clippy::too_many_lines)]
 fn main() -> ExitCode {
+    if let Err(error) = vinemix_platform::checked_development_instance() {
+        return fail("VineMix", &error);
+    }
     let options = match parse() {
         Ok(options) => options,
         Err(error) => return fail("VineMix", &error),
@@ -210,10 +213,7 @@ fn main() -> ExitCode {
     // title together with the window class winit registers ("Window Class");
     // see `WorkspaceFramework` in scripts/assert-desktop-data-context.ps1.
     // Change either only together with that guard and its fixtures.
-    #[cfg(not(feature = "rust-edition"))]
     let (icon, title) = (include_bytes!("../assets/branding/app.png").as_slice(), "VineMix · Patch workspace");
-    #[cfg(feature = "rust-edition")]
-    let (icon, title) = (include_bytes!("../assets/branding/app-rust.png").as_slice(), "VineMix (Rust) · Patch workspace");
     let icon = eframe::icon_data::from_png_bytes(icon).ok();
     let mut viewport = egui::ViewportBuilder::default()
         .with_title(if options.preview { "VineMix · UI Preview" } else { title })

@@ -808,6 +808,60 @@ pub mod bindings {
         }
     }
 
+    /// A device binding that matches its active endpoint by the exact saved
+    /// endpoint ID but was saved without Windows' stable ID (every binding
+    /// saved while the stable ID was never read). Recording it is not a
+    /// guess: the endpoint is the saved one, and the stable ID is what lets
+    /// the binding follow that device if Windows later replaces its endpoint
+    /// ID (as it did for a USB headphone amplifier on 16 November 2026).
+    #[derive(Clone, Debug, PartialEq)]
+    pub struct StableIdFill {
+        pub node_id: String,
+        pub id: String,
+        pub stable_id: String,
+    }
+
+    fn device_direction(kind: &str) -> Option<&'static str> {
+        match kind {
+            "microphone" | "virtualInput" => Some("capture"),
+            "output" | "virtualOutput" => Some("render"),
+            _ => None,
+        }
+    }
+
+    pub fn find_stable_id_fills(graph: &AudioGraph, endpoints: &[Endpoint]) -> Vec<StableIdFill> {
+        let mut fills = Vec::new();
+        for node in &graph.nodes {
+            let Some(direction) = device_direction(&node.kind) else { continue };
+            if node.device.id.is_empty() || !node.device.stable_id.is_empty() {
+                continue;
+            }
+            if let vinemix_model::identity::Resolution::Active(endpoint, vinemix_model::identity::Match::EndpointId) =
+                vinemix_model::identity::resolve(endpoints, &node.device, direction)
+            {
+                if !endpoint.stable_id.is_empty() {
+                    fills.push(StableIdFill { node_id: node.id.clone(), id: endpoint.id.clone(), stable_id: endpoint.stable_id.clone() });
+                }
+            }
+        }
+        fills
+    }
+
+    /// Records each stable ID only where the binding still names the same
+    /// endpoint and still has none, so a replayed fill never overrides a
+    /// device the user chose since.
+    pub fn apply_stable_ids(graph: &mut AudioGraph, fills: &[StableIdFill]) -> usize {
+        let mut changed = 0;
+        for fill in fills {
+            let Some(node) = graph.nodes.iter_mut().find(|n| n.id == fill.node_id) else { continue };
+            if node.device.id == fill.id && node.device.stable_id.is_empty() {
+                node.device.stable_id = fill.stable_id.clone();
+                changed += 1;
+            }
+        }
+        changed
+    }
+
     pub fn same(binding: &DeviceBinding, endpoint: &Endpoint) -> bool {
         (!binding.id.is_empty() && binding.id == endpoint.id) || (!binding.stable_id.is_empty() && binding.stable_id == endpoint.stable_id)
     }
@@ -986,6 +1040,46 @@ mod tests {
         assert_eq!(new_connection_error(&graph, &link), "Connect Level control to a node with a Level knob.");
         link.to = "starter-input".into();
         assert_eq!(new_connection_error(&graph, &link), "");
+    }
+
+    /// A binding that still matches by endpoint ID records the stable ID
+    /// and follows the device when Windows replaces the endpoint.
+    #[test]
+    fn bindings_record_the_stable_id_and_then_follow_a_replaced_endpoint() {
+        use vinemix_model::identity::{resolve, Match, Resolution};
+        let endpoint = |id: &str, stable: &str, direction: &str| Endpoint {
+            id: id.into(),
+            stable_id: stable.into(),
+            name: "Headphones (Example)".into(),
+            direction: direction.into(),
+            state: "Active".into(),
+            ..Endpoint::default()
+        };
+        let mut graph = fresh();
+        let output = graph.nodes.iter().position(|n| n.kind == "output").expect("starter output");
+        let microphone = graph.nodes.iter().position(|n| n.kind == "microphone").expect("starter microphone");
+        graph.nodes[output].device = DeviceBinding { id: "old".into(), stable_id: String::new(), name: "Headphones (Example)".into(), channel: -1 };
+        graph.nodes[microphone].device = DeviceBinding { id: "gone".into(), stable_id: String::new(), name: "Mic".into(), channel: -1 };
+        // A capture endpoint with the output's ID is the other direction, and
+        // the microphone's endpoint is gone: neither gains anything.
+        let inventory = [endpoint("old", "stable-s", "render"), endpoint("old", "stable-c", "capture")];
+        let fills = bindings::find_stable_id_fills(&graph, &inventory);
+        assert_eq!(fills, [bindings::StableIdFill { node_id: graph.nodes[output].id.clone(), id: "old".into(), stable_id: "stable-s".into() }]);
+        assert_eq!(bindings::apply_stable_ids(&mut graph, &fills), 1);
+        assert_eq!(graph.nodes[output].device.stable_id, "stable-s");
+        assert!(graph.nodes[microphone].device.stable_id.is_empty());
+        assert!(bindings::find_stable_id_fills(&graph, &inventory).is_empty(), "a recorded stable ID is not filled again");
+        assert_eq!(bindings::apply_stable_ids(&mut graph, &fills), 0, "replaying a fill changes nothing");
+
+        // Windows replaces the endpoint ID; the stable ID finds the device.
+        let replaced = [endpoint("new", "stable-s", "render")];
+        let resolved = resolve(&replaced, &graph.nodes[output].device, "render");
+        assert_eq!(resolved, Resolution::Active(&replaced[0], Match::StableId));
+
+        // A device the user chose since is never overwritten by a stale fill.
+        graph.nodes[output].device = DeviceBinding { id: "other".into(), stable_id: String::new(), name: "Speakers".into(), channel: -1 };
+        assert_eq!(bindings::apply_stable_ids(&mut graph, &fills), 0);
+        assert!(graph.nodes[output].device.stable_id.is_empty());
     }
 
     #[test]

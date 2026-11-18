@@ -1,15 +1,16 @@
 #requires -Version 7.3
 [CmdletBinding()]
-param([string]$EvidencePath = '')
+param([string]$EvidencePath = '', [string]$ToolsDirectory = '')
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $project = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
-$dotnet = Join-Path $project '.tools\dotnet\dotnet.exe'
+if (-not $ToolsDirectory) { $ToolsDirectory = Join-Path $project '.tools' }
+$dotnet = Join-Path $ToolsDirectory 'dotnet\dotnet.exe'
 $tool = Join-Path $PSScriptRoot 'update-release-tools\VineMix.UpdateReleaseTools.csproj'
 $tokens = $null; $errors = $null
 [Management.Automation.Language.Parser]::ParseFile((Join-Path $PSScriptRoot 'prepare-update-release.ps1'),[ref]$tokens,[ref]$errors) | Out-Null
 if ($errors.Count) { throw 'The preparation wrapper did not parse.' }
-& (Join-Path $PSScriptRoot 'test-release-file-version.ps1')
+& (Join-Path $PSScriptRoot 'test-release-file-version.ps1') -ToolsDirectory $ToolsDirectory
 & $dotnet run --project $tool -c Release -- --self-test
 if ($LASTEXITCODE) { throw 'The signing parser roundtrip fixture failed.' }
 $fixture = Join-Path ([IO.Path]::GetTempPath()) ('VineMix.ReleaseTool.Tests-' + [Guid]::NewGuid().ToString('N'))
@@ -47,13 +48,15 @@ try {
     $standaloneData = @{buildMode='Standalone';version=$version;numericVersion=$numeric;published=$false;sourceIdentity=@{sourceSnapshotSha256=$sourceHash;gitHead=$head};files=@(@{path=[IO.Path]::GetFileName($standalone);size=$size;sha256=$hash})}
     $setupData | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $setupReceipt -Encoding utf8
     $standaloneData | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $standaloneReceipt -Encoding utf8
-    function InvokeFixture([string]$outputName,[bool]$expectSuccess) {
+    function InvokeFixture([string]$outputName,[bool]$expectSuccess,[string]$rustReceipt = '',[string]$dirty = 'true') {
         $output = Join-Path $fixture $outputName
         $arguments = @('run','--no-build','--project',$tool,'-c','Release','--','--project',$source,'--release',$release,'--trust',$trust,
-            '--setup',$setup,'--setup-receipt',$setupReceipt,'--standalone',$standalone,'--standalone-receipt',$standaloneReceipt,
-            '--private-key',$keyPath,'--notes',$notes,'--output',$output,'--source-hash',$sourceHash,'--git-head',$head,'--git-dirty','true')
+            '--setup',$setup,'--standalone',$standalone,
+            '--private-key',$keyPath,'--notes',$notes,'--output',$output,'--source-hash',$sourceHash,'--git-head',$head,'--git-dirty',$dirty)
+        if ($rustReceipt) { $arguments += @('--rust-receipt',$rustReceipt) }
+        else { $arguments += @('--setup-receipt',$setupReceipt,'--standalone-receipt',$standaloneReceipt) }
         $diagnostic = & $dotnet @arguments 2>&1 | Out-String
-        if (($LASTEXITCODE -eq 0) -ne $expectSuccess) { throw ('Unexpected release-tool fixture outcome: ' + $outputName) }
+        if (($LASTEXITCODE -eq 0) -ne $expectSuccess) { throw ('Unexpected release-tool fixture outcome: ' + $outputName + ' (' + $diagnostic.Trim() + ')') }
         return $output
     }
     $output = InvokeFixture 'valid' $true
@@ -77,6 +80,31 @@ try {
     $null = InvokeFixture 'mixed-version' $false; $checks.Add('Mixed package release versions are rejected.')
     $setupData.version = $version
     $setupData | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $setupReceipt -Encoding utf8
+    $rustPath = Join-Path $private 'rust-build-receipt.json'
+    $rustReceipt = @{
+        format=1; product='VineMix'; version=$version; numericVersion=$numeric
+        releaseCandidate=$true; embeddedSourceRevision=$head
+        source=@{gitDirty=$false; inputsDirty=$false; inputsMatchCommit=$true; gitHead=$head; sourceSnapshotSha256=$sourceHash}
+        toolchain=@{target='x86_64-pc-windows-gnullvm'}
+        build=@{profile='release'; installerBuilt=$true; standaloneFeatures='standalone'}
+        outputs=@(
+            @{path=('output/' + [IO.Path]::GetFileName($setup)); size=$size; sha256=$hash}
+            @{path=('output/' + [IO.Path]::GetFileName($standalone)); size=$size; sha256=$hash}
+        )
+    }
+    function Write-RustFixture { $rustReceipt | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $rustPath -Encoding utf8 }
+    Write-RustFixture
+    $null = InvokeFixture 'rust-valid' $true $rustPath 'false'
+    $null = InvokeFixture 'rust-dirty-checkout' $false $rustPath 'true'
+    $rustReceipt.source.sourceSnapshotSha256 = 'c' * 64; Write-RustFixture
+    $null = InvokeFixture 'rust-mixed-source' $false $rustPath 'false'
+    $rustReceipt.source.sourceSnapshotSha256 = $sourceHash
+    $rustReceipt.outputs[1].sha256 = 'd' * 64; Write-RustFixture
+    $null = InvokeFixture 'rust-changed-package' $false $rustPath 'false'
+    $rustReceipt.outputs[1].sha256 = $hash
+    $rustReceipt.outputs += @{path='output/extra.exe'; size=$size; sha256=$hash}; Write-RustFixture
+    $null = InvokeFixture 'rust-extra-package' $false $rustPath 'false'
+    $checks.Add('A clean Rust receipt prepares a legacy-verifiable signed envelope; dirty, mixed-source, changed-package and foreign output fixtures are rejected.')
     $untrusted = [Security.Cryptography.RSA]::Create(3072)
     try { [IO.File]::WriteAllText($keyPath,$untrusted.ExportPkcs8PrivateKeyPem()) } finally { $untrusted.Dispose() }
     $null = InvokeFixture 'untrusted-key' $false; $checks.Add('An unpinned private signing key cannot prepare an update.')

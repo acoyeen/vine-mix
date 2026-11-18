@@ -1,9 +1,9 @@
 {
-  "description": "What a qualifying run of scripts/verify-rust.ps1 must exercise. Keys are <package>/<lib|bin|test>/<target>. 'passed' is an exact count (used for the C/C++ parity comparisons, which must never shrink unnoticed); 'minimumPassed' is a floor, so adding tests needs no change here but losing them does. 'ignored' names every test the suite is allowed to skip: benchmarks and diagnostics that only print measurements, and the two cross-language update tests that the script runs separately against the 0.5 C# serializer. A suite that is missing, unlisted, failing, short of its count, or skipping anything not named here fails qualification. Update this file in the same change that adds, removes or renames tests; `scripts/verify-rust.ps1 -PrintObserved` prints the current tree as a starting point.",
+  "description": "What a qualifying run of scripts/verify-rust.ps1 must exercise. Keys are <package>/<lib|bin|test>/<target>. 'passed' is an exact count (used for the C/C++ parity comparisons, which must never shrink unnoticed); 'minimumPassed' is a floor, so adding tests needs no change here but losing them does. 'ignored' names every test the suite is allowed to skip: benchmarks, diagnostics, Windows-only clipboard and live inventory checks run separately, and the two cross-language update tests that the script runs separately against the 0.5 C# serializer. A suite that is missing, unlisted, failing, short of its count, or skipping anything not named here fails qualification. Update this file in the same change that adds, removes or renames tests; `scripts/verify-rust.ps1 -PrintObserved` prints the current tree as a starting point.",
   "suites": {
     "vinemix-denoise/lib/vinemix_denoise": { "minimumPassed": 9 },
     "vinemix-dsp/lib/vinemix_dsp": {
-      "minimumPassed": 29,
+      "minimumPassed": 31,
       "ignored": [
         "effects::denoise::tests::denoise_engine_cost",
         "effects::dynamics::tests::expander_cost",
@@ -26,22 +26,23 @@
     "vinemix-engine/test/snapshot_gating": { "minimumPassed": 2, "ignored": ["inventory_churn", "polling_cost"] },
     "vinemix-ipc/lib/vinemix_ipc": { "minimumPassed": 0 },
     "vinemix-model/lib/vinemix_model": {
-      "minimumPassed": 38,
+      "minimumPassed": 39,
       "ignored": ["distortion::tests::makeup_table", "voice::tests::contour_table"]
     },
     "vinemix-oracle/lib/vinemix_oracle": { "minimumPassed": 0 },
     "vinemix-oracle/test/availability": { "passed": 1 },
     "vinemix-oracle/test/denoise_parity": { "passed": 3, "ignored": ["denoise_benchmark"] },
-    "vinemix-oracle/test/graph_parity": { "passed": 5, "ignored": ["processing_benchmark"] },
+    "vinemix-oracle/test/graph_parity": { "passed": 6, "ignored": ["processing_benchmark"] },
     "vinemix-oracle/test/resampler_parity": { "passed": 3 },
     "vinemix-platform/lib/vinemix_platform": { "minimumPassed": 1 },
-    "vinemix-resample/lib/vinemix_resample": { "minimumPassed": 3 },
+    "vinemix-resample/lib/vinemix_resample": { "minimumPassed": 4 },
     "vinemix-rt/lib/vinemix_rt": { "minimumPassed": 28 },
     "vinemix-setup-helper/bin/vinemix-setup-helper": { "minimumPassed": 1 },
     "vinemix-ui/bin/vinemix": { "minimumPassed": 0 },
     "vinemix-ui/lib/vinemix_ui": {
-      "minimumPassed": 122,
+      "minimumPassed": 136,
       "ignored": [
+        "platform::clipboard::copy_round_trips_in_a_private_window_station",
         "protocol::cache_tests::snapshot_poll_cost",
         "ui::app::tests::frame_cost",
         "update::tests::interop_read",
@@ -53,7 +54,7 @@
     "vinemix-update/lib/vinemix_update": { "minimumPassed": 13 },
     "vinemix-wasapi/lib/vinemix_wasapi": {
       "minimumPassed": 14,
-      "ignored": ["process::tests::application_enumeration_cost"]
+      "ignored": ["catalog::tests::live_inventory_reads_stable_ids", "process::tests::application_enumeration_cost"]
     }
   }
 }

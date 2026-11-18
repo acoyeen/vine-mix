@@ -2,5 +2,5 @@ Crate: epaint_default_fonts
 Manifest-License: (MIT OR Apache-2.0) AND OFL-1.1 AND Ubuntu-font-1.0
 Used-Under: Apache-2.0
 Text: Apache-2.0.txt
-Basis: The package published on crates.io contains no licence file for its code, only the font notices reproduced below. Apache-2.0 reads the same for every work, so its text is reproduced exactly for the code; the fonts keep their own terms.
-Review: Pending: confirm against https://github.com/emilk/egui (LICENSE-APACHE, LICENSE-MIT) and decide whether to keep Apache-2.0 or reproduce the upstream MIT text instead.
+Basis: The published manifest offers Apache-2.0 and the upstream repository supplies its text. The bundled fonts retain the separate notices printed below.
+Review: 2026-11-18. Compared the published source files to the upstream 0.37.0 tag. https://github.com/emilk/egui/blob/841a328ba2dd8f6996beb7189ebb7fc00e668a2a/LICENSE-APACHE

@@ -62,7 +62,10 @@ fn speex_matches_reference_bit_for_bit() {
 fn rnnoise_parity(kernel: Kernel) {
     // SAFETY: plain C API; RNNoise selects its kernel with the same rule.
     unsafe {
-        let reference = ffi::rnnoise_create(std::ptr::null_mut());
+        let reference = match kernel {
+            Kernel::Sse2 => ffi::am_oracle_rnnoise_create_baseline(),
+            Kernel::Avx2Fma => ffi::rnnoise_create(std::ptr::null_mut()),
+        };
         assert!(!reference.is_null());
         let mut port = RnNoise::with_kernel(kernel);
         let mut seed = 7u32;
@@ -77,6 +80,7 @@ fn rnnoise_parity(kernel: Kernel) {
             let mut actual = [0.0f32; 480];
             let vad_expected = ffi::rnnoise_process_frame(reference, expected.as_mut_ptr(), input.as_ptr());
             let vad_actual = port.process_frame(&mut actual, &input);
+            assert_eq!(vad_actual.to_bits(), vad_expected.to_bits(), "{kernel:?} VAD probability at frame {frame}: {vad_actual} vs {vad_expected}");
             for (a, e) in actual.iter().zip(&expected) {
                 if a.to_bits() != e.to_bits() {
                     mismatches += 1;
@@ -91,8 +95,12 @@ fn rnnoise_parity(kernel: Kernel) {
 
 #[test]
 fn rnnoise_matches_reference_bit_for_bit() {
-    // The C library picks its kernel family per CPU; compare against the same.
-    rnnoise_parity(Kernel::detect());
+    for kernel in [Kernel::Sse2, Kernel::Avx2Fma] {
+        if kernel.available() {
+            println!("Comparing RNNoise audio and voice probability with {kernel:?}");
+            rnnoise_parity(kernel);
+        }
+    }
 }
 
 #[test]

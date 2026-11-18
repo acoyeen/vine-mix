@@ -2,18 +2,11 @@
 
 A Windows 11 audio mixer built around draggable nodes and visible audio cables.
 Create sources, processing chains and destinations on a resizable node canvas, with
-settings inside each node. The C++ engine handles audio in a separate process;
-the WPF desktop handles editing, telemetry and tray behavior.
+settings inside each node. VineMix 0.6 uses a Rust desktop and a separate Rust audio
+engine. See the [0.6.0 release notes](releases/0.6.0.md) for the change from 0.5.
 
-This guide describes **0.5.0 Beta**. See the
-[release notes](releases/0.5.0-beta.md) for changes and the
-[qualification record](RELEASE_0.5.0_QUALIFICATION.md) for tested scope and limits.
-
-For the current beta, installation, first-session setup, driver
-terms, manual updates and reporting, start with the
-[beta tester guide](BETA_TESTER_GUIDE.md). The version beside the connection dot
-identifies the beta; **Settings → About VineMix** provides copyable full release
-and build information.
+For installation, driver terms and updates, start with the
+[installation and update guide](INSTALLATION_AND_UPDATES.md).
 
 A fresh workspace contains a ready-connected voice chain: **Microphone →
 High-pass filter → Denoiser → Expander → Compressor**, followed by separate

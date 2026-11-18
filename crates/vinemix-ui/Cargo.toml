@@ -13,8 +13,7 @@ workspace = true
 # The single-file distribution: VineMix.exe carries the engine runtime.
 # Build with VINEMIX_RUNTIME_ZIP and VINEMIX_RUNTIME_MANIFEST set.
 standalone = []
-# Orange-tile icon and "(Rust)" window title, to tell a Rust build apart
-# from an installed 0.5 on the same machine (scripts/generate-rust-edition-icons.ps1).
+# Retained for compatibility with pre-0.6 local build commands. All editions use the original VineMix icon.
 rust-edition = []
 
 [[bin]]
@@ -31,6 +30,7 @@ eframe = { version = "0.37", default-features = false, features = ["accesskit", 
 egui_extras = { version = "0.37", default-features = false, features = ["svg"] }
 
 [dev-dependencies]
+windows = { workspace = true, features = ["Win32_System_StationsAndDesktops"] }
 vinemix-update = { path = "../vinemix-update", features = ["testing"] }
 # The real control-pipe server, for connection integration tests.
 vinemix-engine = { path = "../vinemix-engine" }

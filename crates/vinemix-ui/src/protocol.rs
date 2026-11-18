@@ -198,7 +198,7 @@ pub fn request_with(
     interest: Option<&Value>,
     persist: bool,
 ) -> String {
-    let mut message = json!({"protocolVersion": 1, "requestId": request_id, "command": command});
+    let mut message = json!({"protocolVersion": 1, "requestId": request_id, "command": command, "lengthPrefixedResponse": true});
     if let Some(known) = known {
         message["known"] = known;
     }

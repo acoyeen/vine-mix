@@ -41,6 +41,8 @@ Their vendor terms are separate from VineMix's MIT licence. VAC Lite is limited
 to private home use unrelated to income generation. Details and vendor links
 are retained in [the driver notices](SetupSupport/DRIVER-NOTICES.txt).
 
-VineMix is in beta. New outputs start muted; check routing, levels and
-device selection before relying on a setup. The current installer
-and application are unsigned.
+In 0.5, open **Settings → Check for updates**, download the offered 0.6 package,
+then choose **Install and restart** when you can pause audio. Updating keeps
+your saved workspace and existing drivers. For a manual update, quit VineMix
+and run Setup in the existing installation folder or replace the standalone
+launcher with the new standalone executable.

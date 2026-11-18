@@ -232,7 +232,7 @@ impl Pair {
             self.rust.process(&self.plan, &views, defer);
             self.frame += QUANTUM_FRAMES as u64;
             for (i, node) in self.plan.nodes.iter().enumerate() {
-                let expected = self.reference.output(i);
+                let expected = self.reference.output(i).expect("valid plan slot");
                 let actual = self.rust.output(i);
                 for (n, frame) in actual.iter().enumerate() {
                     let (l, r) = (expected[2 * n], expected[2 * n + 1]);
@@ -246,7 +246,7 @@ impl Pair {
                     );
                 }
                 let m = self.rust.meter(i);
-                let e = self.reference.meter(i);
+                let e = self.reference.meter(i).expect("valid plan slot");
                 let actual = [m.peak, m.peak_left, m.peak_right, if m.clipped { 1.0 } else { 0.0 }, m.gain_reduction_db, m.detector_db];
                 for k in 0..6 {
                     assert!(actual[k].to_bits() == e[k].to_bits(), "quantum {q}, node {} meter {k}: {} vs {}", node.id, actual[k], e[k]);
@@ -271,6 +271,17 @@ impl Pair {
         self.rust = next;
         self.plan = plan;
         self.graph = graph;
+    }
+}
+
+#[test]
+fn oracle_slots_are_checked_before_ffi() {
+    let graph = Graph::new(&json(&routing_graph())).unwrap();
+    assert_eq!(graph.output(ffi::NODES - 1).unwrap().len(), ffi::QUANTUM * 2);
+    assert!(graph.meter(ffi::NODES - 1).is_some());
+    for slot in [ffi::NODES, usize::MAX] {
+        assert!(graph.output(slot).is_none());
+        assert!(graph.meter(slot).is_none());
     }
 }
 

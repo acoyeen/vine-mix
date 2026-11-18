@@ -291,6 +291,7 @@ def generate(metadata, supplements=SUPPLEMENTS, roots=ROOTS):
 def main(arguments=None) -> int:
     parser = argparse.ArgumentParser(description="Writes or checks licenses/Rust-crates.txt.")
     parser.add_argument("--check", action="store_true", help="verify the output file is current instead of writing it")
+    parser.add_argument("--require-reviewed", action="store_true", help="reject pending licence supplements in release builds")
     parser.add_argument("--output", default=OUTPUT)
     parser.add_argument("--supplements", default=SUPPLEMENTS)
     parser.add_argument("--metadata", help="read `cargo metadata` JSON from this file instead of running cargo")
@@ -310,6 +311,8 @@ def main(arguments=None) -> int:
     crates = len(shipped_packages(metadata))
     if pending:
         print(f"{len(pending)} supplement(s) await confirmation against the crate's source repository: {', '.join(pending)}", file=sys.stderr)
+        if options.require_reviewed:
+            return 1
     if options.check:
         try:
             with open(options.output, encoding="utf-8", newline="") as handle:

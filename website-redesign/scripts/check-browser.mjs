@@ -166,7 +166,7 @@ try {
   }, page => page.route('https://api.github.com/**', route => route.fulfill(discoveryFails
     ? { status: 503, body: 'Unavailable' }
     : { status: 200, contentType: 'application/json', body: JSON.stringify([{ tag_name: `v${version}`, draft: false,
-      published_at: '2026-10-27T00:00:00Z', assets: [`VineMix-${version}-Setup-x64.exe`, `VineMix-${version}-Standalone-x64.exe`, 'SHA256SUMS.txt']
+      published_at: '2026-10-27T00:00:00Z', assets: [`VineMix-${version}-Setup-x64.exe`, `VineMix-${version}-Standalone-x64.exe`, `VineMix-${version}-Updates.json`, 'SHA256SUMS.txt']
         .map(name => ({ name, size: 100, state: 'uploaded', browser_download_url: `${repository}/releases/download/v${version}/${name}` })) }]) })));
 
   console.log(`Browser checks passed: ${scenarios} scenarios; navigation/focus/history, FAQ mouse/keyboard, six viewport sizes, local links/credits, successful and offline downloads, reduced motion, high contrast, no JavaScript, unavailable WebGL and failed artwork.`);

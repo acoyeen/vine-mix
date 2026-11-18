@@ -166,7 +166,7 @@ pub fn evaluate_processes(processes: &[ProcessEvidence], mut succeeded: bool, in
 
 /// `\\?\C:\x` → `C:\x`; `\\?\UNC\s\x` → `\\s\x`.
 pub fn normalize_final_path(value: &str) -> String {
-    if value.len() >= 8 && value[..8].eq_ignore_ascii_case(r"\\?\UNC\") {
+    if value.get(..8).is_some_and(|prefix| prefix.eq_ignore_ascii_case(r"\\?\UNC\")) {
         format!(r"\\{}", &value[8..])
     } else if let Some(rest) = value.strip_prefix(r"\\?\") {
         rest.to_owned()
@@ -236,6 +236,8 @@ pub fn self_tests() -> Result<usize, String> {
     require(!crate::sanitize("value\r\nInjected=1\u{e9}").contains('\n'), "INI injection prevented")?;
     require(normalize_final_path(r"\\?\C:\Programs\VineMix") == r"C:\Programs\VineMix", "DOS final path normalization")?;
     require(normalize_final_path(r"\\?\UNC\server\share\VineMix") == r"\\server\share\VineMix", "UNC final path normalization")?;
+    require(normalize_final_path(r"\\?\C:\音楽") == r"C:\音楽", "Unicode drive-root component")?;
+    require(normalize_final_path(r"\\?\unc\事務\音楽") == r"\\事務\音楽", "Unicode UNC server and share")?;
     require(is_same_or_within(r"C:\Data\AudioMixer\Nested", r"C:\Data\AudioMixer"), "protected data descendant blocked after final-path resolution")?;
     require(is_same_or_within(r"C:\Data\AudioMixer", r"C:\Data\AudioMixer"), "protected data directory blocked after final-path resolution")?;
     require(!is_same_or_within(r"C:\Data\AudioMixer2", r"C:\Data\AudioMixer"), "protected data sibling prefix remains distinct")?;
@@ -246,6 +248,6 @@ pub fn self_tests() -> Result<usize, String> {
 mod tests {
     #[test]
     fn self_tests_pass() {
-        assert_eq!(super::self_tests().unwrap(), 31);
+        assert_eq!(super::self_tests().unwrap(), 33);
     }
 }

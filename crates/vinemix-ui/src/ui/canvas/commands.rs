@@ -64,7 +64,7 @@ impl Canvas {
                 let count = self.selected.len();
                 self.set_message(mixer, &format!("Copied {count} {} and their internal connections.", if count == 1 { "node" } else { "nodes" }), false);
             }
-            Err(_) => self.set_message(mixer, "The clipboard is busy. Try Copy again.", true),
+            Err(error) => self.set_message(mixer, &error, true),
         }
     }
 
@@ -246,7 +246,7 @@ impl Canvas {
     }
 
     /// Changes a cable from its menu, guarding against a changed cable.
-    pub fn change_edge(&mut self, mixer: &mut MixerState, expected: &GraphEdge, change: fn(&mut Vec<GraphEdge>, usize), message: &str, allow_missing: bool) {
+    pub fn change_edge(&mut self, mixer: &mut MixerState, expected: &GraphEdge, change: impl Fn(&mut Vec<GraphEdge>, usize) + Send + 'static, message: &str, allow_missing: bool) {
         if !mixer.can_edit() {
             return;
         }

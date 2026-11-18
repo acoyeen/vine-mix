@@ -1,10 +1,11 @@
 #requires -Version 7.3
 [CmdletBinding()]
-param([string]$EvidencePath = '')
+param([string]$EvidencePath = '', [string]$ToolsDirectory = '')
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $project = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
-$compilerDirectory = Join-Path $project '.tools\llvm-mingw-20261006-ucrt-x86_64\bin'
+if (-not $ToolsDirectory) { $ToolsDirectory = Join-Path $project '.tools' }
+$compilerDirectory = Join-Path $ToolsDirectory 'llvm-mingw-20261006-ucrt-x86_64\bin'
 $compiler = Join-Path $compilerDirectory 'clang.exe'
 $resourceCompiler = Join-Path $compilerDirectory 'windres.exe'
 $gate = Join-Path $PSScriptRoot 'assert-release-file-version.ps1'
