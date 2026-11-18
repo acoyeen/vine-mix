@@ -283,7 +283,9 @@ mod pipe {
     /// Serves control clients on `pipe_name` (tests use a private name).
     pub fn run_on(engine: &Engine, pipe_name: &str, timeouts: Timeouts) -> Result<(), String> {
         let sid = vinemix_platform::current_user_sid()?;
-        let sddl = vinemix_platform::wide(&format!("D:P(A;;GA;;;SY)(A;;GA;;;{sid})"));
+        // The desktop verifies the pipe owner's SID. An elevated token can
+        // otherwise assign the Administrators group as the default owner.
+        let sddl = vinemix_platform::wide(&format!("O:{sid}D:P(A;;GA;;;SY)(A;;GA;;;{sid})"));
         let mut descriptor = PSECURITY_DESCRIPTOR::default();
         // SAFETY: valid SDDL; the descriptor is freed below.
         unsafe { ConvertStringSecurityDescriptorToSecurityDescriptorW(PCWSTR(sddl.as_ptr()), SDDL_REVISION_1, &mut descriptor, None) }

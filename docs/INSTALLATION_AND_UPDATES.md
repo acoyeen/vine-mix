@@ -19,6 +19,11 @@ from the [release page](https://github.com/acoyeen/vine-mix/releases/tag/v0.6.0)
 Run Setup in its existing installation folder, or replace your standalone
 launcher at its original path. Reopen VineMix and check your routes.
 
+Start the desktop normally from its shortcut or launcher. On 0.6.0,
+running as administrator can make Windows assign the engine connection
+to the Administrators group. The desktop then refuses the connection.
+Quit the elevated copy and reopen VineMix as your usual Windows user.
+
 If the release service is unavailable, use the matching package from the
 published release. Quit VineMix first. Run Setup in its existing folder or
 replace the standalone launcher, according to how you currently run VineMix.

@@ -17,6 +17,20 @@ visitors to missing files.
 
 ## Publish an update
 
+### 0.6.0 production cutover — 18 November 2026
+
+The [release](https://github.com/acoyeen/vine-mix/releases/tag/v0.6.0) and
+all five release assets were verified without signing in. The website now
+offers 0.6.0 in its saved HTML as well as through live release discovery.
+The download FAQ covers manual recovery if 0.5 cancels before installation.
+
+Cloudflare deployment `3a027efe-2a78-4d50-9cac-9bf9c866c6e9` serves
+version `284d4d32-6cc5-4fba-b800-ef4de15600d1` at 100% traffic.
+All 86 public files matched the build by SHA-256 and returned the configured
+security headers. The prior version is `867439b6-26b3-4036-b8ca-e350285203bf`.
+
+### Deployment procedure
+
 The initial deployment was a direct upload through the Cloudflare dashboard.
 Automatic deployment from Git is **not configured**. Local edits alone do not
 change the public website.

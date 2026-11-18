@@ -597,9 +597,9 @@ the app, press Escape or choose Close to dismiss them; an update installation
 already in progress stays protected. **About VineMix** follows **What's new?**
 in the help section, above the separately grouped **Quit VineMix**.
 
-After building, open **`artifacts/VineMix-0.5.0-beta-Installed/VineMix.exe`** through
-File Explorer. The native engine
-is alongside it, and the package includes the .NET desktop runtime. Closing the
+Launch VineMix from its Start menu shortcut or open the standalone executable
+in File Explorer. Both 0.6 packages include the Rust desktop and engine. For
+local builds, see the [Rust packaging guide](RUST_BUILD.md#release-candidates). Closing the
 window hides it to the tray; choose **Quit VineMix** at the bottom of Settings or
 from the tray menu to stop audio. Both actions save first. If the final save fails,
 VineMix stays open while you retry, save a recovery copy, cancel quitting or
