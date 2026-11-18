@@ -122,7 +122,9 @@ try {
   }
 
   await scenario({ javaScriptEnabled: false, viewport: { width: 320, height: 844 } }, async page => {
-    assert(await page.locator('.pipeline-fallback').isVisible());
+    const route = 'Physical input → High-pass filter → Denoiser → Expander → Compressor → Equaliser → Virtual output';
+    assert(await page.locator('vine-mix-pipeline').getByText(route, { exact: true }).isVisible(),
+      'The static audio route is visible with JavaScript disabled');
     for (const route of await page.locator('.story-fallback').all()) assert(await route.isVisible());
     await page.locator('.arrival-actions a').click();
     assert.equal(new URL(page.url()).hash, '#download');
