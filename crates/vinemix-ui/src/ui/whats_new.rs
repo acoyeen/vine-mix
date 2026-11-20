@@ -53,6 +53,7 @@ pub const ALL: &[Highlight] = &[
     h("0.5.0-beta", "More reliable workspace edits", "Fixed an unwanted Undo reset after level changes and clarified device-status handling. Renamed nodes update their accessibility labels while Find node still recognises the original node type."),
     h("0.6.0", "VineMix moves to Rust", "The desktop, audio engine and standalone launcher now run on Rust. Keep using the same workspace, device assignments and original VineMix shortcut."),
     h("0.6.1", "Device visibility and minimap", "Expand Audio device visibility inside Settings to see the three filters. Hover over the minimap without a popup covering the graph. Click or drag it to navigate."),
+    h("0.6.2", "Standalone updates", "Future in-app updates can replace a launcher marked Read-only. VineMix keeps a backup of the previous launcher and checks the new engine before confirming the update."),
 ];
 
 /// Highlights after `previous` up to `current`.

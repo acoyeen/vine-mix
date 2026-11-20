@@ -212,7 +212,7 @@ pub fn copy_new(source: &Path, destination: &Path) -> bool {
 }
 
 /// `ReplaceFileW(target, replacement, backup?, IGNORE_MERGE_ERRORS)`.
-pub fn replace_file(target: &Path, replacement: &Path, backup: Option<&Path>) -> bool {
+pub fn replace_file(target: &Path, replacement: &Path, backup: Option<&Path>) -> windows::core::Result<()> {
     let (to, from) = (wide_path(target), wide_path(replacement));
     let backup = backup.map(wide_path);
     // SAFETY: valid paths.
@@ -225,7 +225,6 @@ pub fn replace_file(target: &Path, replacement: &Path, backup: Option<&Path>) ->
             None,
             None,
         )
-        .is_ok()
     }
 }
 

@@ -3,11 +3,17 @@
 VineMix runs on Windows 11 x64. Download the installer or standalone
 executable, source and checksums from [GitHub Releases](https://github.com/acoyeen/vine-mix/releases).
 
+## Standalone updates from 0.6.0 or 0.6.1
+
+Open **Settings → Check for updates**, then select **Download update** and **Install and restart**. The current launcher must be in a writable folder. If you copied it from read-only media, right-click the **VineMix executable** in File Explorer, select **Properties**, clear **Read-only**, and select **Apply** before updating. This one-time step lets the older updater replace the launcher itself.
+
+If the previous attempt already stopped at “The standalone application could not be replaced,” clear **Read-only** on the same executable and reopen it. Choose **Yes** if VineMix offers to resume recovery. Keep the saved workspace and update backup in place. Starting with 0.6.2, the standalone updater handles this attribute during installation.
+
 ## Upgrading from 0.6.0 to 0.6.1
 
 Open **Settings → Check for updates**, download the update and select **Install and restart** when you can pause audio. Setup completed this path in Windows 11 qualification.
 
-A 0.6.0 standalone installation can report **“The standalone application could not be replaced.”** If this happens, download the [0.6.1 standalone release](https://github.com/acoyeen/vine-mix/releases/tag/v0.6.1), quit VineMix from Settings or the tray if it is running, and replace the launcher in its original folder, retaining its filename. Open it in File Explorer. If VineMix asks whether to resume the interrupted update, choose **Yes**. VineMix will finish the update and reopen your saved workspace.
+For a 0.6.0 standalone installation reporting **“The standalone application could not be replaced,”** first follow the [Read-only recovery steps above](#standalone-updates-from-060-or-061). If manual replacement is needed, download the [0.6.1 standalone release](https://github.com/acoyeen/vine-mix/releases/tag/v0.6.1), quit VineMix from Settings or the tray if it is running, and replace the launcher in its original folder, retaining its filename. Open it in File Explorer. If VineMix asks whether to resume the interrupted update, choose **Yes**. VineMix will finish the update and reopen your saved workspace.
 
 ## Upgrading from 0.5 to 0.6
 

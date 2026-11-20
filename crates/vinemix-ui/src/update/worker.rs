@@ -3,10 +3,12 @@
 //! killed and no personal settings are restored.
 
 use std::collections::{BTreeMap, HashSet};
+use std::os::windows::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use vinemix_update::Trust;
+use windows::Win32::Storage::FileSystem::{FILE_FLAG_OPEN_REPARSE_POINT, FILE_READ_ATTRIBUTES, FILE_WRITE_ATTRIBUTES};
 
 use super::files::{self, Result};
 use super::model::{Backup, FileEntry, Journal, Phase, ProcessIdentity, RegistrySnapshot, UtcTime};
@@ -449,11 +451,31 @@ pub fn replace_standalone(context: &Verified) -> Result<()> {
     }
     guard_original_target(context)?;
     files::verify_asset(&staged, asset)?;
-    if vinemix_platform::replace_file(&target, &staged, Some(&retained)) {
-        Ok(())
-    } else {
-        Err("The standalone application could not be replaced.".into())
+    // The target can inherit Read-only when copied from removable media.
+    let replace = || vinemix_platform::replace_file(&target, &staged, Some(&retained));
+    let error = match replace() {
+        Ok(()) => return Ok(()),
+        Err(error) => error,
+    };
+    let failure = |error| format!("The standalone application could not be replaced. {error}");
+    if error.code() != windows::Win32::Foundation::E_ACCESSDENIED || !target.metadata().is_ok_and(|m| m.permissions().readonly()) {
+        return Err(failure(error));
     }
+
+    guard_original_target(context)?;
+    let original = std::fs::OpenOptions::new()
+        .access_mode(FILE_READ_ATTRIBUTES.0 | FILE_WRITE_ATTRIBUTES.0)
+        .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT.0)
+        .open(&target)
+        .map_err(|e| format!("The standalone launcher's Read-only attribute could not be opened for updating. {e}"))?;
+    let permissions = original.metadata().map_err(|e| format!("The standalone launcher's attributes could not be read. {e}"))?.permissions();
+    let mut writable = permissions.clone();
+    writable.set_readonly(false);
+    original.set_permissions(writable).map_err(|e| format!("The standalone launcher's Read-only attribute could not be cleared. {e}"))?;
+    let result = replace().map_err(failure);
+    // The handle follows the old file if it becomes the retained backup.
+    let restore = original.set_permissions(permissions).map_err(|e| format!("The original launcher's attributes could not be restored. {e}"));
+    result.and(restore)
 }
 
 /// The payload present after Setup, limited to the old and new inventories.
@@ -609,7 +631,7 @@ pub fn restore(context: &Verified, original: &Backup, candidate: &Backup, platfo
         } else {
             files::copy_checked(&files::relative_file(&backup_root, &old.path)?, &temporary, old.size as u64, &old.sha256)?;
         }
-        let replaced = if target.exists() { vinemix_platform::replace_file(&target, &temporary, None) } else { std::fs::rename(&temporary, &target).is_ok() };
+        let replaced = if target.exists() { vinemix_platform::replace_file(&target, &temporary, None).is_ok() } else { std::fs::rename(&temporary, &target).is_ok() };
         if !replaced {
             return Err("A previous application file could not be restored.".into());
         }

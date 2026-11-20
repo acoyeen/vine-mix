@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.2
+
+- Standalone updates handle a launcher marked Read-only. Other replacement failures include the Windows error in the recovery record.
+- See the [in-app update instructions for earlier versions](docs/releases/0.6.2.md).
+
 ## 0.6.1
 
 - Expand **Audio device visibility** directly inside Settings. The three device filters sit together in a shaded group and appear in search.

@@ -13,6 +13,8 @@ for discovery, saved-workspace continuity, audio, interrupted handoffs, rollback
 and a second launch. Exercise the Rust client's next update as well.
 Hardware, installed upgrade and listening checks need separate evidence.
 
+The 0.6.2 worker regression tests exercise Windows file replacement for a read-only standalone launcher and for a launcher held open without delete sharing. The first case checks the signed candidate and the retained original’s Read-only attribute. The second checks the Windows error, the original bytes and successful recovery once the lock is released. On Windows 11, clearing only Read-only on the released 0.6.0 test launcher allowed the signed 0.6.1 in-app update to complete with the saved workspace and preferences intact.
+
 For 0.6.1, all 374 qualifying Rust tests passed, with 22 expected ignores across 30 suites. Setup and standalone each upgraded a 0.6.0 installation manually and passed a second Windows 11 launch with the same physical workspace, saved file hash, preferences and assigned emulated devices. The 276 archived build inputs matched the package receipt. All five GitHub downloads matched the staged files by SHA-256.
 
 The published 0.6.0 Setup client also downloaded and applied the signed update in-app. The worker committed after the candidate confirmed advancing audio frames. The resulting workspace matched the updater's saved checkpoint byte for byte. The standalone client verified its download and reported a launcher replacement failure on two runs. After manual replacement, choosing **Yes** to resume recovery completed the transaction and passed the engine health check. The workspace matched the saved checkpoint byte for byte. See the [release notes](docs/releases/0.6.1.md) for recovery.

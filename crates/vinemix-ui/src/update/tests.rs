@@ -251,6 +251,41 @@ fn successful_standalone_update() {
 }
 
 #[test]
+fn standalone_update_accepts_readonly_launcher_and_preserves_original_attributes() {
+    let fixture = Fixture::new("readonly");
+    let target = fixture.context.target_path();
+    let mut permissions = target.metadata().unwrap().permissions();
+    permissions.set_readonly(true);
+    std::fs::set_permissions(&target, permissions).unwrap();
+    fixture.commit();
+    assert_eq!(fixture.run(&FakePlatform::new()), 0, "{}", fixture.journal().message);
+    assert_eq!(fixture.target(), NEW);
+    assert_eq!(fixture.journal().phase, Phase::Completed);
+    let retained = PathBuf::from(format!("{}.vinemix-{}.old", target.display(), fixture.context.data.id));
+    assert_eq!(std::fs::read(&retained).unwrap(), OLD);
+    assert!(retained.metadata().unwrap().permissions().readonly());
+    assert!(!target.metadata().unwrap().permissions().readonly());
+}
+
+#[test]
+fn locked_standalone_launcher_stays_intact_and_reports_windows_error() {
+    use std::os::windows::fs::OpenOptionsExt;
+    use windows::Win32::Storage::FileSystem::FILE_SHARE_READ;
+    let fixture = Fixture::new("locked-launcher");
+    let target = fixture.context.target_path();
+    let lock = std::fs::OpenOptions::new().read(true).share_mode(FILE_SHARE_READ.0).open(&target).unwrap();
+    fixture.commit();
+    assert_eq!(fixture.run(&FakePlatform::new()), 1);
+    assert_eq!(fixture.target(), OLD);
+    let journal = fixture.journal();
+    assert_eq!(journal.phase, Phase::RecoveryRequired);
+    assert!(journal.message.contains("0x80070020"), "{}", journal.message);
+    drop(lock);
+    assert_eq!(fixture.run(&FakePlatform::new()), 0);
+    assert_eq!(fixture.target(), NEW);
+}
+
+#[test]
 fn tampered_asset_is_rejected_before_any_effect() {
     let fixture = Fixture::new("tamper");
     fixture.commit();

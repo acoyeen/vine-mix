@@ -315,7 +315,7 @@ impl ConfigurationStore {
                 }
             }
             let keep = self.primary_valid.then_some(backup.as_path());
-            if !replace_file(&self.path, &temporary, keep) {
+            if replace_file(&self.path, &temporary, keep).is_err() {
                 return Err(StoreError::write("Cannot replace settings; the previous file was preserved."));
             }
         } else if !move_write_through(&temporary, &self.path) {

@@ -2752,14 +2752,14 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
 name = "vinemix-denoise"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "cc",
 ]
 
 [[package]]
 name = "vinemix-dsp"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "vinemix-denoise",
  "vinemix-model",
@@ -2768,7 +2768,7 @@ dependencies = [
 
 [[package]]
 name = "vinemix-engine"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "serde_json",
  "vinemix-dsp",
@@ -2781,14 +2781,14 @@ dependencies = [
 
 [[package]]
 name = "vinemix-ipc"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "vinemix-model",
 ]
 
 [[package]]
 name = "vinemix-model"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "serde",
  "serde_json",
@@ -2796,7 +2796,7 @@ dependencies = [
 
 [[package]]
 name = "vinemix-oracle"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "cc",
  "serde_json",
@@ -2809,25 +2809,25 @@ dependencies = [
 
 [[package]]
 name = "vinemix-platform"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "windows",
 ]
 
 [[package]]
 name = "vinemix-resample"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "vinemix-rt",
 ]
 
 [[package]]
 name = "vinemix-rt"
-version = "0.6.1"
+version = "0.6.2"
 
 [[package]]
 name = "vinemix-setup-helper"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "vinemix-platform",
  "windows",
@@ -2835,7 +2835,7 @@ dependencies = [
 
 [[package]]
 name = "vinemix-ui"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "eframe",
  "egui_extras",
@@ -2850,7 +2850,7 @@ dependencies = [
 
 [[package]]
 name = "vinemix-update"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "serde",
  "serde_json",
@@ -2859,7 +2859,7 @@ dependencies = [
 
 [[package]]
 name = "vinemix-wasapi"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "vinemix-model",
  "vinemix-resample",
