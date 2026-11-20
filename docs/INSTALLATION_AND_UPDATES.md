@@ -3,6 +3,12 @@
 VineMix runs on Windows 11 x64. Download the installer or standalone
 executable, source and checksums from [GitHub Releases](https://github.com/acoyeen/vine-mix/releases).
 
+## Upgrading from 0.6.0 to 0.6.1
+
+Open **Settings → Check for updates**, download the update and select **Install and restart** when you can pause audio. Setup completed this path in Windows 11 qualification.
+
+A 0.6.0 standalone installation can report **“The standalone application could not be replaced.”** If this happens, download the [0.6.1 standalone release](https://github.com/acoyeen/vine-mix/releases/tag/v0.6.1), quit VineMix from Settings or the tray if it is running, and replace the launcher in its original folder, retaining its filename. Open it in File Explorer. Leave the workspace and preferences in place.
+
 ## Upgrading from 0.5 to 0.6
 
 In 0.5, open **Settings → Check for updates**. When 0.6 is offered, select

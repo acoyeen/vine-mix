@@ -2,6 +2,13 @@
 
 Reported defects, known limitations and their verification status are recorded below.
 
+<a id="issue-061"></a>
+## ISSUE-061 · The 0.6.0 standalone updater can stop before replacing its launcher
+
+**Reproduced on Windows 11, 20 November 2026.** The released 0.6.0 standalone client discovered and downloaded the signed 0.6.1 update. After **Install and restart**, its worker reported “The standalone application could not be replaced” and requested manual repair. The original launcher kept its 0.6.0 hash. The workspace on disk matched the saved handoff checkpoint.
+
+The expected result is a restart into the verified 0.6.1 launcher. Manual replacement and a second launch passed in a separate run. Follow the [standalone update instructions](INSTALLATION_AND_UPDATES.md#upgrading-from-060-to-061). The worker records a generic Windows replacement failure. Capture the underlying Windows error in a disposable standalone update test to establish its cause.
+
 <a id="issue-056"></a>
 ## ISSUE-056 · Website release discovery can replace the saved download with an older version
 

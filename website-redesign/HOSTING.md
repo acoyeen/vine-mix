@@ -24,6 +24,10 @@ GitHub. The desktop updater manages its own channel selection.
 
 ## Publish an update
 
+### 0.6.1 downloads — 20 November 2026
+
+The live release feed and static download links offer [VineMix 0.6.1](https://github.com/acoyeen/vine-mix/releases/tag/v0.6.1). The five release assets passed anonymous download verification before the fallback changed. All 102 public site files matched the build by SHA-256 and served the expected security headers.
+
 ### 0.6.0 production cutover — 18 November 2026
 
 The [release](https://github.com/acoyeen/vine-mix/releases/tag/v0.6.0) and

@@ -13,6 +13,10 @@ for discovery, saved-workspace continuity, audio, interrupted handoffs, rollback
 and a second launch. Exercise the Rust client's next update as well.
 Hardware, installed upgrade and listening checks need separate evidence.
 
+For 0.6.1, all 374 qualifying Rust tests passed, with 22 expected ignores across 30 suites. Setup and standalone each upgraded a 0.6.0 installation manually and passed a second Windows 11 launch with the same physical workspace, saved file hash, preferences and assigned emulated devices. The 276 archived build inputs matched the package receipt. All five GitHub downloads matched the staged files by SHA-256.
+
+The published 0.6.0 Setup client also downloaded and applied the signed update in-app. The worker committed after the candidate confirmed advancing audio frames. The resulting workspace matched the updater's saved checkpoint byte for byte. The standalone client verified its download but reported a launcher replacement failure. See the [release notes](docs/releases/0.6.1.md) for recovery.
+
 For 0.6.0, separate Windows 11 installations exercised both distributions.
 The shipped worker completed updates from the post-approval checkpoint,
 resumed after interruption and rolled back after a failed health check.
