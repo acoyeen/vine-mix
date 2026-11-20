@@ -196,8 +196,8 @@ are ignored. Node renaming remains available under layout lock; group renaming
 requires an unlocked layout.
 
 Physical device dropdowns show available devices by default. Under
-**Settings → Audio device visibility**, optionally show disabled, disconnected
-or advanced endpoints. Current saved selections stay visible while unavailable;
+**Settings**, expand **Audio device visibility** to show the three filters in
+place. You can include disabled, disconnected or advanced endpoints. Current saved selections stay visible while unavailable;
 the filters never clear assignments or change audio routes. See the
 [device visibility guide](DEVICE_VISIBILITY.md) for categories and recovery.
 

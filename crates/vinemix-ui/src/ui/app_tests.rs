@@ -172,6 +172,28 @@ impl AppHarness {
 }
 
 #[test]
+fn minimap_click_and_drag_move_the_view() {
+    let mut app = AppHarness::new(1280.0, 800.0, 1.0);
+    let map = app.rect_of(Id::unique("vinemix-minimap")).unwrap();
+    let before = app.app.canvas.pan;
+    app.click(map.center() + egui::vec2(30.0, 12.0));
+    let after_click = app.app.canvas.pan;
+    assert_ne!(before, after_click);
+    let start = map.center();
+    let end = start + egui::vec2(20.0, 10.0);
+    app.harness.move_to(start);
+    app.frame();
+    app.harness.press(start);
+    app.frame();
+    let after_press = app.app.canvas.pan;
+    app.harness.move_to(end);
+    app.frame();
+    app.harness.release(end);
+    app.frame();
+    assert_ne!(after_press, app.app.canvas.pan);
+}
+
+#[test]
 fn the_whole_application_draws_headlessly() {
     let app = AppHarness::new(1280.0, 800.0, 1.0);
     let painted: Vec<String> = app.harness.painted_text().into_iter().map(|(text, _)| text).collect();
@@ -236,6 +258,41 @@ fn repeated_searches_keep_restoring_the_full_menu() {
     let painted: Vec<String> = app.harness.painted_text().into_iter().map(|(text, _)| text).collect();
     for row in ["Find node…", "Activity", "Show minimap", "Audio device visibility", "Help & shortcuts", "About VineMix", "Quit VineMix"] {
         assert!(painted.iter().any(|t| t == row), "{row} is listed again: {painted:?}");
+    }
+}
+
+#[test]
+fn device_visibility_expands_inside_settings_without_covering_other_rows() {
+    for (width, height, scale) in [(499.0, 579.0, 1.0), (900.0, 500.0, 1.5), (1280.0, 800.0, 1.0)] {
+        let mut app = AppHarness::new(width, height, scale);
+        app.open_settings();
+        let group = "Audio device visibility";
+        let first = "Show disabled devices";
+        assert!(app.harness.find_text(first).is_none());
+        app.click(text_run(&app, group).center());
+        app.settle(6);
+        let menu = app.settings_menu();
+        let parent = text_run(&app, group);
+        let mut bottom = parent.bottom();
+        for label in [first, "Show disconnected or missing devices", "Show advanced inputs and outputs"] {
+            let child = text_run(&app, label);
+            assert!(menu.contains_rect(child) && child.left() > parent.left() && child.top() > bottom, "{label}: {child:?} inside {menu:?}");
+            bottom = child.bottom();
+        }
+        assert!(text_run(&app, "Windows sound settings").top() > bottom);
+        let previous = app.app.link.state().device_visibility().disabled;
+        app.click(text_run(&app, first).center());
+        assert_ne!(app.app.link.state().device_visibility().disabled, previous);
+        app.click(text_run(&app, group).center());
+        assert!(app.harness.find_text(first).is_none());
+        app.key(Key::ArrowRight);
+        assert!(app.harness.find_text(first).is_some());
+        app.key(Key::ArrowLeft);
+        assert!(app.harness.find_text(first).is_none());
+        app.click(app.search_field().center());
+        app.type_text("disconnected");
+        assert!(app.harness.find_text("Show disconnected or missing devices").is_some());
+        assert!(app.harness.find_text(first).is_none());
     }
 }
 

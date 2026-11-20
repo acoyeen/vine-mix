@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.1
+
+- Expand **Audio device visibility** directly inside Settings. The three device filters sit together in a shaded group and appear in search.
+- Hovering over the minimap leaves the graph unobstructed. Click or drag the minimap to move around the graph.
+- See the [0.6.1 release notes](docs/releases/0.6.1.md).
+
 ## 0.6.0
 
 - Move the Windows desktop, audio engine and Setup helper to Rust. Retain the

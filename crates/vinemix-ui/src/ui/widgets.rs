@@ -689,6 +689,31 @@ pub fn menu_separator(ui: &mut Ui) {
     ui.painter().rect_filled(line, 0.0, theme::BORDER);
 }
 
+/// An expandable group in the same scrolling menu as its children.
+pub fn menu_disclosure(ui: &mut Ui, label: &str, help: &str, expanded: &mut bool) {
+    let row = MenuRow { label, gesture: "", enabled: true, checked: false, arrow: false, color: None, swatch: None };
+    let response = menu_row(ui, &row, false);
+    if response.clicked() {
+        response.request_focus();
+        *expanded = !*expanded;
+    } else if response.has_focus() {
+        if ui.input(|i| i.key_pressed(egui::Key::ArrowRight)) {
+            *expanded = true;
+        } else if ui.input(|i| i.key_pressed(egui::Key::ArrowLeft)) {
+            *expanded = false;
+        }
+    }
+    if response.has_focus() {
+        ui.memory_mut(|m| m.set_focus_lock_filter(response.id, egui::EventFilter { horizontal_arrows: true, ..Default::default() }));
+    }
+    response.ctx.accesskit_node_builder(response.id, |node| node.set_expanded(*expanded));
+    let center = Pos2::new(response.rect.right() - MENU_PAD_X - 5.0, response.rect.center().y);
+    let offsets = if *expanded { [(-4.0, -2.0), (0.0, 2.0), (4.0, -2.0)] } else { [(-2.0, -4.0), (2.0, 0.0), (-2.0, 4.0)] };
+    let points = offsets.into_iter().map(|(x, y)| center + Vec2::new(x, y)).collect();
+    ui.painter().add(egui::Shape::line(points, Stroke::new(1.2, theme::TEXT)));
+    with_help(response, help);
+}
+
 /// A row whose submenu opens to the right on hover, click or Right arrow.
 pub fn submenu<R>(ui: &mut Ui, label: &str, enabled: bool, help: &str, content: impl FnOnce(&mut Ui) -> R) -> Option<R> {
     submenu_styled(ui, label, enabled, help, None, content)

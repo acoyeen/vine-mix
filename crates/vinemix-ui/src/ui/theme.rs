@@ -14,6 +14,7 @@ pub const BRAND_ACTION_TEXT: Color32 = hex(0xF5F8F6);
 pub const BRAND_HOVER: Color32 = hex(0x347B5B);
 pub const WINDOW: Color32 = hex(0x0C0D0F);
 pub const PANEL: Color32 = hex(0x15181E);
+pub const MENU_INSET: Color32 = hex(0x111319);
 pub const TEXT: Color32 = hex(0xE8EBF2);
 pub const MUTED: Color32 = hex(0xA5ADBA);
 pub const BORDER: Color32 = hex(0x303744);

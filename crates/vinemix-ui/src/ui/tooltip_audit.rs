@@ -129,12 +129,13 @@ fn sweep() -> Vec<(&'static str, BTreeSet<String>)> {
     }
     families.push(("device and application pickers", pickers));
 
-    // Settings menu, its search and its submenu.
+    // Settings menu, its search and expanded device visibility options.
     app.open_settings();
     let mut settings = record(&mut app, 2);
     if let Some(row) = app.harness.find_text("Audio device visibility") {
-        app.harness.move_to(row + Vec2::new(30.0, 6.0));
+        app.click(row + Vec2::new(30.0, 6.0));
         settings.extend(record(&mut app, 4));
+        app.click(app.search_field().center());
     }
     app.type_text("zoom");
     settings.extend(record(&mut app, 3));
@@ -394,6 +395,7 @@ fn every_hover_help_text_in_the_application_is_concise() {
 
     // The sweep reached each tooltip family named in the audit scope.
     let all: BTreeSet<&str> = families.iter().flat_map(|(_, tips)| tips.iter().map(String::as_str)).collect();
+    assert!(!all.iter().any(|tip| tip.lines().next() == Some("Minimap")), "the canvas minimap should have no tooltip");
     for (family, expected) in [
         ("node heading", "Reverb\nAdds room-like decay. Wet carries the reverb alone."),
         ("dial and numeric entry", "Level\nAdjusts this node's audio level. 0 dB leaves it unchanged."),
@@ -408,7 +410,6 @@ fn every_hover_help_text_in_the_application_is_concise() {
         ("equalizer", "Equalizer\nLine · EQ response. Shaded · Measured output.\nNo bands · Audio passes without EQ changes"),
         ("practice equalizer", "Equalizer\nPractice only · Calculated response; no audio is measured or changed.\nNo bands · Audio passes without EQ changes"),
         ("voice color", "Voice Color\nAcross · Warm to Bright. Up · Natural to Broadcast.\nNeutral"),
-        ("canvas control", "Minimap\nThe whole canvas, with the part in view outlined."),
         ("group heading", "Example group\n2 nodes"),
         ("menu", "Frame selection\nBrings the selected nodes into view"),
         ("node library", "Echo\nAdds fading echoes. The Echo output carries the echoes alone."),

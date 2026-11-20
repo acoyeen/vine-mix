@@ -52,6 +52,7 @@ pub const ALL: &[Highlight] = &[
     h("0.5.0-beta", "Independent routes to the same output", "Several output nodes can share a destination and keep separate levels and mutes. Duplicate output preserves its device but starts muted. Overload indicators also account for the combined signal."),
     h("0.5.0-beta", "More reliable workspace edits", "Fixed an unwanted Undo reset after level changes and clarified device-status handling. Renamed nodes update their accessibility labels while Find node still recognises the original node type."),
     h("0.6.0", "VineMix moves to Rust", "The desktop, audio engine and standalone launcher now run on Rust. Keep using the same workspace, device assignments and original VineMix shortcut."),
+    h("0.6.1", "Device visibility and minimap", "Expand Audio device visibility inside Settings to see the three filters. Hover over the minimap without a popup covering the graph. Click or drag it to navigate."),
 ];
 
 /// Highlights after `previous` up to `current`.

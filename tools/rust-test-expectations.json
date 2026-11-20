@@ -40,7 +40,7 @@
     "vinemix-setup-helper/bin/vinemix-setup-helper": { "minimumPassed": 1 },
     "vinemix-ui/bin/vinemix": { "minimumPassed": 0 },
     "vinemix-ui/lib/vinemix_ui": {
-      "minimumPassed": 136,
+      "minimumPassed": 138,
       "ignored": [
         "platform::clipboard::copy_round_trips_in_a_private_window_station",
         "protocol::cache_tests::snapshot_poll_cost",

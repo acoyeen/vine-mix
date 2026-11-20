@@ -786,7 +786,8 @@ impl Canvas {
             Gesture::Minimap { projection, .. } => *projection,
             _ => minimap_projection(&nodes, visible_world, size),
         };
-        let response = ui.interact(rect, Id::unique("vinemix-minimap"), Sense::click_and_drag()).tip("Minimap\nThe whole canvas, with the part in view outlined.");
+        let response = ui.interact(rect, Id::unique("vinemix-minimap"), Sense::click_and_drag());
+        widgets::describe(&response, "Minimap. Click to centre the view or drag to pan.");
         let painter = ui.painter();
         painter.rect(rect, 5.0, theme::WINDOW, Stroke::new(1.0, theme::BORDER), egui::StrokeKind::Inside);
         let clip = painter.with_clip_rect(rect.shrink(5.0));

@@ -4,7 +4,7 @@
 Windows 11 x64. Connect microphones, apps and effects with cables, then send
 your mix to headphones, a recording app or a virtual microphone.
 
-**[Download VineMix for Windows](https://vinemix.app/#download)** · [0.6.0 packages and checksums](https://github.com/acoyeen/vine-mix/releases/tag/v0.6.0) · [Upgrade from 0.5](docs/INSTALLATION_AND_UPDATES.md#upgrading-from-05-to-06)
+**[Download VineMix for Windows](https://vinemix.app/#download)** · [Latest packages and checksums](https://github.com/acoyeen/vine-mix/releases/latest) · [Upgrade from 0.5](docs/INSTALLATION_AND_UPDATES.md#upgrading-from-05-to-06)
 
 ![VineMix's voice starter, with example devices and both outputs muted](docs/images/workspace.png)
 
@@ -71,7 +71,7 @@ use **Quit VineMix** in Settings or the tray menu to stop it.
 
 ## Compatibility
 
-VineMix 0.6 uses a Rust desktop and audio engine. Setup and standalone use
+VineMix 0.6 builds its desktop interface, audio engine and Setup helper from Rust. Setup and standalone use
 the existing VineMix workspace. For upgrade and rollback behaviour see
 [installation and updates](docs/INSTALLATION_AND_UPDATES.md). Each published
 release provides checksums and signed update metadata.

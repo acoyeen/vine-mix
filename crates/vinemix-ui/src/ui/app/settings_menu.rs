@@ -202,6 +202,7 @@ pub(super) struct SettingsSearch {
     pub query: String,
     selected: usize,
     focus: bool,
+    visibility_expanded: bool,
 }
 
 impl SettingsSearch {
@@ -209,6 +210,7 @@ impl SettingsSearch {
         self.query.clear();
         self.selected = 0;
         self.focus = true;
+        self.visibility_expanded = false;
     }
 }
 
@@ -287,8 +289,14 @@ impl App {
                 Row::Sub { label, tip, help, children } => {
                     let text = normalize(&[*label, *help, *tip, aliases(label)].join(" "));
                     let own = parent_matches || (!terms.is_empty() && terms.iter().all(|t| text.contains(t.as_str())));
-                    if let Some(Some(act)) = widgets::submenu(ui, label, true, tip, |ui| self.draw_rows(ui, children, terms, own)) {
-                        chosen = Some(act);
+                    widgets::menu_disclosure(ui, label, tip, &mut self.settings_search.visibility_expanded);
+                    if self.settings_search.visibility_expanded {
+                        let group = egui::Frame::new()
+                            .fill(theme::MENU_INSET)
+                            .inner_margin(egui::Margin { left: 16, right: 4, top: 3, bottom: 3 });
+                        if let Some(act) = group.show(ui, |ui| self.draw_rows(ui, children, terms, own)).inner {
+                            chosen = Some(act);
+                        }
                     }
                 }
             }
@@ -360,6 +368,7 @@ impl App {
                     }
                     if self.settings_search.query != query_before {
                         self.settings_search.selected = 0;
+                        self.settings_search.visibility_expanded = !self.settings_search.query.trim().is_empty();
                     }
                     widgets::menu_separator(ui);
                     let query = self.settings_search.query.trim().to_owned();
@@ -383,6 +392,7 @@ impl App {
                         }
                         if escape && !self.settings_search.query.is_empty() {
                             self.settings_search.query.clear();
+                            self.settings_search.visibility_expanded = false;
                             self.settings_search.focus = true;
                             escape_handled = true;
                         }
@@ -418,12 +428,8 @@ impl App {
                 });
             });
         let outside = ctx.input(|i| i.pointer.any_pressed() && i.pointer.interact_pos().is_some_and(|p| !area.response.rect.contains(p) && !anchor.contains(p)));
-        let in_submenu = ctx
-            .input(|i| i.pointer.interact_pos())
-            .and_then(|p| ctx.layer_id_at(p))
-            .is_some_and(|l| l.order == egui::Order::Foreground && l.id != area.response.layer_id.id);
         let escape = !escape_handled && ctx.input(|i| i.key_pressed(Key::Escape));
-        if chosen.is_some() || open_entry.is_some() || (outside && !in_submenu) || escape {
+        if chosen.is_some() || open_entry.is_some() || outside || escape {
             self.settings_open = false;
         }
         if let Some(entry) = open_entry {
