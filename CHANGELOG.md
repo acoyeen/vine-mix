@@ -73,7 +73,7 @@ of Beta 1–5 downloads. This release consolidates the work formerly called Beta
   VB-CABLE with separate consent and restart guidance.
 - See the [release notes](docs/releases/0.4.0-beta.md),
   [qualification record](docs/RELEASE_0.4.0_QUALIFICATION.md) and dated
-  [development evidence](docs/BETA6_DEVELOPMENT.md).
+  [development evidence](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/BETA6_DEVELOPMENT.md).
 
 ## 0.3.0-beta.5 — 24 October 2026
 
@@ -112,9 +112,9 @@ of Beta 1–5 downloads. This release consolidates the work formerly called Beta
 - Publish separate Beta 4 downloads, matching source, checksums and signed update
   metadata. Earlier releases retain their existing tags and downloads.
   See the [Beta 4 notes](docs/releases/0.3.0-beta.4.md) and
-  [qualification record](docs/BETA_TESTING_CURRENT.md) for verification scope
+  [qualification record](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/BETA_TESTING_CURRENT.md) for verification scope
   and remaining limitations. The preceding
-  [local candidate record](docs/LOCAL_CANDIDATE_2026-10-23.md) remains historical.
+  [local candidate record](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/LOCAL_CANDIDATE_2026-10-23.md) remains historical.
 
 ## 0.3.0-beta.3 — 23 October 2026
 
@@ -162,7 +162,7 @@ of Beta 1–5 downloads. This release consolidates the work formerly called Beta
 - Prepare separate single-EXE standalone and Setup beta packages, with shared
   release metadata and release builds separated from verification/render code.
   Publish versioned downloads and source. Hardware qualification remains
-  incomplete; see [the historical beta record](docs/BETA_IMPLEMENTATION.md).
+  incomplete; see [the historical beta record](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/BETA_IMPLEMENTATION.md).
 - Rewrite the beginner README, beta tester/install/recovery guidance and bug
   report form, and use silent three-node documentation fixtures with generic
   example devices. Beta 1 predates the in-app updater and needs a manual upgrade.

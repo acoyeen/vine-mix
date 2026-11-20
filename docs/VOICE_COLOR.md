@@ -9,7 +9,7 @@ first principles (11 November 2026); it does not reproduce Intellipan or any
 other product, and it does not match a particular announcer's voice.
 
 This page describes the node in the Rust edition. The 0.5 C++ engine keeps the
-earlier design, which the [historical reviews](VOICE_COLOR_INTENSITY_REVIEW.md)
+earlier design, which the [historical reviews](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/VOICE_COLOR_INTENSITY_REVIEW.md)
 describe. [Why it changed](#why-the-design-changed) is at the end.
 
 ## Controls

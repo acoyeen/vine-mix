@@ -1,9 +1,6 @@
 # VineMix known issues
 
-A durable log of reported bugs, interface defects and existing usability limitations. Future feature proposals
-belong in [development ideas](IDEAS.md). Recording an issue does not authorize
-implementation or imply that it has been independently reproduced.
-Optional refinements to working controls and layout belong in [tweaks](TWEAKS.md).
+Reported defects, known limitations and their verification status are recorded below.
 
 <a id="issue-056"></a>
 ## ISSUE-056 · Website release discovery can replace the saved download with an older version
@@ -14,7 +11,7 @@ download controller received a successful feed containing only the genuine
 older release “Latest Release”. The live GitHub response selected 0.6.0.
 Routine refreshes should preserve a newer saved or verified release. Add a
 version-floor regression test and define how an intentional withdrawal is handled.
-[Website audit](../website-redesign/AUDIT_2026-11-18.md)
+[Website audit](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/website-redesign/AUDIT_2026-11-18.md)
 
 **Resolved on the public site · 19 November 2026.** Stable downloads preserve the saved or last verified release floor. Older, equal, newer, incomplete and prerelease cases passed the release checks.
 
@@ -25,7 +22,7 @@ version-floor regression test and define how an intentional withdrawal is handle
 “VB-CABLE ZIP” and “VAC Lite ZIP” do not occur intact in the corresponding
 accessible names. Lighthouse flagged both links. Speech-input users should
 be able to use the words on screen. Start each name with its visible label
-and verify both commands with speech input. [Website audit](../website-redesign/AUDIT_2026-11-18.md)
+and verify both commands with speech input. [Website audit](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/website-redesign/AUDIT_2026-11-18.md)
 
 **Resolved on the public site · 19 November 2026.** Both ZIP links now begin with their visible labels. The published page passed the label-in-name check. OS speech input remains untested.
 
@@ -36,7 +33,7 @@ and verify both commands with speech input. [Website audit](../website-redesign/
 Graph description calls VineMix a beta while the download panel and GitHub
 offer regular release 0.6.0. Share metadata should describe the current
 product. Use evergreen copy or derive the wording from the release record,
-then check a fresh share preview. [Website audit](../website-redesign/AUDIT_2026-11-18.md)
+then check a fresh share preview. [Website audit](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/website-redesign/AUDIT_2026-11-18.md)
 
 **Resolved on the public site · 19 November 2026.** Evergreen share metadata and its 1200 × 630 preview image are served publicly. Third-party preview cache refresh timing is external.
 
@@ -47,7 +44,7 @@ then check a fresh share preview. [Website audit](../website-redesign/AUDIT_2026
 page returned HTTP 404 with an empty body for an HTML request. A visitor
 following an old link should see where to find the current site. Supply a
 small recovery page and check its status and links on the live host.
-[Website audit](../website-redesign/AUDIT_2026-11-18.md)
+[Website audit](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/website-redesign/AUDIT_2026-11-18.md)
 
 **Resolved on the public site · 19 November 2026.** The canonical domain and a redirect alias both served the recovery page with HTTP 404 for a missing nested path.
 
@@ -60,7 +57,7 @@ navigation and download action. The system reduced-motion preference selects
 a static wordmark. Visitors using normal motion should also be able to stop
 the words while continuing to use the page. Check a stationary presentation
 or a keyboard-operable pause, including persistence after focus moves away.
-[Website audit](../website-redesign/AUDIT_2026-11-18.md)
+[Website audit](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/website-redesign/AUDIT_2026-11-18.md)
 
 **Resolved on the public site · 19 November 2026.** The word sequence is optional. Keyboard play/pause and continued pause after moving focus passed in all three tested browser engines.
 
@@ -112,7 +109,7 @@ remains undecided; record that distinction explicitly.
 successful Tab/Shift+Tab, Ctrl+Tab pipeline travel, arrow nudge/undo and pan, F2
 rename, Find by custom name/type, direct dial entry/Page keys and decimal-edit
 undo. Minimap navigation/visibility persistence and focused Trigger/Reverb checks
-are recorded in [the release plan](IDEAS.md#release-0-5-0-plan). These are
+are recorded in [the release plan](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/IDEAS.md#release-0-5-0-plan). These are
 maintainer-reported results, not independently observed qualification. The new
 ISSUE-003/005 keyboard/zoom/detail refinements, Settings fix (ISSUE-025) and final
 meter corrections passed source review and the final offline suite: 14,726
@@ -128,7 +125,7 @@ accessibility, IME, Narrator and pointer/DPI coverage remain open.
 **Subsequent corrections — 2026-11-04:** Node-header colour is retained while
 only its small text hides (ISSUE-005). The meter's full border and original peak/
 idle indicator are restored; an inset gradient removes only the tiny red seam
-([TWEAK-021](TWEAKS.md#tweak-021)). Both corrections are implemented, offline
+([TWEAK-021](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/TWEAKS.md#tweak-021)). Both corrections are implemented, offline
 verified and locally integrated: the latest suite passed 14,748 checks / 314
 renders / zero binding errors, with 525 focused checks. Guarded
 interface-only activation preserved the same engine identity/hash and unchanged
@@ -147,10 +144,10 @@ aligned source receipt/inventory. Each update preserved its then-current saved
 settings/preferences, including newer workspace edits between updates. Native
 keyboard/IME, Narrator, pointer/DPI usability and listening tests of new
 Trigger/Wet routes remain unperformed. The release identity remains 0.4.0 Beta.
-See [the execution report](IMPLEMENTATION_0.5.0.md) for evidence and remaining work.
+See [the execution report](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/IMPLEMENTATION_0.5.0.md) for evidence and remaining work.
 
 **Rust review corrections — 10 November 2026:** The findings of the
-[Rust review](RUST_REVIEW_2026-11-10.md) were worked through on the `rust-rewrite` branch.
+[Rust review](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/RUST_REVIEW_2026-11-10.md) were worked through on the `rust-rewrite` branch.
 ISSUE-031 to ISSUE-044 below keep their original evidence and each gains a
 dated correction paragraph. ISSUE-045 to ISSUE-048 record further defects found
 while doing that work. All of it is uncommitted source on top of `55e77c7`,
@@ -193,10 +190,10 @@ released. The review tracker records what remains open.
 | [ISSUE-003](#issue-003) | Graph keyboard/accessibility gaps | Feedback refinements offline verified and integrated; maintainer follow-up and broader accessibility open |
 | [ISSUE-004](#issue-004) | Precise edits discarded on focus loss | Resolved in 0.4.0 Beta |
 | [ISSUE-005](#issue-005) | Dense-graph navigation and Fit limits | Navigation, detail guards and Quiet Blocks released in 0.5.0 Beta; broader pointer/DPI review remains |
-| [ISSUE-006](#issue-006) | Website node route is hard to follow | Moved to [TWEAK-009](TWEAKS.md#tweak-009) |
+| [ISSUE-006](#issue-006) | Website node route is hard to follow | Moved to [TWEAK-009](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/TWEAKS.md#tweak-009) |
 | [ISSUE-007](#issue-007) | Automatic update checks can appear inactive and suppress failed retries | Resolved in Beta 5 |
 | [ISSUE-008](#issue-008) | Installed Beta 2 reopens after an attempted Beta 4 update | Metadata defect resolved in Beta 5; tester incident not independently confirmed |
-| [ISSUE-009](#issue-009) | Update window does not match the minimal application interface | Moved into [TWEAK-004](TWEAKS.md#tweak-004) |
+| [ISSUE-009](#issue-009) | Update window does not match the minimal application interface | Moved into [TWEAK-004](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/TWEAKS.md#tweak-004) |
 | [ISSUE-010](#issue-010) | Word-reader prototype logo jitters at collapse finish | Local correction; visual review pending |
 | [ISSUE-011](#issue-011) | Local UI activation helper rejects a newly opened controller | Hardening verified offline and in guarded live activation; original incident cause unknown |
 | [ISSUE-012](#issue-012) | Scroll-story main heading is partly clipped | Local correction verified; maintainer review pending |
@@ -449,7 +446,7 @@ released. The review tracker records what remains open.
 ## ISSUE-048: Rust crate notices state MIT terms for crates that publish no licence file
 
 - **Found:** 2026-11-10 while correcting the notice generator
-  ([RUST-REV-025](RUST_REVIEW_2026-11-10.md#rust-rev-025)). **Status:** Generator corrected in
+  ([RUST-REV-025](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/RUST_REVIEW_2026-11-10.md#rust-rev-025)). **Status:** Generator corrected in
   source; the replacement supplements await confirmation. Unreleased.
 - **Evidence:** The committed `licenses/Rust-crates.txt` said of 16 crates that
   the crate "is used under the MIT licence named in its manifest" and followed
@@ -480,7 +477,7 @@ released. The review tracker records what remains open.
 ## ISSUE-047: Arrow keys leave the Rust Voice Color pad and EQ plot after one step
 
 - **Found:** 2026-11-10 while adding accessibility semantics
-  ([RUST-REV-027](RUST_REVIEW_2026-11-10.md#rust-rev-027)). **Status:** Resolved in source;
+  ([RUST-REV-027](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/RUST_REVIEW_2026-11-10.md#rust-rev-027)). **Status:** Resolved in source;
   unreleased.
 - **Evidence:** With the pad or the EQ plot focused, the first arrow key moved
   the value and also moved keyboard focus to a neighbouring control, so the
@@ -546,7 +543,7 @@ released. The review tracker records what remains open.
   visibility settings, identical names, ambiguity and default-role changes.
   Keep raw device evidence outside the checkout. Do not delete devices, merge
   names or change Windows priority speculatively.
-- **References:** [RUST-REV-041](RUST_REVIEW_2026-11-10.md#rust-rev-041) contains
+- **References:** [RUST-REV-041](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/RUST_REVIEW_2026-11-10.md#rust-rev-041) contains
   the synthetic matrix, source references and Microsoft documentation researched
   on 2026-11-10. Distinct from the selector-index crash (ISSUE-032) and returning
   output's transient Unassigned status (ISSUE-035).
@@ -575,7 +572,7 @@ released. The review tracker records what remains open.
   search/clear paths, repeated queries, scroll offsets, submenus and small/DPI-
   scaled windows before integration. Related historical WPF issue: ISSUE-025;
   its resolution remains historical, not a qualification of this Rust layout.
-  See [RUST-REV-039](RUST_REVIEW_2026-11-10.md#rust-rev-039).
+  See [RUST-REV-039](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/RUST_REVIEW_2026-11-10.md#rust-rev-039).
 - **Correction and verification — 2026-11-10:** Reproduced in the real application code, not only the reconstruction: after a search the menu stayed 95 points high instead of 578. The menu now takes its maximum height from the available window each frame. Tests `clearing_the_settings_search_restores_the_menu_height`, `repeated_searches_keep_restoring_the_full_menu` and `small_windows_and_display_scales_restore_to_the_available_height`. Working tree on `rust-rewrite` above `55e77c7`; not committed, not released, not checked in the installed application.
 
 <a id="issue-043"></a>
@@ -598,7 +595,7 @@ released. The review tracker records what remains open.
   horizontal scrolling and clearing across DPI scales; correct shared alignment
   and investigate any remaining horizontal mismatch. Related historical WPF
   issue: ISSUE-001; do not assume its old placeholder-offset cause applies here.
-  See [RUST-REV-040](RUST_REVIEW_2026-11-10.md#rust-rev-040).
+  See [RUST-REV-040](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/RUST_REVIEW_2026-11-10.md#rust-rev-040).
 - **Correction and verification — 2026-11-10:** The 2.5-point vertical offset was confirmed in the real application code and removed by centring the field content. `search_caret_placeholder_and_typed_text_share_one_line` checks the caret, placeholder and typed text at display scales 1.0, 1.25, 1.5 and 2.0, including after clearing a long query. The native blinking caret was not observed, so whether this was the whole of the reported defect is unconfirmed. Working tree on `rust-rewrite` above `55e77c7`; not committed, not released, not checked in the installed application.
 
 <a id="issue-040"></a>
@@ -625,7 +622,7 @@ released. The review tracker records what remains open.
   forward/backward selection, click and keyboard focus, replacement typing,
   release outside the entry, double-click reset and validation at different zoom
   levels. No installed app, settings or audio engine was changed.
-  See [RUST-REV-037](RUST_REVIEW_2026-11-10.md#rust-rev-037).
+  See [RUST-REV-037](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/RUST_REVIEW_2026-11-10.md#rust-rev-037).
 - **Correction and verification — 2026-11-10:** The entry keeps the pointer-down anchor and selects everything only after a click without a drag. Eleven interaction tests cover forward and backward, full and partial selection, in unfocused and already focused entries, release outside the entry, keyboard focus, double-click reset and rejected values. Working tree on `rust-rewrite` above `55e77c7`; not committed, not released, not checked in the installed application.
 
 <a id="issue-041"></a>
@@ -650,7 +647,7 @@ released. The review tracker records what remains open.
   zoom/pan, DPI, overlapping cables and hover transfer. The alternative anchor
   was checked only in an isolated harness. This placement issue is separate from
   the application-wide tooltip-copy audit in ISSUE-039.
-  See [RUST-REV-038](RUST_REVIEW_2026-11-10.md#rust-rev-038).
+  See [RUST-REV-038](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/RUST_REVIEW_2026-11-10.md#rust-rev-038).
 - **Correction and verification — 2026-11-10:** Cable help is anchored at the hovered point on the cable and has an identity per cable. `cable_help_appears_at_the_hovered_cable` runs the real canvas at four window size, display scale and zoom combinations and checks that dragging dismisses it. The exact bottom-right placement originally reported was not reproduced in the installed application. Working tree on `rust-rewrite` above `55e77c7`; not committed, not released, not checked in the installed application.
 
 <a id="issue-039"></a>
@@ -667,7 +664,7 @@ released. The review tracker records what remains open.
   type, state and purpose. The retained C# version keeps ordinary hover to the
   control title/purpose or cable route, with detailed instructions separately
   exposed through accessible help. This contradicts the established concise-copy
-  direction in [TWEAK-018](TWEAKS.md#tweak-018).
+  direction in [TWEAK-018](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/TWEAKS.md#tweak-018).
 - **Expected:** Short, scannable control names and purpose; longer interaction
   guidance in Help and accessible descriptions. Invalid-value guidance remains
   available when relevant.
@@ -686,7 +683,7 @@ released. The review tracker records what remains open.
   states, and preserve detailed Help/accessibility guidance and meaningful errors.
   A single-node or shared-dial-only change is insufficient. The full audit and
   refactor remain pending; the current investigation verified specific examples.
-  See [RUST-REV-036](RUST_REVIEW_2026-11-10.md#rust-rev-036).
+  See [RUST-REV-036](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/RUST_REVIEW_2026-11-10.md#rust-rev-036).
   Recording this defect does not authorize implementation.
 - **Correction and verification — 2026-11-10:** The application-wide audit and refactor is done in source. A sweep test renders every surface and state and records each hover text: 588 texts with 205 outside the standard before, 689 texts with none outside it now, with two justified exceptions. Removed instructions are in Help (about 22 new entries) and in accessible descriptions. The coverage checklist is [TOOLTIP_AUDIT_2026-11-10.md](TOOLTIP_AUDIT_2026-11-10.md). Still open: the maintainer has not reviewed the wording or its appearance in the installed application. Working tree on `rust-rewrite` above `55e77c7`; not committed, not released, not checked in the installed application.
 
@@ -703,7 +700,7 @@ released. The review tracker records what remains open.
   documented keyboard action, with the original focus/lifecycle safeguards.
 - **Next step:** Implement keyboard-owned help, test toggle/dismissal/handoff,
   and preserve accessible help independently of visible hover content.
-  See [RUST-REV-034](RUST_REVIEW_2026-11-10.md#rust-rev-034).
+  See [RUST-REV-034](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/RUST_REVIEW_2026-11-10.md#rust-rev-034).
 - **Correction and verification — 2026-11-10:** Help for the focused control appears after a short delay and at once with Ctrl+Shift+F10, hands over with focus, works on menu rows and is dismissed by Escape or pointer input. Covered in `ui/widgets_tests.rs`. Narrator and NVDA were not run. Working tree on `rust-rewrite` above `55e77c7`; not committed, not released, not checked in the installed application.
 
 <a id="issue-038"></a>
@@ -719,7 +716,7 @@ released. The review tracker records what remains open.
 - **Next step:** Add an explicit practice/live tooltip presentation choice and
   verify both general and selected-band help. This is misleading copy, not
   evidence that the practice lesson changes the user's running audio.
-  See [RUST-REV-035](RUST_REVIEW_2026-11-10.md#rust-rev-035).
+  See [RUST-REV-035](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/RUST_REVIEW_2026-11-10.md#rust-rev-035).
 - **Correction and verification — 2026-11-10:** `eq::plot_help` takes a practice flag; the practice plot says the response is calculated and no audio is measured or changed, and practice meters say `Sample peaks`. Test `practice_help_never_claims_to_measure_audio`. Working tree on `rust-rewrite` above `55e77c7`; not committed, not released, not checked in the installed application.
 
 <a id="issue-036"></a>
@@ -744,7 +741,7 @@ released. The review tracker records what remains open.
   to deliberate label/viewport constraints, without requiring close/reopen.
 - **Next step:** Correct actual-width constraints or sizing invalidation while
   preserving selection, focus and scroll; add bidirectional zoom regressions.
-  Full evidence: [RUST-REV-033](RUST_REVIEW_2026-11-10.md#rust-rev-033).
+  Full evidence: [RUST-REV-033](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/RUST_REVIEW_2026-11-10.md#rust-rev-033).
 - **Correction and verification — 2026-11-10:** An open list is laid out at an explicit width each frame, so it shrinks as well as grows. `open_list_shrinks_as_well_as_grows_with_zoom` reproduces the retained 500-point width against the reviewed code and passes now. Rows keep a fixed 13-point text size with a readable minimum width bounded by the window; that is a recorded decision, not a defect. Working tree on `rust-rewrite` above `55e77c7`; not committed, not released, not checked in the installed application.
 
 <a id="issue-035"></a>
@@ -763,7 +760,7 @@ released. The review tracker records what remains open.
   assigned output until it is Running.
 - **Next step:** Reproduce with a controlled endpoint-return/status sequence
   and retain sanitized evidence. See
-  [RUST-REV-032](RUST_REVIEW_2026-11-10.md#rust-rev-032).
+  [RUST-REV-032](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/RUST_REVIEW_2026-11-10.md#rust-rev-032).
 - **Correction and verification — 2026-11-10:** A worker configured with an assignment now reports Resolving until its first real status, so an assigned path never shows Unassigned. `assigned_worker_is_pending_never_unassigned` reproduces the reported sequence against the unchanged code path and passes now. The physical device return that prompted the report was not reproduced. Working tree on `rust-rewrite` above `55e77c7`; not committed, not released, not checked in the installed application.
 
 <a id="issue-031"></a>
@@ -778,7 +775,7 @@ released. The review tracker records what remains open.
 - **Expected:** Effect processing, adoption and reset boundaries honor the
   documented allocation-free mixer contract.
 - **Next step:** Use compiled runtime settings and add boundary allocation guards.
-  See [RUST-REV-001](RUST_REVIEW_2026-11-10.md#rust-rev-001) for locations and evidence.
+  See [RUST-REV-001](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/RUST_REVIEW_2026-11-10.md#rust-rev-001) for locations and evidence.
 - **Correction and verification — 2026-11-10:** Effect settings are now plain copyable values, so configuring, adopting and resetting an effect no longer clones strings. `crates/vinemix-dsp/tests/realtime_alloc.rs` counts allocations on the calling thread: against the reviewed code it fails with 2 allocations and 2 frees for the reverb fixture and 20 of each across every effect kind; it now counts none for first processing, steady processing, edited settings, adoption, in-place retargeting and reset. The 11 C/C++ parity comparisons still pass. Limits: device-free fixtures; the running engine's mixer loop is not itself instrumented, and no listening test was done. Working tree on `rust-rewrite` above `55e77c7`; not committed, not released, not checked in the installed application.
 
 <a id="issue-032"></a>
@@ -794,7 +791,7 @@ released. The review tracker records what remains open.
 - **Expected:** Live inventory updates preserve or safely clear highlighted
   identity and never cause out-of-bounds access.
 - **Next step:** Reconcile by stable identity, bound index use and test changing
-  inventories. See [RUST-REV-002](RUST_REVIEW_2026-11-10.md#rust-rev-002).
+  inventories. See [RUST-REV-002](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/RUST_REVIEW_2026-11-10.md#rust-rev-002).
 - **Correction and verification — 2026-11-10:** The open list now tracks its highlight by identity, bounds every index and never selects a disabled row. Regressions in `crates/vinemix-ui/src/ui/widgets_tests.rs` cover shrinking then Enter (the reproduced panic), reordering, an emptied list, a highlighted row that becomes disabled and backwards navigation after a shrink. Working tree on `rust-rewrite` above `55e77c7`; not committed, not released, not checked in the installed application.
 
 <a id="issue-033"></a>
@@ -808,8 +805,8 @@ released. The review tracker records what remains open.
 - **Expected:** Preserve unreadable preferences, including group data, before
   permitting a recovery replacement.
 - **Next step:** Add explicit preference recovery and preservation regression
-  tests. See [RUST-REV-003](RUST_REVIEW_2026-11-10.md#rust-rev-003).
-- **Correction and verification — 2026-11-10:** Unreadable preferences are copied to `ui.json.damaged-<time>` before anything is written, the last good `ui.json.bak` is used to recover groups, and a notice stays until dismissed. Tests `damaged_preferences_are_preserved_before_any_replacement`, `damaged_preferences_recover_groups_from_the_last_good_backup` and `damaged_copies_never_overwrite_each_other` use disposable files only. The same change bounds the file size read and moves writes to a background writer ([RUST-REV-014](RUST_REVIEW_2026-11-10.md#rust-rev-014)). Working tree on `rust-rewrite` above `55e77c7`; not committed, not released, not checked in the installed application.
+  tests. See [RUST-REV-003](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/RUST_REVIEW_2026-11-10.md#rust-rev-003).
+- **Correction and verification — 2026-11-10:** Unreadable preferences are copied to `ui.json.damaged-<time>` before anything is written, the last good `ui.json.bak` is used to recover groups, and a notice stays until dismissed. Tests `damaged_preferences_are_preserved_before_any_replacement`, `damaged_preferences_recover_groups_from_the_last_good_backup` and `damaged_copies_never_overwrite_each_other` use disposable files only. The same change bounds the file size read and moves writes to a background writer ([RUST-REV-014](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/RUST_REVIEW_2026-11-10.md#rust-rev-014)). Working tree on `rust-rewrite` above `55e77c7`; not committed, not released, not checked in the installed application.
 
 <a id="issue-034"></a>
 ## ISSUE-034: Rust update checks/downloads block Quit and cancel slowly
@@ -823,8 +820,8 @@ released. The review tracker records what remains open.
   save-and-quit flow. Installation handoff may require a distinct guarded state.
 - **Next step:** Separate installation from background work, make transport
   cancellation/deadlines effective, and test stalled responses plus Quit.
-  See [RUST-REV-004](RUST_REVIEW_2026-11-10.md#rust-rev-004) and
-  [RUST-REV-005](RUST_REVIEW_2026-11-10.md#rust-rev-005).
+  See [RUST-REV-004](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/RUST_REVIEW_2026-11-10.md#rust-rev-004) and
+  [RUST-REV-005](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/RUST_REVIEW_2026-11-10.md#rust-rev-005).
 - **Correction and verification — 2026-11-10:** Quit now cancels a check or download and proceeds; only the installation handoff still holds it, with a message. Network calls run on a worker and are aborted by closing the request handle, with a total deadline. Tests against a local stalled server confirm cancellation and the deadline before headers and during the body; `quit_cancels_checks_and_downloads_but_not_an_install` covers the quit path. Limits: not exercised from the tray of a running application or against the real update service; a stalled redirect was not tested separately. Working tree on `rust-rewrite` above `55e77c7`; not committed, not released, not checked in the installed application.
 
 <a id="issue-029"></a>
@@ -906,7 +903,7 @@ released. The review tracker records what remains open.
   source, build receipt and installed inventory. No engine restart or rollback.
 - **Next step:** Maintainer visual follow-up and final release qualification.
   Related presentation work:
-  [TWEAK-026](TWEAKS.md#tweak-026); [execution evidence](IMPLEMENTATION_0.5.0.md#short-cable-flow-correction--6-november-2026).
+  [TWEAK-026](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/TWEAKS.md#tweak-026); [execution evidence](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/IMPLEMENTATION_0.5.0.md#short-cable-flow-correction--6-november-2026).
 
 <a id="issue-027"></a>
 ## ISSUE-027: Maximum Distortion graph has insufficient routing-fade timing margin
@@ -938,7 +935,7 @@ released. The review tracker records what remains open.
   guarded integration passed without altering saved volumes or routing.
 - **Next step:** Maintainer listening follow-up and final release qualification.
   See [Distortion research](EFFECTS_RESEARCH.md#distortion-refinement-2026-11-06)
-  and the [execution report](IMPLEMENTATION_0.5.0.md). A synthetic pass does not
+  and the [execution report](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/IMPLEMENTATION_0.5.0.md). A synthetic pass does not
   establish hardware dropout-free behavior on every computer.
 
 ### Follow-up cloud capacity result — 6 November 2026
@@ -986,7 +983,7 @@ hosted functional run does not mean the measured real-time budget passed.
   replaying the previous tail; the original audio path remains immediate.
   Mix edits should not reset the delay. Preserve ordinary graph-edit continuity,
   stereo separation, bypass/mute behavior and real-time processing bounds.
-- **Related refinement:** [IDEA-055](IDEAS.md#idea-055) owns the requested exact
+- **Related refinement:** [IDEA-055](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/IDEAS.md#idea-055) owns the requested exact
   repeat count, clearer Mix guidance and separate echo-only output. Short delay
   coloration and Mix at 100% must be distinguished from processing lag.
 - **Reproduction/correction:** A synthetic impulse reappears with the earlier
@@ -1003,7 +1000,7 @@ hosted functional run does not mean the measured real-time budget passed.
   undo/routing and activation-comparator checks also pass. Large history copies
   were removed from the engine handoff and queued history is bounded.
   [Research and decisions](EFFECTS_RESEARCH.md#echo-refinement-2026-11-05);
-  [measured evidence and limits](IMPLEMENTATION_0.5.0.md#echo-refinement-after-listening-feedback--2026-11-05).
+  [measured evidence and limits](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/IMPLEMENTATION_0.5.0.md#echo-refinement-after-listening-feedback--2026-11-05).
 - **Local integration:** Guarded paired update and actual shortcut launch passed
   the eight-second observation with settings/preferences/physical identity and
   running paths preserved, documented Echo migration only, and no rollback.
@@ -1015,7 +1012,7 @@ hosted functional run does not mean the measured real-time budget passed.
 
 - **Reported:** 2026-11-04. **Status:** Resolved locally; offline verified and
   integrated for unreleased 0.5.0. Maintainer follow-up review remains pending.
-  Accepted as a follow-up in the [0.5.0 plan](IDEAS.md#release-0-5-0-plan).
+  Accepted as a follow-up in the [0.5.0 plan](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/IDEAS.md#release-0-5-0-plan).
 - **Maintainer report:** The Settings menu introduces unnecessary scrolling
   and leaves lower options out of view. This report is separate from the
   implementation pass's source and detached-render evidence.
@@ -1063,7 +1060,7 @@ CI runs the new regression. The precision mechanism was reproduced through the
 real production boundary; the original personal live incident and its exact
 Level value have not been replayed. Guarded local installation passed without
 tests adjusting personal volume controls or routing. Combined
-qualification is recorded in [the execution report](IMPLEMENTATION_0.5.0.md).
+qualification is recorded in [the execution report](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/IMPLEMENTATION_0.5.0.md).
 Earlier investigation and acceptance notes below are retained as dated evidence.
 Next step: retain the production-boundary regression and monitor ordinary
 editing for recurrence. Local integration does not establish the original
@@ -1093,7 +1090,7 @@ incident's exact input or publish a release.
   after correction. A C# copy or simulated float cast alone does not establish
   that boundary. Add coverage to CI and retain separate isolated engine IPC and
   live interaction qualification. Supporting test and refactoring work is in
-  [IDEA-054](IDEAS.md#idea-054). Preserve personal-engine isolation safeguards.
+  [IDEA-054](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/IDEAS.md#idea-054). Preserve personal-engine isolation safeguards.
 
 ### Investigation and planned correction — 2026-11-04
 
@@ -1241,7 +1238,7 @@ incident's exact input or publish a release.
 - **Implemented correction:** Retain a consistent session selection order for node visuals,
   including click, movement and selection changes, without changing saved audio
   configuration or automatic frame bounds. This is separate from the requested
-  group appearance/background refinement in [TWEAK-017](TWEAKS.md#tweak-017).
+  group appearance/background refinement in [TWEAK-017](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/TWEAKS.md#tweak-017).
 - **Verification:** The final detached suite passed 13,526 checks with 273 renders
   and zero binding errors. Focused checks retain recent selection and drag/drop
   order through telemetry, view recreation, zoom, cancellation, multi-selection
@@ -1252,7 +1249,7 @@ incident's exact input or publish a release.
   process and binary, advancing frames and running paths. The additional
   eight-second check passed. Saved settings/preferences were unchanged; physical
   settings identity and installed inventory were verified. Evidence is in
-  [Beta 6 development](BETA6_DEVELOPMENT.md#group-refinements-and-node-stacking--28-october-2026).
+  [Beta 6 development](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/BETA6_DEVELOPMENT.md#group-refinements-and-node-stacking--28-october-2026).
 - **Next step:** Maintainer review with overlapping nodes in the running app,
   including real pointer/VR use, then final Beta 6 release qualification when
   authorized. Local resolution does not imply publication or finalization.
@@ -1364,7 +1361,7 @@ incident's exact input or publish a release.
   pages defer the retry until visible. A failed retry does not loop.
 - **Verification/next:** Release regression and browser fallback checks pass.
   Keep these checks in future changes; live service availability remains separate.
-  See the [audit](../website-redesign/AUDIT.md).
+  See the local website audit.
 
 <a id="issue-019"></a>
 ## ISSUE-019: Pipeline loading can outlive a disconnected component
@@ -1381,7 +1378,7 @@ incident's exact input or publish a release.
 - **Verification/next:** Lifecycle, stale success/error, reconnect, observer and
   hidden-layout regressions pass; the normal pipeline loads in browser checks.
   Preserve these checks with future embedding changes. See the
-  [audit](../website-redesign/AUDIT.md).
+  local website audit.
 
 <a id="issue-020"></a>
 ## ISSUE-020: Website Download and keyboard skip miss destination focus
@@ -1397,7 +1394,7 @@ incident's exact input or publish a release.
   fragment destinations remain available without JavaScript.
 - **Verification/next:** Browser checks cover both destination focus paths,
   history, other section shortcuts and JavaScript-disabled navigation. Keep
-  equivalent checks when adding shortcuts. See the [audit](../website-redesign/AUDIT.md).
+  equivalent checks when adding shortcuts. See the local website audit.
 
 <a id="issue-017"></a>
 ## ISSUE-017: Header logo jitters when expanding
@@ -1436,7 +1433,7 @@ incident's exact input or publish a release.
   beginning on the first animation frame before reaching the top, then
   completing without further scrolling. Regression checks cover both sides of
   the trigger gap and retain the exact collapse/expansion timing samples.
-- **Next:** Maintainer visual review of the [earlier expansion](../website-redesign/review/earlier-logo-expansion.jpg).
+- **Next:** Maintainer visual review of the earlier expansion capture.
 
 <a id="issue-016"></a>
 ## ISSUE-016: Open-source button GitHub icon does not invert on hover
@@ -1452,7 +1449,7 @@ incident's exact input or publish a release.
   backing and the same difference blending as the label. Browser checks confirm
   inversion on hover and keyboard focus. The 20 px artwork, 26 px wrapper and
   194.15625 × 54 px desktop button dimensions are unchanged. Build passed.
-- **Next:** Maintainer visual review of the [local capture](../website-redesign/review/github-icon-hover.jpg).
+- **Next:** Maintainer visual review of the local hover capture.
 
 <a id="issue-015"></a>
 ## ISSUE-015: Scroll for more remains visible after scrolling
@@ -1472,7 +1469,7 @@ incident's exact input or publish a release.
   returning to y=0 restores it. The landing control still reaches How It Works;
   Skip reaches the pipeline. Build and existing navigation checks pass.
 - **Next:** Maintainer review of the locally hosted result. The associated
-  visual refinement is recorded in [TWEAK-009](TWEAKS.md#tweak-009).
+  visual refinement is recorded in [TWEAK-009](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/TWEAKS.md#tweak-009).
 - **Fade refinement, 2026-10-27:** The maintainer subsequently found the
   immediate disappearance too abrupt. The landing cue now eases to zero
   opacity over the first 120 px, restoring on reverse scrolling. Skip fades
@@ -1494,9 +1491,9 @@ incident's exact input or publish a release.
   remains in the header, now a compact 36 px white pill with black text and arrow.
   The platform/beta note beneath Download remains removed. The original
   two-button mismatch and its corrections below are historical; the new layout
-  has no post-change visual verification yet. See [TWEAK-012](TWEAKS.md#tweak-012).
+  has no post-change visual verification yet. See [TWEAK-012](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/TWEAKS.md#tweak-012).
 - **Report:** The maintainer still found the landing buttons uneven after the
-  equal-size change in [TWEAK-012](TWEAKS.md#tweak-012), and supplied a Chrome
+  equal-size change in [TWEAK-012](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/TWEAKS.md#tweak-012), and supplied a Chrome
   screenshot of the implemented page.
 - **Verified pre-correction evidence:** The screenshot shows equal 216 × 54 px
   outer action boxes at the same vertical position. Their contents differ:
@@ -1533,8 +1530,8 @@ incident's exact input or publish a release.
   sizing and retained focus-visible styling were checked. No new visual check.
 - **Next step:** Capture and compare the corrected desktop and phone views
   when browser access returns. Track the outstanding visual review in
-  [website QA](../website-redesign/QA.md) and
-  [design QA](../website-redesign/design-qa.md).
+  the local website QA notes and
+  design review notes.
 
 <a id="issue-013"></a>
 ## ISSUE-013: Low / Mid / High and Ducking website meters do not animate
@@ -1570,7 +1567,7 @@ incident's exact input or publish a release.
   and the page has no audio/video elements.
 - **Next step:** Maintainer review in the local preview. This correction has
   not been published as a website or desktop release. Current evidence and
-  limits are in [scroll QA](../website-redesign/SCROLL_QA.md).
+  limits are in the local scroll QA notes.
 
 <a id="issue-012"></a>
 ## ISSUE-012: Scroll-story main heading is partly clipped
@@ -1589,7 +1586,7 @@ incident's exact input or publish a release.
 - **Local correction:** Size the shared heading region from its chapter
   content and use that measured height when fitting the node scene. Remove the
   three small chapter headings as separately requested in
-  [TWEAK-009](TWEAKS.md#tweak-009).
+  [TWEAK-009](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/TWEAKS.md#tweak-009).
 - **Verification:** All three headings remained fully inside their heading
   region and clear of the diagram at 1440×900, 1280×720 and 900×680. The region
   now measured 115, 102 and 98 px respectively, fitting its actual text instead
@@ -1599,7 +1596,7 @@ incident's exact input or publish a release.
   verify the revised local layout, not the cause of the original clipping.
 - **Next step:** Maintainer review at the originally affected viewport. No
   published website or desktop release has been changed. See
-  [scroll QA](../website-redesign/SCROLL_QA.md) for current evidence and limits.
+  the local scroll QA notes for current evidence and limits.
 
 <a id="issue-011"></a>
 ## ISSUE-011: Local UI activation helper rejects a newly opened controller
@@ -1621,7 +1618,7 @@ its eight-second observation passed. Physical settings and each update's
 then-current saved settings/preferences were verified, with backups of both
 settings views retained outside the checkout. Newer workspace edits between updates
 were preserved. Final payload hashes pass 36/36 and source receipt/inventory agree.
-See [the execution report](IMPLEMENTATION_0.5.0.md) for full evidence.
+See [the execution report](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/IMPLEMENTATION_0.5.0.md) for full evidence.
 Next step: retain the guarded identity checks and capture sanitized field-level
 evidence if rejection recurs. Successful activation does not identify the
 original incident's exact failing field.
@@ -1733,7 +1730,7 @@ original incident's exact failing field.
 - **Next step:** Qualify the delivered
   correction on a separate test installation.
   The tester's exact automatic-check timing and network conditions remain unknown.
-- **Evidence:** [Update investigation](UPDATE_INVESTIGATION_2026-10-24.md).
+- **Evidence:** [Update investigation](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/UPDATE_INVESTIGATION_2026-10-24.md).
 
 <a id="issue-008"></a>
 ## ISSUE-008: Installed Beta 2 reopens after an attempted Beta 4 update
@@ -1787,12 +1784,12 @@ original incident's exact failing field.
   actual delivered update on a separate test machine/account. Existing Beta 3/4
   packages remain affected. A sanitized tester journal can confirm the exact
   incident. Retain raw evidence outside the repository.
-- **Evidence and workaround:** [Update investigation](UPDATE_INVESTIGATION_2026-10-24.md).
+- **Evidence and workaround:** [Update investigation](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/UPDATE_INVESTIGATION_2026-10-24.md).
 
 <a id="issue-009"></a>
 ## ISSUE-009: Update window does not match the minimal application interface
 
-Reclassified on 2026-10-25 into [TWEAK-004](TWEAKS.md#tweak-004): the Beta 5
+Reclassified on 2026-10-25 into [TWEAK-004](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/TWEAKS.md#tweak-004): the Beta 5
 update-window redesign is the released foundation for the later information-window
 refinements. Its original report, scope and verification are retained there.
 Update-check and installation failures remain ISSUE-007 and ISSUE-008. This ID
@@ -1801,7 +1798,7 @@ and heading remain reserved for existing links.
 <a id="issue-006"></a>
 ## ISSUE-006: Website node route is hard to follow
 
-Reclassified on 2026-10-25 as [TWEAK-009](TWEAKS.md#tweak-009): website diagram
+Reclassified on 2026-10-25 as [TWEAK-009](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/TWEAKS.md#tweak-009): website diagram
 layout and copy polish. The original report and local verification are retained
 there; no public deployment is implied. This ID and heading remain reserved for
 existing links.
@@ -1850,13 +1847,13 @@ existing links.
 - **Beta 6 preparation, 2026-10-28:** Reverified under the canonical
   `0.3.0-beta.6` / `0.3.0.7` identity: **13,356 desktop checks, 268 renders and
   zero binding errors**. The live development transition is tracked in
-  [the Beta 6 record](BETA6_DEVELOPMENT.md); this result does not claim a native
+  [the Beta 6 record](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/BETA6_DEVELOPMENT.md); this result does not claim a native
   caret observation or a published release.
 - **Live integration, 2026-10-28:** Applied to the installed Beta 6 testing app
   after the maintainer approved the required engine restart. Matching binaries
   and inventory, preserved workspace/preferences and recovered running audio
   paths were verified. The native blinking-caret observation remains a testing
-  step; see [the integration record](BETA6_DEVELOPMENT.md#live-activation--28-october-2026).
+  step; see [the integration record](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/BETA6_DEVELOPMENT.md#live-activation--28-october-2026).
 
 <a id="issue-002"></a>
 ## ISSUE-002: Duplicate audio when monitoring an application
@@ -1949,7 +1946,7 @@ The Rust replacement at `55e77c7` has explicit accessibility metadata for severa
 standard/custom widgets, but comparable semantics for the Voice Color pad and
 EQ interactions remain incomplete in source. Assistive-technology behavior was
 not exercised in this review. See
-[RUST-REV-027](RUST_REVIEW_2026-11-10.md#rust-rev-027). Next step: inspect and test
+[RUST-REV-027](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/RUST_REVIEW_2026-11-10.md#rust-rev-027). Next step: inspect and test
 the custom controls' accessible names, values, actions and focus behavior with
 Narrator/NVDA. This does not change the status of dated legacy UI verification.
 
@@ -1981,7 +1978,7 @@ Ctrl+plus/minus zoom is tracked with
 offline verified and locally integrated for unreleased 0.5.0; the broader accessibility issue remains open.
 The accepted pipeline keys, canvas nudge/pan, single-target F2, direct numeric
 entry and accessible-name refresh are implemented in source. Combined detached
-qualification is in [the execution report](IMPLEMENTATION_0.5.0.md). Ordinary
+qualification is in [the execution report](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/IMPLEMENTATION_0.5.0.md). Ordinary
 Tab/Shift+Tab, Page Up/Down and Find name/type matching are preserved. This does
 not close the broader issue: actual keyboard-focus/IME, Narrator and remaining
 cable-inspection workflows have not been fully qualified. Historical proposals
@@ -1997,7 +1994,7 @@ to the accepted 0.5.0 scope.
 
 ### Accepted contracts and scope — 2026-11-04
 
-The [0.5.0 release plan](IDEAS.md#release-0-5-0-plan) contains accepted scope,
+The [0.5.0 release plan](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/IDEAS.md#release-0-5-0-plan) contains accepted scope,
 focus/draft/branch contracts and completion criteria. The symmetric
 Tab and Ctrl+Tab mappings, arrow nudge/pan, single-target F2 and direct numeric
 entry are implemented source scope; historical suggestions below do not supersede
@@ -2043,7 +2040,7 @@ IME and screen-reader announcements still need separate qualification.
   Page Up increase and Page Down decrease a focused dial by its larger step.
   Arrow keys make smaller changes. No implementation is needed for that basic
   request. Direct numeric typing from dial focus is new, recorded separately as
-  [TWEAK-023](TWEAKS.md#tweak-023).
+  [TWEAK-023](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/TWEAKS.md#tweak-023).
 - **Narrow implementation authorization:** The maintainer explicitly asked to
   fix stale screen-reader naming. `GraphNodeView.Apply` now refreshes the attached
   accessible Name alongside the visible title, including names restored through
@@ -2094,7 +2091,7 @@ Historical proposal stage: accepted mappings and scope are stated above.
   both custom name and type in results. The accessible metadata still needs
   refreshing on rename independently of search.
 - **F2:** Track the small shortcut refinement in
-  [TWEAK-022](TWEAKS.md#tweak-022): rename exactly one selected node or group,
+  [TWEAK-022](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/TWEAKS.md#tweak-022): rename exactly one selected node or group,
   ignore multiple selections. One selected group remains one logical target
   even though its member nodes participate in selection internally.
 - **Evidence/next step:** Reviewed `NodeSearch`, `WorkspaceKeyDown`,
@@ -2213,7 +2210,7 @@ They do not establish a chosen fix or implementation approval.
   preparation check pending editors throughout the live workspace. Help examples
   retain their separate temporary state. Help text and the user guide describe
   the new behavior. Optional fine-adjustment/reset affordances remain separate
-  in [TWEAK-007](TWEAKS.md#tweak-007).
+  in [TWEAK-007](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/TWEAKS.md#tweak-007).
 - **Verification:** Regression checks cover exact and localized values, invalid
   and whole-sample input, preserved text/selection, menu Apply/Cancel and deferred
   closure, unchanged layout, theme feedback, disabled/read-only/unloaded controls,
@@ -2230,14 +2227,14 @@ They do not establish a chosen fix or implementation approval.
 - **Beta 6 preparation, 2026-10-28:** The canonical Beta 6 detached suite passed
   **13,356 checks, 268 renders and zero binding errors**, including exact-value
   focus loss, invalid drafts and menu Apply/Cancel. See
-  [the Beta 6 record](BETA6_DEVELOPMENT.md) for live integration status. Native
+  [the Beta 6 record](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/BETA6_DEVELOPMENT.md) for live integration status. Native
   pointer/VR interaction remains a separate testing boundary.
 - **Live integration, 2026-10-28:** The verified exact-entry implementation is
   active in the installed Beta 6 testing app. The authorized transition preserved
   saved settings/preferences and recovered previously running audio paths with
   matching app/engine versions and inventory. Native pointer/VR and popup-focus
   testing remains separate; see
-  [the integration record](BETA6_DEVELOPMENT.md#live-activation--28-october-2026).
+  [the integration record](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/BETA6_DEVELOPMENT.md#live-activation--28-october-2026).
 
 ### Retained proposal and research from IDEA-027
 
@@ -2267,7 +2264,7 @@ affordances outside that resolution remain proposals.
 ### Current presentation selection — 2026-11-05
 
 The maintainer selected **Quiet Blocks** (concept 1) and requested implementation
-under [TWEAK-025](TWEAKS.md#tweak-025). Below the existing roughly 30% detail
+under [TWEAK-025](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/TWEAKS.md#tweak-025). Below the existing roughly 30% detail
 threshold, keep plain solid charcoal node bodies and category-coloured header
 strips. Hide decorative type symbols, name/control text, miniature control shapes
 and audio meters; retain existing selection and device-warning indicators.
@@ -2286,13 +2283,13 @@ the latest evidence is linked from TWEAK-025.
 
 The maintainer rejected the low-fidelity control shapes and requested a simple
 white symbol for each node type. Implementation is offline verified and locally integrated under
-[TWEAK-025](TWEAKS.md#tweak-025), superseding the dark silhouettes and equal-size
+[TWEAK-025](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/TWEAKS.md#tweak-025), superseding the dark silhouettes and equal-size
 dial requirements below. Keep the zoom/navigation fixes, coloured headers,
 hidden simplified meters and stable geometry. Earlier checks and installation
 evidence do not qualify this new presentation. The new suite passes 15,164 checks/
 317 renders/zero binding errors; all 34 real kinds pass the separate geometry,
 zoom and dynamic-theme probe. Reviewed screenshots and guarded paired integration
-are recorded in [the execution report](IMPLEMENTATION_0.5.0.md). Maintainer visual
+are recorded in [the execution report](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/IMPLEMENTATION_0.5.0.md). Maintainer visual
 follow-up and final release qualification remain open.
 
 ### Current manual feedback and accepted refinements — 2026-11-04
@@ -2391,7 +2388,7 @@ highlighting and system high contrast. The maintainer found the previous
 `#626974` still too light. The suite passed 14,748 checks / 314
 renders / zero binding errors, with screenshots reviewed. Guarded interface-only
 activation preserved the same engine process/hash and unchanged settings/preferences
-through eight seconds of observation. See [IDEA-053](IDEAS.md#idea-053).
+through eight seconds of observation. See [IDEA-053](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/IDEAS.md#idea-053).
 The minimap shade remains current. The centred-name presentation and its results
 are historical; the work remains unreleased under the installed `0.4.0-beta` identity.
 
@@ -2406,7 +2403,7 @@ Added **Ctrl+plus / Ctrl+minus** canvas zoom using existing camera limits and
 interaction guards, alongside wheel zoom, Fit and Ctrl+0. Focused text/control
 editors retain their native shortcuts. Related minimap navigation and visibility
 persistence were reported successful by the maintainer; its darker, title-free
-refinement is tracked in [IDEA-053](IDEAS.md#idea-053).
+refinement is tracked in [IDEA-053](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/IDEAS.md#idea-053).
 
 The preceding refinements passed source review and the combined offline run
 of 14,726 detached checks, 314 renders and zero binding errors, including the
@@ -2425,7 +2422,7 @@ be snapped to accidentally. Drafts defer simplification, and control navigation
 reveals readable controls. Pan remains within the native supported bounds.
 The 32-node/96-cable limits are unchanged. Combined detached geometry/render
 evidence and guarded installation are recorded in
-[the execution report](IMPLEMENTATION_0.5.0.md); real pointer/DPI usability
+[the execution report](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/IMPLEMENTATION_0.5.0.md); real pointer/DPI usability
 remains separate qualification. Next step: maintainer interaction review.
 The native upper compatibility bound remains 400%; the desktop maximum is 200%.
 Older builds may reject new low-zoom values, so downgrade compatibility is not assumed.
@@ -2435,7 +2432,7 @@ Older builds may reject new low-zoom values, so downgrade compatibility is not a
 - **Status at research:** Research complete for an initial plan; selected for 0.5.0,
   not implemented. The maintainer requests more zoom-out, progressive removal
   of node detail, and a bottom-right overview showing the visible canvas region.
-  The new minimap capability is tracked in [IDEA-053](IDEAS.md#idea-053).
+  The new minimap capability is tracked in [IDEA-053](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/IDEAS.md#idea-053).
   This supersedes the earlier undecided hand-mode/overview remedy below.
 - **Confirmed local constraints:** `GraphWorkspace` clamps normal zoom, restored
   views, Fit and Frame selection at 30%; its discrete stops also start there.

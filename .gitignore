@@ -39,3 +39,15 @@ __pycache__/
 # Reference C sources for the test-only parity oracle (vinemix-oracle); the
 # archives and hashes are listed in CMakeLists.txt. Not needed to build VineMix.
 /third_party/
+
+# Local editor instructions, assistant settings and maintainer notebooks.
+/AGENTS.md
+/AGENTS.override.md
+/CLAUDE.md
+/CLAUDE.local.md
+/.claude/
+/.codex/
+/docs/IDEAS.md
+/docs/IDEAS_IMPLEMENTED.md
+/docs/IDEAS_LATER.md
+/docs/TWEAKS.md

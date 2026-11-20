@@ -2,7 +2,7 @@
 
 > Historical development record. Results and procedures below belong to their
 > named versions; they do not qualify the current beta. See
-> [current qualification](BETA_TESTING_CURRENT.md) for the active release checks.
+> [current qualification](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/BETA_TESTING_CURRENT.md) for the active release checks.
 
 18 October 2026. All measurements below use generated signals in memory. No
 audio device, microphone recording, desktop input, personal settings or running

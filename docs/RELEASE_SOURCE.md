@@ -28,7 +28,7 @@ the corrected package. Checksums cover both executables, that envelope and the
 source ZIP. Private keys, diagnostics and recovery files are excluded.
 
 See [Beta 5's notes](releases/0.3.0-beta.5.md) and
-[current qualification](BETA_TESTING_CURRENT.md). Full delivered update and
+[current qualification](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/BETA_TESTING_CURRENT.md). Full delivered update and
 rollback exercises on a separate account/machine remain a separate qualification.
 
 ## 0.3.0-beta.4
@@ -42,8 +42,8 @@ same source snapshot. `SHA256SUMS.txt` covers the two downloads, signed update
 metadata and source ZIP.
 
 See [Beta 4's notes](releases/0.3.0-beta.4.md) and
-[qualification record](BETA_TESTING_CURRENT.md) for the scope of verification.
-The [preceding local candidate record](LOCAL_CANDIDATE_2026-10-23.md) describes
+[qualification record](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/BETA_TESTING_CURRENT.md) for the scope of verification.
+The [preceding local candidate record](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/LOCAL_CANDIDATE_2026-10-23.md) describes
 earlier unpublished bytes and does not identify the Beta 4 downloads. Earlier
 versions keep their original source tags and assets; this release does not
 finalize or replace provisional Beta 2.

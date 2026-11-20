@@ -252,7 +252,7 @@ nodes to give its curve and live spectrum room without shrinking other controls.
 ## Verification and availability
 
 Final verification counts and package activation for the current effect,
-EQ and library update are tracked in [design-qa.md](../design-qa.md).
+EQ and library update are tracked in [design-qa.md](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/design-qa.md).
 The later physical gesture and audible checks are in [TESTING.md](../TESTING.md).
 They remain separate from detached rendering and synthetic DSP verification.
 The records below are historical results for their named builds; references to
@@ -264,7 +264,7 @@ with zero binding errors. Coverage includes independent L/R values, lane geometr
 time-based release, reduced animation, toggle behavior and saved channel
 assignments. The later hands-on stereo-source procedure is in
 [TESTING.md](../TESTING.md); it has not been run against real audio or physical
-controls. Build and activation evidence is recorded in [design-qa.md](../design-qa.md).
+controls. Build and activation evidence is recorded in [design-qa.md](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/design-qa.md).
 
 The selection/grab published results
 passed **641 checks and 55 renders**, with zero binding errors. They cover
@@ -302,7 +302,7 @@ captures include 75%, 90%, 110% and 150% at 96/144 DPI, including EQ/dials at
 Visual review found neutral text, distinct category bands, visible caption
 controls and correctly contained Fit results. This establishes rendering and
 layout; physical-monitor sharpness and native resize gestures remain separate.
-See [design-qa.md](../design-qa.md) and [TESTING.md](../TESTING.md).
+See [design-qa.md](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/design-qa.md) and [TESTING.md](../TESTING.md).
 
 At 22:32 UTC+10, the controller-only activation
 opened responsive controller PID 48788 matching the verified package. Original
@@ -327,14 +327,14 @@ preserved. The installed UI opened a responsive window. Both the ordinary
 Release build and the published single-file executable passed **268 detached
 checks and 22 renders**, with no binding errors. See the
 published results,
-[benchmark](ZOOM_RENDERING_BENCHMARK.md) and [review](../design-qa.md).
+[benchmark](ZOOM_RENDERING_BENCHMARK.md) and [review](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/design-qa.md).
 These are controlled rendering results; live pointer feel and physical display
 rendering remain for the user to assess without desktop automation.
 
 The updated controller and matching native engine were installed and opened at
 21:35 UTC+10 on 17 October. The activation record
 confirms a responsive window, advancing frames and the identical saved
-configuration. See [design-qa.md](../design-qa.md) for scope, the two updater
+configuration. See [design-qa.md](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/design-qa.md) for scope, the two updater
 retries and the remaining interaction checks. The earlier
 61-check style result and
 21:04 controller-only activation

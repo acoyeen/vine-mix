@@ -4,7 +4,7 @@ Updated 28 October 2026 for the monochrome refresh planned for Beta 6. The
 native workspace uses the split VM mark, IBM Plex typography and forest-green
 actions. The logo follows the website's single-colour treatment while controls
 retain their operational colours. The [original implementation plan and
-evidence](BRANDING_IMPLEMENTATION_PLAN.md) records the earlier two-colour identity.
+evidence](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/BRANDING_IMPLEMENTATION_PLAN.md) records the earlier two-colour identity.
 
 ## Naming
 
@@ -94,7 +94,7 @@ the existing system-colour policy. Implementation is offline verified and locall
 integrated, with maintainer visual follow-up pending. The earlier soft-white and
 then dark (`#0B0D11`) vector symbols,
 including the 128-DIP/2.6-stroke refinement, are superseded; their dated evidence
-is retained under [TWEAK-025](TWEAKS.md#tweak-025).
+is retained under [TWEAK-025](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/TWEAKS.md#tweak-025).
 
 | Role | Normal palette | Meaning |
 | --- | --- | --- |
@@ -156,7 +156,7 @@ search/help, window dimensions, zoom and DPI. See [testing](../TESTING.md).
 
 The images below record the original branding implementation; they predate the
 monochrome refresh. Windows Volume Mixer session identity is a separate
-[tracked refinement](TWEAKS.md#tweak-011), not verified by replacing desktop icons.
+[tracked refinement](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/TWEAKS.md#tweak-011), not verified by replacing desktop icons.
 
 ![Original native workspace branding](images/workspace.png)
 

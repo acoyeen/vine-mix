@@ -5,7 +5,7 @@ of completed tests. Use Windows 11 x64 on a spare PC or VM with no existing
 VB-CABLE or VAC package for the clean-driver cases. The current app and packages
 are not Windows Authenticode signed. Get the exact versioned files and SHA-256
 checksums from the matching [GitHub release](https://github.com/acoyeen/vine-mix/releases).
-See the [qualification record](BETA_TESTING_CURRENT.md) for completed checks.
+See the [qualification record](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/BETA_TESTING_CURRENT.md) for completed checks.
 
 The next beta's installer candidate changes missing-driver defaults and order:
 test the checked defaults, explicit vendor consent and VAC-before-VB-CABLE flow
@@ -84,5 +84,5 @@ An isolated installer policy test is different from a real driver installation.
 Record exact app version from **Settings → About VineMix**, package checksum,
 Windows version, wizard step, driver result and restart status. Setup accepts
 `/LOG="<path-to-a-log-file>"`; logs can contain personal paths. Review them before
-sharing. Current evidence belongs in [the beta record](BETA_IMPLEMENTATION.md);
+sharing. Current evidence belongs in [the beta record](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/BETA_IMPLEMENTATION.md);
 [the earlier installer report](INSTALLER_VERIFICATION.md) covers 0.2.0 only.

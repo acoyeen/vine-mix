@@ -10,7 +10,7 @@ passed.
 The maintainer authorized the complete audit, fixes, documentation refresh and
 publication. Identity: `0.5.0-beta`, Windows `0.5.0.0`, display **0.5.0 · Beta**.
 The [release notes](releases/0.5.0-beta.md) explain the changes. Earlier local
-implementation evidence is retained in [the execution record](IMPLEMENTATION_0.5.0.md).
+implementation evidence is retained in [the execution record](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/IMPLEMENTATION_0.5.0.md).
 
 ## Scope
 

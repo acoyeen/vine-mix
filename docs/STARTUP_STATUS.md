@@ -6,7 +6,7 @@ outside this checkout.
 
 > Historical development record. Results and procedures below belong to their
 > named versions; they do not qualify the current beta. See
-> [current qualification](BETA_TESTING_CURRENT.md) for the active release checks.
+> [current qualification](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/BETA_TESTING_CURRENT.md) for the active release checks.
 
 Evidence note: raw reports, historical renders and reference captures cited
 here are retained privately outside the repository. Their labels below identify
@@ -118,8 +118,8 @@ open devices or write the user's mixer settings. Preview mouse/keyboard checks
 also used inert data. No test sound, playback or recording was started during
 this update.
 
-See [the design review](../design-qa.md), [UI implementation plan](UI_REDESIGN_PLAN.md)
-and [current UI verification procedure](BETA_TESTING_CURRENT.md#automated-checks).
+See [the design review](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/design-qa.md), [UI implementation plan](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/UI_REDESIGN_PLAN.md)
+and [current UI verification procedure](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/BETA_TESTING_CURRENT.md#automated-checks).
 The 125%/150% images simulate render density; actual Windows scaling changes and
 full screen-reader speech behavior remain unverified. These UI results do not
 qualify the native audio paths or replace the deferred hardware tests.
@@ -161,8 +161,8 @@ The before/after settings hashes match the revision-3 baseline above; A remains
 muted at −24 dB. Final client captures measure 1120 × 680 and 880 × 600 pixels at
 the current 100% density, without a separate OS title bar.
 
-See [the revised mockup and review](design/LIGHT_CONSOLE_REVIEW.md) and
-[design-qa.md](../design-qa.md). Render-density simulations do not establish actual
+See [the revised mockup and review](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/design/LIGHT_CONSOLE_REVIEW.md) and
+[design-qa.md](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/design-qa.md). Render-density simulations do not establish actual
 Windows DPI transitions. Alt+Space did not produce an observed system-menu popup
 in this environment and remains unverified; caption right-click access worked.
 Native audio, full screen-reader speech behavior and the
@@ -200,7 +200,7 @@ and existing routes retained. A silent-preview fader-thumb/Up check changed A to
 +0.5 dB while B remained 0 dB and A routing stayed off; the preview was closed
 without applying those edits to the live engine. No new rounded cards, audio features, driver changes,
 Windows setting changes or test sounds are part of this refinement. See the
-[control-detail review](design/CONTROL_DETAIL_REVIEW.md) and [design-qa.md](../design-qa.md).
+[control-detail review](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/design/CONTROL_DETAIL_REVIEW.md) and [design-qa.md](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/design-qa.md).
 
 ## First informal check
 

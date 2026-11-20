@@ -260,4 +260,4 @@ No driver was installed or loaded, no certificate or security policy changed,
 and the running audio engine and personal settings were preserved. Loaded-driver
 qualification on our own disposable Windows target remains the decisive next
 test. The proposal and accepted requirements are recorded in
-[IDEA-014](IDEAS.md#idea-014-dedicated-vine-mix-virtual-audio-driver).
+[IDEA-014](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/IDEAS.md#idea-014-dedicated-vine-mix-virtual-audio-driver).

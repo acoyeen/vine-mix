@@ -14,7 +14,7 @@ screen reader was used; see [What was not checked](#what-was-not-checked).
 
 ## The standard
 
-From [TWEAK-018](TWEAKS.md#tweak-018) and the review:
+From [TWEAK-018](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/TWEAKS.md#tweak-018) and the review:
 
 - Hover help is a short control name and a brief purpose, or the state that
   matters right now.

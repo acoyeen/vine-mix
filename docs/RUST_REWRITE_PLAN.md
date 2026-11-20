@@ -57,7 +57,7 @@ change the user's machine or public release state, so they need the
 maintainer's go-ahead. Remaining documentation work: `docs/DISTRIBUTION.md`
 and the user guides still describe the .NET/C++ packages.
 
-Reviewed on 10 November 2026: [RUST_REVIEW_2026-11-10.md](RUST_REVIEW_2026-11-10.md)
+Reviewed on 10 November 2026: [RUST_REVIEW_2026-11-10.md](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/RUST_REVIEW_2026-11-10.md)
 records 41 findings against the 7 November state and what was done about
 each. "Done and verified" above means what it meant on 7 November: parity and
 the listed scenarios. It does not mean release-qualified. Section 0.3 lists
@@ -179,7 +179,7 @@ were not built, or were built differently. The table states what the code does
 today; where it disagrees with a later section, the table is current and the
 section is a proposal. Build and verification steps for what exists are in
 [RUST_BUILD.md](RUST_BUILD.md). Findings and their evidence are in
-[the 10 November 2026 review](RUST_REVIEW_2026-11-10.md).
+[the 10 November 2026 review](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/RUST_REVIEW_2026-11-10.md).
 
 | Topic (section) | The plan says | Delivered today |
 |---|---|---|

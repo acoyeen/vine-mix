@@ -694,7 +694,7 @@ Current implementation evidence is recorded in [NODE_VERIFICATION.md](NODE_VERIF
 Run `scripts/verify-offline.ps1` for the complete silent maintenance suite: synthetic
 audio, isolated settings, simulated endpoint inventory, private test pipes and
 detached WPF rendering. It does not use the personal engine or audio devices.
-The [maintenance review](MAINTENANCE_REVIEW.md) records fixes, measurements
+The [maintenance review](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/MAINTENANCE_REVIEW.md) records fixes, measurements
 and the limits of those checks.
 
 The effect-quality audit corrected weak de-essing/plosive attenuation and
@@ -714,7 +714,7 @@ assertions and the synthetic engine lifecycle suite. The earlier readable-UI
 candidate passed 226 offscreen checks (local historical report)
 with 20 actual WPF renders at 96/144/192 DPI, zero binding errors and a Release
 build with no warnings or errors. Visual review found no remaining issue within
-that scope. [design-qa.md](../design-qa.md) records the review and tracks package
+that scope. [design-qa.md](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/design-qa.md) records the review and tracks package
 activation separately. Audible/physical interaction qualification and the
 stopped endurance run remain **Deferred**.
 

@@ -19,7 +19,7 @@ Build and qualification scripts enforce this contract on actual binaries through
 `assert-release-file-version.ps1`; regression fixtures run with
 `test-release-file-version.ps1`. A valid manifest/signature or matching `--version`
 output alone does not establish updater compatibility. See the
-[Beta 4 metadata defect](UPDATE_INVESTIGATION_2026-10-24.md).
+[Beta 4 metadata defect](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/UPDATE_INVESTIGATION_2026-10-24.md).
 
 Use PowerShell 7.3 or later:
 

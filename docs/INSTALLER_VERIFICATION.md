@@ -1,7 +1,7 @@
 # Historical installer verification — 20 October 2026
 
 > This is evidence for the older 0.2.0 artifacts only. It does not qualify
-> the current beta. See [the beta record](BETA_IMPLEMENTATION.md) and
+> the current beta. See [the beta record](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/BETA_IMPLEMENTATION.md) and
 > [current clean-machine instructions](INSTALLER_TESTING.md).
 
 The Windows 11 x64 installer was built for private review and fresh-machine

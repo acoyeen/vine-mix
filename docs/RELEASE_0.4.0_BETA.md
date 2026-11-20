@@ -66,17 +66,17 @@ are in the [release notes](releases/0.4.0-beta.md).
 
 | Area | Released behavior | Development record |
 | --- | --- | --- |
-| Named node groups | Named frames, seven colors, automatic bounds, shared movement, membership, saving, Undo/Redo and complete-group copying | [IDEA-023](IDEAS_IMPLEMENTED.md#idea-023) |
-| Group interaction and headings | Selection/movement from exposed backgrounds, concise help, centered names and readable titles; node/cable input retains precedence | [TWEAK-017](TWEAKS.md#tweak-017), [TWEAK-020](TWEAKS.md#tweak-020) |
+| Named node groups | Named frames, seven colors, automatic bounds, shared movement, membership, saving, Undo/Redo and complete-group copying | [IDEA-023](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/IDEAS_IMPLEMENTED.md#idea-023) |
+| Group interaction and headings | Selection/movement from exposed backgrounds, concise help, centered names and readable titles; node/cable input retains precedence | [TWEAK-017](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/TWEAKS.md#tweak-017), [TWEAK-020](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/TWEAKS.md#tweak-020) |
 | Overlapping nodes | Selected and dragged nodes remain above overlapping nodes | [ISSUE-022](KNOWN_ISSUES.md#issue-022) |
-| Mixing nodes | Port-aware mixing and stereo tools, including Channel Swap, Stereo Width, Pan, Crossfade, Stereo Combine and Stereo Split | [Mixing-node development](BETA6_DEVELOPMENT.md#mixing-nodes--28-october-2026) |
-| Level and linked controls | One Level dial for the former duplicate value; Linked control uses Multiplier; Ducking sidechain is labelled Trigger | [Development record](BETA6_DEVELOPMENT.md) |
-| Optional notifications | Saved toggle hides routine timed messages while retaining errors, save status and Activity | [TWEAK-015](TWEAKS.md#tweak-015) |
+| Mixing nodes | Port-aware mixing and stereo tools, including Channel Swap, Stereo Width, Pan, Crossfade, Stereo Combine and Stereo Split | [Mixing-node development](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/BETA6_DEVELOPMENT.md#mixing-nodes--28-october-2026) |
+| Level and linked controls | One Level dial for the former duplicate value; Linked control uses Multiplier; Ducking sidechain is labelled Trigger | [Development record](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/BETA6_DEVELOPMENT.md) |
+| Optional notifications | Saved toggle hides routine timed messages while retaining errors, save status and Activity | [TWEAK-015](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/TWEAKS.md#tweak-015) |
 | Precise numeric entry | Valid values apply on focus loss at full precision; invalid drafts remain visible; Apply/Cancel stay available | [ISSUE-004](KNOWN_ISSUES.md#issue-004) |
-| Settings search and organization | Aligned placeholder/caret/text, related actions grouped, search first and Quit separate | [ISSUE-001](KNOWN_ISSUES.md#issue-001), [TWEAK-016](TWEAKS.md#tweak-016) |
-| Information windows and workspace | Centered node count and consistent compact About, What's New and Updates windows | [TWEAK-002](TWEAKS.md#tweak-002), [TWEAK-004](TWEAKS.md#tweak-004) |
-| Branding | Monochrome identity and brighter Windows, taskbar, tray and shortcut icons | [TWEAK-013](TWEAKS.md#tweak-013) |
-| Optional driver setup | Clear choices, missing eligible drivers selected initially, retained deselections, separate consent and restart guidance | [TWEAK-014](TWEAKS.md#tweak-014) |
+| Settings search and organization | Aligned placeholder/caret/text, related actions grouped, search first and Quit separate | [ISSUE-001](KNOWN_ISSUES.md#issue-001), [TWEAK-016](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/TWEAKS.md#tweak-016) |
+| Information windows and workspace | Centered node count and consistent compact About, What's New and Updates windows | [TWEAK-002](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/TWEAKS.md#tweak-002), [TWEAK-004](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/TWEAKS.md#tweak-004) |
+| Branding | Monochrome identity and brighter Windows, taskbar, tray and shortcut icons | [TWEAK-013](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/TWEAKS.md#tweak-013) |
+| Optional driver setup | Clear choices, missing eligible drivers selected initially, retained deselections, separate consent and restart guidance | [TWEAK-014](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/TWEAKS.md#tweak-014) |
 | Attribution | Offline credit, MIT licence, attribution policy and third-party notices | [Attribution policy](../ATTRIBUTION.md) |
 
 The cleanup also protects pending node/group names during Quit and update
@@ -234,7 +234,7 @@ transactions. Keep direct Setup guidance for older workers and original 0.4.0
 installations. Repository visibility is unchanged; raw diagnostics, settings and
 recovery files remain outside project documentation and downloadable artifacts.
 
-The [Beta 6 development record](BETA6_DEVELOPMENT.md) and
+The [Beta 6 development record](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/BETA6_DEVELOPMENT.md) and
 [earlier release draft](releases/0.3.0-beta.6.md) preserve dated development
 identities and verification; they are not substituted for final qualification.
 

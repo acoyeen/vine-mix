@@ -460,8 +460,8 @@ controls. Recording, VST hosting, MIDI, modulation oscillators and
 reusable subgraphs remain
 future additions rather than nonfunctional entries in the node library.
 Organizational group frames are implemented and locally integrated into Beta 6.
-The [implemented idea](IDEAS_IMPLEMENTED.md#idea-023) retains the request and
-decisions; [Beta 6 development](BETA6_DEVELOPMENT.md#named-organizational-groups--28-october-2026)
+The [implemented idea](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/IDEAS_IMPLEMENTED.md#idea-023) retains the request and
+decisions; [Beta 6 development](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/BETA6_DEVELOPMENT.md#named-organizational-groups--28-october-2026)
 records local verification and integration separately from release qualification.
 
 ## EQ and dynamics
@@ -746,6 +746,6 @@ engine lifecycle suite passed 210 concurrent commits. The earlier readable-UI
 candidate passed 226 offscreen checks
 with 20 actual WPF renders at 96/144/192 DPI, zero binding errors and a Release
 build with no warnings or errors. The visual review found no remaining scoped
-blocking issue. Consult [design-qa.md](../design-qa.md) for that review and the
+blocking issue. Consult [design-qa.md](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/design-qa.md) for that review and the
 separate activation record. Real mouse/keyboard, audible and eight-hour endurance
 qualification remain **Deferred**.

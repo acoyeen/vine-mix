@@ -38,7 +38,7 @@ wait for Saved, choose **Quit VineMix**,
 then run the newer Setup using the existing folder. Do not uninstall first.
 Standalone users should quit and replace their launcher with the matching standalone download.
 Keep optional drivers unchanged if they already work. Intermediate betas are not
-required. See the [update investigation](UPDATE_INVESTIGATION_2026-10-24.md).
+required. See the [update investigation](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/UPDATE_INVESTIGATION_2026-10-24.md).
 
 The Windows 11 x64 Setup installs the matched desktop and engine together under
 `%LOCALAPPDATA%\Programs\VineMix`, creates shortcuts, and registers an uninstall
@@ -65,8 +65,7 @@ originals before restoring a backup or creating the muted starter.
 The 0.5.0 Beta installer selects both missing eligible drivers by
 default, labels their Virtual input/output roles and runs VAC Lite before
 VB-CABLE. Separate vendor consent remains required, and restart guidance says
-to finish VineMix Setup first. Clear either selection if it is not needed;
-this change is tracked in [TWEAK-014](TWEAKS.md#tweak-014).
+to finish VineMix Setup first. Clear either selection if you do not need the driver.
 
 Setup detects VB-CABLE and VAC by their driver/package identities, including
 installed but disabled or nonpresent devices. It offers original vendor setup
@@ -130,5 +129,5 @@ retry later or use the matching GitHub release for a manual update. The client
 never contains a repository credential.
 
 [Release testing](../TESTING.md) describes the checks for each distribution. Component fixtures do not prove the complete delivered upgrade and
-rollback flow. [Earlier design notes](INSTALLATION_UPDATE_DESIGN_HISTORY.md)
+rollback flow. [Earlier design notes](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/INSTALLATION_UPDATE_DESIGN_HISTORY.md)
 remain historical research, not current installation instructions.

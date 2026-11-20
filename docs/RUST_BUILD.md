@@ -88,8 +88,9 @@ cargo run --locked --target $rust.target -p vinemix-ui -- --preview
 To run a complete desktop and engine beside an installed copy, set
 `VINEMIX_DEV_INSTANCE` to a name first. That gives the instance its own pipe,
 mutexes and data folder (`%LOCALAPPDATA%\VineMix.dev-<name>`), and it never
-installs updates or registers itself to start at login. Follow the launch and
-settings rules in `AGENTS.md` before starting anything against personal data.
+installs updates or registers itself to start at login. Launch personal installations
+through the Windows shell and verify the physical workspace path before making
+changes. See [installation and recovery](INSTALLATION_AND_UPDATES.md).
 
 ## Verify
 

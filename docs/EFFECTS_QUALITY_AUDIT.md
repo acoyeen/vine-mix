@@ -2,7 +2,7 @@
 
 > Historical development record. Results and procedures below belong to their
 > named versions; they do not qualify the current beta. See
-> [current qualification](BETA_TESTING_CURRENT.md) for the active release checks.
+> [current qualification](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/BETA_TESTING_CURRENT.md) for the active release checks.
 
 This audit uses generated, memory-only audio at 48 kHz. It does not open an audio
 device, record a microphone, change personal settings, or play a test signal.

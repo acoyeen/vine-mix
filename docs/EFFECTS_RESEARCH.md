@@ -4,7 +4,7 @@
 the earlier Simple/Advanced split into one Effects menu. Current controls
 and timing are in the [user guide](USER_GUIDE.md) and
 [protocol](CONTROL_PROTOCOL.md); implementation/verification evidence is in
-[the 0.5.0 report](IMPLEMENTATION_0.5.0.md). The dated original implementation
+[the 0.5.0 report](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/IMPLEMENTATION_0.5.0.md). The dated original implementation
 notes and counts below describe the earlier effect set.
 
 <a id="distortion-refinement-2026-11-06"></a>
@@ -49,7 +49,7 @@ control transitions, repeated graph publication, bypass/mute/reset, finite
 extremes, stereo, latency, headroom and measured whole-transition execution time.
 Filter scheduling optimizations must retain the selected filter and algorithm;
 before/after waveform comparisons and performance evidence are recorded in the
-[implementation report](IMPLEMENTATION_0.5.0.md). Automated evidence does not
+[implementation report](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/IMPLEMENTATION_0.5.0.md). Automated evidence does not
 claim an independent listening-quality pass.
 
 <a id="echo-refinement-2026-11-05"></a>
@@ -119,7 +119,7 @@ the maintainer's request; they are not claimed industry standards:
   must not claim to turn a mono source into stereo merely because its separate
   wet output is connected.
 - Migrate legacy Feedback deterministically to an approximate audible repeat
-  count, as specified under [IDEA-055](IDEAS.md#idea-055). Preserve Time/Mix,
+  count, as specified under [IDEA-055](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/IDEAS.md#idea-055). Preserve Time/Mix,
   validate both schemas strictly and keep canonical desktop/native/history
   comparisons consistent. The old decay sound cannot be preserved exactly
   while replacing it with a finite fixed-decay model.
@@ -141,7 +141,7 @@ stall or clipping defect. Conversely, numeric peak tests do not establish
 listening quality. No independent live listening result is claimed until it is
 actually performed and recorded. The new native, interface, cross-language and
 activation-comparison results are recorded in the
-[implementation report](IMPLEMENTATION_0.5.0.md#echo-refinement-after-listening-feedback--2026-11-05).
+[implementation report](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/IMPLEMENTATION_0.5.0.md#echo-refinement-after-listening-feedback--2026-11-05).
 
 ## Earlier implementation research
 
@@ -361,7 +361,7 @@ adaptation, reverb decay/tails/stereo, state transfers, repeated parameter edits
 maximum-size graphs and allocation-free processing. Detached WPF tests cover
 control bindings, node resets, clipboard compatibility, dimensions, zoom and
 rendering. Measured results and activation evidence are in
-[design-qa.md](../design-qa.md).
+[design-qa.md](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/design-qa.md).
 
 These tests do not establish perceived voice quality, full microphone-to-headphone
 latency, or hardware reliability. The audible checks remain in

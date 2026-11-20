@@ -35,5 +35,5 @@ The [0.5 qualification guide](docs/RELEASE_0.5.0_QUALIFICATION.md) and
 
 The previous testing document, including the settings-redirection
 investigation, is retained as a sanitized historical record in
-[the historical testing log](docs/history/TESTING_PRE_BETA1.md). Its older names,
+[the historical testing log](https://github.com/acoyeen/vine-mix/blob/272f0b78a3fb76b9e66a2807244b5a28044725b1/docs/history/TESTING_PRE_BETA1.md). Its older names,
 paths and results describe their original source snapshots.
