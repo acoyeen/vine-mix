@@ -7,7 +7,7 @@ executable, source and checksums from [GitHub Releases](https://github.com/acoye
 
 Open **Settings → Check for updates**, download the update and select **Install and restart** when you can pause audio. Setup completed this path in Windows 11 qualification.
 
-A 0.6.0 standalone installation can report **“The standalone application could not be replaced.”** If this happens, download the [0.6.1 standalone release](https://github.com/acoyeen/vine-mix/releases/tag/v0.6.1), quit VineMix from Settings or the tray if it is running, and replace the launcher in its original folder, retaining its filename. Open it in File Explorer. Leave the workspace and preferences in place.
+A 0.6.0 standalone installation can report **“The standalone application could not be replaced.”** If this happens, download the [0.6.1 standalone release](https://github.com/acoyeen/vine-mix/releases/tag/v0.6.1), quit VineMix from Settings or the tray if it is running, and replace the launcher in its original folder, retaining its filename. Open it in File Explorer. If VineMix asks whether to resume the interrupted update, choose **Yes**. VineMix will finish the update and reopen your saved workspace.
 
 ## Upgrading from 0.5 to 0.6
 
