@@ -470,6 +470,7 @@ pub fn replace_standalone(context: &Verified) -> Result<()> {
         .map_err(|e| format!("The standalone launcher's Read-only attribute could not be opened for updating. {e}"))?;
     let permissions = original.metadata().map_err(|e| format!("The standalone launcher's attributes could not be read. {e}"))?.permissions();
     let mut writable = permissions.clone();
+    #[expect(clippy::permissions_set_readonly_false, reason = "On Windows this clears only FILE_ATTRIBUTE_READONLY on the verified original launcher.")]
     writable.set_readonly(false);
     original.set_permissions(writable).map_err(|e| format!("The standalone launcher's Read-only attribute could not be cleared. {e}"))?;
     let result = replace().map_err(failure);
